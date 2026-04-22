@@ -54,7 +54,7 @@ Los modelos se entrenan con un dataset sintético de envíos argentinos y toman 
 
 El sistema está disponible en línea, sin necesidad de instalar nada. Ingresá desde cualquier navegador web:
 
-**`https://logitrack-prototipo.onrender.com/`**
+**``**
 
 ---
 
@@ -63,3 +63,7 @@ El sistema está disponible en línea, sin necesidad de instalar nada. Ingresá 
 - Santiago Chappa
 - Luca Corigliano
 - Maximo Flores
+- Paula Moragues
+- Tadeo Pavicich
+- Juan Puigjane
+- Bruno Merlo
