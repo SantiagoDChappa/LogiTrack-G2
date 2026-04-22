@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Modificar Usuario - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Modificación de usuario</h1>
+        </div>
+        <div class="form-new">
+            <form action="/user/update/<%= user.id %>" method="POST">
+                <div class="usuario">
+                    <h3>Usuario</h3>
+                    <div class="field">
+                        <label for="fullName">Nombre y Apellido</label>
+                        <input id="fullName" type="text" name="fullName" value="<%= user.fullName || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="document">Documento</label>
+                        <input id="document" type="number" name="document" value="<%= user.document || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input id="email" type="email" name="email" value="<%= user.email || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="roleId">Rol</label>
+                        <select id="roleId" name="roleId">
+                            <option value="">Seleccione un rol</option>
+                            <% Object.values(RoleType).forEach(role => { %>
+                                <option value="<%= role.id %>" <%= user.roleId == role.id ? 'selected' : '' %>>
+                                    <%= role.description %>
+                                </option>
+                            <% }); %>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <a href="/user" class="btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
+    <script src="/js/new_shipment_popup.js" defer></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

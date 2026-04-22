@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Envíos - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Administrador de envios</h1>
+            <a href="/shipment/new" class="btn-primary">
+                <span class="material-symbols-outlined">add</span>Alta
+            </a>
+        </div>
+
+        <div class="shipments-wrapper">
+        <form method="GET" action="/shipment/search" class="search-form" id="search-form">
+            <div class="search-fields">
+                <div class="search-field">
+                    <label for="role">Buscar en</label>
+                    <select id="role" name="role" class="search-input">
+                        <option value="both"      <%= (!query.role || query.role === 'both')      ? 'selected' : '' %>>Remitente y Destinatario</option>
+                        <option value="sender"    <%= query.role === 'sender'                     ? 'selected' : '' %>>Solo Remitente</option>
+                        <option value="recipient" <%= query.role === 'recipient'                  ? 'selected' : '' %>>Solo Destinatario</option>
+                    </select>
+                </div>
+                <div class="search-field">
+                    <label for="trackingId">ID Tracking</label>
+                    <input type="text" id="trackingId" name="trackingId" placeholder="Ej: ENV-001" value="<%= query.trackingId || '' %>" class="search-input">
+                </div>
+
+                <%/* Campos para Solo Remitente / Solo Destinatario */%>
+                <div class="search-field campos-simples">
+                    <label for="name">Nombre y Apellido</label>
+                    <input type="text" id="name" name="name" placeholder="Ej: Juan Pérez" value="<%= query.name || '' %>" class="search-input">
+                </div>
+                <div class="search-field campos-simples">
+                    <label for="document">Documento</label>
+                    <input type="text" id="document" name="document" placeholder="Ej: 38456789" value="<%= query.document || '' %>" class="search-input">
+                </div>
+
+                <%/* Campos para Remitente y Destinatario */%>
+                <div class="search-field campos-ambos">
+                    <label for="senderName">Nombre Remitente</label>
+                    <input type="text" id="senderName" name="senderName" placeholder="Ej: Juan Pérez" value="<%= query.senderName || '' %>" class="search-input">
+                </div>
+                <div class="search-field campos-ambos">
+                    <label for="senderDocument">Doc. Remitente</label>
+                    <input type="text" id="senderDocument" name="senderDocument" placeholder="Ej: 38456789" value="<%= query.senderDocument || '' %>" class="search-input">
+                </div>
+                <div class="search-field campos-ambos">
+                    <label for="recipientName">Nombre Destinatario</label>
+                    <input type="text" id="recipientName" name="recipientName" placeholder="Ej: Pedro García" value="<%= query.recipientName || '' %>" class="search-input">
+                </div>
+                <div class="search-field campos-ambos">
+                    <label for="recipientDocument">Doc. Destinatario</label>
+                    <input type="text" id="recipientDocument" name="recipientDocument" placeholder="Ej: 45034934" value="<%= query.recipientDocument || '' %>" class="search-input">
+                </div>
+
+                <button type="submit" class="btn-primary search-btn">
+                    <span class="material-symbols-outlined">search</span>Buscar
+                </button>
+                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= (query.statusIds && query.statusIds.length > 0) ? 'active' : '' %>" onclick="toggleFilterPanel()">
+                    <span class="material-symbols-outlined">tune</span>Filtros
+                    <% if (query.statusIds && query.statusIds.length > 0) { %>
+                        <span class="filter-count-badge"><%= query.statusIds.length %></span>
+                    <% } %>
+                </button>
+            </div>
+
+            <!-- Panel de filtros -->
+            <div id="filter-panel" class="filter-panel" style="<%= (query.statusIds && query.statusIds.length > 0) ? '' : 'display:none;' %>">
+                <div class="filter-section">
+                    <span class="filter-label">Estado</span>
+                    <div class="filter-chips">
+                        <%
+                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                            function _fsk(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
+                        %>
+                        <% statuses.forEach(function(s) { %>
+                            <% const fkey = _fsk(s.description); %>
+                            <% const flabel = _fsl[fkey] || s.description; %>
+                            <% const isChecked = query.statusIds && query.statusIds.includes(String(s.id)); %>
+                            <label class="filter-chip">
+                                <input type="checkbox" name="statusIds" value="<%= s.id %>" <%= isChecked ? 'checked' : '' %>>
+                                <span class="status-badge status-badge--sm <%= fkey %>"><%= flabel %></span>
+                            </label>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-wrapper">
+            <table id="shipments-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" class="th-sortable" data-col="0" data-sort="">
+                            ID Tracking <span class="material-symbols-outlined sort-icon">unfold_more</span>
+                        </th>
+                        <th colspan="2" class="group-header">Remitente</th>
+                        <th colspan="2" class="group-header">Destinatario</th>
+                        <th rowspan="2" class="th-sortable" data-col="5" data-sort="">
+                            Estado <span class="material-symbols-outlined sort-icon">unfold_more</span>
+                        </th>
+                        <th rowspan="2" class="col-actions">Acciones</th>
+                    </tr>
+                    <tr>
+                        <th>Nombre y apellido</th>
+                        <th>Documento</th>
+                        <th>Nombre y apellido</th>
+                        <th>Documento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (shipments.length === 0) { %>
+                        <tr>
+                            <td colspan="7" class="empty-row">
+                                <span class="material-symbols-outlined">search</span>
+                                No se encontraron resultados para esa búsqueda
+                            </td>
+                        </tr>
+                    <% } else { %>
+                                                        <% console.log("ultimo envios: " + shipments) %>
+                        <% shipments.forEach(shipment => { %>
+                            <tr>
+                                <td class="tracking-id"><%= shipment.trackingId %></td>
+                                <td><%= shipment.sender.fullName %></td>
+                                <td><%= shipment.sender.document %></td>
+                                <td><%= shipment.recipient.fullName %></td>
+                                <td><%= shipment.recipient.document %></td>
+                                <td>
+                                    <% const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
+                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'}; %>
+                                    <span class="status-badge <%= _sk %>">
+                                        <%= _sl[_sk] || shipment.status.description %>
+                                    </span>
+                                </td>
+                                <td class="col-actions">
+                                    <a href="/shipment/update/<%= shipment.id %>" class="action-btn modificar" data-tooltip="Modificar">
+                                        <span class="material-symbols-outlined">edit</span>
+                                    </a>
+                                    <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
+                                        <span class="material-symbols-outlined">info</span>
+                                    </a>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        const roleSelect   = document.getElementById('role');
+        const simpleFields = document.querySelectorAll('.campos-simples');
+        const bothFields   = document.querySelectorAll('.campos-ambos');
+
+        function updateFields() {
+            const isBoth = roleSelect.value === 'both';
+            simpleFields.forEach(el => el.style.display = isBoth ? 'none' : '');
+            bothFields.forEach(el =>   el.style.display = isBoth ? ''     : 'none');
+        }
+
+        roleSelect.addEventListener('change', updateFields);
+        updateFields();
+
+        // --- Filter panel toggle ---
+        function toggleFilterPanel() {
+            const panel = document.getElementById('filter-panel');
+            const btn   = document.getElementById('btn-filtros');
+            const open  = panel.style.display === 'none';
+            panel.style.display = open ? '' : 'none';
+            btn.classList.toggle('active', open);
+        }
+
+        // --- Table sort ---
+        document.querySelectorAll('.th-sortable').forEach(function(th) {
+            th.addEventListener('click', function() {
+                const col    = parseInt(this.dataset.col);
+                const tbody  = document.querySelector('#shipments-table tbody');
+                const rows   = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.querySelector('.empty-row'));
+                if (rows.length === 0) return;
+
+                const isAsc = this.dataset.sort !== 'asc';
+
+                document.querySelectorAll('.th-sortable').forEach(function(t) {
+                    t.dataset.sort = '';
+                    t.querySelector('.sort-icon').textContent = 'unfold_more';
+                });
+
+                this.dataset.sort = isAsc ? 'asc' : 'desc';
+                this.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
+
+                rows.sort(function(a, b) {
+                    const aVal = (a.cells[col]?.textContent || '').trim();
+                    const bVal = (b.cells[col]?.textContent || '').trim();
+                    return isAsc ? aVal.localeCompare(bVal, 'es') : bVal.localeCompare(aVal, 'es');
+                });
+
+                rows.forEach(function(r) { tbody.appendChild(r); });
+            });
+        });
+
+        if (new URLSearchParams(window.location.search).get('success') === '1') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'success',
+                title: '¡Envío creado con éxito!',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => {
+                history.replaceState(null, '', '/shipments');
+            });
+        }else if(new URLSearchParams(window.location.search).get('success') === '2'){
+             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'success',
+                title: '¡Envío modificado con éxito!',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => {
+                history.replaceState(null, '', '/shipments');
+            });
+        }
+    </script>
+</body>
+</html>

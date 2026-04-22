@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('partials/head') %>
+    <title>Dashboard - LogiTrack</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('partials/header') %>
+    <main class="main-content">
+        <div class="dashboard-wrapper">
+            <div class="page-header">
+                <h1>Inicio - Panel General</h1>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Envíos Activos</span>
+                        <span class="stat-value"><%= activeShipments %></span>
+                    </div>
+                    <div class="stat-icon icon-blue">
+                        <span class="material-symbols-outlined">local_shipping</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Entregas Hoy</span>
+                        <span class="stat-value"><%= deliveriesToday %></span>
+                    </div>
+                    <div class="stat-icon icon-green">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Alertas de Demora</span>
+                        <span class="stat-value"><%= delayAlerts %></span>
+                    </div>
+                    <div class="stat-icon icon-orange">
+                        <span class="material-symbols-outlined">warning</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Registros Nuevos</span>
+                        <span class="stat-value"><%= newRecords %></span>
+                    </div>
+                    <div class="stat-icon icon-teal">
+                        <span class="material-symbols-outlined">note_add</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-grid">
+                <div class="card acceso-rapido">
+                    <h2>Acceso Rápido</h2>
+                    <div class="quick-actions">
+                        <a href="/shipment/new" class="btn-primary quick-btn">
+                            <span class="material-symbols-outlined">add_box</span>
+                            Crear Nuevo Envío
+                        </a>
+                        <a href="/shipment" class="btn-outline quick-btn">
+                            <span class="material-symbols-outlined">search</span>
+                            Buscar Envío por ID/DNI
+                        </a>
+                    </div>
+                </div>
+                <div class="card ultima-actividad">
+                    <h2>Última Actividad</h2>
+                    <table class="activity-table">
+                        <thead>
+                            <tr>
+                                <th>ID de rastreo</th>
+                                <th>Destinatario</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (lastActivity.length === 0) { %>
+                                <tr>
+                                    <td colspan="4" class="empty-row">Sin actividad reciente</td>
+                                </tr>
+                            <% } else { %>
+                                <% lastActivity.forEach(s => { %>
+                                    <tr>
+                                        <td class="tracking-id"><%= s.trackingId %></td>
+                                        <td>
+                                            <span class="dest-nombre"><%= s.recipient.fullName %></span>
+                                            <span class="dest-dni">DNI: <%= s.recipient.document %></span>
+                                        </td>
+                                        <td>
+                                            <% const _sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
+                                            <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'}; %>
+                                            <span class="status-badge <%= _sk %>">
+                                                <%= _sl[_sk] || s.status.description %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="/shipment/detail/<%= s.id %>" class="btn-ver-detalle">Ver Detalle</a>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

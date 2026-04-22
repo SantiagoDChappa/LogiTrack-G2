@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('partials/head') %>
+    <link rel="stylesheet" href="/css/login.css">
+    <title>LogiTrack — Iniciar sesión</title>
+</head>
+<body>
+
+    <!-- Toggle modo oscuro/claro -->
+    <button id="btn-theme" class="login-theme-btn" aria-label="Cambiar tema">
+        <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
+        <span id="theme-label">Modo claro</span>
+    </button>
+
+    <div class="login-wrapper">
+        <div class="login-card">
+
+            <!-- Logo -->
+            <div class="login-brand">
+                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
+                <h1>LogiTrack</h1>
+                <p>Sistema de gestión de envíos</p>
+            </div>
+
+            <!-- Formulario -->
+            <form class="login-form" action="/login" method="post">
+
+                <div class="login-field">
+                    <label for="user-email">Correo electrónico</label>
+                    <input
+                        id="user-email"
+                        type="email"
+                        name="email"
+                        placeholder="usuario@logitrack.com"
+                        autocomplete="email"
+                        required
+                    >
+                </div>
+
+                <div class="login-field">
+                    <label for="password">Contraseña</label>
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        placeholder="••••••••"
+                        autocomplete="current-password"
+                        required
+                    >
+                </div>
+
+                <% if (locals.error) { %>
+                <div class="login-error">
+                    <span class="material-symbols-outlined">error</span>
+                    <%= error %>
+                </div>
+                <% } %>
+
+                <div class="login-options">
+                    <label class="login-remember">
+                        <input type="checkbox" name="remember">
+                        <span>Recordar sesión</span>
+                    </label>
+                    <a href="#" class="login-forgot">¿Olvidaste tu contraseña?</a>
+                </div>
+
+                <button type="submit" class="login-btn">Ingresar</button>
+
+            </form>
+
+            <!-- Soporte -->
+            <div class="login-support">
+                <a href="/support">Solicitar acceso a Soporte Técnico</a>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

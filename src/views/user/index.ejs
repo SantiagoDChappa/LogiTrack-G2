@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Usuarios - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Administrador de usuarios</h1>
+            <a href="/user/new" class="btn-primary">
+                <span class="material-symbols-outlined">add</span>Alta
+            </a>
+        </div>
+
+        <div class="shipments-wrapper">
+        <form method="GET" action="/user/search" class="search-form">
+            <div class="search-fields">
+                <div class="search-field">
+                    <label for="fullName">Nombre y Apellido</label>
+                    <input type="text" id="fullName" name="fullName" placeholder="Ej: Juan Pérez" value="<%= query.fullName || '' %>" class="search-input">
+                </div>
+                <div class="search-field">
+                    <label for="document">Documento</label>
+                    <input type="text" id="document" name="document" placeholder="Ej: 38456789" value="<%= query.document || '' %>" class="search-input">
+                </div>
+                <div class="search-field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" placeholder="Ej: juan@email.com" value="<%= query.email || '' %>" class="search-input">
+                </div>
+                <div class="search-field">
+                    <label for="roleId">Tipo de Rol</label>
+                    <select id="roleId" name="roleId" class="search-input">
+                        <option value="">Todos</option>
+                        <% roleTypes.forEach(role => { %>
+                            <option value="<%= role.id %>" <%= (query.roleId && Number(query.roleId) === role.id) ? 'selected' : '' %>>
+                                <%= role.description %>
+                            </option>
+                        <% }); %>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-primary search-btn">
+                    <span class="material-symbols-outlined">search</span>Buscar
+                </button>
+            </div>
+        </form>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre y Apellido</th>
+                        <th>Documento</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th class="col-actions">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (users.length === 0) { %>
+                        <tr>
+                            <td colspan="5" class="empty-row">
+                                <span class="material-symbols-outlined">search</span>
+                                No se encontraron resultados para esa búsqueda
+                            </td>
+                        </tr>
+                    <% } else { %>
+                        <% users.forEach(user => { %>
+                            <tr>
+                                <td><%= user.fullName %></td>
+                                <td><%= user.document %></td>
+                                <td><%= user.email %></td>
+                                <td>
+                                    <span class="status-badge <%= user.roleId === 1 ? 'en_sucursal' : 'en_transito' %>">
+                                        <%= roleLabels[user.roleId] || '-' %>
+                                    </span>
+                                </td>
+                                <td class="col-actions">
+                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
+                                        <span class="material-symbols-outlined">edit</span>
+                                    </a>
+                                    <form action="/user/delete/<%= user.id %>" method="POST" style="display:inline">
+                                        <button type="submit" class="action-btn eliminar" data-tooltip="Eliminar">
+                                            <span class="material-symbols-outlined">delete</span>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        if (new URLSearchParams(window.location.search).get('success') === '1') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'success',
+                title: '¡Usuario creado con éxito!',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => {
+                history.replaceState(null, '', '/user');
+            });
+        } else if (new URLSearchParams(window.location.search).get('success') === '2') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'success',
+                title: '¡Usuario modificado con éxito!',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => {
+                history.replaceState(null, '', '/user');
+            });
+        } else if (new URLSearchParams(window.location.search).get('success') === '3') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'success',
+                title: '¡Usuario eliminado con éxito!',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => {
+                history.replaceState(null, '', '/user');
+            });
+        }
+    </script>
+</body>
+</html>

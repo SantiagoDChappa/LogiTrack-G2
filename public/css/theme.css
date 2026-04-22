@@ -1,0 +1,30 @@
+#btn-theme {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-sun,
+.icon-moon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 1.3rem;
+  transition: transform 0.4s ease, opacity 0.3s ease;
+}
+
+.icon-moon {
+  transform: translate(-50%, 40%) rotate(-20deg) scale(0.6);
+}
+
+[data-theme="dark"] .icon-sun {
+  transform: translate(-50%, -150%) rotate(20deg) scale(0.6);
+}
+
+[data-theme="dark"] .icon-moon {
+  transform: translate(-50%, -50%) rotate(0deg) scale(1);
+}

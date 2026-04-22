@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <% if (mapData && mapData.destination) { %>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <% } %>
+    <title>Modificación de Envío - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Modificación de envío</h1>
+        </div>
+
+        <div class="page-update-wrapper">
+
+            <%
+                const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                const _slU = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _slLabel = _slU[_sk] || shipment.status.description;
+            %>
+
+            <!-- ══════════ TOP: 3 COLUMNAS ══════════ -->
+            <div class="update-top-grid">
+
+                <!-- ── Resumen del envío + ML ── -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">inventory_2</span> Resumen del envío</h3>
+
+                    <div class="summary-stats-row">
+                        <div class="summary-stat-item">
+                            <span class="summary-stat-label">Tipo de Envío</span>
+                            <span class="summary-stat-value">
+                                <span class="material-symbols-outlined">local_shipping</span>
+                                <%= shipment.shipmentType ? shipment.shipmentType.description : '-' %>
+                            </span>
+                        </div>
+                        <div class="summary-stat-item">
+                            <span class="summary-stat-label">Peso</span>
+                            <span class="summary-stat-value">
+                                <span class="material-symbols-outlined">scale</span>
+                                <%= shipment.weightKg != null ? Number(shipment.weightKg).toFixed(2) + ' kg' : '-' %>
+                            </span>
+                        </div>
+                        <div class="summary-stat-item">
+                            <span class="summary-stat-label">Cantidad</span>
+                            <span class="summary-stat-value">
+                                <span class="material-symbols-outlined">widgets</span>
+                                <%= shipment.packageQty != null ? shipment.packageQty : '-' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="summary-addresses">
+                        <div><span class="summary-addr-lbl">ORIGEN:</span> <%= mapData.origin.label.toUpperCase() %></div>
+                        <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
+                    </div>
+
+                    <div id="prediction-widget"
+                         class="pred-card pred-card--embedded"
+                         data-autoload="true">
+                        <h3>
+                            <span class="material-symbols-outlined">query_stats</span>
+                            Detalles de la entrega
+                        </h3>
+                        <div id="prediction-result"></div>
+                    </div>
+                </div>
+
+                <!-- ── Trayecto del envío (mapa) ── -->
+                <% if (mapData && mapData.destination) { %>
+                <div class="update-card update-map-card">
+                    <h3><span class="material-symbols-outlined">map</span> Trayecto del envío</h3>
+                    <div id="shipment-map"></div>
+                    <div class="map-legend">
+                        <div class="map-legend-item">
+                            <div class="map-dot map-dot--origin"></div>
+                            <span>Origen</span>
+                        </div>
+                        <div class="map-legend-item">
+                            <div class="map-dot map-dot--dest"></div>
+                            <span>Destino</span>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- ── Historial de estado ── -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">history</span> Historial de estado</h3>
+                    <% if (history.length === 0) { %>
+                        <p class="historial-empty">Sin cambios registrados.</p>
+                    <% } else { %>
+                        <%
+                            const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                            function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
+                        %>
+                        <ul class="historial-list">
+                            <% history.forEach(function(h) { %>
+                                <%
+                                    const _fk = h.fromStatus ? _sk2(h.fromStatus.description) : 'inicial';
+                                    const _fl = h.fromStatus ? (_sl2[_fk] || h.fromStatus.description) : 'Inicial';
+                                    const _tk = _sk2(h.toStatus.description);
+                                    const _tl = _sl2[_tk] || h.toStatus.description;
+                                %>
+                                <li class="historial-item">
+                                    <span class="historial-fecha">
+                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %> -
+                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                    </span>
+                                    <span class="historial-estados">
+                                        <span class="status-badge status-badge--sm <%= _fk %>"><%= _fl %></span>
+                                        →
+                                        <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
+                                    </span>
+                                    <% if (h.comment) { %>
+                                        <span class="historial-motivo">Motivo: <%= h.comment %></span>
+                                    <% } %>
+                                </li>
+                            <% }) %>
+                        </ul>
+                    <% } %>
+                </div>
+
+            </div>
+            <!-- ══════════ FIN TOP GRID ══════════ -->
+
+
+            <!-- ══════════ FORM + GESTIÓN DE ESTADO ══════════ -->
+            <div class="update-bottom-grid">
+
+                <form id="main-update-form" style="display:contents" action="/shipment/update/<%= shipment.id %>" method="post">
+                    <input type="hidden" name="newStatusId" id="hidden-new-status-id">
+                    <input type="hidden" name="statusComment" id="hidden-status-comment">
+
+                    <div class="update-card" style="grid-area:destinatario">
+                        <h3>Destinatario</h3>
+                        <div class="update-fields">
+                            <div class="field">
+                                <label for="recipient-name">Nombre y Apellido <span class="req">*</span></label>
+                                <input id="recipient-name" type="text" name="recipientName" value="<%= shipment.recipient.fullName || '' %>" placeholder="Ej: Juan Pérez">
+                            </div>
+                            <div class="field">
+                                <label for="recipient-document">Documento <span class="req">*</span></label>
+                                <input id="recipient-document" type="text" name="recipientDocument" value="<%= shipment.recipient.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                            </div>
+                            <div class="field">
+                                <label for="recipient-phone">Teléfono</label>
+                                <input id="recipient-phone" type="tel" name="recipientPhone" value="<%= shipment.recipient.phone || '' %>" placeholder="Ej: 1123456789" maxlength="10">
+                            </div>
+                            <div class="field">
+                                <label for="recipient-email">Email</label>
+                                <input id="recipient-email" type="email" name="recipientEmail" value="<%= shipment.recipient.email || '' %>" placeholder="Ej: juan@email.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card" style="grid-area:infopaquete">
+                        <h3>Información del paquete</h3>
+                        <div class="update-fields">
+                            <div class="field">
+                                <label for="shipment-type">Tipo de envío <span class="req">*</span></label>
+                                <select id="shipment-type" name="shipmentTypeId">
+                                    <option value="">Seleccione un tipo</option>
+                                    <% typesShipment.forEach(type => { %>
+                                        <option value="<%= type.id %>" <%= shipment.shipmentTypeId == type.id ? 'selected' : '' %>><%= type.description %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="weight-kg">Peso (kg) <span class="req">*</span></label>
+                                <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= shipment.weightKg || '' %>" placeholder="Ej: 1.5">
+                            </div>
+                            <div class="field">
+                                <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
+                                <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= shipment.packageQty || '' %>" placeholder="Ej: 3">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="update-card" style="grid-area:direccion">
+                        <h3>Dirección de entrega</h3>
+
+                        <input type="hidden" id="street"      name="street"     value="<%= shipment.address.street || '' %>">
+                        <input type="hidden" id="number"      name="number"     value="<%= shipment.address.number || '' %>">
+                        <input type="hidden" id="province"    name="province"   value="<%= shipment.address.provinceId || '' %>">
+                        <input type="hidden" id="postal-code" name="postalCode" value="<%= shipment.address.postalCode || '' %>">
+                        <input type="hidden" id="address-lat" name="addressLat" value="<%= shipment.address.lat || '' %>">
+                        <input type="hidden" id="address-lng" name="addressLng" value="<%= shipment.address.lng || '' %>">
+
+                        <div class="update-fields" style="display:flex;flex-direction:column;gap:var(--space-3);">
+
+                            <div class="field addr-search-wrapper" style="position:relative;">
+                                <label for="address-search">Dirección completa</label>
+                                <input id="address-search" type="text" autocomplete="off"
+                                       placeholder="Ej: Av. Corrientes 1234, CABA">
+                                <div id="address-dropdown" class="addr-dropdown" style="display:none;"></div>
+                            </div>
+
+                            <% const currentProvName = provinces.find(p => p.id == shipment.address.provinceId)?.description || ''; %>
+                            <div class="addr-selected-row" id="addr-selected-row"
+                                 <% if (!shipment.address.street) { %>style="display:none;"<% } %>>
+                                <div id="address-chip" class="addr-chip">
+                                    <span class="material-symbols-outlined">pin_drop</span>
+                                    <span id="addr-chip-text">
+                                        <strong><%= shipment.address.street %> <%= shipment.address.number %></strong><% if (currentProvName) { %> — <%= currentProvName %><% } %>
+                                    </span>
+                                </div>
+                                <button type="button" id="address-clear" class="addr-clear-btn">
+                                    <span class="material-symbols-outlined">close</span> Cambiar
+                                </button>
+                            </div>
+
+                            <div class="field">
+                                <label for="floor-apartment">Piso y/o Depto <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
+                                <input id="floor-apartment" type="text" name="floorApartment" value="<%= shipment.address.floorApartment || '' %>" placeholder="Ej: 3° B">
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+
+                <!-- Gestión de estado -->
+                <div class="gestion-estado" style="grid-area:gestion">
+                    <h3>Gestión de Estado</h3>
+
+                    <div class="estado-actual-badge">
+                        ESTADO ACTUAL: <%= shipment.status.description.toUpperCase() %>
+                    </div>
+
+                    <div class="timeline-track">
+                        <% const currentId = shipment.statusId; %>
+                        <% const isSupervisor = currentUser.getAccess; %>
+                        <% statuses.forEach(function(s, idx) { %>
+                            <%
+                                var isDone      = s.id < currentId && currentId !== 5;
+                                var isCurrent   = s.id === currentId;
+                                var isCancel    = s.id === 5;
+                                var isFilled    = (currentId !== 5 && s.id <= currentId) || (currentId === 5 && s.id === 5);
+                                var isClickable = isSupervisor && (
+                                    (!isCancel && s.id === currentId + 1 && currentId < 4 && currentId !== 5) ||
+                                    (isCancel && currentId >= 1 && currentId <= 3)
+                                );
+                                var stateClass  = isDone ? 'done' : (isCurrent ? 'active' : 'pending');
+                            %>
+                            <% if (idx > 0) { %>
+                                <div class="timeline-connector <%= isFilled ? 'filled' : '' %>"></div>
+                            <% } %>
+                            <div class="timeline-step">
+                                <button
+                                    type="button"
+                                    class="timeline-dot status-dot-<%= s.id %> <%= stateClass %>"
+                                    <% if (isClickable) { %>data-clickable data-status-id="<%= s.id %>" data-status-name="<%= s.description %>"<% } %>
+                                    <% if (!isClickable) { %>disabled<% } %>
+                                >
+                                    <% if (isDone) { %><span class="material-symbols-outlined">check</span><% } %>
+                                    <% if (isCurrent && isCancel) { %><span class="material-symbols-outlined">close</span><% } %>
+                                </button>
+                                <span class="timeline-label"><%= s.description %></span>
+                            </div>
+                        <% }) %>
+                    </div>
+
+                    <div id="status-confirm-panel" class="status-confirm-panel" style="display:none;">
+                        <p class="confirm-title">Confirmar nuevo estado: <strong id="confirm-status-name"></strong></p>
+                        <input type="hidden" id="confirm-status-id">
+                        <textarea id="status-comment-input" placeholder="Describa el motivo del cambio de estado..." rows="3"></textarea>
+                        <div class="confirm-actions">
+                            <button type="button" id="btn-cancel-confirm" class="btn-secondary btn-sm">Cancelar</button>
+                            <button type="button" id="btn-confirm-status" class="btn-primary btn-sm">Confirmar cambio</button>
+                        </div>
+                    </div>
+
+                    <% if (!currentUser.getAccess) { %>
+                    <div class="status-info-message" style="background-color:var(--color-warning-bg,#fef3c7);border:1px solid var(--color-warning,#f59e0b);border-radius:4px;padding:12px;margin-top:16px;color:var(--color-warning-text,#92400e);font-size:0.9rem;">
+                        <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">info</span>
+                        Solo los supervisores pueden cambiar el estado del envío.
+                    </div>
+                    <% } %>
+
+                    <div id="pending-status-badge" style="display:none;" class="pending-status-badge">
+                        Cambio de estado pendiente: <strong id="pending-status-name"></strong>
+                        <button type="button" id="btn-undo-status" class="btn-secondary btn-sm">Deshacer</button>
+                    </div>
+                </div>
+
+            </div>
+            <!-- ══════════ FIN FORM ══════════ -->
+
+            <div class="update-form-actions">
+                <a href="/shipment" class="btn-secondary">Cancelar</a>
+                <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes">Guardar cambios</button>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
+    <script>
+        document.querySelectorAll('.timeline-dot[data-clickable]').forEach(function(dot) {
+            dot.addEventListener('click', function() {
+                var panel = document.getElementById('status-confirm-panel');
+                document.getElementById('confirm-status-id').value = this.dataset.statusId;
+                document.getElementById('confirm-status-name').textContent = this.dataset.statusName;
+                document.getElementById('status-comment-input').value = '';
+                panel.style.display = 'flex';
+            });
+        });
+
+        document.getElementById('btn-cancel-confirm').addEventListener('click', function() {
+            document.getElementById('status-confirm-panel').style.display = 'none';
+        });
+
+        document.getElementById('btn-confirm-status').addEventListener('click', function() {
+            var statusId   = document.getElementById('confirm-status-id').value;
+            var statusName = document.getElementById('confirm-status-name').textContent;
+            var comment    = document.getElementById('status-comment-input').value;
+            document.getElementById('hidden-new-status-id').value  = statusId;
+            document.getElementById('hidden-status-comment').value = comment;
+            document.getElementById('pending-status-name').textContent = statusName;
+            document.getElementById('pending-status-badge').style.display = 'flex';
+            document.getElementById('status-confirm-panel').style.display = 'none';
+        });
+
+        document.getElementById('btn-undo-status').addEventListener('click', function() {
+            document.getElementById('hidden-new-status-id').value  = '';
+            document.getElementById('hidden-status-comment').value = '';
+            document.getElementById('pending-status-badge').style.display = 'none';
+        });
+
+        // Prevenir doble submit
+        document.getElementById('main-update-form').addEventListener('submit', function() {
+            var btn = document.getElementById('btn-save-changes');
+            if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+        });
+    </script>
+
+    <% if (mapData && mapData.destination) { %>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+    (function () {
+        const origin = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %> };
+        const dest   = { lat: <%- mapData.destination.lat %>, lng: <%- mapData.destination.lng %> };
+
+        const map = L.map('shipment-map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18,
+        }).addTo(map);
+
+        const blueIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [12, 12], iconAnchor: [6, 6],
+        });
+        const redIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [12, 12], iconAnchor: [6, 6],
+        });
+
+        L.marker([origin.lat, origin.lng], { icon: blueIcon }).addTo(map)
+            .bindPopup('<strong>Origen</strong><br><%- mapData.origin.label %>');
+        L.marker([dest.lat, dest.lng], { icon: redIcon }).addTo(map)
+            .bindPopup('<strong>Destino</strong><br><%- mapData.destination.label %>');
+        L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
+            color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
+        }).addTo(map);
+        map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+    })();
+    </script>
+    <% } %>
+
+    <script src="/js/new_shipment_popup.js" defer></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/prediction.js" defer></script>
+    <script src="/js/address-autocomplete.js" defer></script>
+    <script src="/js/document-format.js" defer></script>
+</body>
+</html>

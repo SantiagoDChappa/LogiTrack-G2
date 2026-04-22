@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>Nuevo Envío - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+     <main class="main-content">
+        <div class="page-header">
+            <h1>Alta de envío</h1>
+        </div>
+        <div class="form-new">
+            <p class="form-required-note"><span class="req">*</span> Campo obligatorio</p>
+            <form action="" method="post">
+                <div class="remitente">
+                    <h3>Remitente</h3>
+                    <div class="field">
+                        <label for="sender-name">Nombre y Apellido <span class="req">*</span></label>
+                        <input id="sender-name" type="text" name="senderName" value="<%= body.senderName || '' %>" placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="field">
+                        <label for="sender-document">Documento <span class="req">*</span></label>
+                        <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                    </div>
+                    <div class="field">
+                        <label for="sender-phone">Teléfono</label>
+                        <input id="sender-phone" type="tel" name="senderPhone" maxlength="10" value="<%= body.senderPhone || '' %>" placeholder="Ej: 1123456789">
+                    </div>
+                    <div class="field">
+                        <label for="sender-email">Email</label>
+                        <input id="sender-email" type="email" name="senderEmail" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
+                    </div>
+                </div>
+
+                <div class="destinatario">
+                    <h3>Destinatario</h3>
+                    <div class="field">
+                        <label for="recipient-name">Nombre y Apellido <span class="req">*</span></label>
+                        <input id="recipient-name" type="text" name="recipientName" value="<%= body.recipientName || '' %>" placeholder="Ej: María García">
+                    </div>
+                    <div class="field">
+                        <label for="recipient-document">Documento <span class="req">*</span></label>
+                        <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                    </div>
+                    <div class="field">
+                        <label for="recipient-phone">Teléfono</label>
+                        <input id="recipient-phone" type="tel" name="recipientPhone" maxlength="10" value="<%= body.recipientPhone || '' %>" placeholder="Ej: 1123456789">
+                    </div>
+                    <div class="field">
+                        <label for="recipient-email">Email</label>
+                        <input id="recipient-email" type="email" name="recipientEmail" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
+                    </div>
+                </div>
+
+                <div class="direccion">
+                    <h3>Dirección de entrega</h3>
+
+                    <!-- Campos hidden enviados al servidor -->
+                    <input type="hidden" id="street"      name="street"     value="<%= body.street || '' %>">
+                    <input type="hidden" id="number"      name="number"     value="<%= body.number || '' %>">
+                    <input type="hidden" id="province"    name="province"   value="<%= body.province || '' %>">
+                    <input type="hidden" id="postal-code" name="postalCode" value="<%= body.postalCode || '' %>">
+                    <input type="hidden" id="address-lat" name="addressLat" value="">
+                    <input type="hidden" id="address-lng" name="addressLng" value="">
+
+                    <!-- Buscador unificado — ocupa todo el ancho -->
+                    <div class="field addr-search-wrapper addr-full">
+                        <label for="address-search">Dirección completa <span class="req">*</span></label>
+                        <input id="address-search" type="text" autocomplete="off"
+                               placeholder="Ej: Av. Corrientes 1234, CABA">
+                        <div id="address-dropdown" class="addr-dropdown" style="display:none;"></div>
+                    </div>
+
+                    <!-- Chip + botón limpiar — ocupa todo el ancho -->
+                    <div class="addr-selected-row addr-full" id="addr-selected-row" style="display:none;">
+                        <div id="address-chip" class="addr-chip">
+                            <span class="material-symbols-outlined">pin_drop</span>
+                            <span id="addr-chip-text"></span>
+                        </div>
+                        <button type="button" id="address-clear" class="addr-clear-btn">
+                            <span class="material-symbols-outlined">close</span> Cambiar
+                        </button>
+                    </div>
+
+                    <!-- Validación — dentro de la sección, ocupa todo el ancho -->
+                    <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full"></div>
+
+                    <!-- Piso/depto — siempre visible, posición fija -->
+                    <div class="field">
+                        <label for="floor-apartment">Piso y/o Depto <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
+                        <input id="floor-apartment" type="text" name="floorApartment" value="<%= body.floorApartment || '' %>" placeholder="Ej: 3° B">
+                    </div>
+                </div>
+
+                <div class="info-shipment">
+                    <h3>Información del paquete</h3>
+                    <div class="field">
+                        <label for="shipment-type">Tipo de envío <span class="req">*</span></label>
+                        <select id="shipment-type" name="shipmentTypeId">
+                            <option value="">Seleccione un tipo de envío</option>
+                            <% typesShipment.forEach(type => { %>
+                                <option value="<%= type.id %>" <%= body.shipmentTypeId == type.id ? 'selected' : '' %>><%= type.description %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="weight-kg">Peso (kg) <span class="req">*</span></label>
+                        <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= body.weightKg || '' %>" placeholder="Ej: 1.5">
+                    </div>
+                    <div class="field">
+                        <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
+                        <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= body.packageQty || '' %>" placeholder="Ej: 3">
+                    </div>
+                </div>
+
+                <div id="prediction-widget" class="pred-card">
+                    <h3><span class="material-symbols-outlined">psychology</span> Predicción de entrega</h3>
+                    <div id="prediction-result"></div>
+                </div>
+
+                <div class="form-actions">
+                    <a href="/shipment" class="btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn-primary">Guardar envío</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
+    <script src="/js/new_shipment_popup.js" defer></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/prediction.js" defer></script>
+    <script src="/js/address-validation.js" defer></script>
+    <script src="/js/address-autocomplete.js" defer></script>
+    <script src="/js/document-format.js" defer></script>
+</body>
+</html>

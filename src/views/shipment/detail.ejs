@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <% if (mapData && mapData.destination) { %>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <% } %>
+    <title>Detalle de Envío - LogiTrack</title>
+</head>
+
+<body>
+    <%- include('../partials/header') %>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Detalle de Envío</h1>
+            <a href="/shipment" class="btn-secondary">Volver</a>
+        </div>
+
+        <div class="detail-wrapper">
+
+            <%
+                const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _slLabel = _sl[_sk] || shipment.status.description;
+            %>
+
+            <!-- Tracking ID + estado -->
+            <div class="detail-top">
+                <div class="detail-tracking">
+                    <span class="detail-tracking-label">ID Tracking</span>
+                    <span class="detail-tracking-id"><%= shipment.trackingId %></span>
+                </div>
+                <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
+            </div>
+
+            <!-- ══════════ TOP: 3 COLUMNAS ══════════ -->
+            <div class="update-top-grid">
+
+                <!-- ── Resumen del envío + ML ── -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">inventory_2</span> Resumen del envío</h3>
+
+                    <div class="summary-stats-row">
+                        <div class="summary-stat-item">
+                            <span class="summary-stat-label">Tipo de Envío</span>
+                            <span class="summary-stat-value">
+                                <span class="material-symbols-outlined">local_shipping</span>
+                                <%= shipment.shipmentType ? shipment.shipmentType.description : '-' %>
+                            </span>
+                        </div>
+                        <div class="summary-stat-item">
+                            <span class="summary-stat-label">Peso</span>
+                            <span class="summary-stat-value">
+                                <span class="material-symbols-outlined">scale</span>
+                                <%= shipment.weightKg != null ? Number(shipment.weightKg).toFixed(2) + ' kg' : '-' %>
+                            </span>
+                        </div>
+                        <div class="summary-stat-item">
+                            <span class="summary-stat-label">Cantidad</span>
+                            <span class="summary-stat-value">
+                                <span class="material-symbols-outlined">widgets</span>
+                                <%= shipment.packageQty != null ? shipment.packageQty : '-' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="summary-addresses">
+                        <div><span class="summary-addr-lbl">ORIGEN:</span> <%= mapData.origin.label.toUpperCase() %></div>
+                        <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
+                    </div>
+
+                    <div id="prediction-widget"
+                         class="pred-card pred-card--embedded"
+                         data-province-id="<%= shipment.address.provinceId %>"
+                         data-street="<%= shipment.address.street || '' %>"
+                         data-number="<%= shipment.address.number || '' %>"
+                         data-weight-kg="<%= shipment.weightKg || '' %>"
+                         data-package-qty="<%= shipment.packageQty || '' %>"
+                         data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
+                         data-autoload="true">
+                        <h3>
+                            <span class="material-symbols-outlined">query_stats</span>
+                            Detalles de la entrega
+                        </h3>
+                        <div id="prediction-result"></div>
+                    </div>
+                </div>
+
+                <!-- ── Trayecto del envío (mapa) ── -->
+                <% if (mapData && mapData.destination) { %>
+                <div class="update-card update-map-card">
+                    <h3><span class="material-symbols-outlined">map</span> Trayecto del envío</h3>
+                    <div id="shipment-map"></div>
+                    <div class="map-legend">
+                        <div class="map-legend-item">
+                            <div class="map-dot map-dot--origin"></div>
+                            <span>Origen: <%= mapData.origin.label %></span>
+                        </div>
+                        <div class="map-legend-item">
+                            <div class="map-dot map-dot--dest"></div>
+                            <span>Destino: <%= mapData.destination.label %></span>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- ── Historial de estado ── -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">history</span> Historial de estado</h3>
+                    <% if (history.length === 0) { %>
+                        <p class="historial-empty">Sin cambios registrados.</p>
+                    <% } else { %>
+                        <%
+                            const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                            function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
+                        %>
+                        <ul class="historial-list">
+                            <% history.forEach(function(h) { %>
+                                <%
+                                    const _fk = h.fromStatus ? _sk2(h.fromStatus.description) : 'inicial';
+                                    const _fl = h.fromStatus ? (_sl2[_fk] || h.fromStatus.description) : 'Inicial';
+                                    const _tk = _sk2(h.toStatus.description);
+                                    const _tl = _sl2[_tk] || h.toStatus.description;
+                                %>
+                                <li class="historial-item">
+                                    <span class="historial-fecha">
+                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %> -
+                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                    </span>
+                                    <span class="historial-estados">
+                                        <span class="status-badge status-badge--sm <%= _fk %>"><%= _fl %></span>
+                                        →
+                                        <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
+                                    </span>
+                                    <% if (h.comment) { %>
+                                        <span class="historial-motivo">Motivo: <%= h.comment %></span>
+                                    <% } %>
+                                </li>
+                            <% }) %>
+                        </ul>
+                    <% } %>
+                </div>
+
+            </div>
+            <!-- ══════════ FIN TOP GRID ══════════ -->
+
+            <!-- ══════════ BOTTOM: 2×2 CARDS ══════════ -->
+            <div class="detail-bottom-grid">
+
+                <div class="update-card">
+                    <h3>Remitente</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Nombre y apellido</span>
+                        <span class="detail-value"><%= shipment.sender.fullName %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Documento</span>
+                        <span class="detail-value"><%= shipment.sender.document %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Teléfono</span>
+                        <span class="detail-value"><%= shipment.sender.phone || '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value"><%= shipment.sender.email || '-' %></span>
+                    </div>
+                </div>
+
+                <div class="update-card">
+                    <h3>Destinatario</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Nombre y apellido</span>
+                        <span class="detail-value"><%= shipment.recipient.fullName %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Documento</span>
+                        <span class="detail-value"><%= shipment.recipient.document %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Teléfono</span>
+                        <span class="detail-value"><%= shipment.recipient.phone || '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value"><%= shipment.recipient.email || '-' %></span>
+                    </div>
+                </div>
+
+                <div class="update-card">
+                    <h3>Dirección de entrega</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Calle y número</span>
+                        <span class="detail-value"><%= shipment.address.street %> <%= shipment.address.number %><%= shipment.address.floorApartment ? ', ' + shipment.address.floorApartment : '' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Provincia</span>
+                        <span class="detail-value"><%= shipment.address.province ? shipment.address.province.description : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Código postal</span>
+                        <span class="detail-value"><%= shipment.address.postalCode || '-' %></span>
+                    </div>
+                </div>
+
+                <div class="update-card">
+                    <h3>Información del paquete</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Tipo de envío</span>
+                        <span class="detail-value"><%= shipment.shipmentType ? shipment.shipmentType.description : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Peso (kg)</span>
+                        <span class="detail-value"><%= shipment.weightKg != null ? shipment.weightKg + ' kg' : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Cantidad de paquetes</span>
+                        <span class="detail-value"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
+                    </div>
+                </div>
+
+            </div>
+            <!-- ══════════ FIN BOTTOM GRID ══════════ -->
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/prediction.js" defer></script>
+
+    <% if (mapData && mapData.destination) { %>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+    (function () {
+        const origin = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %> };
+        const dest   = { lat: <%- mapData.destination.lat %>, lng: <%- mapData.destination.lng %> };
+
+        const map = L.map('shipment-map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18,
+        }).addTo(map);
+
+        const blueIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [12, 12], iconAnchor: [6, 6],
+        });
+        const redIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [12, 12], iconAnchor: [6, 6],
+        });
+
+        L.marker([origin.lat, origin.lng], { icon: blueIcon })
+            .addTo(map).bindPopup('<strong>Origen</strong><br><%- mapData.origin.label %>');
+        L.marker([dest.lat, dest.lng], { icon: redIcon })
+            .addTo(map).bindPopup('<strong>Destino</strong><br><%- mapData.destination.label %>');
+        L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
+            color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
+        }).addTo(map);
+        map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+    })();
+    </script>
+    <% } %>
+</body>
+</html>

@@ -1,0 +1,27 @@
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+server/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# ML
+ml/.venv/
+ml/__pycache__/
+ml/model/*.pkl
+ml/*.pyc
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.claude/

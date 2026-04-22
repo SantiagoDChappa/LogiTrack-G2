@@ -1,0 +1,23 @@
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.logo img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+  background: transparent;
+}
+
+.logo span {
+  font-family: var(--font-family);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-inverse);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}

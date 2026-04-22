@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: logitrack
+    runtime: node
+    buildCommand: npm install && python3 -m pip install --user -r ml/requirements.txt
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PYTHON_BIN
+        value: python3

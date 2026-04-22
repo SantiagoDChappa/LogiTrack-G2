@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>Ajustes - LogiTrack</title>
+    <style>
+        .settings-content {
+            padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
+        }
+
+        .settings-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-6);
+            box-shadow: var(--shadow-sm);
+            max-width: 900px;
+        }
+
+        .settings-card-title {
+            font-size: var(--font-size-base);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text);
+            padding-bottom: var(--space-3);
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: var(--space-5);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .settings-card-title .material-symbols-outlined {
+            font-size: 1.1rem;
+            color: var(--color-primary);
+        }
+
+        .settings-subtitle {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-5);
+            line-height: 1.5;
+        }
+
+        .settings-actions {
+            display: flex;
+            justify-content: flex-end;
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--color-border);
+            margin-top: var(--space-5);
+        }
+
+        /* Reutiliza la grid de direccion de new.ejs */
+        .settings-addr {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-4) var(--space-5);
+            align-items: start;
+        }
+        .settings-addr .addr-full,
+        .settings-addr .span-full {
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Ajustes</h1>
+        </div>
+
+        <div class="settings-content">
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">location_on</span>
+                    Dirección de origen del sistema
+                </h2>
+                <p class="settings-subtitle">
+                    Esta dirección representa la sucursal o punto de partida de todos los envíos.
+                    Se usa para calcular la distancia real hasta el destino y mejorar la predicción del modelo de ML.
+                </p>
+
+                <form method="POST" action="/setting">
+
+                    <!-- Campos hidden: ID para el autocomplete, name para el POST -->
+                    <input type="hidden" id="street"      name="origin_street"      value="<%= settings.origin_street      || '' %>">
+                    <input type="hidden" id="number"      name="origin_number"      value="<%= settings.origin_number      || '' %>">
+                    <input type="hidden" id="province"    name="origin_province_id" value="<%= settings.origin_province_id || '' %>">
+                    <input type="hidden" id="postal-code" name="origin_postal_code" value="<%= settings.origin_postal_code || '' %>">
+
+                    <div class="settings-addr">
+
+                        <!-- Buscador unificado -->
+                        <div class="field addr-search-wrapper addr-full">
+                            <label for="address-search">Dirección completa <span class="req">*</span></label>
+                            <input id="address-search" type="text" autocomplete="off"
+                                   placeholder="Ej: Av. Corrientes 1234, Buenos Aires">
+                            <div id="address-dropdown" class="addr-dropdown" style="display:none;"></div>
+                        </div>
+
+                        <!-- Chip de dirección seleccionada -->
+                        <div class="addr-selected-row addr-full" id="addr-selected-row" style="display:none;">
+                            <div id="address-chip" class="addr-chip">
+                                <span class="material-symbols-outlined">pin_drop</span>
+                                <span id="addr-chip-text"></span>
+                            </div>
+                            <button type="button" id="address-clear" class="addr-clear-btn">
+                                <span class="material-symbols-outlined">close</span> Cambiar
+                            </button>
+                        </div>
+
+                        <!-- Resultado de validación -->
+                        <div id="address-validation-result"
+                             class="addr-validation-box addr-validation-box--empty addr-full"></div>
+
+                    </div>
+
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar ajustes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/address-autocomplete.js" defer></script>
+    <script>
+        // ── Mostrar dirección actual si ya hay una guardada ────────────────────
+        <% if (settings.origin_street && settings.origin_number) { %>
+        document.addEventListener('DOMContentLoaded', function () {
+            const street  = '<%= (settings.origin_street  || '').replace(/'/g, "\\'") %>';
+            const number  = '<%= (settings.origin_number  || '').replace(/'/g, "\\'") %>';
+            <%
+                const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
+            %>
+            const prov    = '<%= _currentProv ? _currentProv.description.replace(/'/g, "\\'") : "" %>';
+            const mainLine = street + ' ' + number;
+            const subLine  = prov;
+
+            const row  = document.getElementById('addr-selected-row');
+            const text = document.getElementById('addr-chip-text');
+            if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' \u2014 ' + subLine : '');
+            if (row)  row.style.display = 'flex';
+
+            const box = document.getElementById('address-validation-result');
+            if (box) {
+                box.className = 'addr-validation-box addr-validation-box--valid addr-full';
+                box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
+            }
+            window.addrValid = true;
+        });
+        <% } %>
+
+        // ── SweetAlert al guardar con éxito ────────────────────────────────────
+        if (new URLSearchParams(window.location.search).get('success') === '1') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'success',
+                title: 'Ajustes guardados',
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color:      isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => { history.replaceState(null, '', '/setting'); });
+        }
+    </script>
+</body>
+</html>
