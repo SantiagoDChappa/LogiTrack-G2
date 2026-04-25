@@ -180,6 +180,7 @@ const updateShipment = async (req, res) => {
           toStatusId:   Number(body.newStatusId),
           comment:      body.statusComment || null
         });
+
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
         if (newStatus) notifyStatusChange(shipment, newStatus.description);
       }

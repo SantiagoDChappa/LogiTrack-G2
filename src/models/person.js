@@ -31,6 +31,20 @@ const create = async (data) => {
     });
 };
 
+const createOrUpdate = async (data) => {
+    let person = await findByDocument(data.document);
+
+    if(person) {
+        await person.update({
+            phone:        data.phone,
+            email:        data.email,
+            personTypeId: data.personTypeId
+        });
+        return person;
+    }
+    return await create(data);
+}
+
 const search = async ({ senderName, senderDocument, recipientName, recipientDocument }) => {
     const where = {};
 
@@ -42,5 +56,8 @@ const search = async ({ senderName, senderDocument, recipientName, recipientDocu
     return await Person.findAll({ where });
 };
 
+const findByDocument = async (document) => {
+    return await Person.findOne({ where: { document } });
+}
 
-module.exports = { Person, getAll, create, search };
+module.exports = { Person, getAll, create, search, findByDocument };
