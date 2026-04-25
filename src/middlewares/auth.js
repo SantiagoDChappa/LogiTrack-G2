@@ -22,17 +22,16 @@ const requireAuth = async (req, res, next) => {
     }
 };
 
-  const requireSupervisor = async (req, res, next) => {
-      const user = res.locals.currentUser;
-      if(user.roleId === enums.RoleType.OPERATOR.id){
-          return res.redirect('/');
-      }
-
-      try {
-          next();
-      } catch (err) {
-          res.redirect('/');
-      }
-  };
+const requireSupervisor = async (req, res, next) => {
+    const user = res.locals.currentUser;
+    if (user.roleId !== enums.RoleType.SUPERVISOR.id) {
+        return res.redirect('/');
+    }
+    try {
+        next();
+    } catch (err) {
+        res.redirect('/');
+    }
+};
 
   module.exports = { requireAuth, requireSupervisor };

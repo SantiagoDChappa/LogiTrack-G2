@@ -296,6 +296,29 @@
             </div>
 
         </div>
+    <!-- Asignar Repartidor -->
+<div class="section-card" style="margin-top: 1.5rem;">
+    <h2 class="section-title">Asignar Repartidor</h2>
+    <% if (shipment.deliveryUser) { %>
+        <p>Repartidor actual: <strong><%= shipment.deliveryUser.fullName %></strong></p>
+    <% } else { %>
+        <p>Sin repartidor asignado</p>
+    <% } %>
+    <form action="/shipment/update/<%= shipment.id %>/assign" method="POST" style="margin-top: 1rem;">
+        <div class="form-group">
+            <label for="deliveryUserId">Seleccionar Repartidor</label>
+            <select name="deliveryUserId" id="deliveryUserId" class="form-control">
+                <option value="">-- Sin asignar --</option>
+                <% deliveryUsers.forEach(user => { %>
+                    <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
+                        <%= user.fullName %>
+                    </option>
+                <% }) %>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top: 0.5rem;">Guardar Repartidor</button>
+    </form>
+</div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
