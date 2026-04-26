@@ -1,0 +1,779 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ─── Reset mínimo ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --c-primary:      #2563eb;
+    --c-primary-dk:   #1d4ed8;
+    --c-primary-lt:   #eff6ff;
+    --c-bg:           #f8fafc;
+    --c-surface:      #ffffff;
+    --c-border:       #e2e8f0;
+    --c-text:         #0f172a;
+    --c-text-2:       #475569;
+    --c-text-3:       #94a3b8;
+    --c-success:      #16a34a;
+    --c-warning:      #d97706;
+    --c-danger:       #dc2626;
+    --c-info:         #0284c7;
+    --radius:         12px;
+    --shadow:         0 4px 20px rgba(0,0,0,.08);
+}
+
+html { scroll-behavior: smooth; }
+
+/* ─── Dark mode ─── */
+[data-theme="dark"] {
+    --c-primary:    #3b82f6;
+    --c-primary-dk: #2563eb;
+    --c-primary-lt: #1e3a5f;
+    --c-bg:         #0f172a;
+    --c-surface:    #1e293b;
+    --c-border:     #334155;
+    --c-text:       #f1f5f9;
+    --c-text-2:     #94a3b8;
+    --c-text-3:     #475569;
+}
+
+[data-theme="dark"] .portal-nav         { background: #0f172a; border-color: #334155; }
+[data-theme="dark"] .portal-search-panel { background: #1e293b; }
+[data-theme="dark"] .portal-card        { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .portal-card-header { border-color: #334155; }
+[data-theme="dark"] .portal-card-field  { border-color: #334155; }
+[data-theme="dark"] .portal-faq         { background: #0f172a; }
+[data-theme="dark"] .portal-faq-item    { border-color: #334155; color: #f1f5f9; }
+[data-theme="dark"] .portal-footer      { background: #0a1120; border-color: #334155; }
+[data-theme="dark"] .portal-search-input-field {
+    background: #0f172a;
+    border-color: #334155;
+    color: #f1f5f9;
+}
+[data-theme="dark"] .portal-timeline-line { background: #334155; }
+
+/* ─── Navbar right group ─── */
+.portal-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* ─── Botón toggle tema ─── */
+.portal-theme-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.9rem;
+    background: transparent;
+    border: 1px solid var(--c-border);
+    border-radius: 9999px;
+    color: var(--c-text-2);
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: background .18s, border-color .18s, color .18s;
+}
+.portal-theme-btn:hover { background: var(--c-bg); border-color: var(--c-text-2); color: var(--c-text); }
+.portal-theme-btn .material-symbols-outlined { font-size: 1rem; }
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--c-bg);
+    color: var(--c-text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--c-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul { list-style: none; }
+
+/* ─── NAVBAR ─── */
+.portal-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    height: 64px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--c-border);
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+.portal-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--c-text);
+    text-decoration: none;
+}
+.portal-brand:hover { text-decoration: none; }
+
+.portal-logo { width: 36px; height: 36px; object-fit: contain; }
+
+.portal-nav-login {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border: 1.5px solid var(--c-primary);
+    border-radius: 8px;
+    color: var(--c-primary);
+    font-size: .875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .18s;
+}
+.portal-nav-login:hover {
+    background: var(--c-primary);
+    color: #fff;
+    text-decoration: none;
+}
+.portal-nav-login .material-symbols-outlined { font-size: 18px; }
+
+/* ─── HERO ─── */
+.portal-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a6e 60%, #2563eb 100%);
+    padding: 60px 24px 80px;
+}
+
+.portal-hero-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 48px;
+    align-items: center;
+}
+
+.portal-search-panel {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.2);
+}
+
+.portal-search-panel-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--c-text);
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.portal-search-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.portal-search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.portal-search-label {
+    font-size: .8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--c-text);
+}
+
+.portal-search-input-field {
+    padding: 12px 14px;
+    border: 1.5px solid var(--c-border);
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: .9375rem;
+    color: var(--c-text);
+    transition: border-color .18s;
+}
+.portal-search-input-field:focus {
+    outline: none;
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px #dbeafe;
+}
+
+.portal-search-help {
+    font-size: .75rem;
+    color: var(--c-text-3);
+}
+
+.portal-search-divider {
+    text-align: center;
+    color: var(--c-text-3);
+    font-size: .8125rem;
+    font-weight: 500;
+    margin: 4px 0;
+}
+
+.portal-search-panel-btn {
+    background: var(--c-primary);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Inter', sans-serif;
+    font-size: .9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background .18s;
+    margin-top: 8px;
+}
+.portal-search-panel-btn:hover {
+    background: var(--c-primary-dk);
+}
+
+.portal-hero-content {
+    text-align: left;
+}
+
+.portal-hero-label {
+    font-size: .8125rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #93c5fd;
+    margin-bottom: 12px;
+}
+
+.portal-hero-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 16px;
+    line-height: 1.15;
+}
+
+.portal-hero-sub {
+    font-size: 1rem;
+    color: #bfdbfe;
+    line-height: 1.6;
+    max-width: 500px;
+}
+
+/* ─── SEARCH ─── */
+.portal-search-form { width: 100%; }
+
+.portal-search-wrap {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    overflow: hidden;
+    padding: 6px 6px 6px 16px;
+    gap: 8px;
+}
+
+.portal-search-icon {
+    color: var(--c-text-3);
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.portal-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    color: var(--c-text);
+    background: transparent;
+    padding: 10px 0;
+}
+.portal-search-input::placeholder { color: var(--c-text-3); }
+
+.portal-search-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--c-primary);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    font-family: 'Inter', sans-serif;
+    font-size: .9375rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .18s, transform .1s;
+}
+.portal-search-btn:hover { background: var(--c-primary-dk); }
+.portal-search-btn:active { transform: scale(.98); }
+.portal-search-btn .material-symbols-outlined { font-size: 20px; }
+
+.portal-search-hint {
+    margin-top: 10px;
+    font-size: .8125rem;
+    color: #93c5fd;
+}
+
+/* ─── RESULTS ─── */
+.portal-results {
+    padding: 48px 24px;
+}
+
+.portal-results-inner {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.portal-results-title {
+    font-size: 1.125rem;
+    color: var(--c-text-2);
+    font-weight: 500;
+    margin-bottom: 24px;
+}
+.portal-results-title strong { color: var(--c-text); }
+
+/* ─── EMPTY ─── */
+.portal-empty {
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    padding: 56px 32px;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+.portal-empty-icon {
+    font-size: 56px;
+    color: var(--c-text-3);
+    margin-bottom: 16px;
+}
+.portal-empty h2 { font-size: 1.375rem; margin-bottom: 8px; }
+.portal-empty p { color: var(--c-text-2); font-size: .9375rem; }
+
+/* ─── CARD ─── */
+.portal-cards { display: flex; flex-direction: column; gap: 20px; }
+
+.portal-card {
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    border: 1px solid var(--c-border);
+}
+
+.portal-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--c-border);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.portal-card-tracking-label {
+    display: block;
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--c-text-3);
+    margin-bottom: 2px;
+}
+
+.portal-card-tracking-id {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--c-text);
+    letter-spacing: .03em;
+}
+
+/* ─── BADGES ─── */
+.portal-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: .8125rem;
+    font-weight: 600;
+}
+
+.portal-badge.pendiente, .portal-badge.inicial {
+    background: #fef3c7; color: #92400e;
+}
+.portal-badge.en_transito {
+    background: #dbeafe; color: #1d4ed8;
+}
+.portal-badge.entregado {
+    background: #dcfce7; color: #166534;
+}
+.portal-badge.cancelado, .portal-badge.cancelada {
+    background: #fee2e2; color: #991b1b;
+}
+.portal-badge.retrasado {
+    background: #ffedd5; color: #9a3412;
+}
+.portal-badge.en_sucursal {
+    background: #ede9fe; color: #6d28d9;
+}
+
+/* ─── TIMELINE ─── */
+.portal-timeline {
+    display: flex;
+    align-items: flex-start;
+    padding: 28px 24px 20px;
+    gap: 0;
+    overflow-x: auto;
+}
+
+.portal-timeline-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    flex: 1;
+    min-width: 72px;
+}
+
+.portal-timeline-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--c-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .25s;
+    position: relative;
+    z-index: 1;
+}
+.portal-timeline-circle .material-symbols-outlined {
+    font-size: 22px;
+    color: var(--c-text-3);
+}
+
+.portal-timeline-step.done .portal-timeline-circle {
+    background: #dcfce7;
+}
+.portal-timeline-step.done .portal-timeline-circle .material-symbols-outlined {
+    color: var(--c-success);
+}
+
+.portal-timeline-step.active .portal-timeline-circle {
+    background: var(--c-primary);
+    box-shadow: 0 0 0 4px #dbeafe;
+}
+.portal-timeline-step.active .portal-timeline-circle .material-symbols-outlined {
+    color: #ffffff;
+}
+
+.portal-timeline-step.cancelled .portal-timeline-circle {
+    background: #fee2e2;
+    box-shadow: 0 0 0 4px #fecaca;
+}
+.portal-timeline-step.cancelled .portal-timeline-circle .material-symbols-outlined {
+    color: var(--c-danger);
+}
+.portal-timeline-step.cancelled .portal-timeline-label {
+    color: var(--c-danger);
+    font-weight: 600;
+}
+.portal-timeline-step.cancelled .portal-timeline-date {
+    color: var(--c-danger);
+}
+
+.portal-timeline-line {
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    width: 100%;
+    height: 3px;
+    background: var(--c-border);
+    z-index: 0;
+}
+.portal-timeline-line.done { background: var(--c-success); }
+
+.portal-timeline-label {
+    margin-top: 10px;
+    font-size: .75rem;
+    font-weight: 500;
+    color: var(--c-text-3);
+    text-align: center;
+    line-height: 1.3;
+}
+.portal-timeline-step.done .portal-timeline-label,
+.portal-timeline-step.active .portal-timeline-label {
+    color: var(--c-text);
+    font-weight: 600;
+}
+
+.portal-timeline-date {
+    font-size: .7rem;
+    color: var(--c-text-3);
+    text-align: center;
+    margin-top: 2px;
+    min-height: 14px;
+}
+.portal-timeline-step.done .portal-timeline-date,
+.portal-timeline-step.active .portal-timeline-date {
+    color: var(--c-primary);
+    font-weight: 500;
+}
+
+/* ─── CANCELLED BANNER ─── */
+.portal-cancelled-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 24px;
+    padding: 14px 18px;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: .9375rem;
+}
+.portal-cancelled-banner .material-symbols-outlined { font-size: 22px; }
+
+/* ─── CARD GRID ─── */
+.portal-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--c-border);
+}
+
+.portal-card-field {
+    padding: 16px 24px;
+    border-right: 1px solid var(--c-border);
+    border-bottom: 1px solid var(--c-border);
+}
+.portal-card-field:last-child { border-right: none; }
+
+.portal-card-label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--c-text-3);
+    margin-bottom: 4px;
+}
+
+.portal-card-value {
+    font-size: .9375rem;
+    font-weight: 500;
+    color: var(--c-text);
+    word-break: break-word;
+}
+
+/* ─── FAQ ─── */
+.portal-faq {
+    background: var(--c-surface);
+    border-top: 1px solid var(--c-border);
+    padding: 64px 24px;
+}
+
+.portal-faq-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+}
+
+.portal-faq-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+}
+
+.portal-faq-item {
+    border-bottom: 1px solid var(--c-border);
+    padding: 14px 0;
+    cursor: pointer;
+}
+
+.portal-faq-item summary {
+    font-size: .9375rem;
+    font-weight: 600;
+    color: var(--c-text);
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+.portal-faq-item summary::after {
+    content: '+';
+    font-size: 1.25rem;
+    color: var(--c-primary);
+    flex-shrink: 0;
+}
+.portal-faq-item[open] summary::after { content: '−'; }
+
+.portal-faq-item p,
+.portal-faq-item ul {
+    margin-top: 10px;
+    font-size: .875rem;
+    color: var(--c-text-2);
+    line-height: 1.6;
+}
+.portal-faq-item ul { padding-left: 1rem; list-style: disc; }
+.portal-faq-item ul li { margin-bottom: 4px; }
+
+/* ─── CONTACT ─── */
+.portal-contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--c-border);
+}
+.portal-contact-item:last-child { border-bottom: none; }
+.portal-contact-item .material-symbols-outlined {
+    font-size: 24px;
+    color: var(--c-primary);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.portal-contact-item div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.portal-contact-item strong { font-size: .9375rem; }
+.portal-contact-item span, .portal-contact-item a {
+    font-size: .875rem;
+    color: var(--c-text-2);
+}
+
+/* ─── FOOTER ─── */
+.portal-footer {
+    background: #0f172a;
+    color: #94a3b8;
+    padding: 32px 24px;
+}
+
+.portal-footer-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+}
+
+.portal-footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #ffffff;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+.portal-footer-brand .portal-logo { width: 30px; height: 30px; }
+
+.portal-footer-links {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.portal-footer-links a {
+    font-size: .875rem;
+    color: #94a3b8;
+}
+.portal-footer-links a:hover { color: #ffffff; text-decoration: none; }
+
+.portal-footer-copy { font-size: .8125rem; }
+
+/* ─── HISTORY ─── */
+.portal-history {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--c-border);
+}
+
+.portal-history-title {
+    display: block;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--c-text-3);
+    margin-bottom: 12px;
+}
+
+.portal-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.portal-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .875rem;
+}
+
+.portal-history-date {
+    color: var(--c-text-3);
+    min-width: 110px;
+    font-size: .8125rem;
+}
+
+.portal-history-from {
+    color: var(--c-text-2);
+}
+
+.portal-history-arrow {
+    font-size: 16px;
+    color: var(--c-text-3);
+}
+
+.portal-history-to {
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.portal-history-comment {
+    color: var(--c-text-2);
+    font-size: .8125rem;
+    margin-left: 4px;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 900px) {
+    .portal-hero-wrapper {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+    .portal-hero-content {
+        text-align: center;
+    }
+}
+
+@media (max-width: 720px) {
+    .portal-faq-inner { grid-template-columns: 1fr; gap: 32px; }
+    .portal-card-grid { grid-template-columns: 1fr 1fr; }
+    .portal-search-panel { padding: 24px; }
+    .portal-hero-title { font-size: 1.75rem; }
+}
+
+@media (max-width: 480px) {
+    .portal-hero { padding: 40px 16px 60px; }
+    .portal-card-grid { grid-template-columns: 1fr; }
+    .portal-card-field { border-right: none; }
+    .portal-timeline { padding: 20px 12px; }
+    .portal-search-panel { padding: 20px; }
+    .portal-search-panel-title { font-size: 1.125rem; }
+    .portal-hero-title { font-size: 1.5rem; }
+}
