@@ -10,12 +10,15 @@ function setupAutocompletado(tipo) {
   function blockFields(bloquear) {
     [nameInput, emailInput, phoneInput].forEach(input => {
       input.readOnly = bloquear;
-      input.style.backgroundColor = bloquear ? '#eee' : '#fff';
+      input.style.opacity = bloquear ? '0.6' : '';
+      input.style.cursor = bloquear ? 'not-allowed' : '';
     });
+    editBtn.classList.toggle('btn-edit-persona--active', !bloquear);
   }
 
   editBtn.addEventListener('click', () => {
-    blockFields(false);
+    const editing = editBtn.classList.contains('btn-edit-persona--active');
+    blockFields(editing);
   });
 
   docInput.addEventListener('input', (e) => {
@@ -71,10 +74,51 @@ function limpiarDocumento(doc) {
   return doc.replace(/\./g, '');
 }
 
+function mismapersona(docA, docB) {
+  return docA && docB && limpiarDocumento(docA) === limpiarDocumento(docB);
+}
+
+function mostrarErrorMismaPersona() {
+  const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+  Swal.fire({
+    icon: 'error',
+    title: 'Documento duplicado',
+    text: 'El remitente y el destinatario no pueden ser la misma persona.',
+    confirmButtonText: 'Aceptar',
+    confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+    background: isDark ? '#1e293b' : '#ffffff',
+    color: isDark ? '#f1f5f9' : '#1e293b',
+  });
+}
+
 // inicializamos
 const sender = setupAutocompletado('sender');
 const recipient = setupAutocompletado('recipient');
 
+// Validación cruzada al cambiar documento
+document.getElementById('sender-document').addEventListener('change', () => {
+  if (mismapersona(
+    document.getElementById('sender-document').value,
+    document.getElementById('recipient-document').value
+  )) mostrarErrorMismaPersona();
+});
+document.getElementById('recipient-document').addEventListener('change', () => {
+  if (mismapersona(
+    document.getElementById('sender-document').value,
+    document.getElementById('recipient-document').value
+  )) mostrarErrorMismaPersona();
+});
+
+// Bloquear submit si misma persona
+document.querySelector('form')?.addEventListener('submit', (e) => {
+  if (mismapersona(
+    document.getElementById('sender-document').value,
+    document.getElementById('recipient-document').value
+  )) {
+    e.preventDefault();
+    mostrarErrorMismaPersona();
+  }
+});
 
 // 🔁 sincronización automática
 function sincronizarSiMismoDocumento() {

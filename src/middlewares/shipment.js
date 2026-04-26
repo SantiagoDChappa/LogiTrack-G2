@@ -13,7 +13,15 @@ const validateShipment = [
     body('recipientName').notEmpty().trim().withMessage('El nombre del destinatario es obligatorio'),
     body('recipientEmail').isEmail().normalizeEmail().withMessage('Email del destinatario inválido'),
     body('recipientPhone').isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido'),
-    body('recipientDocument').isLength({ min: 7, max: 11 }).withMessage('Documento del destinatario inválido'),
+    body('recipientDocument')
+        .isLength({ min: 7, max: 11 }).withMessage('Documento del destinatario inválido')
+        .custom((value, { req }) => {
+            const clean = v => v?.replace(/\./g, '');
+            if (clean(value) === clean(req.body.senderDocument)) {
+                throw new Error('El remitente y el destinatario no pueden ser la misma persona');
+            }
+            return true;
+        }),
 
     body('street').notEmpty().withMessage('La calle es obligatoria'),
     body('number').notEmpty().withMessage('La numeración es obligatoria'),
