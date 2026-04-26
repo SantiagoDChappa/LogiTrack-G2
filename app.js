@@ -21,6 +21,7 @@ const apiDistanceRoutes        = require('./src/routes/api/distance');
 const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const authRoutes        = require('./src/routes/auth');
+const personRoutes = require('./src/routes/person')
 const portalRoutes        = require('./src/routes/portal');
 
 // Conecto la base de datos con el sistema
@@ -56,7 +57,10 @@ app.use('/api/validate-address',  requireAuth, apiValidateAddressRoutes);
 app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.use((req, res) => {
+;
+app.use('/api/persons',personRoutes);
+
+/*app.use((req, res) => {
     const token = req.cookies?.token;
     if (token) {
         try {
@@ -67,7 +71,7 @@ app.use((req, res) => {
         }
     }
     res.redirect('/login');
-});
+});*/
 
 app.listen(port, () => {
     console.log(`LogiTrack running at http://localhost:${port}`);

@@ -274,6 +274,17 @@
   margin-bottom: 0;
 }
 
+.btn-edit-persona {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.btn-edit-persona--active {
+  background-color: var(--color-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary) !important;
+}
+
 .form-new .field {
   display: flex;
   flex-direction: column;

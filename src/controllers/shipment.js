@@ -77,7 +77,7 @@ const createShipment = async (req, res) => {
   try {
     const body = req.body;
     //Creo el remitente
-    const sender = await personModel.create({
+    const sender = await personModel.createOrUpdate({
         name:         body.senderName,
         document:     body.senderDocument,
         phone:        body.senderPhone,
@@ -86,7 +86,7 @@ const createShipment = async (req, res) => {
     });
 
     //Creo el destinatario
-    const recipient = await personModel.create({
+    const recipient = await personModel.createOrUpdate({
         name:         body.recipientName,
         document:     body.recipientDocument,
         phone:        body.recipientPhone,
@@ -183,6 +183,7 @@ const updateShipment = async (req, res) => {
           toStatusId:   Number(body.newStatusId),
           comment:      body.statusComment || null
         });
+
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
         if (newStatus) notifyStatusChange(shipment, newStatus.description);
       }
