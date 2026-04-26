@@ -15,6 +15,16 @@
             <h1>Modificación de envío</h1>
         </div>
 
+        <% const isOperator = !currentUser.getAccess; %>
+        <% const isNonEditable = isOperator && (shipment.statusId === 4 || shipment.statusId === 5); %>
+
+        <% if (isNonEditable) { %>
+        <div style="display:flex;align-items:center;gap:10px;background:#fee2e2;border:1px solid #f87171;border-radius:6px;padding:14px 18px;margin-bottom:20px;color:#991b1b;font-size:0.95rem;">
+            <span class="material-symbols-outlined">block</span>
+            <span>Este envío está <strong><%= shipment.status.description %></strong> y no puede modificarse en este estado.</span>
+        </div>
+        <% } %>
+
         <div class="page-update-wrapper">
 
             <%
@@ -160,10 +170,19 @@
 
                     <div class="update-card" style="grid-area:infopaquete">
                         <h3>Información del paquete</h3>
+                        <% if (isOperator) { %>
+                        <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#92400e;font-size:0.88rem;">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem;">lock</span>
+                            No tenés permisos para modificar estos campos.
+                        </div>
+                        <% } %>
                         <div class="update-fields">
                             <div class="field">
                                 <label for="shipment-type">Tipo de envío <span class="req">*</span></label>
-                                <select id="shipment-type" name="shipmentTypeId">
+                                <% if (isOperator) { %>
+                                <input type="hidden" name="shipmentTypeId" value="<%= shipment.shipmentTypeId || '' %>">
+                                <% } %>
+                                <select id="shipment-type" name="shipmentTypeId" <%= isOperator ? 'disabled' : '' %>>
                                     <option value="">Seleccione un tipo</option>
                                     <% typesShipment.forEach(type => { %>
                                         <option value="<%= type.id %>" <%= shipment.shipmentTypeId == type.id ? 'selected' : '' %>><%= type.description %></option>
@@ -172,17 +191,24 @@
                             </div>
                             <div class="field">
                                 <label for="weight-kg">Peso (kg) <span class="req">*</span></label>
-                                <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= shipment.weightKg || '' %>" placeholder="Ej: 1.5">
+                                <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= shipment.weightKg || '' %>" placeholder="Ej: 1.5" <%= isOperator ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                             <div class="field">
                                 <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
-                                <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= shipment.packageQty || '' %>" placeholder="Ej: 3">
+                                <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= shipment.packageQty || '' %>" placeholder="Ej: 3" <%= isOperator ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                         </div>
                     </div>
 
                     <div class="update-card" style="grid-area:direccion">
                         <h3>Dirección de entrega</h3>
+
+                        <% if (isOperator) { %>
+                        <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#92400e;font-size:0.88rem;">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem;">lock</span>
+                            No tenés permisos para modificar estos campos.
+                        </div>
+                        <% } %>
 
                         <input type="hidden" id="street"      name="street"     value="<%= shipment.address.street || '' %>">
                         <input type="hidden" id="number"      name="number"     value="<%= shipment.address.number || '' %>">
@@ -193,12 +219,14 @@
 
                         <div class="update-fields" style="display:flex;flex-direction:column;gap:var(--space-3);">
 
+                            <% if (!isOperator) { %>
                             <div class="field addr-search-wrapper" style="position:relative;">
                                 <label for="address-search">Dirección completa</label>
                                 <input id="address-search" type="text" autocomplete="off"
                                        placeholder="Ej: Av. Corrientes 1234, CABA">
                                 <div id="address-dropdown" class="addr-dropdown" style="display:none;"></div>
                             </div>
+                            <% } %>
 
                             <% const currentProvName = provinces.find(p => p.id == shipment.address.provinceId)?.description || ''; %>
                             <div class="addr-selected-row" id="addr-selected-row"
@@ -209,14 +237,16 @@
                                         <strong><%= shipment.address.street %> <%= shipment.address.number %></strong><% if (currentProvName) { %> — <%= currentProvName %><% } %>
                                     </span>
                                 </div>
+                                <% if (!isOperator) { %>
                                 <button type="button" id="address-clear" class="addr-clear-btn">
                                     <span class="material-symbols-outlined">close</span> Cambiar
                                 </button>
+                                <% } %>
                             </div>
 
                             <div class="field">
                                 <label for="floor-apartment">Piso y/o Depto <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
-                                <input id="floor-apartment" type="text" name="floorApartment" value="<%= shipment.address.floorApartment || '' %>" placeholder="Ej: 3° B">
+                                <input id="floor-apartment" type="text" name="floorApartment" value="<%= shipment.address.floorApartment || '' %>" placeholder="Ej: 3° B" <%= isOperator ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                         </div>
                     </div>
@@ -292,7 +322,7 @@
 
             <div class="update-form-actions">
                 <a href="/shipment" class="btn-secondary">Cancelar</a>
-                <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes">Guardar cambios</button>
+                <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes" <%= isNonEditable ? 'disabled' : '' %>>Guardar cambios</button>
             </div>
 
         </div>

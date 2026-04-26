@@ -94,6 +94,7 @@ const handleUpdateValidationErrors = async (req, res, next) => {
         statuses,
         history,
         typesShipment,
+        mapData: { origin: { lat: -34.6037, lng: -58.3816, label: 'Origen' }, destination: null },
     });
 };
 

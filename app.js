@@ -22,6 +22,7 @@ const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const authRoutes        = require('./src/routes/auth');
 const personRoutes = require('./src/routes/person')
+const portalRoutes        = require('./src/routes/portal');
 
 // Conecto la base de datos con el sistema
 sequelize.sync({ alter: true }) 
@@ -37,13 +38,14 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // Rutas Publicas
+app.use('/', portalRoutes);
 app.use('/', authRoutes);
 
 
 app.use(apiHealthRoutes);
 
 // Rutas Protegidas
-app.use('/', requireAuth, homeRoutes);
+app.use('/home', requireAuth, homeRoutes);
 app.use('/user',          requireAuth, requireSupervisor, userRoutes);
 app.use('/shipment',      requireAuth, shipmentRoutes);
 app.use('/setting',       requireAuth, requireSupervisor, settingRoutes);

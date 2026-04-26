@@ -3,7 +3,15 @@ const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 
 const getLogin = async (req, res) => {
-    return res.render('login',);
+    if (req.cookies?.token) {
+        try {
+            require('jsonwebtoken').verify(req.cookies.token, process.env.JWT_SECRET);
+            return res.redirect('/home');
+        } catch {
+            res.clearCookie('token');
+        }
+    }
+    return res.render('login');
 };
 
 const login = async (req, res) => {
@@ -30,7 +38,7 @@ const login = async (req, res) => {
         cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 días
     }
     res.cookie('token', token, cookieOptions);
-    res.redirect('/');
+    res.redirect('/home');
 };
 
 const logout = async (req, res) => {

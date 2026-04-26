@@ -156,22 +156,25 @@ const getUpdateShipment = async (req, res) => {
 
 const updateShipment = async (req, res) => {
   try {
-    const { id } = req.params;
-    const body   = { ...req.body, id };
+    const { id }      = req.params;
+    const body        = { ...req.body, id };
+    const currentUser = res.locals.currentUser;
+    const { RoleType, Status } = require('../constants/enums');
+    const isOperator  = currentUser.roleId === RoleType.OPERATOR.id;
+
+    const shipment = await shipmentModel.getById(id);
+    if (!shipment) return res.status(404).send('Envío no encontrado');
+
+    // Escenario 3: operador no puede editar un envío Entregado o Cancelado
+    if (isOperator && (shipment.statusId === Status.DELIVERED.id || shipment.statusId === Status.CANCELLED.id)) {
+      return res.redirect(`/shipment/update/${id}`);
+    }
 
     if (body.newStatusId) {
-      // Solo supervisores pueden cambiar el estado
-      const currentUser = res.locals.currentUser;
-      const { RoleType } = require('../constants/enums');
-      
-      if (currentUser.roleId !== RoleType.SUPERVISOR.id) {
+      if (isOperator) {
         return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
       }
-
-      const [shipment, newStatus] = await Promise.all([
-          shipmentModel.getById(id),
-          statusModel.getById(Number(body.newStatusId)),
-      ]);
+      const newStatus = await statusModel.getById(Number(body.newStatusId));
       // Solo registrar si realmente cambia de estado (evita duplicados por doble submit)
       if (shipment.statusId !== Number(body.newStatusId)) {
         await shipmentHistoryModel.create({
@@ -184,6 +187,19 @@ const updateShipment = async (req, res) => {
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
         if (newStatus) notifyStatusChange(shipment, newStatus.description);
       }
+    }
+
+    if (isOperator) {
+      body.street         = shipment.address.street;
+      body.number         = shipment.address.number;
+      body.province       = shipment.address.provinceId;
+      body.postalCode     = shipment.address.postalCode;
+      body.floorApartment = shipment.address.floorApartment;
+      body.addressLat     = shipment.address.lat;
+      body.addressLng     = shipment.address.lng;
+      body.weightKg       = shipment.weightKg;
+      body.packageQty     = shipment.packageQty;
+      body.shipmentTypeId = shipment.shipmentTypeId;
     }
 
     await shipmentModel.update(body);
