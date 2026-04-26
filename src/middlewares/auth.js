@@ -33,5 +33,15 @@ const requireSupervisor = async (req, res, next) => {
         res.redirect('/');
     }
 };
-
-  module.exports = { requireAuth, requireSupervisor };
+const requireDelivery = async (req, res, next) => {
+    const user = res.locals.currentUser;
+    if (user.roleId !== enums.RoleType.DELIVERY.id) {
+        return res.redirect('/');
+    }
+    try {
+        next();
+    } catch (err) {
+        res.redirect('/');
+    }
+};
+module.exports = { requireAuth, requireSupervisor, requireDelivery };

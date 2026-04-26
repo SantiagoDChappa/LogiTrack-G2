@@ -74,10 +74,12 @@ const create = async (data) => {
     });
 };
 
-const search = async ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds }) => {
+const search = async ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId }) => {
     const shipmentWhere  = {};
     const senderWhere    = {};
     const recipientWhere = {};
+
+    if (deliveryUserId) shipmentWhere.deliveryUserId = deliveryUserId;
 
     if (statusIds && statusIds.length > 0) {
         shipmentWhere.statusId = { [Op.in]: statusIds.map(Number) };

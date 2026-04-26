@@ -9,7 +9,11 @@
         </a>
         <div class="nav">
             <li>
-                <a href="/shipment"><ul><span class="material-symbols-outlined">local_shipping</span>Envios</ul></a>
+                <% if (currentUser.roleId === 3) { %>
+    <a href="/delivery"><ul><span class="material-symbols-outlined">local_shipping</span>Mis Envíos</ul></a>
+<% } else { %>
+    <a href="/shipment"><ul><span class="material-symbols-outlined">local_shipping</span>Envios</ul></a>
+<% } %>
                 <% if (currentUser.getAccess) { %>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
                 <% } %>
@@ -38,7 +42,7 @@
         <div class="user">
             <div class="user-avatar"><%= currentUser.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
             <span class="user-name"><%= currentUser.fullName %></span>
-            <span class="user-role"><%= currentUser.roleId == 1 ? "Supervisor" : "Operador" %></span>
+            <span class="user-role"><%= currentUser.roleId == 1 ? "Supervisor" : currentUser.roleId == 2 ? "Operador" : "Repartidor" %></span>
             <span class="material-symbols-outlined">keyboard_arrow_down</span>
         </div>
         <div class="user-dropdown" id="user-dropdown">

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Mis Envíos - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Mis Envíos Asignados</h1>
+        </div>
+        <div class="table-container">
+            <% if (shipments.length === 0) { %>
+                <p>No tenés envíos asignados.</p>
+            <% } else { %>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tracking ID</th>
+                            <th>Destinatario</th>
+                            <th>Dirección</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% shipments.forEach(shipment => { %>
+                            <tr>
+                                <td><%= shipment.trackingId %></td>
+                                <td><%= shipment.recipient.fullName %></td>
+                                <td><%= shipment.address.street %> <%= shipment.address.number %></td>
+                                <td><%= shipment.status.description %></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            <% } %>
+        </div>
+    </main>
+</body>
+</html>
