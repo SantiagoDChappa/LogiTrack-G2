@@ -194,11 +194,17 @@ const updateShipment = async (req, res) => {
       ]);
       // Solo registrar si realmente cambia de estado (evita duplicados por doble submit)
       if (shipment.statusId !== Number(body.newStatusId)) {
+        let comment = body.statusComment || null;
+        if (Number(body.newStatusId) === 4 && body.deliveredName) {
+          comment = `Recibido por: ${body.deliveredName} (DNI: ${body.deliveredDocument})`;
+          if (body.deliveredObservation) comment += ` — ${body.deliveredObservation}`;
+        }
+
         await shipmentHistoryModel.create({
           shipmentId:   id,
           fromStatusId: shipment.statusId,
           toStatusId:   Number(body.newStatusId),
-          comment:      body.statusComment || null
+          comment,
         });
 
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
