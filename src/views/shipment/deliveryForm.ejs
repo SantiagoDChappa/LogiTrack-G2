@@ -1,0 +1,39 @@
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Entrega de Envío</title>
+    <link rel="stylesheet" href="/public/css/deliveryForm.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Registro de Entrega</h1>
+
+        <form id="form-entrega" class="form">
+
+            <input type="hidden" name="shipmentId" value="<%= shipmentId %>">
+
+            <div class="form-group">
+                <label for="nombre">Nombre de quien recibe</label>
+                <input type="text" id="nombre" name="name" placeholder="Ej: Juan Pérez" required>
+            </div>
+
+            <div class="form-group">
+                <label for="documento">Documento (DNI)</label>
+                <input type="text" id="documento" name="document" placeholder="Ej: 12345678" required>
+            </div>
+
+            <div class="form-group">
+                <label for="observacion">Observación</label>
+                <textarea id="observacion" name="observation" rows="4" maxlength="300" placeholder="Detalles adicionales..."></textarea>
+                <small id="contador">300 caracteres restantes</small>
+            </div>
+            <button type="submit">Registrar Entrega</button>
+        </form>
+    </div>
+
+</body>
+</html>
+    <script src="/public/js/deliveryForm.js" defer></script>
+  </body>
+</html>

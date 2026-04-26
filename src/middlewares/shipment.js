@@ -3,6 +3,8 @@ const provinceModel        = require("../models/province");
 const shipmentModel        = require("../models/shipment");
 const statusModel          = require("../models/status");
 const shipmentHistoryModel = require("../models/shipmentHistory");
+const userModel            = require("../models/user");
+const {RoleType}             = require("../constants/enums");
 
 const validateShipment = [
     body('senderName').notEmpty().trim().withMessage('El nombre del remitente es obligatorio'),

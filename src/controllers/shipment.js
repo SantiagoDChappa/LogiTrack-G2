@@ -120,6 +120,26 @@ const createShipment = async (req, res) => {
     res.status(500).send(err.message);
   }
 };
+/*
+const deliveredShipment = async (req, res) => {
+  const { name, document, observation, shipmentId, deliveryId } = req.body;
+
+  const shipment = await shipmentModel.getById(shipmentId);
+  if (!shipment) {
+    return res.status(404).json({ error: 'Envío no encontrado' });
+  }
+
+  if (shipment.statusId === 5) { // Ya está entregado
+    return res.status(400).json({ error: 'El envío ya ha sido marcado como entregado' });
+  }
+
+  if (shipment.deliveryId !== deliveryId) {
+    return res.status(400).json({ error: 'El envio no esta asignado al repartidor' });
+  }
+  res.status(200).json({ message: 'Envío marcado como entregado exitosamente' });
+  return shipmentModel.markAsDelivered(shipmentId, { name, document, observation, deliveryId})
+};*/
+
 
 const getUpdateShipment = async (req, res) => {
   const { id } = req.params;
