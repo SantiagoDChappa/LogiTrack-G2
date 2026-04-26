@@ -274,6 +274,11 @@
   margin-bottom: 0;
 }
 
+.btn-edit-persona {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
 .form-new .field {
   display: flex;
   flex-direction: column;
