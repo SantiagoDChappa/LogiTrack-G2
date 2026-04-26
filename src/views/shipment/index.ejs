@@ -123,8 +123,7 @@
                             </td>
                         </tr>
                     <% } else { %>
-                                                        <% console.log("ultimo envios: " + shipments) %>
-                        <% shipments.forEach(shipment => { %>
+<% shipments.forEach(shipment => { %>
                             <tr>
                                 <td class="tracking-id"><%= shipment.trackingId %></td>
                                 <td><%= shipment.sender.fullName %></td>
