@@ -88,40 +88,60 @@
                 </div>
                 <% } %>
 
-                <!-- ── Historial de estado ── -->
+                <!-- ── Línea de tiempo ── -->
                 <div class="update-card">
-                    <h3><span class="material-symbols-outlined">history</span> Historial de estado</h3>
+                    <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo</h3>
                     <% if (history.length === 0) { %>
-                        <p class="historial-empty">Sin cambios registrados.</p>
+                        <p class="historial-empty">Sin eventos registrados.</p>
                     <% } else { %>
                         <%
                             const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
                             function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         %>
-                        <ul class="historial-list">
+                        <ol class="shipment-timeline">
                             <% history.forEach(function(h) { %>
                                 <%
-                                    const _fk = h.fromStatus ? _sk2(h.fromStatus.description) : 'inicial';
-                                    const _fl = h.fromStatus ? (_sl2[_fk] || h.fromStatus.description) : 'Inicial';
+                                    const _isCreated = h.eventType === 'CREATED';
                                     const _tk = _sk2(h.toStatus.description);
                                     const _tl = _sl2[_tk] || h.toStatus.description;
+                                    const _icon = _isCreated ? 'add_circle' : 'swap_horiz';
+                                    const _author = h.user ? h.user.fullName : null;
                                 %>
-                                <li class="historial-item">
-                                    <span class="historial-fecha">
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %> -
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                <li class="shipment-timeline-item">
+                                    <span class="shipment-timeline-dot <%= _tk %>">
+                                        <span class="material-symbols-outlined"><%= _icon %></span>
                                     </span>
-                                    <span class="historial-estados">
-                                        <span class="status-badge status-badge--sm <%= _fk %>"><%= _fl %></span>
-                                        →
-                                        <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
-                                    </span>
-                                    <% if (h.comment) { %>
-                                        <span class="historial-motivo">Motivo: <%= h.comment %></span>
-                                    <% } %>
+                                    <div class="shipment-timeline-content">
+                                        <div class="shipment-timeline-header">
+                                            <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
+                                            <% if (_isCreated) { %>
+                                                <span class="shipment-timeline-tag">Creación del envío</span>
+                                            <% } else if (h.fromStatus) { %>
+                                                <%
+                                                    const _fk = _sk2(h.fromStatus.description);
+                                                    const _fl = _sl2[_fk] || h.fromStatus.description;
+                                                %>
+                                                <span class="shipment-timeline-tag">Desde <%= _fl %></span>
+                                            <% } %>
+                                        </div>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
+                                            <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
+                                            <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        </div>
+                                        <% if (_author) { %>
+                                            <div class="shipment-timeline-meta">
+                                                <span class="material-symbols-outlined shipment-timeline-meta-ico">person</span>
+                                                <%= _author %>
+                                            </div>
+                                        <% } %>
+                                        <% if (h.comment) { %>
+                                            <div class="shipment-timeline-comment">"<%= h.comment %>"</div>
+                                        <% } %>
+                                    </div>
                                 </li>
                             <% }) %>
-                        </ul>
+                        </ol>
                     <% } %>
                 </div>
 
