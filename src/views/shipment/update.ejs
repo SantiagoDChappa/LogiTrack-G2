@@ -13,6 +13,7 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Modificación de envío</h1>
+            <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
         </div>
 
         <% const isOperator = !currentUser.getAccess; %>
@@ -32,6 +33,15 @@
                 const _slU = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
                 const _slLabel = _slU[_sk] || shipment.status.description;
             %>
+
+            <!-- Tracking ID + estado -->
+            <div class="detail-top">
+                <div class="detail-tracking">
+                    <span class="detail-tracking-label">ID Tracking</span>
+                    <span class="detail-tracking-id"><%= shipment.trackingId %></span>
+                </div>
+                <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
+            </div>
 
             <!-- ══════════ TOP: 3 COLUMNAS ══════════ -->
             <div class="update-top-grid">
@@ -361,7 +371,6 @@
             <!-- ══════════ FIN FORM ══════════ -->
 
             <div class="update-form-actions">
-                <a href="<%= returnUrl %>" class="btn-secondary">Cancelar</a>
                 <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes" <%= isNonEditable ? 'disabled' : '' %>>Guardar cambios</button>
             </div>
 
