@@ -29,17 +29,18 @@ const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
-// Nota: NO usamos sync({alter:true}) porque mutaba el schema en cada arranque
-// (creaba FKs duplicadas y borraba columnas que no estaban en el modelo).
-// Los cambios de schema van por src/database/migrations/. Las migraciones son
-// idempotentes, así que correrlas en cada arranque es seguro y se autorrepara
-// si otro server con la rama vieja borró columnas.
 const path = require('path');
 
-sequelize.authenticate()
-    .then(() => runMigrations())
-    .then(() => console.warn('Base de datos conectada y migrada'))
-    .catch(err => console.error('Error de DB:', err));
+if (process.env.NODE_ENV === 'test') {
+    sequelize.authenticate()
+        .then(() => console.warn('Base de datos conectada (test)'))
+        .catch(err => console.error('Error de DB (test):', err));
+} else {
+    sequelize.authenticate()
+        .then(() => runMigrations())
+        .then(() => console.warn('Base de datos conectada y migrada'))
+        .catch(err => console.error('Error de DB:', err));
+}
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'src', 'views'));

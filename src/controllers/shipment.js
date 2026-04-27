@@ -138,7 +138,14 @@ const createShipment = async (req, res) => {
     res.redirect('/shipment?success=1');
   } catch (err) {
     console.error('ERROR createShipment:', err.message);
-    res.status(500).send('Error interno al crear el envío');
+    const provinces     = await provinceModel.getAll();
+    const typesShipment = await typeShipmentModel.getAll();
+    res.render('shipment/new', { 
+        errors: [err.message], 
+        body: req.body, 
+        provinces, 
+        typesShipment 
+    });
   }
 };
 
