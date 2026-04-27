@@ -10,6 +10,7 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Modificación de usuario</h1>
+            <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
         </div>
         <div class="form-new">
             <form action="/user/update/<%= user.id %>" method="POST">
@@ -41,7 +42,6 @@
                 </div>
 
                 <div class="form-actions">
-                    <a href="<%= returnUrl %>" class="btn-secondary">Cancelar</a>
                     <button type="submit" class="btn-primary">Guardar cambios</button>
                 </div>
             </form>

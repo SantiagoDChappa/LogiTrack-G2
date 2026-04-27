@@ -15,7 +15,14 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Detalle de Envío</h1>
-            <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
+            <div style="display:flex;gap:var(--space-3)">
+                <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
+                <% if (currentUser.getAccess || currentUser.roleId === 2) { %>
+                <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="btn-primary">
+                    <span class="material-symbols-outlined">edit</span>Modificar
+                </a>
+                <% } %>
+            </div>
         </div>
 
         <div class="detail-wrapper">

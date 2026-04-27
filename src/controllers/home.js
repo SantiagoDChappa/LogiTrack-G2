@@ -3,6 +3,7 @@ const shipmentModel = require('../models/shipment');
 const getIndex = async (req, res) => {
     if (req.user && req.user.roleId === 3) return res.redirect('/delivery');
 
+
     const shipments = await shipmentModel.getAll();
 
     const normalizeStatus = (s) => s.status.description.toLowerCase().replace(/[\s-]+/g, '_');
