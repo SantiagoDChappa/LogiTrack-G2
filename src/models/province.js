@@ -8,7 +8,7 @@ const Province = sequelize.define('province', {
 { tableName: 'province', timestamps: false });
 
 const getAll = async () => {
-    return await Province.findAll();
+    return Province.findAll();
 };
 
 module.exports = { Province, getAll };

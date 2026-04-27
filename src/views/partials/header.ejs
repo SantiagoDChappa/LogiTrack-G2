@@ -3,18 +3,22 @@
         <button class="nav-close-btn" id="btn-nav-close" aria-label="Cerrar menú">
             <span class="material-symbols-outlined">close</span>
         </button>
-        <a href="/" class="logo">
+        <a href="<%= currentUser.roleId === 3 ? '/delivery' : '/home' %>" class="logo">
             <img src="/images/logo.png" alt="LogiTrack logo">
             <h1>LogiTrack</h1>
         </a>
         <div class="nav">
             <li>
-                <a href="/shipment"><ul><span class="material-symbols-outlined">local_shipping</span>Envios</ul></a>
-                <% if (currentUser.getAccess) { %>
+                <% if (currentUser.roleId === 3) { %>
+    <a href="/delivery"><ul><span class="material-symbols-outlined">local_shipping</span>Mis Envíos</ul></a>
+<% } else { %>
+    <a href="/shipment"><ul><span class="material-symbols-outlined">local_shipping</span>Envios</ul></a>
+<% } %>
+                <% if (currentUser.roleId === 1) { %>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
                 <% } %>
-                <a href="/"><ul><span class="material-symbols-outlined">bar_chart</span>Reportes</ul></a>
-                <% if (currentUser.getAccess) { %>
+                <!-- <a href="/"><ul><span class="material-symbols-outlined">bar_chart</span>Reportes</ul></a> -->
+                <% if (currentUser.roleId === 1) { %>
                     <a href="/setting"><ul><span class="material-symbols-outlined">settings</span>Ajustes</ul></a>
                 <% } %>
             </li>
@@ -30,7 +34,7 @@
         <button id="btn-hamburger" class="hamburger-btn" aria-label="Abrir menú">
             <span class="material-symbols-outlined">menu</span>
         </button>
-        <a href="/" class="logo-mobile">
+        <a href="<%= currentUser.roleId === 3 ? '/delivery' : '/home' %>" class="logo-mobile">
             <img src="/images/logo.png" alt="LogiTrack">
             <span>LogiTrack</span>
         </a>
@@ -38,7 +42,7 @@
         <div class="user">
             <div class="user-avatar"><%= currentUser.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
             <span class="user-name"><%= currentUser.fullName %></span>
-            <span class="user-role"><%= currentUser.roleId == 1 ? "Supervisor" : "Operador" %></span>
+            <span class="user-role"><%= currentUser.roleId == 1 ? "Supervisor" : currentUser.roleId == 2 ? "Operador" : "Repartidor" %></span>
             <span class="material-symbols-outlined">keyboard_arrow_down</span>
         </div>
         <div class="user-dropdown" id="user-dropdown">

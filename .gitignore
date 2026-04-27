@@ -1,5 +1,5 @@
 node_modules/
-
+package-lock.json
 # Environment
 .env
 .env.local
@@ -8,7 +8,9 @@ server/.env
 
 # Logs
 *.log
+*.png
 npm-debug.log*
+CLAUDE.MD
 
 # ML
 ml/.venv/
@@ -25,3 +27,6 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+.gemini/
+coverage/
+docs

@@ -13,38 +13,23 @@ const validateShipment = [
     body('recipientName').notEmpty().trim().withMessage('El nombre del destinatario es obligatorio'),
     body('recipientEmail').isEmail().normalizeEmail().withMessage('Email del destinatario inválido'),
     body('recipientPhone').isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido'),
-    body('recipientDocument').isLength({ min: 7, max: 11 }).withMessage('Documento del destinatario inválido'),
+    body('recipientDocument')
+        .isLength({ min: 7, max: 11 }).withMessage('Documento del destinatario inválido')
+        .custom((value, { req }) => {
+            const clean = v => v?.replace(/\./g, '');
+            if (clean(value) === clean(req.body.senderDocument)) {
+                throw new Error('El remitente y el destinatario no pueden ser la misma persona');
+            }
+            return true;
+        }),
 
     body('street').notEmpty().withMessage('La calle es obligatoria'),
-    body('number').notEmpty().withMessage('La numeración es obligatoria'),
-    body('province').notEmpty().withMessage('La provincia es obligatoria'),
+    body('number').isInt({ min: 1 }).withMessage('La numeración debe ser un número positivo'),
+    body('province').isInt().withMessage('Provincia inválida'),
     body('postalCode').notEmpty().withMessage('El código postal es obligatorio'),
-
+    body('weightKg').optional({ checkFalsy: true }).isFloat({ min: 0.1 }).withMessage('El peso debe ser mayor a 0'),
+    body('packageQty').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('La cantidad debe ser al menos 1'),
 ];
-
-const handleValidationErrors = async (req, res, next) => {
-    const errors = validationResult(req);
-    const provinces = await provinceModel.getAll();
-
-    const recipientDoc = req.body.recipientDocument;
-    const senderDoc    = req.body.senderDocument;
-
-    const errorsArray = errors.array();
-
-    if (await shipmentModel.existsByDocument(recipientDoc)) {
-        errorsArray.push({ msg: 'Ya existe un envío con ese documento de destinatario' });
-    }
-    if (await shipmentModel.existsByDocument(senderDoc)) {
-        errorsArray.push({ msg: 'Ya existe un envío con ese documento de remitente' });
-    }
-
-    if (errorsArray.length > 0) {
-        const typesShipment = await require('../models/typeShipment').getAll();
-        return res.render('shipment/new', { errors: errorsArray, body: req.body, provinces, typesShipment });
-    }
-
-    next();
-};
 
 const validateUpdateShipment = [
     body('recipientName').notEmpty().trim().withMessage('El nombre del destinatario es obligatorio'),
@@ -68,7 +53,7 @@ const validateUpdateShipment = [
 
 const handleUpdateValidationErrors = async (req, res, next) => {
     const errors = validationResult(req);
-    if (errors.isEmpty()) return next();
+    if (errors.isEmpty()) { return next(); }
 
     const { id } = req.params;
     const [provinces, statuses, shipment, history, typesShipment] = await Promise.all([
@@ -80,13 +65,15 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     ]);
 
     return res.render('shipment/update', {
-        errors: errors.array(),
+        errors: errors.array().map(e => e.msg),
         shipment,
         provinces,
         statuses,
         history,
         typesShipment,
+        mapData: { origin: { lat: -34.6037, lng: -58.3816, label: 'Origen' }, destination: null },
+        returnUrl: '/shipment'
     });
 };
 
-module.exports = { validateShipment, handleValidationErrors, validateUpdateShipment, handleUpdateValidationErrors };
+module.exports = { validateShipment, validateUpdateShipment, handleUpdateValidationErrors };

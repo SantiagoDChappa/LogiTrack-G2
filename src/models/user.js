@@ -5,93 +5,85 @@ const SALT_ROUNDS = 12;
 
 const User = sequelize.define('user', {
     id:       { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    fullName: { type: DataTypes.TEXT    },
-    email:    { type: DataTypes.STRING  },
-    password: { type: DataTypes.STRING  },
-    document: { type: DataTypes.INTEGER },
-    roleId:   { type: DataTypes.INTEGER }
-}, { timestamps: false, tableName: 'user' });
+    fullName: { type: DataTypes.TEXT,    allowNull: false },
+    email:    { type: DataTypes.TEXT,    allowNull: false, unique: true },
+    password: { type: DataTypes.TEXT,    allowNull: false },
+    document: { type: DataTypes.INTEGER, allowNull: false, unique: true },
+    roleId:   { type: DataTypes.INTEGER, allowNull: false },
+    active:   { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+}, { tableName: 'user', timestamps: false });
 
-const getAll = async () => {
-    return await User.findAll({ order: [['id', 'ASC']] });
-};
+const getAll = () => User.findAll();
 
-const getById = async (id) => {
-    return await User.findOne({ where: { id } });
-};
+const getById = (id) => User.findByPk(id);
 
 const create = async (data) => {
-    const password =  await bcrypt.hash(data.password, SALT_ROUNDS);
-    return await User.create({
+    const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
+    return User.create({
         fullName: data.fullName,
         email:    data.email,
-        password: password,
+        password: hashedPassword,
         document: data.document,
-        roleId:   data.roleId
+        roleId:   data.roleId,
+        active:   true,
     });
-
 };
 
-const search = async ({ fullName, document, email, roleId }) => {
+const update = async (id, data) => {
+    const updateData = { ...data };
+    if (updateData.password) {
+        updateData.password = await bcrypt.hash(updateData.password, SALT_ROUNDS);
+    }
+    if (updateData.active !== undefined) {
+        updateData.active = updateData.active === 'true' || updateData.active === true;
+    }
+    return User.update(updateData, { where: { id } });
+};
+
+const deleteById = (id) => User.update({ active: false }, { where: { id } });
+
+const search = ({ fullName, document, roleId, active }) => {
     const where = {};
+    if (fullName) { where.fullName = { [Op.iLike]: `%${fullName}%` }; }
+    if (document) { where.document = document; }
+    if (roleId)   { where.roleId   = roleId; }
+    
+    if (active === 'true') { where.active = true; }
+    else if (active === 'false') { where.active = false; }
 
-    if (fullName) where.fullName = { [Op.iLike]: `%${fullName}%` };
-    if (document) where.document = document;
-    if (email)    where.email    = { [Op.iLike]: `%${email}%` };
-    if (roleId)   where.roleId   = roleId;
-
-    return await User.findAll({ where, order: [['id', 'ASC']] });
-};
-
-const deleteById = async (id) => {
-    return await User.destroy({ where: { id } });
-};
-
-const update = async (data) => {
-    return await User.update(
-        {
-            fullName: data.fullName,
-            email:    data.email,
-            document: data.document,
-            roleId:   data.roleId
-        },
-        { where: { id: data.id } }
-    );
+    return User.findAll({ where });
 };
 
 const existsByDocument = async (document) => {
-    const result = await User.findOne({
-        where: { document: document }
-    });
-    console.log("RESULTADO: " + result);
-    return result !== null;
+    const user = await User.findOne({ where: { document } });
+    return user !== null;
 };
 
 const existsByEmail = async (email) => {
-    const result = await User.findOne({
-        where: { email: email }
+    const user = await User.findOne({ where: { email } });
+    return user !== null;
+};
+
+const existsByDocumentExcluding = async (document, id) => {
+    const user = await User.findOne({
+        where: {
+            document,
+            id: { [Op.ne]: id },
+        },
     });
-    return result !== null;
+    return user !== null;
 };
 
-const existsByDocumentExcluding = async (document, excludeId) => {
-    const result = await User.findOne({
-        where: { document: document, id: { [Op.ne]: excludeId } }
+const existsByEmailExcluding = async (email, id) => {
+    const user = await User.findOne({
+        where: {
+            email,
+            id: { [Op.ne]: id },
+        },
     });
-    return result !== null;
+    return user !== null;
 };
 
-const existsByEmailExcluding = async (email, excludeId) => {
-    const result = await User.findOne({
-        where: { email: email, id: { [Op.ne]: excludeId } }
-    });
-    return result !== null;
-};
-
-
-const findByEmail = async (email) => {
-    return await User.findOne({ where: { email } });
-};
-
+const findByEmail = (email) => User.findOne({ where: { email } });
 
 module.exports = { User, getAll, getById, create, update, deleteById, search, existsByDocument, existsByEmail, existsByDocumentExcluding, existsByEmailExcluding, findByEmail };

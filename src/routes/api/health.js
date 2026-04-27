@@ -1,15 +1,14 @@
-// En src/routes/health.js
-  const express = require('express');
-  const router = express.Router();
-  const sequelize = require('../../database/connection'); 
+const express = require('express');
+const router = express.Router();
+const sequelize = require('../../database/connection');
 
-  router.get('/health', async (req, res) => {
-      try {
-          await sequelize.authenticate();
-          res.json({ status: 'ok' });
-      } catch (err) {
-          res.status(500).json({ status: 'error' });
-      }
-  });
+router.get('/', async (req, res) => {
+    try {
+        await sequelize.authenticate();
+        res.json({ status: 'ok', database: 'connected' });
+    } catch {
+        res.status(500).json({ status: 'error', database: 'disconnected' });
+    }
+});
 
-  module.exports = router;
+module.exports = router;

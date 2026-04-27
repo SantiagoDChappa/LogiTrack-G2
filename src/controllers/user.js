@@ -1,13 +1,16 @@
 const userModel = require('../models/user');
 const { RoleType } = require('../constants/enums');
 
-const ROLE_LABELS = {
-    [RoleType.SUPERVISOR.id]: RoleType.SUPERVISOR.description,
-    [RoleType.OPERATOR.id]:   RoleType.OPERATOR.description,
+const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
+
+const ROLE_CLASSES = {
+    [RoleType.SUPERVISOR.id]: 'en_sucursal',
+    [RoleType.OPERATOR.id]:   'en_transito',
+    [RoleType.DELIVERY.id]:   'pendiente',
 };
 
 const getIndex = (req, res) => {
-    res.render('user/index', { users: [], query: {}, roleLabels: ROLE_LABELS, roleTypes: Object.values(RoleType) });
+    res.render('user/index', { users: [], query: {}, roleLabels: ROLE_LABELS, roleClasses: ROLE_CLASSES, roleTypes: Object.values(RoleType) });
 };
 
 const createUser = async (req, res) => {
@@ -26,18 +29,20 @@ const createUser = async (req, res) => {
 
 const searchUsers = async (req, res) => {
     try {
-        const { fullName, document, email, roleId } = req.query;
+        const { fullName, document, email, roleId, active } = req.query;
         const users = await userModel.search({
             fullName: fullName || '',
             document: document || '',
             email:    email    || '',
-            roleId:   roleId   || ''
+            roleId:   roleId   || '',
+            active:   active   || ''
         });
         res.render('user/index', {
             users,
-            query:      req.query,
-            roleLabels: ROLE_LABELS,
-            roleTypes:  Object.values(RoleType)
+            query:       req.query,
+            roleLabels:  ROLE_LABELS,
+            roleClasses: ROLE_CLASSES,
+            roleTypes:   Object.values(RoleType)
         });
     } catch (err) {
         console.error('ERROR searchUsers:', err.message);
@@ -53,15 +58,14 @@ const getUpdateUser  = async (req, res) => {
   const { id }    = req.params;
   const user = await userModel.getById(id);
 
-  res.render('user/update', { errors: [], user, RoleType });
+  const returnUrl = req.query.from || '/user';
+  res.render('user/update', { errors: [], user, roleTypes: Object.values(RoleType), returnUrl });
 };
 
 
 const updateUser = async (req, res) => {
   try {
-    const body = { ...req.body, id: req.params.id };
-    await userModel.update(body);
-
+    await userModel.update(req.params.id, req.body);
     res.redirect('/user?success=2');
   } catch (err) {
     console.error('ERROR updateuser:', err.message);

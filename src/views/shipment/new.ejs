@@ -32,6 +32,9 @@
                         <label for="sender-email">Email</label>
                         <input id="sender-email" type="email" name="senderEmail" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
                     </div>
+                    <button type="button" id="sender-edit" class="btn-secondary btn-edit-persona">
+                        <span class="material-symbols-outlined">edit</span>Editar
+                    </button>
                 </div>
 
                 <div class="destinatario">
@@ -52,6 +55,9 @@
                         <label for="recipient-email">Email</label>
                         <input id="recipient-email" type="email" name="recipientEmail" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
                     </div>
+                    <button type="button" id="recipient-edit" class="btn-secondary btn-edit-persona">
+                        <span class="material-symbols-outlined">edit</span>Editar
+                    </button>
                 </div>
 
                 <div class="direccion">
@@ -121,7 +127,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <a href="/shipment" class="btn-secondary">Cancelar</a>
+                    <a href="/shipment" class="btn-secondary">Volver</a>
                     <button type="submit" class="btn-primary">Guardar envío</button>
                 </div>
             </form>
@@ -137,5 +143,6 @@
     <script src="/js/address-validation.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
     <script src="/js/document-format.js" defer></script>
+    <script src="/js/personaSugerencia.js" defer></script>
 </body>
 </html>

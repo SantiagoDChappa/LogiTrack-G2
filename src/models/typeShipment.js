@@ -8,7 +8,7 @@ const TypeShipment = sequelize.define('shipmentType', {
 { tableName: 'shipmentType', timestamps: false });
 
 const getAll = async () => {
-    return await TypeShipment.findAll({ order: [['id', 'ASC']] });
+    return TypeShipment.findAll({ order: [['id', 'ASC']] });
 };
 
 module.exports = { TypeShipment, getAll };

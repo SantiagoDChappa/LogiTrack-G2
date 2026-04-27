@@ -11,36 +11,44 @@ const Person = sequelize.define('person', {
     fullName:  { type: DataTypes.TEXT },
     document:    { type: DataTypes.INTEGER },
     phone:   { type: DataTypes.STRING },
-    email:    { type: DataTypes.STRING },
-    personTypeId: { type: DataTypes.INTEGER }
+    email:    { type: DataTypes.STRING }
     },
     { tableName: 'person' }
 );
 
-const getAll = async () => {
-    return await Person.findAll();
+const getAll = () => Person.findAll();
+
+const create = (data) => Person.create({
+    fullName:     data.name,
+    document:     data.document,
+    phone:        data.phone,
+    email:        data.email
+});
+
+const createOrUpdate = async (data) => {
+    const person = await findByDocument(data.document);
+
+    if (person) {
+        await person.update({
+            phone:        data.phone,
+            email:        data.email
+        });
+        return person;
+    }
+    return create(data);
 };
 
-const create = async (data) => {
-    return await Person.create({
-        fullName:     data.name,
-        document:     data.document,
-        phone:        data.phone,
-        email:        data.email,
-        personTypeId: data.personTypeId
-    });
-};
-
-const search = async ({ senderName, senderDocument, recipientName, recipientDocument }) => {
+const search = ({ senderName, senderDocument, recipientName, recipientDocument }) => {
     const where = {};
 
-    if (senderName)    where.fullName    = { [Op.iLike]: `%${senderName}%` };
-    if (senderDocument) where.document = senderDocument;
-    if (recipientName)    where.fullName    = { [Op.iLike]: `%${recipientName}%` };
-    if (recipientDocument) where.document = recipientDocument;
+    if (senderName) { where.fullName = { [Op.iLike]: `%${senderName}%` }; }
+    if (senderDocument) { where.document = senderDocument; }
+    if (recipientName) { where.fullName = { [Op.iLike]: `%${recipientName}%` }; }
+    if (recipientDocument) { where.document = recipientDocument; }
 
-    return await Person.findAll({ where });
+    return Person.findAll({ where });
 };
 
+const findByDocument = (document) => Person.findOne({ where: { document } });
 
-module.exports = { Person, getAll, create, search };
+module.exports = { Person, getAll, create, search, findByDocument, createOrUpdate };

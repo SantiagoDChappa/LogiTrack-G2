@@ -1,38 +1,45 @@
-const JWT = require('jsonwebtoken');
-const userModel = require('../models/user');
-const enums = require('../constants/enums');
+const jwt = require('jsonwebtoken');
 
-const requireAuth = async (req, res, next) => {
+const requireAuth = (req, res, next) => {
     const token = req.cookies.token;
 
-    if(!token){
-        return res.redirect('/login');
+    if (!token) {
+        return res.status(401).redirect('/login');
     }
 
     try {
-        const payload = JWT.verify(token, process.env.JWT_SECRET);
-        req.user = payload;
-        res.locals.currentUser = await userModel.getById(payload.id);
-        res.locals.currentUser.getAccess = res.locals.currentUser.roleId === enums.RoleType.SUPERVISOR.id;
-        res.setHeader('Cache-Control', 'no-store');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        res.locals.currentUser = decoded;
         next();
-    } catch (err) {
-        res.clearCookie('token');
-        res.redirect('/login');
+    } catch {
+        return res.status(401).redirect('/login');
     }
 };
 
-  const requireSupervisor = async (req, res, next) => {
-      const user = res.locals.currentUser;
-      if(user.roleId === enums.RoleType.OPERATOR.id){
-          return res.redirect('/');
-      }
+const requireSupervisor = (req, res, next) => {
+    const { RoleType } = require('../constants/enums');
+    if (res.locals.currentUser?.roleId !== RoleType.SUPERVISOR.id) {
+        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor');
+    }
+    next();
+};
 
-      try {
-          next();
-      } catch (err) {
-          res.redirect('/');
-      }
-  };
+const requireOperator = (req, res, next) => {
+    const { RoleType } = require('../constants/enums');
+    const roleId = res.locals.currentUser?.roleId;
+    if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.OPERATOR.id) {
+        return res.status(403).send('Acceso denegado: se requieren permisos de operador o supervisor');
+    }
+    next();
+};
 
-  module.exports = { requireAuth, requireSupervisor };
+const requireDelivery = (req, res, next) => {
+    const { RoleType } = require('../constants/enums');
+    const roleId = res.locals.currentUser?.roleId;
+    if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.DELIVERY.id) {
+        return res.status(403).send('Acceso denegado: se requieren permisos de repartidor o supervisor');
+    }
+    next();
+};
+
+module.exports = { requireAuth, requireSupervisor, requireOperator, requireDelivery };

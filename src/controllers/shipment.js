@@ -6,10 +6,11 @@ const statusModel          = require('../models/status');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const typeShipmentModel    = require('../models/typeShipment');
 const settingModel         = require('../models/setting');
-const { PersonType }       = require('../constants/enums');
+const userModel            = require('../models/user');
 const { PROVINCES }        = require('../utils/provinces');
 const { notifyStatusChange } = require('../utils/notifications');
-
+const { RoleType, Status }   = require('../constants/enums');
+const { validationResult }   = require('express-validator');
 
 const home = async (req, res) => {
     const statuses = await statusModel.getAll();
@@ -64,7 +65,9 @@ const getDetail = async (req, res) => {
         } : null,
     };
 
-    res.render('shipment/detail', { shipment, history, mapData });
+    const returnUrl   = req.query.from || '/shipment';
+    const returnLabel = req.query.fromLabel || 'Administrador de envíos';
+    res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel });
 };
 
 const getNewShipmentForm = async (req, res) => {
@@ -74,26 +77,37 @@ const getNewShipmentForm = async (req, res) => {
 };
 
 const createShipment = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const provinces = await provinceModel.getAll();
+    const typesShipment = await typeShipmentModel.getAll();
+    return res.render('shipment/new', { 
+        errors: errors.array().map(e => e.msg), 
+        body: req.body, 
+        provinces, 
+        typesShipment 
+    });
+  }
+
   try {
     const body = req.body;
-    //Creo el remitente
-    const sender = await personModel.create({
+    if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
+    if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+
+    const sender = await personModel.createOrUpdate({
         name:         body.senderName,
         document:     body.senderDocument,
         phone:        body.senderPhone,
-        email:        body.senderEmail,
-        personTypeId: PersonType.SENDER.id
+        email:        body.senderEmail
     });
 
-    //Creo el destinatario
-    const recipient = await personModel.create({
+    const recipient = await personModel.createOrUpdate({
         name:         body.recipientName,
         document:     body.recipientDocument,
         phone:        body.recipientPhone,
-        email:        body.recipientEmail,
-        personTypeId: PersonType.RECIPIENT.id
+        email:        body.recipientEmail
     });
-    //Creo la direccion del envio
+
     const address = await addressModel.create({
         street:         body.street,
         number:         body.number,
@@ -104,8 +118,7 @@ const createShipment = async (req, res) => {
         lng:            body.addressLng ? parseFloat(body.addressLng) : null,
     });
 
-    //Creo el envio
-    await shipmentModel.create({
+    const shipment = await shipmentModel.create({
         senderId:       sender.id,
         recipientId:    recipient.id,
         addressId:      address.id,
@@ -113,17 +126,32 @@ const createShipment = async (req, res) => {
         weightKg:       body.weightKg       || null,
         packageQty:     body.packageQty      || null,
     });
-    
+
+    await shipmentHistoryModel.create({
+        shipmentId:   shipment.id,
+        fromStatusId: null,
+        toStatusId:   shipment.statusId,
+        eventType:    'CREATED',
+        userId:       res.locals.currentUser?.id || null,
+    });
+
     res.redirect('/shipment?success=1');
   } catch (err) {
     console.error('ERROR createShipment:', err.message);
-    res.status(500).send(err.message);
+    const provinces     = await provinceModel.getAll();
+    const typesShipment = await typeShipmentModel.getAll();
+    res.render('shipment/new', { 
+        errors: [err.message], 
+        body: req.body, 
+        provinces, 
+        typesShipment 
+    });
   }
 };
 
 const getUpdateShipment = async (req, res) => {
   const { id } = req.params;
-  const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber] = await Promise.all([
+  const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
       provinceModel.getAll(),
       statusModel.getAll(),
       shipmentModel.getById(id),
@@ -133,6 +161,7 @@ const getUpdateShipment = async (req, res) => {
       settingModel.get('origin_lng'),
       settingModel.get('origin_street'),
       settingModel.get('origin_number'),
+      userModel.search({ roleId: RoleType.DELIVERY.id })
   ]);
 
   const destProv = PROVINCES[shipment.address.provinceId];
@@ -151,45 +180,94 @@ const getUpdateShipment = async (req, res) => {
       } : null,
   };
 
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData });
+  const returnUrl = req.query.from || '/shipment';
+  const isSupervisor = res.locals.currentUser?.roleId === RoleType.SUPERVISOR.id;
+  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor });
 };
 
 const updateShipment = async (req, res) => {
   try {
-    const { id } = req.params;
-    const body   = { ...req.body, id };
+    const { id }      = req.params;
+    const body        = { ...req.body, id };
+    const currentUser = res.locals.currentUser;
+    const isOperator  = currentUser.roleId === RoleType.OPERATOR.id;
+
+    const shipment = await shipmentModel.getById(id);
+    if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+
+    if (isOperator && (shipment.statusId === Status.DELIVERED.id || shipment.statusId === Status.CANCELLED.id)) {
+      return res.redirect(`/shipment/update/${id}`);
+    }
 
     if (body.newStatusId) {
-      // Solo supervisores pueden cambiar el estado
-      const currentUser = res.locals.currentUser;
-      const { RoleType } = require('../constants/enums');
-      
-      if (currentUser.roleId !== RoleType.SUPERVISOR.id) {
-        return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
+      if (isOperator) {
+          return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
       }
 
-      const [shipment, newStatus] = await Promise.all([
-          shipmentModel.getById(id),
-          statusModel.getById(Number(body.newStatusId)),
-      ]);
-      // Solo registrar si realmente cambia de estado (evita duplicados por doble submit)
-      if (shipment.statusId !== Number(body.newStatusId)) {
+      const targetStatusId = Number(body.newStatusId);
+
+      if (targetStatusId === Status.IN_TRANSIT.id) {
+          const currentDeliveryUserId = body.deliveryUserId || shipment.deliveryUserId;
+          if (!currentDeliveryUserId) {
+              const [provinces, statuses, history, typesShipment, deliveryUsers, originLat, originLng, originStreet, originNumber] = await Promise.all([
+                  provinceModel.getAll(),
+                  statusModel.getAll(),
+                  shipmentHistoryModel.getByShipmentId(id),
+                  typeShipmentModel.getAll(),
+                  userModel.search({ roleId: RoleType.DELIVERY.id }),
+                  settingModel.get('origin_lat'),
+                  settingModel.get('origin_lng'),
+                  settingModel.get('origin_street'),
+                  settingModel.get('origin_number')
+              ]);
+              
+              const mapData = {
+                  origin: { lat: parseFloat(originLat), lng: parseFloat(originLng), label: originStreet + ' ' + originNumber },
+                  destination: { lat: shipment.address.lat, lng: shipment.address.lng, label: shipment.address.street + ' ' + shipment.address.number }
+              };
+
+              return res.render('shipment/update', {
+                  errors: ['Debe asignar un repartidor antes de pasar el envío a estado "En Tránsito".'],
+                  shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl: '/shipment',
+                  isSupervisor: currentUser?.roleId === RoleType.SUPERVISOR.id,
+              });
+          }
+      }
+
+      const newStatus = await statusModel.getById(targetStatusId);
+      if (shipment.statusId !== targetStatusId) {
         await shipmentHistoryModel.create({
           shipmentId:   id,
           fromStatusId: shipment.statusId,
           toStatusId:   Number(body.newStatusId),
-          comment:      body.statusComment || null
+          comment:      body.statusComment || null,
+          userId:       currentUser?.id    || null,
+          eventType:    'STATUS_CHANGE',
         });
+
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
-        if (newStatus) notifyStatusChange(shipment, newStatus.description);
+        if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
       }
+    }
+
+    if (isOperator) {
+      body.street         = shipment.address.street;
+      body.number         = shipment.address.number;
+      body.province       = shipment.address.provinceId;
+      body.postalCode     = shipment.address.postalCode;
+      body.floorApartment = shipment.address.floorApartment;
+      body.addressLat     = shipment.address.lat;
+      body.addressLng     = shipment.address.lng;
+      body.weightKg       = shipment.weightKg;
+      body.packageQty     = shipment.packageQty;
+      body.shipmentTypeId = shipment.shipmentTypeId;
     }
 
     await shipmentModel.update(body);
     res.redirect('/shipment?success=2');
   } catch (err) {
     console.error('ERROR updateShipment:', err.message);
-    res.status(500).send(err.message);
+    res.status(500).send('Error interno al actualizar el envío');
   }
 };
 
@@ -206,17 +284,31 @@ const updateShipmentStatus = async (req, res) => {
         shipmentId:   id,
         fromStatusId: shipment.statusId,
         toStatusId:   Number(newStatusId),
-        comment:      comment || null
+        comment:      comment || null,
+        userId:       res.locals.currentUser?.id || null,
+        eventType:    'STATUS_CHANGE',
     });
 
     await shipmentModel.updateStatus(id, Number(newStatusId));
-    if (newStatus) notifyStatusChange(shipment, newStatus.description);
+    if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
 
     res.redirect(`/shipment/update/${id}`);
   } catch (err) {
     console.error('ERROR updateShipmentStatus:', err.message);
-    res.status(500).send(err.message);
+    res.status(500).send('Error interno al actualizar estado');
   }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments };
+const assignDelivery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { deliveryUserId } = req.body;
+        await shipmentModel.update({ id, deliveryUserId: deliveryUserId || null });
+        res.redirect(`/shipment/update/${id}?success=3`);
+    } catch (err) {
+        console.error('ERROR assignDelivery:', err.message);
+        res.status(500).send('Error interno al asignar repartidor');
+    }
+};
+
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery };

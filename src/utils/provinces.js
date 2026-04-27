@@ -49,22 +49,22 @@ function normalizeStr(s) {
 }
 
 function findProvinceByIndec(indecId) {
-    if (!indecId) return null;
+    if (!indecId) {return null;}
     // El API devuelve IDs como '02', '6', etc. — normalizamos a 2 dígitos
     const key = String(indecId).padStart(2, '0');
     return BY_INDEC[key] || null;
 }
 
 function findProvinceByState(stateName) {
-    if (!stateName) return null;
+    if (!stateName) {return null;}
     const norm = normalizeStr(stateName);
     // 1. Exacto por nombre oficial
     for (const [id, p] of Object.entries(PROVINCES)) {
-        if (normalizeStr(p.name) === norm) return { id: parseInt(id), ...p };
+        if (normalizeStr(p.name) === norm) {return { id: parseInt(id), ...p };}
     }
     // 2. Exacto por alias ml (cubre "CABA", "Cordoba", "Tucuman", etc.)
     for (const [id, p] of Object.entries(PROVINCES)) {
-        if (normalizeStr(p.ml) === norm) return { id: parseInt(id), ...p };
+        if (normalizeStr(p.ml) === norm) {return { id: parseInt(id), ...p };}
     }
     // 3. Parcial por nombre (ej: "Ciudad de Buenos Aires" → CABA)
     for (const [id, p] of Object.entries(PROVINCES)) {

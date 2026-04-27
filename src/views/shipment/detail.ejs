@@ -15,10 +15,17 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Detalle de Envío</h1>
-            <a href="/shipment" class="btn-secondary">Volver</a>
+            <div style="display:flex;gap:var(--space-3)">
+                <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
+                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && shipment.statusId !== 3 && shipment.statusId !== 4 && shipment.statusId !== 5) { %>
+                <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="btn-primary">
+                    <span class="material-symbols-outlined">edit</span>Modificar
+                </a>
+                <% } %>
+            </div>
         </div>
 
-        <div class="detail-wrapper">
+        <div class="page-update-wrapper">
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
@@ -27,7 +34,7 @@
             %>
 
             <!-- Tracking ID + estado -->
-            <div class="detail-top">
+            <div class="detail-top" style="margin-bottom: 1.5rem;">
                 <div class="detail-tracking">
                     <span class="detail-tracking-label">ID Tracking</span>
                     <span class="detail-tracking-id"><%= shipment.trackingId %></span>
@@ -35,7 +42,76 @@
                 <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
             </div>
 
-            <!-- ══════════ TOP: 3 COLUMNAS ══════════ -->
+            <!-- ── Línea de tiempo (card independiente) ── -->
+            <div class="update-card" style="margin-bottom: 1.5rem;">
+                <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo</h3>
+                <% if (history.length === 0) { %>
+                    <p class="historial-empty">Sin eventos registrados.</p>
+                <% } else { %>
+                    <%
+                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                        function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
+                        const _refLocation = [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || null;
+                    %>
+                    <ol class="shipment-timeline">
+                        <% history.forEach(function(h) { %>
+                            <%
+                                const _isCreated = h.eventType === 'CREATED';
+                                const _tk = _sk2(h.toStatus.description);
+                                const _tl = _sl2[_tk] || h.toStatus.description;
+                                const _icon = _isCreated ? 'add_circle' : 'swap_horiz';
+                                const _author = h.user ? h.user.fullName : null;
+                            %>
+                            <li class="shipment-timeline-item">
+                                <span class="shipment-timeline-dot <%= _tk %>">
+                                    <span class="material-symbols-outlined"><%= _icon %></span>
+                                </span>
+                                <div class="shipment-timeline-content">
+                                    <div class="shipment-timeline-header">
+                                        <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
+                                        <% if (_isCreated) { %>
+                                            <span class="shipment-timeline-tag">Creación del envío</span>
+                                        <% } else if (h.fromStatus) { %>
+                                            <%
+                                                const _fk = _sk2(h.fromStatus.description);
+                                                const _fl = _sl2[_fk] || h.fromStatus.description;
+                                            %>
+                                            <span class="shipment-timeline-tag">Desde <%= _fl %></span>
+                                        <% } %>
+                                    </div>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
+                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
+                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                    </div>
+                                    <% if (_author) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">person</span>
+                                            <%= _author %>
+                                        </div>
+                                    <% } %>
+                                    <% if (_isCreated) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
+                                            <%= mapData.origin.label.toUpperCase() %>
+                                        </div>
+                                    <% } else if (_refLocation) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
+                                            <%= _refLocation.toUpperCase() %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.comment) { %>
+                                        <div class="shipment-timeline-comment">"<%= h.comment %>"</div>
+                                    <% } %>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ol>
+                <% } %>
+            </div>
+
+            <!-- ══════════ TOP: 2 COLUMNAS ══════════ -->
             <div class="update-top-grid">
 
                 <!-- ── Resumen del envío + ML ── -->
@@ -106,41 +182,13 @@
                 </div>
                 <% } %>
 
-                <!-- ── Historial de estado ── -->
+                <!-- ── Repartidor Asignado ── -->
                 <div class="update-card">
-                    <h3><span class="material-symbols-outlined">history</span> Historial de estado</h3>
-                    <% if (history.length === 0) { %>
-                        <p class="historial-empty">Sin cambios registrados.</p>
-                    <% } else { %>
-                        <%
-                            const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
-                            function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
-                        %>
-                        <ul class="historial-list">
-                            <% history.forEach(function(h) { %>
-                                <%
-                                    const _fk = h.fromStatus ? _sk2(h.fromStatus.description) : 'inicial';
-                                    const _fl = h.fromStatus ? (_sl2[_fk] || h.fromStatus.description) : 'Inicial';
-                                    const _tk = _sk2(h.toStatus.description);
-                                    const _tl = _sl2[_tk] || h.toStatus.description;
-                                %>
-                                <li class="historial-item">
-                                    <span class="historial-fecha">
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %> -
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
-                                    </span>
-                                    <span class="historial-estados">
-                                        <span class="status-badge status-badge--sm <%= _fk %>"><%= _fl %></span>
-                                        →
-                                        <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
-                                    </span>
-                                    <% if (h.comment) { %>
-                                        <span class="historial-motivo">Motivo: <%= h.comment %></span>
-                                    <% } %>
-                                </li>
-                            <% }) %>
-                        </ul>
-                    <% } %>
+                    <h3><span class="material-symbols-outlined">person_pin_circle</span> Repartidor</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Nombre y apellido</span>
+                        <span class="detail-value"><%= shipment.deliveryUser ? shipment.deliveryUser.fullName : 'Sin asignar' %></span>
+                    </div>
                 </div>
 
             </div>

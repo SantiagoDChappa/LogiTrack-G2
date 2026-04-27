@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
-const { Province } = require('./province');
 
 const Address = sequelize.define('address', {
     id: {
@@ -18,10 +17,8 @@ const Address = sequelize.define('address', {
 },
 { tableName: 'address' });
 
-Address.belongsTo(Province, { as: 'province', foreignKey: 'provinceId' });
-
 const create = async (data) => {
-    return await Address.create({
+    return Address.create({
         street:         data.street,
         number:         data.number,
         provinceId:     data.provinceId,
