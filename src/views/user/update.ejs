@@ -31,7 +31,7 @@
                         <label for="roleId">Rol</label>
                         <select id="roleId" name="roleId">
                             <option value="">Seleccione un rol</option>
-                            <% Object.values(RoleType).forEach(role => { %>
+                            <% roleTypes.forEach(role => { %>
                                 <option value="<%= role.id %>" <%= user.roleId == role.id ? 'selected' : '' %>>
                                     <%= role.description %>
                                 </option>
