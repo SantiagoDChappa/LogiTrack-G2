@@ -53,7 +53,8 @@ const getUpdateUser  = async (req, res) => {
   const { id }    = req.params;
   const user = await userModel.getById(id);
 
-  res.render('user/update', { errors: [], user, RoleType });
+  const returnUrl = req.query.from || '/user';
+  res.render('user/update', { errors: [], user, RoleType, returnUrl });
 };
 
 

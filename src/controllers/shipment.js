@@ -64,7 +64,9 @@ const getDetail = async (req, res) => {
         } : null,
     };
 
-    res.render('shipment/detail', { shipment, history, mapData });
+    const returnUrl   = req.query.from || '/shipment';
+    const returnLabel = req.query.fromLabel || 'Administrador de envíos';
+    res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel });
 };
 
 const getNewShipmentForm = async (req, res) => {
@@ -153,7 +155,8 @@ const getUpdateShipment = async (req, res) => {
 
 const userModel = require('../models/user');
 const deliveryUsers = await userModel.search({ roleId: 3 });
-res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers });
+const returnUrl = req.query.from || '/shipment';
+res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl });
 };
 
 const updateShipment = async (req, res) => {

@@ -159,9 +159,10 @@ const update = async (data) => {
 
     await Shipment.update(
         {
-            shipmentTypeId: data.shipmentTypeId || null,
-            weightKg:       data.weightKg       || null,
+            shipmentTypeId: data.shipmentTypeId  || null,
+            weightKg:       data.weightKg        || null,
             packageQty:     data.packageQty      || null,
+            deliveryUserId: data.deliveryUserId  || null,
         },
         { where: { id: data.id } }
     );
