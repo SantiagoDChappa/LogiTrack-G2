@@ -17,12 +17,26 @@ module.exports = [
             },
         },
         rules: {
-            'no-unused-vars':  ['warn', { argsIgnorePattern: '^_' }],
-            'no-console':       'off',
-            'semi':            ['error', 'always'],
-            'eqeqeq':          ['error', 'always'],
-            'no-var':           'error',
-            'prefer-const':    'warn',
+            // ── Calidad ──────────────────────────────────────────────────────
+            'no-unused-vars':            ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+            'no-console':                ['warn', { allow: ['warn', 'error'] }],
+            'semi':                      ['error', 'always'],
+            'eqeqeq':                    ['error', 'always'],
+            'no-var':                    'error',
+            'prefer-const':              'error',
+            'no-duplicate-imports':      'error',
+            'no-return-await':           'warn',
+            // ── Seguridad ────────────────────────────────────────────────────
+            'no-eval':                   'error',
+            'no-implied-eval':           'error',
+            'no-new-func':               'error',
+            'no-script-url':             'error',
+            // ── Async / errores ──────────────────────────────────────────────
+            'no-async-promise-executor': 'error',
+            'require-await':             'warn',
+            // ── Estilo ───────────────────────────────────────────────────────
+            'curly':                     ['error', 'all'],
+            'no-lonely-if':              'error',
         },
     },
     {
@@ -40,8 +54,12 @@ module.exports = [
                 afterEach:   'readonly',
             },
         },
+        rules: {
+            'no-console':    'off',
+            'require-await': 'off',
+        },
     },
     {
-        ignores: ['node_modules/**', 'public/**'],
+        ignores: ['node_modules/**', 'public/**', 'client/**', 'ml/**'],
     },
 ];

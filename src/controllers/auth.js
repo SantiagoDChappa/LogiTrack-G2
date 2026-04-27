@@ -33,9 +33,13 @@ const login = async (req, res) => {
         {expiresIn: req.body.remember ? '30d' : '8h'}
     );
 
-    const cookieOptions = { httpOnly: true };
+    const cookieOptions = {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure:   process.env.NODE_ENV === 'production',
+    };
     if (req.body.remember) {
-        cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 días
+        cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000;
     }
     res.cookie('token', token, cookieOptions);
     res.redirect(user.roleId === 3 ? '/delivery' : '/home');

@@ -35,10 +35,10 @@ const create = async (data) => {
 const search = async ({ fullName, document, email, roleId }) => {
     const where = {};
 
-    if (fullName) where.fullName = { [Op.iLike]: `%${fullName}%` };
-    if (document) where.document = document;
-    if (email)    where.email    = { [Op.iLike]: `%${email}%` };
-    if (roleId)   where.roleId   = roleId;
+    if (fullName) {where.fullName = { [Op.iLike]: `%${fullName}%` };}
+    if (document) {where.document = document;}
+    if (email)    {where.email    = { [Op.iLike]: `%${email}%` };}
+    if (roleId)   {where.roleId   = roleId;}
 
     return await User.findAll({ where, order: [['id', 'ASC']] });
 };
@@ -63,7 +63,6 @@ const existsByDocument = async (document) => {
     const result = await User.findOne({
         where: { document: document }
     });
-    console.log("RESULTADO: " + result);
     return result !== null;
 };
 

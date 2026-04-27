@@ -10,6 +10,8 @@
     "dev": "nodemon app.js",
     "db:setup": "node src/database/setup.js",
     "test": "jest --forceExit --detectOpenHandles",
+    "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
+    "test:watch": "jest --watch",
     "lint": "eslint ."
   },
   "jest": {
@@ -17,7 +19,19 @@
     "testMatch": [
       "**/Test/**/*.test.js"
     ],
-    "clearMocks": true
+    "clearMocks": true,
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/database/seed.sql",
+      "!src/docs/**"
+    ],
+    "coverageReporters": ["text", "lcov", "json-summary"],
+    "coverageThreshold": {
+      "global": {
+        "lines": 50,
+        "functions": 50
+      }
+    }
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
