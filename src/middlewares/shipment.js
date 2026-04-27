@@ -3,6 +3,8 @@ const provinceModel        = require("../models/province");
 const shipmentModel        = require("../models/shipment");
 const statusModel          = require("../models/status");
 const shipmentHistoryModel = require("../models/shipmentHistory");
+const userModel            = require("../models/user");
+const {RoleType}             = require("../constants/enums");
 
 const validateShipment = [
     body('senderName').notEmpty().trim().withMessage('El nombre del remitente es obligatorio'),
@@ -22,7 +24,7 @@ const validateShipment = [
 
 ];
 
-const handleValidationErrors = async (req, res, next) => {
+/*const handleValidationErrors = async (req, res, next) => {
     const errors = validationResult(req);
     const provinces = await provinceModel.getAll();
 
@@ -44,7 +46,7 @@ const handleValidationErrors = async (req, res, next) => {
     }
 
     next();
-};
+};*/
 
 const validateUpdateShipment = [
     body('recipientName').notEmpty().trim().withMessage('El nombre del destinatario es obligatorio'),
@@ -89,4 +91,5 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     });
 };
 
-module.exports = { validateShipment, handleValidationErrors, validateUpdateShipment, handleUpdateValidationErrors };
+/*module.exports = { validateShipment, handleValidationErrors, validateUpdateShipment, handleUpdateValidationErrors };*/
+module.exports = { validateShipment, validateUpdateShipment, handleUpdateValidationErrors };

@@ -77,7 +77,7 @@ const createShipment = async (req, res) => {
   try {
     const body = req.body;
     //Creo el remitente
-    const sender = await personModel.create({
+    const sender = await personModel.createOrUpdate({
         name:         body.senderName,
         document:     body.senderDocument,
         phone:        body.senderPhone,
@@ -86,7 +86,7 @@ const createShipment = async (req, res) => {
     });
 
     //Creo el destinatario
-    const recipient = await personModel.create({
+    const recipient = await personModel.createOrUpdate({
         name:         body.recipientName,
         document:     body.recipientDocument,
         phone:        body.recipientPhone,
@@ -120,6 +120,26 @@ const createShipment = async (req, res) => {
     res.status(500).send(err.message);
   }
 };
+/*
+const deliveredShipment = async (req, res) => {
+  const { name, document, observation, shipmentId, deliveryId } = req.body;
+
+  const shipment = await shipmentModel.getById(shipmentId);
+  if (!shipment) {
+    return res.status(404).json({ error: 'Envío no encontrado' });
+  }
+
+  if (shipment.statusId === 5) { // Ya está entregado
+    return res.status(400).json({ error: 'El envío ya ha sido marcado como entregado' });
+  }
+
+  if (shipment.deliveryId !== deliveryId) {
+    return res.status(400).json({ error: 'El envio no esta asignado al repartidor' });
+  }
+  res.status(200).json({ message: 'Envío marcado como entregado exitosamente' });
+  return shipmentModel.markAsDelivered(shipmentId, { name, document, observation, deliveryId})
+};*/
+
 
 const getUpdateShipment = async (req, res) => {
   const { id } = req.params;
@@ -174,12 +194,19 @@ const updateShipment = async (req, res) => {
       ]);
       // Solo registrar si realmente cambia de estado (evita duplicados por doble submit)
       if (shipment.statusId !== Number(body.newStatusId)) {
+        let comment = body.statusComment || null;
+        if (Number(body.newStatusId) === 4 && body.deliveredName) {
+          comment = `Recibido por: ${body.deliveredName} (DNI: ${body.deliveredDocument})`;
+          if (body.deliveredObservation) comment += ` — ${body.deliveredObservation}`;
+        }
+
         await shipmentHistoryModel.create({
           shipmentId:   id,
           fromStatusId: shipment.statusId,
           toStatusId:   Number(body.newStatusId),
-          comment:      body.statusComment || null
+          comment,
         });
+
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
         if (newStatus) notifyStatusChange(shipment, newStatus.description);
       }

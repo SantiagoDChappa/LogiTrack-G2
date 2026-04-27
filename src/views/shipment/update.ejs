@@ -135,6 +135,9 @@
                 <form id="main-update-form" style="display:contents" action="/shipment/update/<%= shipment.id %>" method="post">
                     <input type="hidden" name="newStatusId" id="hidden-new-status-id">
                     <input type="hidden" name="statusComment" id="hidden-status-comment">
+                    <input type="hidden" name="deliveredName" id="hidden-delivered-name">
+                    <input type="hidden" name="deliveredDocument" id="hidden-delivered-document">
+                    <input type="hidden" name="deliveredObservation" id="hidden-delivered-observation">
 
                     <div class="update-card" style="grid-area:destinatario">
                         <h3>Destinatario</h3>
@@ -267,6 +270,23 @@
                     <div id="status-confirm-panel" class="status-confirm-panel" style="display:none;">
                         <p class="confirm-title">Confirmar nuevo estado: <strong id="confirm-status-name"></strong></p>
                         <input type="hidden" id="confirm-status-id">
+
+                        <!-- Campos extra solo para estado Entregado -->
+                        <div id="delivery-fields" style="display:none; flex-direction:column; gap:var(--space-3); width:100%;">
+                            <div class="field">
+                                <label for="delivered-name">Nombre y Apellido del receptor <span class="req">*</span></label>
+                                <input id="delivered-name" type="text" placeholder="Ej: Juan Pérez" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label for="delivered-document">Documento del receptor <span class="req">*</span></label>
+                                <input id="delivered-document" type="text" placeholder="Ej: 12.345.678" maxlength="11">
+                            </div>
+                            <div class="field">
+                                <label for="delivered-observation">Observación <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
+                                <textarea id="delivered-observation" placeholder="Ej: Dejado en portería..." rows="2" style="min-height:unset;"></textarea>
+                            </div>
+                        </div>
+
                         <textarea id="status-comment-input" placeholder="Describa el motivo del cambio de estado..." rows="3"></textarea>
                         <div class="confirm-actions">
                             <button type="button" id="btn-cancel-confirm" class="btn-secondary btn-sm">Cancelar</button>
@@ -301,12 +321,25 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
     <script>
+        var ENTREGADO_ID = '4';
+
         document.querySelectorAll('.timeline-dot[data-clickable]').forEach(function(dot) {
             dot.addEventListener('click', function() {
-                var panel = document.getElementById('status-confirm-panel');
-                document.getElementById('confirm-status-id').value = this.dataset.statusId;
+                var statusId = this.dataset.statusId;
+                var panel    = document.getElementById('status-confirm-panel');
+                var deliveryFields = document.getElementById('delivery-fields');
+                var commentArea    = document.getElementById('status-comment-input');
+
+                document.getElementById('confirm-status-id').value = statusId;
                 document.getElementById('confirm-status-name').textContent = this.dataset.statusName;
-                document.getElementById('status-comment-input').value = '';
+                document.getElementById('delivered-name').value = '';
+                document.getElementById('delivered-document').value = '';
+                document.getElementById('delivered-observation').value = '';
+                commentArea.value = '';
+
+                var isEntregado = statusId === ENTREGADO_ID;
+                deliveryFields.style.display = isEntregado ? 'flex' : 'none';
+                commentArea.style.display    = isEntregado ? 'none'  : '';
                 panel.style.display = 'flex';
             });
         });
@@ -316,11 +349,34 @@
         });
 
         document.getElementById('btn-confirm-status').addEventListener('click', function() {
-            var statusId   = document.getElementById('confirm-status-id').value;
+            var statusId = document.getElementById('confirm-status-id').value;
             var statusName = document.getElementById('confirm-status-name').textContent;
-            var comment    = document.getElementById('status-comment-input').value;
-            document.getElementById('hidden-new-status-id').value  = statusId;
-            document.getElementById('hidden-status-comment').value = comment;
+
+            if (statusId === ENTREGADO_ID) {
+                var name  = document.getElementById('delivered-name').value.trim();
+                var doc   = document.getElementById('delivered-document').value.trim();
+                var obs   = document.getElementById('delivered-observation').value.trim();
+                if (!name || !doc) {
+                    var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Datos requeridos',
+                        text: 'Nombre y documento del receptor son obligatorios.',
+                        confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                        background: isDark ? '#1e293b' : '#ffffff',
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                    });
+                    return;
+                }
+                document.getElementById('hidden-delivered-name').value        = name;
+                document.getElementById('hidden-delivered-document').value    = doc;
+                document.getElementById('hidden-delivered-observation').value = obs;
+                document.getElementById('hidden-status-comment').value        = obs || '';
+            } else {
+                document.getElementById('hidden-status-comment').value = document.getElementById('status-comment-input').value;
+            }
+
+            document.getElementById('hidden-new-status-id').value = statusId;
             document.getElementById('pending-status-name').textContent = statusName;
             document.getElementById('pending-status-badge').style.display = 'flex';
             document.getElementById('status-confirm-panel').style.display = 'none';
