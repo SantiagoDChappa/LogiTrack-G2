@@ -16,32 +16,26 @@ const requireAuth = async (req, res, next) => {
         res.locals.currentUser.getAccess = res.locals.currentUser.roleId === enums.RoleType.SUPERVISOR.id;
         res.setHeader('Cache-Control', 'no-store');
         next();
-    } catch (err) {
+    } catch (_err) {
         res.clearCookie('token');
         res.redirect('/login');
     }
 };
 
-const requireSupervisor = async (req, res, next) => {
+const requireSupervisor = (req, res, next) => {
     const user = res.locals.currentUser;
     if (user.roleId !== enums.RoleType.SUPERVISOR.id) {
         return res.redirect('/');
     }
-    try {
-        next();
-    } catch (err) {
-        res.redirect('/');
-    }
+    next();
 };
-const requireDelivery = async (req, res, next) => {
+
+const requireDelivery = (req, res, next) => {
     const user = res.locals.currentUser;
     if (user.roleId !== enums.RoleType.DELIVERY.id) {
         return res.redirect('/');
     }
-    try {
-        next();
-    } catch (err) {
-        res.redirect('/');
-    }
+    next();
 };
+
 module.exports = { requireAuth, requireSupervisor, requireDelivery };

@@ -176,7 +176,7 @@ const updateShipment = async (req, res) => {
     const isOperator  = currentUser.roleId === RoleType.OPERATOR.id;
 
     const shipment = await shipmentModel.getById(id);
-    if (!shipment) return res.status(404).send('Envío no encontrado');
+    if (!shipment) { return res.status(404).send('Envío no encontrado'); }
 
     // Escenario 3: operador no puede editar un envío Entregado o Cancelado
     if (isOperator && (shipment.statusId === Status.DELIVERED.id || shipment.statusId === Status.CANCELLED.id)) {
@@ -185,7 +185,7 @@ const updateShipment = async (req, res) => {
 
     if (body.newStatusId) {
       if (isOperator) {
-        return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
+          return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
       }
       const newStatus = await statusModel.getById(Number(body.newStatusId));
       // Solo registrar si realmente cambia de estado (evita duplicados por doble submit)
@@ -200,7 +200,7 @@ const updateShipment = async (req, res) => {
         });
 
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
-        if (newStatus) notifyStatusChange(shipment, newStatus.description);
+        if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
       }
     }
 
@@ -244,7 +244,7 @@ const updateShipmentStatus = async (req, res) => {
     });
 
     await shipmentModel.updateStatus(id, Number(newStatusId));
-    if (newStatus) notifyStatusChange(shipment, newStatus.description);
+    if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
 
     res.redirect(`/shipment/update/${id}`);
   } catch (err) {

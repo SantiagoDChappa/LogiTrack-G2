@@ -9,11 +9,12 @@ const User = sequelize.define('user', {
     email:    { type: DataTypes.STRING  },
     password: { type: DataTypes.STRING  },
     document: { type: DataTypes.INTEGER },
-    roleId:   { type: DataTypes.INTEGER }
+    roleId:   { type: DataTypes.INTEGER },
+    active:   { type: DataTypes.BOOLEAN, defaultValue: true }
 }, { timestamps: false, tableName: 'user' });
 
 const getAll = async () => {
-    return await User.findAll({ order: [['id', 'ASC']] });
+    return await User.findAll({ where: { active: true }, order: [['id', 'ASC']] });
 };
 
 const getById = async (id) => {
@@ -27,36 +28,84 @@ const create = async (data) => {
         email:    data.email,
         password: password,
         document: data.document,
-        roleId:   data.roleId
+        roleId:   data.roleId,
+        active:   true
     });
 
 };
 
-const search = async ({ fullName, document, email, roleId }) => {
+const search = async ({ fullName, document, email, roleId, active }) => {
     const where = {};
 
     if (fullName) {where.fullName = { [Op.iLike]: `%${fullName}%` };}
     if (document) {where.document = document;}
     if (email)    {where.email    = { [Op.iLike]: `%${email}%` };}
     if (roleId)   {where.roleId   = roleId;}
+    if (active !== undefined && active !== '') {
+        where.active = active === 'true' || active === true;
+    }
 
     return await User.findAll({ where, order: [['id', 'ASC']] });
 };
 
 const deleteById = async (id) => {
-    return await User.destroy({ where: { id } });
+    const { Shipment } = require('./shipment');
+    const { ShipmentHistory } = require('./shipmentHistory');
+
+    return await sequelize.transaction(async (t) => {
+        // Desasignamos al usuario de los envíos donde está como repartidor
+        await Shipment.update(
+            { deliveryUserId: null },
+            { where: { deliveryUserId: id }, transaction: t }
+        );
+
+        // Limpiamos la referencia del usuario en el historial para evitar errores de clave foránea
+        await ShipmentHistory.update(
+            { userId: null },
+            { where: { userId: id }, transaction: t }
+        );
+
+        // En lugar de borrar, marcamos como inactivo (Baja)
+        return await User.update(
+            { active: false },
+            { where: { id }, transaction: t }
+        );
+    });
 };
 
 const update = async (data) => {
-    return await User.update(
-        {
-            fullName: data.fullName,
-            email:    data.email,
-            document: data.document,
-            roleId:   data.roleId
-        },
-        { where: { id: data.id } }
-    );
+    const { Shipment } = require('./shipment');
+    const { ShipmentHistory } = require('./shipmentHistory');
+
+    return await sequelize.transaction(async (t) => {
+        const isActive = data.active === 'true' || data.active === true || data.active === '1' || data.active === 1;
+        
+        // Si se está desactivando al usuario (pasando de activo a inactivo)
+        if (!isActive) {
+            // Desasignamos al usuario de los envíos donde está como repartidor
+            await Shipment.update(
+                { deliveryUserId: null },
+                { where: { deliveryUserId: data.id }, transaction: t }
+            );
+
+            // Limpiamos la referencia del usuario en el historial
+            await ShipmentHistory.update(
+                { userId: null },
+                { where: { userId: data.id }, transaction: t }
+            );
+        }
+
+        return await User.update(
+            {
+                fullName: data.fullName,
+                email:    data.email,
+                document: data.document,
+                roleId:   data.roleId,
+                active:   isActive
+            },
+            { where: { id: data.id }, transaction: t }
+        );
+    });
 };
 
 const existsByDocument = async (document) => {

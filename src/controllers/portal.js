@@ -1,4 +1,3 @@
-const { Op, where, cast, col } = require('sequelize');
 const { Shipment }        = require('../models/shipment');
 const { ShipmentHistory } = require('../models/shipmentHistory');
 const { Person }          = require('../models/person');
@@ -47,7 +46,7 @@ const getPortal = async (req, res) => {
 
         const seen = new Set();
         const shipments = [...byTracking, ...byDocument].filter(s => {
-            if (seen.has(s.id)) return false;
+            if (seen.has(s.id)) { return false; }
             seen.add(s.id);
             return true;
         });

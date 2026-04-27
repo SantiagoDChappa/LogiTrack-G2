@@ -32,10 +32,16 @@ function parseQuery(q) {
     return { street, locality, province };
 }
 
+// "1234 Corrientes" → "Corrientes 1234" (Georef requiere calle primero)
+function normalizeStreetOrder(q) {
+    return q.replace(/^(\d+)\s+(.+)$/, '$2 $1');
+}
+
 // ── Georef ────────────────────────────────────────────────────────────────────
 async function searchGeoref(streetQuery, provinceIndec, locality) {
     try {
-        const fullQuery = locality ? `${streetQuery}, ${locality}` : streetQuery;
+        const normalized = normalizeStreetOrder(streetQuery);
+        const fullQuery = locality ? `${normalized}, ${locality}` : normalized;
         let url = `${GEOREF}/direcciones?direccion=${encodeURIComponent(fullQuery)}&max=20&campos=estandar`;
         if (provinceIndec) url += `&provincia=${provinceIndec}`;
 

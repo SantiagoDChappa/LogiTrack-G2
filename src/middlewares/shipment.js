@@ -76,7 +76,7 @@ const validateUpdateShipment = [
 
 const handleUpdateValidationErrors = async (req, res, next) => {
     const errors = validationResult(req);
-    if (errors.isEmpty()) return next();
+    if (errors.isEmpty()) { return next(); }
 
     const { id } = req.params;
     const [provinces, statuses, shipment, history, typesShipment] = await Promise.all([

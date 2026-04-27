@@ -29,12 +29,13 @@ const createUser = async (req, res) => {
 
 const searchUsers = async (req, res) => {
     try {
-        const { fullName, document, email, roleId } = req.query;
+        const { fullName, document, email, roleId, active } = req.query;
         const users = await userModel.search({
             fullName: fullName || '',
             document: document || '',
             email:    email    || '',
-            roleId:   roleId   || ''
+            roleId:   roleId   || '',
+            active:   active   || ''
         });
         res.render('user/index', {
             users,

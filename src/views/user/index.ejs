@@ -41,6 +41,14 @@
                         <% }); %>
                     </select>
                 </div>
+                <div class="search-field">
+                    <label for="active">Estado</label>
+                    <select id="active" name="active" class="search-input">
+                        <option value="">Todos</option>
+                        <option value="true" <%= query.active === 'true' ? 'selected' : '' %>>Alta</option>
+                        <option value="false" <%= query.active === 'false' ? 'selected' : '' %>>Baja</option>
+                    </select>
+                </div>
 
                 <button type="submit" class="btn-primary search-btn">
                     <span class="material-symbols-outlined">search</span>Buscar
@@ -56,13 +64,14 @@
                         <th>Documento</th>
                         <th>Email</th>
                         <th>Rol</th>
+                        <th>Estado</th>
                         <th class="col-actions">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% if (users.length === 0) { %>
                         <tr>
-                            <td colspan="5" class="empty-row">
+                            <td colspan="6" class="empty-row">
                                 <span class="material-symbols-outlined">search</span>
                                 No se encontraron resultados para esa búsqueda
                             </td>
@@ -78,15 +87,24 @@
                                         <%= roleLabels[user.roleId] || '-' %>
                                     </span>
                                 </td>
+                                <td>
+                                    <% if (user.active) { %>
+                                        <span class="status-badge entregado">Alta</span>
+                                    <% } else { %>
+                                        <span class="status-badge retrasado">Baja</span>
+                                    <% } %>
+                                </td>
                                 <td class="col-actions">
                                     <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
                                         <span class="material-symbols-outlined">edit</span>
                                     </a>
-                                    <form action="/user/delete/<%= user.id %>" method="POST" style="display:inline">
-                                        <button type="submit" class="action-btn eliminar" data-tooltip="Eliminar">
-                                            <span class="material-symbols-outlined">delete</span>
-                                        </button>
-                                    </form>
+                                    <% if (user.active) { %>
+                                        <form action="/user/delete/<%= user.id %>" method="POST" style="display:inline">
+                                            <button type="submit" class="action-btn eliminar" data-tooltip="Baja">
+                                                <span class="material-symbols-outlined">delete</span>
+                                            </button>
+                                        </form>
+                                    <% } %>
                                 </td>
                             </tr>
                         <% }); %>

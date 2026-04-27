@@ -1,7 +1,7 @@
 const shipmentModel = require('../models/shipment');
 
 const getIndex = async (req, res) => {
-    if (req.user && req.user.roleId === 3) return res.redirect('/delivery');
+    if (req.user && req.user.roleId === 3) { return res.redirect('/delivery'); }
 
 
     const shipments = await shipmentModel.getAll();

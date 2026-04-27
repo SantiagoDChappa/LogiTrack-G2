@@ -8,7 +8,7 @@ const getSettings = async (req, res) => {
         provinceModel.getAll(),
     ]);
 
-    if (!settings.origin_province_id) settings.origin_province_id = '24';
+    if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
     res.render('setting/index', { settings, provinces });
 };
@@ -34,7 +34,7 @@ const saveSettings = async (req, res) => {
     const provinceId = parseInt(origin_province_id);
     const province   = PROVINCES[provinceId];
 
-    if (!province) return res.redirect('/setting');
+    if (!province) { return res.redirect('/setting'); }
 
     // Intenta geocodificar la dirección exacta; si falla usa el centroide de la provincia
     let lat = province.lat;

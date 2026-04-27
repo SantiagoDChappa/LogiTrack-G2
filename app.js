@@ -23,7 +23,7 @@ const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const authRoutes        = require('./src/routes/auth');
 const deliveryRoutes = require('./src/routes/delivery');
-const personRoutes = require('./src/routes/person')
+const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
@@ -34,7 +34,7 @@ const portalRoutes        = require('./src/routes/portal');
 // si otro server con la rama vieja borró columnas.
 sequelize.authenticate()
     .then(() => runMigrations())
-    .then(() => console.log('Base de datos conectada y migrada'))
+    .then(() => console.warn('Base de datos conectada y migrada'))
     .catch(err => console.error('Error de DB:', err));
 
 app.set('view engine', 'ejs');
@@ -83,7 +83,7 @@ app.use('/api/persons',personRoutes);
 });*/
 
 app.listen(port, () => {
-    console.log(`LogiTrack running at http://localhost:${port}`);
+    console.warn(`LogiTrack running at http://localhost:${port}`);
 });
 
 module.exports = app;

@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 
-const getLogin = async (req, res) => {
+const getLogin = (req, res) => {
     if (req.cookies?.token) {
         try {
             require('jsonwebtoken').verify(req.cookies.token, process.env.JWT_SECRET);
@@ -45,7 +45,7 @@ const login = async (req, res) => {
     res.redirect(user.roleId === 3 ? '/delivery' : '/home');
 };
 
-const logout = async (req, res) => {
+const logout = (req, res) => {
     res.clearCookie('token');
     return res.redirect('/login');
 };
