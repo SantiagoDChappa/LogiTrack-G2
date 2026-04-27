@@ -18,15 +18,15 @@
                     <sub>Los campos marcados con * son obligatorios</sub>
                     <div class="field">
                         <label for="fullName">Nombre y Apellido <span style="color: red;">*</span></label>
-                        <input id="fullName"  type="text" name="fullName" value="<%= body.fullName || '' %>">
+                        <input id="fullName"  type="text" name="fullName" value="<%= body.fullName || '' %>" maxlength="100">
                     </div>
                     <div class="field">
                         <label for="document">Documento <span style="color: red;">*</span></label>
-                        <input id="document"  type="number" minlength="8" name="document" value="<%= body.document || '' %>">
+                        <input id="document" type="text" name="document" value="<%= body.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
                     </div>
                     <div class="field">
                         <label for="email">Email <span style="color: red;">*</span></label>
-                        <input id="email" type="email" name="email" value="<%= body.email || '' %>">
+                        <input id="email" type="email" name="email" value="<%= body.email || '' %>" maxlength="100">
                     </div>
 
                     <div class="field">
@@ -97,6 +97,7 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/document-format.js" defer></script>
     <script>
         const passwordInput  = document.getElementById('password');
         const toggleBtn      = document.getElementById('togglePassword');
