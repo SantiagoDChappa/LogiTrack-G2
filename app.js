@@ -21,6 +21,7 @@ const apiDistanceRoutes        = require('./src/routes/api/distance');
 const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const authRoutes        = require('./src/routes/auth');
+const deliveryRoutes = require('./src/routes/delivery');
 const personRoutes = require('./src/routes/person')
 const portalRoutes        = require('./src/routes/portal');
 
@@ -56,6 +57,7 @@ app.use('/api/distance',         requireAuth, apiDistanceRoutes);
 app.use('/api/validate-address',  requireAuth, apiValidateAddressRoutes);
 app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/delivery', requireAuth, deliveryRoutes);
 
 ;
 app.use('/api/persons',personRoutes);

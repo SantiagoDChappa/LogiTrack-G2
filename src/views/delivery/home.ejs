@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Mis Envíos - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Mis Envíos Asignados</h1>
+        </div>
+
+        <div class="shipments-wrapper">
+            <div class="table-wrapper">
+                <table id="shipments-table">
+                    <thead>
+                        <tr>
+                            <th class="th-sortable" data-col="0" data-sort="">
+                                ID Tracking <span class="material-symbols-outlined sort-icon">unfold_more</span>
+                            </th>
+                            <th>Destinatario</th>
+                            <th>Dirección</th>
+                            <th class="th-sortable" data-col="3" data-sort="">
+                                Estado <span class="material-symbols-outlined sort-icon">unfold_more</span>
+                            </th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (shipments.length === 0) { %>
+                            <tr>
+                                <td colspan="5" class="empty-row">
+                                    <span class="material-symbols-outlined">inbox</span>
+                                    No tenés envíos asignados.
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% shipments.forEach(shipment => { %>
+                                <%
+                                    const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                                    const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                                %>
+                                <tr>
+                                    <td class="tracking-id"><%= shipment.trackingId %></td>
+                                    <td><%= shipment.recipient.fullName %></td>
+                                    <td><%= shipment.address.street %> <%= shipment.address.number %></td>
+                                    <td>
+                                        <span class="status-badge <%= _sk %>">
+                                            <%= _sl[_sk] || shipment.status.description %>
+                                        </span>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/shipment/detail/<%= shipment.id %>?from=/delivery&fromLabel=Mis%20Env%C3%ADos" class="action-btn detalle" data-tooltip="Detalle">
+                                            <span class="material-symbols-outlined">info</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.querySelectorAll('.th-sortable').forEach(function(th) {
+            th.addEventListener('click', function() {
+                const col   = parseInt(this.dataset.col);
+                const tbody = document.querySelector('#shipments-table tbody');
+                const rows  = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.querySelector('.empty-row'));
+                if (rows.length === 0) return;
+
+                const isAsc = this.dataset.sort !== 'asc';
+
+                document.querySelectorAll('.th-sortable').forEach(function(t) {
+                    t.dataset.sort = '';
+                    t.querySelector('.sort-icon').textContent = 'unfold_more';
+                });
+
+                this.dataset.sort = isAsc ? 'asc' : 'desc';
+                this.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
+
+                rows.sort(function(a, b) {
+                    const aVal = (a.cells[col]?.textContent || '').trim();
+                    const bVal = (b.cells[col]?.textContent || '').trim();
+                    return isAsc ? aVal.localeCompare(bVal, 'es') : bVal.localeCompare(aVal, 'es');
+                });
+
+                rows.forEach(function(r) { tbody.appendChild(r); });
+            });
+        });
+    </script>
+</body>
+</html>

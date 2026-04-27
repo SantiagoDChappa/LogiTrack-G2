@@ -251,6 +251,26 @@
                         </div>
                     </div>
 
+                    <div class="update-card" style="grid-area:repartidor">
+                        <h3>Asignar Repartidor</h3>
+                        <% if (shipment.deliveryUser) { %>
+                            <p style="margin-bottom:var(--space-3);color:var(--color-text-secondary);font-size:var(--font-size-sm);">Repartidor actual: <strong style="color:var(--color-text)"><%= shipment.deliveryUser.fullName %></strong></p>
+                        <% } else { %>
+                            <p style="margin-bottom:var(--space-3);color:var(--color-text-secondary);font-size:var(--font-size-sm);">Sin repartidor asignado</p>
+                        <% } %>
+                        <div class="field">
+                            <label for="deliveryUserId">Seleccionar Repartidor</label>
+                            <select name="deliveryUserId" id="deliveryUserId">
+                                <option value="">-- Sin asignar --</option>
+                                <% deliveryUsers.forEach(user => { %>
+                                    <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
+                                        <%= user.fullName %>
+                                    </option>
+                                <% }) %>
+                            </select>
+                        </div>
+                    </div>
+
                 </form>
 
                 <!-- Gestión de estado -->
@@ -321,7 +341,7 @@
             <!-- ══════════ FIN FORM ══════════ -->
 
             <div class="update-form-actions">
-                <a href="/shipment" class="btn-secondary">Cancelar</a>
+                <a href="<%= returnUrl %>" class="btn-secondary">Cancelar</a>
                 <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes" <%= isNonEditable ? 'disabled' : '' %>>Guardar cambios</button>
             </div>
 

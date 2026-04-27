@@ -5,6 +5,7 @@ const { Status }       = require('./status');
 const { Address }      = require('./address');
 const { Province }     = require('./province');
 const { TypeShipment } = require('./typeShipment');
+const { User } = require('./user');
 
 const Shipment = sequelize.define('shipment', {
     id: {
@@ -20,7 +21,8 @@ const Shipment = sequelize.define('shipment', {
     addressId:       { type: DataTypes.INTEGER },
     shipmentTypeId:  { type: DataTypes.INTEGER },
     weightKg:        { type: DataTypes.DECIMAL(8, 2) },
-    packageQty:      { type: DataTypes.INTEGER }
+    packageQty:      { type: DataTypes.INTEGER },
+    deliveryUserId: { type: DataTypes.INTEGER },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -29,6 +31,7 @@ Shipment.belongsTo(Person,       { as: 'recipient',    foreignKey: 'recipientId'
 Shipment.belongsTo(Status,       { as: 'status',       foreignKey: 'statusId'       });
 Shipment.belongsTo(Address,      { as: 'address',      foreignKey: 'addressId'      });
 Shipment.belongsTo(TypeShipment, { as: 'shipmentType', foreignKey: 'shipmentTypeId' });
+Shipment.belongsTo(User, { as: 'deliveryUser', foreignKey: 'deliveryUserId' });
 
 const defaultIncludes = [
     { model: Person,       as: 'sender'       },
@@ -36,6 +39,7 @@ const defaultIncludes = [
     { model: Status,       as: 'status'       },
     { model: Address,      as: 'address',      include: [{ model: Province, as: 'province' }] },
     { model: TypeShipment, as: 'shipmentType' },
+    { model: User, as: 'deliveryUser', required: false },
 ];
 
 const getAll = async () => {
@@ -70,10 +74,12 @@ const create = async (data) => {
     });
 };
 
-const search = async ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds }) => {
+const search = async ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId }) => {
     const shipmentWhere  = {};
     const senderWhere    = {};
     const recipientWhere = {};
+
+    if (deliveryUserId) shipmentWhere.deliveryUserId = deliveryUserId;
 
     if (statusIds && statusIds.length > 0) {
         shipmentWhere.statusId = { [Op.in]: statusIds.map(Number) };
@@ -153,9 +159,10 @@ const update = async (data) => {
 
     await Shipment.update(
         {
-            shipmentTypeId: data.shipmentTypeId || null,
-            weightKg:       data.weightKg       || null,
+            shipmentTypeId: data.shipmentTypeId  || null,
+            weightKg:       data.weightKg        || null,
             packageQty:     data.packageQty      || null,
+            deliveryUserId: data.deliveryUserId  || null,
         },
         { where: { id: data.id } }
     );

@@ -64,7 +64,9 @@ const getDetail = async (req, res) => {
         } : null,
     };
 
-    res.render('shipment/detail', { shipment, history, mapData });
+    const returnUrl   = req.query.from || '/shipment';
+    const returnLabel = req.query.fromLabel || 'Administrador de envíos';
+    res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel });
 };
 
 const getNewShipmentForm = async (req, res) => {
@@ -151,7 +153,10 @@ const getUpdateShipment = async (req, res) => {
       } : null,
   };
 
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData });
+const userModel = require('../models/user');
+const deliveryUsers = await userModel.search({ roleId: 3 });
+const returnUrl = req.query.from || '/shipment';
+res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl });
 };
 
 const updateShipment = async (req, res) => {
@@ -235,5 +240,19 @@ const updateShipmentStatus = async (req, res) => {
     res.status(500).send(err.message);
   }
 };
-
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments };
+const assignDelivery = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { deliveryUserId } = req.body;
+        const { Shipment } = require('../models/shipment');
+        await Shipment.update(
+            { deliveryUserId: deliveryUserId || null },
+            { where: { id } }
+        );
+        res.redirect(`/shipment/update/${id}?success=3`);
+    } catch (err) {
+        console.error('ERROR assignDelivery:', err.message);
+        res.status(500).send(err.message);
+    }
+};
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery };
