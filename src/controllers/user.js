@@ -1,13 +1,16 @@
 const userModel = require('../models/user');
 const { RoleType } = require('../constants/enums');
 
-const ROLE_LABELS = {
-    [RoleType.SUPERVISOR.id]: RoleType.SUPERVISOR.description,
-    [RoleType.OPERATOR.id]:   RoleType.OPERATOR.description,
+const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
+
+const ROLE_CLASSES = {
+    [RoleType.SUPERVISOR.id]: 'en_sucursal',
+    [RoleType.OPERATOR.id]:   'en_transito',
+    [RoleType.DELIVERY.id]:   'pendiente',
 };
 
 const getIndex = (req, res) => {
-    res.render('user/index', { users: [], query: {}, roleLabels: ROLE_LABELS, roleTypes: Object.values(RoleType) });
+    res.render('user/index', { users: [], query: {}, roleLabels: ROLE_LABELS, roleClasses: ROLE_CLASSES, roleTypes: Object.values(RoleType) });
 };
 
 const createUser = async (req, res) => {
@@ -35,9 +38,10 @@ const searchUsers = async (req, res) => {
         });
         res.render('user/index', {
             users,
-            query:      req.query,
-            roleLabels: ROLE_LABELS,
-            roleTypes:  Object.values(RoleType)
+            query:       req.query,
+            roleLabels:  ROLE_LABELS,
+            roleClasses: ROLE_CLASSES,
+            roleTypes:   Object.values(RoleType)
         });
     } catch (err) {
         console.error('ERROR searchUsers:', err.message);
@@ -54,7 +58,7 @@ const getUpdateUser  = async (req, res) => {
   const user = await userModel.getById(id);
 
   const returnUrl = req.query.from || '/user';
-  res.render('user/update', { errors: [], user, RoleType, returnUrl });
+  res.render('user/update', { errors: [], user, roleTypes: Object.values(RoleType), returnUrl });
 };
 
 

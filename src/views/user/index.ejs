@@ -74,7 +74,7 @@
                                 <td><%= user.document %></td>
                                 <td><%= user.email %></td>
                                 <td>
-                                    <span class="status-badge <%= user.roleId === 1 ? 'en_sucursal' : 'en_transito' %>">
+                                    <span class="status-badge <%= roleClasses[user.roleId] || '' %>">
                                         <%= roleLabels[user.roleId] || '-' %>
                                     </span>
                                 </td>
