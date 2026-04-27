@@ -23,7 +23,7 @@ const createUser = async (req, res) => {
     res.redirect('/user?success=1');
   } catch (err) {
     console.error('ERROR createUser:', err.message);
-    res.status(500).send(err.message);
+    res.status(500).send('Error al crear el usuario: ' + err.message);
   }
 };
 
@@ -46,7 +46,7 @@ const searchUsers = async (req, res) => {
         });
     } catch (err) {
         console.error('ERROR searchUsers:', err.message);
-        res.status(500).send(err.message);
+        res.status(500).send('Error al buscar usuarios: ' + err.message);
     }
 };
 
@@ -69,7 +69,7 @@ const updateUser = async (req, res) => {
     res.redirect('/user?success=2');
   } catch (err) {
     console.error('ERROR updateuser:', err.message);
-    res.status(500).send(err.message);
+    res.status(500).send('Error al actualizar el usuario: ' + err.message);
   }
 };
 
@@ -80,7 +80,7 @@ const deleteUser = async (req, res) => {
     res.redirect('/user?success=3');
   } catch (err) {
     console.error('ERROR deleteUser:', err.message);
-    res.status(500).send(err.message);
+    res.status(500).send('Error al eliminar el usuario: ' + err.message);
   }
 };
 

@@ -54,7 +54,10 @@ const getPortal = async (req, res) => {
         const searchType = /^\d+$/.test(q) ? 'dni' : 'codigo';
 
         if (shipments.length === 0) {
-            return res.render('portal', { searched: true, query: q, error: true, searchType });
+            const errorMsg = searchType === 'dni' 
+                ? 'No se encontraron envíos asociados a ese DNI.' 
+                : 'No se encontró ningún envío con ese código de seguimiento.';
+            return res.render('portal', { searched: true, query: q, error: errorMsg, searchType });
         }
 
         const histories = await Promise.all(
@@ -78,7 +81,7 @@ const getPortal = async (req, res) => {
         res.render('portal', { searched: true, query: q, shipments: shipmentsWithHistory });
     } catch (err) {
         console.error('Portal search error:', err);
-        res.render('portal', { searched: true, query: q, error: true });
+        res.render('portal', { searched: true, query: q, error: 'Ocurrió un error al realizar la búsqueda. Por favor, intente nuevamente.' });
     }
 };
 

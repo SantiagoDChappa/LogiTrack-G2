@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
         const shipments = await shipmentModel.getAll();
         res.json(shipments);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Error al obtener los envíos: ' + err.message });
     }
 });
 
@@ -65,7 +65,7 @@ router.get('/:id', async (req, res) => {
         if (!shipment) {return res.status(404).json({ error: 'Envío no encontrado' });}
         res.json(shipment);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Error al obtener los envíos: ' + err.message });
     }
 });
 
@@ -146,7 +146,7 @@ router.post('/', async (req, res) => {
 
         res.status(201).json(shipment);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Error al crear el envío: ' + err.message });
     }
 });
 
@@ -189,7 +189,7 @@ router.patch('/:id/status', async (req, res) => {
         await shipmentModel.updateStatus(req.params.id, statusId);
         res.json({ message: 'Estado actualizado', statusId });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Error al actualizar el estado del envío: ' + err.message });
     }
 });
 
