@@ -6,6 +6,9 @@
     <% if (mapData && mapData.destination) { %>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <% } %>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
+    <script src="/js/new_shipment_popup.js" defer></script>
     <title>Modificación de Envío - LogiTrack</title>
 </head>
 <body>
@@ -17,17 +20,6 @@
         </div>
 
         <div class="page-update-wrapper">
-
-            <% if (errors && errors.length > 0) { %>
-                <div class="error-container" style="background:#fee2e2; border:1px solid #f87171; border-radius:6px; padding:12px 15px; margin-bottom:20px; color:#991b1b; display: flex; align-items: flex-start; gap: 10px; width: 100%; box-sizing: border-box;">
-                    <span class="material-symbols-outlined" style="font-size: 1.2rem; margin-top: 2px;">error</span>
-                    <ul style="margin:0; padding-left:15px; font-size: 0.95rem;">
-                        <% errors.forEach(err => { %>
-                            <li><%= err %></li>
-                        <% }) %>
-                    </ul>
-                </div>
-            <% } %>
 
             <% 
                 const statusId = shipment.statusId;
@@ -375,8 +367,6 @@
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
     <script>
         document.querySelectorAll('.timeline-dot[data-clickable]').forEach(function(dot) {
             dot.addEventListener('click', function() {

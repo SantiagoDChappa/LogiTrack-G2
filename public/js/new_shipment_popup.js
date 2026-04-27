@@ -14,7 +14,7 @@ if (serverErrors.length > 0) {
                 line-height: 1.4;
             ">
                 <span style="color: ${isDark ? '#f87171' : '#dc2626'}; flex-shrink: 0; margin-top: 1px;">✕</span>
-                <span>${e.msg}</span>
+                <span>${typeof e === 'object' ? e.msg : e}</span>
             </li>`)
         .join('');
 

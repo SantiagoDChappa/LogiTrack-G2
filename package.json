@@ -57,7 +57,7 @@
     "swagger-ui-express": "^5.0.1",
     "sweetalert2": "^11.26.24",
     "twilio": "^5.13.1",
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
