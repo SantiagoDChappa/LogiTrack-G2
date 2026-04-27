@@ -105,7 +105,7 @@ const createShipment = async (req, res) => {
     });
 
     //Creo el envio
-    await shipmentModel.create({
+    const shipment = await shipmentModel.create({
         senderId:       sender.id,
         recipientId:    recipient.id,
         addressId:      address.id,
@@ -113,7 +113,15 @@ const createShipment = async (req, res) => {
         weightKg:       body.weightKg       || null,
         packageQty:     body.packageQty      || null,
     });
-    
+
+    await shipmentHistoryModel.create({
+        shipmentId:   shipment.id,
+        fromStatusId: null,
+        toStatusId:   shipment.statusId,
+        eventType:    'CREATED',
+        userId:       res.locals.currentUser?.id || null,
+    });
+
     res.redirect('/shipment?success=1');
   } catch (err) {
     console.error('ERROR createShipment:', err.message);
@@ -178,7 +186,9 @@ const updateShipment = async (req, res) => {
           shipmentId:   id,
           fromStatusId: shipment.statusId,
           toStatusId:   Number(body.newStatusId),
-          comment:      body.statusComment || null
+          comment:      body.statusComment || null,
+          userId:       currentUser?.id    || null,
+          eventType:    'STATUS_CHANGE',
         });
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
         if (newStatus) notifyStatusChange(shipment, newStatus.description);
@@ -206,7 +216,9 @@ const updateShipmentStatus = async (req, res) => {
         shipmentId:   id,
         fromStatusId: shipment.statusId,
         toStatusId:   Number(newStatusId),
-        comment:      comment || null
+        comment:      comment || null,
+        userId:       res.locals.currentUser?.id || null,
+        eventType:    'STATUS_CHANGE',
     });
 
     await shipmentModel.updateStatus(id, Number(newStatusId));
