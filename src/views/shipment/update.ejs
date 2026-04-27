@@ -42,12 +42,7 @@
                 const isGlobalNonEditable = isFinalStatus || isAtBranch;
             %>
 
-            <% if (isGlobalNonEditable) { %>
-            <div style="display:flex;align-items:center;gap:8px;background:#fee2e2;border:1px solid #f87171;border-radius:6px;padding:10px 15px;margin-bottom:15px;color:#991b1b;font-size:0.9rem; width: 100%; box-sizing: border-box;">
-                <span class="material-symbols-outlined" style="font-size:1.2rem;">block</span>
-                <span>Envío <strong><%= shipment.status.description %></strong>: edición deshabilitada.</span>
-            </div>
-            <% } else if (isInTransit) { %>
+            <% if (isInTransit) { %>
             <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 15px;margin-bottom:15px;color:#92400e;font-size:0.9rem; width: 100%; box-sizing: border-box;">
                 <span class="material-symbols-outlined" style="font-size:1.2rem;">info</span>
                 <span><strong>En Tránsito</strong>: solo editable Email y Teléfono.</span>
@@ -69,94 +64,70 @@
                 <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
             </div>
 
-            <!-- ── Línea de tiempo HORIZONTAL DETALLADA ── -->
-            <div class="update-card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
-                <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--color-border); padding-bottom: 1rem;">
-                    <span class="material-symbols-outlined">timeline</span> 
-                    Línea de tiempo
-                </h3>
+            <!-- ── Línea de tiempo ── -->
+            <div class="update-card" style="margin-bottom: 1.5rem;">
+                <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo</h3>
                 <% if (history.length === 0) { %>
                     <p class="historial-empty">Sin eventos registrados.</p>
                 <% } else { %>
-                    <div style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 20px; scrollbar-width: thin;">
-                        <% history.forEach(function(h, idx) { %>
+                    <%
+                        const _refLocationU = [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || null;
+                    %>
+                    <ol class="shipment-timeline">
+                        <% history.forEach(function(h) { %>
                             <%
                                 const _isCreated = h.eventType === 'CREATED';
                                 const _tk = h.toStatus.description.toLowerCase().replace(/[\s-]+/g, '_');
                                 const _tl = _slU[_tk] || h.toStatus.description;
-                                
-                                const _fromTk = h.fromStatus ? h.fromStatus.description.toLowerCase().replace(/[\s-]+/g, '_') : '';
-                                const _fromTl = h.fromStatus ? (_slU[_fromTk] || h.fromStatus.description) : '';
-
-                                const statusColors = {
-                                    pendiente: 'var(--color-warning)',
-                                    en_transito: 'var(--color-primary)',
-                                    en_sucursal: '#8b5cf6',
-                                    entregado: 'var(--color-success)',
-                                    cancelado: 'var(--color-danger)',
-                                    retrasado: '#f43f5e'
-                                };
-                                const currentColor = statusColors[_tk] || 'var(--color-text-secondary)';
+                                const _icon = _isCreated ? 'add_circle' : 'swap_horiz';
+                                const _author = h.user ? h.user.fullName : null;
                             %>
-                            <div style="display: flex; flex-direction: column; min-width: 280px; position: relative;">
-                                
-                                <!-- Zona Superior: Icono y Cabecera -->
-                                <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; position: relative; z-index: 2;">
-                                    <!-- Icono circular -->
-                                    <div style="width: 30px; height: 30px; border-radius: 50%; background: <%= currentColor %>; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 0 0 4px var(--color-bg);">
-                                        <span class="material-symbols-outlined" style="font-size: 16px; color: white;"><%= _isCreated ? 'add' : 'swap_horiz' %></span>
-                                    </div>
-
-                                    <!-- Cabecera -->
-                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
-                                        <span class="status-badge <%= _tk %>" style="font-size: 0.75rem; padding: 2px 8px;"><%= _tl %></span>
-                                        <% if (!_isCreated && h.fromStatus) { %>
-                                            <span style="font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase;">DESDE <%= _fromTl %></span>
-                                        <% } else if (_isCreated) { %>
-                                            <span style="font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase;">CREACIÓN</span>
+                            <li class="shipment-timeline-item">
+                                <span class="shipment-timeline-dot <%= _tk %>">
+                                    <span class="material-symbols-outlined"><%= _icon %></span>
+                                </span>
+                                <div class="shipment-timeline-content">
+                                    <div class="shipment-timeline-header">
+                                        <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
+                                        <% if (_isCreated) { %>
+                                            <span class="shipment-timeline-tag">Creación del envío</span>
+                                        <% } else if (h.fromStatus) { %>
+                                            <%
+                                                const _fk = h.fromStatus.description.toLowerCase().replace(/[\s-]+/g, '_');
+                                                const _fl = _slU[_fk] || h.fromStatus.description;
+                                            %>
+                                            <span class="shipment-timeline-tag">Desde <%= _fl %></span>
                                         <% } %>
                                     </div>
-                                </div>
-
-                                <!-- Línea conectora horizontal -->
-                                <% if (idx < history.length - 1) { %>
-                                    <div style="position: absolute; left: 42px; top: 14px; width: calc(100% - 22px); height: 2px; background: var(--color-border); z-index: 1;"></div>
-                                <% } %>
-
-                                <!-- Contenido (Metadatos y Comentario) -->
-                                <div style="margin-left: 42px;">
-                                    <!-- Metadatos -->
-                                    <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
-                                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-secondary);">
-                                            <span class="material-symbols-outlined" style="font-size: 0.95rem;">schedule</span>
-                                            <%= new Date(h.changedAt).toLocaleDateString('es-AR') %> <%= new Date(h.changedAt).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}) %>
-                                        </div>
-                                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-secondary);">
-                                            <span class="material-symbols-outlined" style="font-size: 0.95rem;">location_on</span>
-                                            <% if (_isCreated) { %>
-                                                <%= mapData.origin.label.toUpperCase() %>
-                                            <% } else { %>
-                                                <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() %>
-                                            <% } %>
-                                        </div>
-                                        <% if (h.user) { %>
-                                            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-secondary);">
-                                                <span class="material-symbols-outlined" style="font-size: 0.95rem;">person</span>
-                                                <%= h.user.fullName %>
-                                            </div>
-                                        <% } %>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
+                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
+                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
                                     </div>
-
-                                    <!-- Caja de Comentario -->
-                                    <% if (h.comment) { %>
-                                        <div style="background: var(--color-bg-alt); padding: 10px 12px; border-radius: 6px; font-style: italic; font-size: 0.85rem; color: var(--color-text); border: 1px solid var(--color-border); display: inline-block; max-width: 100%;">
-                                            "<%= h.comment %>"
+                                    <% if (_author) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">person</span>
+                                            <%= _author %>
                                         </div>
                                     <% } %>
+                                    <% if (_isCreated) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
+                                            <%= mapData.origin.label.toUpperCase() %>
+                                        </div>
+                                    <% } else if (_refLocationU) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
+                                            <%= _refLocationU.toUpperCase() %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.comment) { %>
+                                        <div class="shipment-timeline-comment">"<%= h.comment %>"</div>
+                                    <% } %>
                                 </div>
-                            </div>
+                            </li>
                         <% }) %>
-                    </div>
+                    </ol>
                 <% } %>
             </div>
 

@@ -29,8 +29,7 @@ describe('User Logical Delete', () => {
         expect(spy).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({ active: false })
-            }),
-            expect.any(Object)
+            })
         );
         
         spy.mockRestore();

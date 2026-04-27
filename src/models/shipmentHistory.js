@@ -1,7 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
-const { Status } = require('./status');
-const { User }   = require('./user');
 
 const ShipmentHistory = sequelize.define('shipment_history', {
     id:           { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -14,13 +12,6 @@ const ShipmentHistory = sequelize.define('shipment_history', {
     eventType:    { type: DataTypes.STRING,  allowNull: false, defaultValue: 'STATUS_CHANGE' }
 }, { tableName: 'shipment_history', timestamps: false });
 
-ShipmentHistory.belongsTo(Status, { as: 'fromStatus', foreignKey: 'fromStatusId' });
-ShipmentHistory.belongsTo(Status, { as: 'toStatus',   foreignKey: 'toStatusId'   });
-ShipmentHistory.belongsTo(User,   { as: 'user',       foreignKey: 'userId'       });
-
-// Autoreparación en caliente: si otro server con la rama vieja borra columnas
-// agregadas por migraciones, esta función las restaura y reintenta la operación.
-// Se puede sacar cuando el equipo entero esté en la rama nueva.
 const withSchemaSelfHeal = async (op) => {
     try {
         return await op();
@@ -49,6 +40,9 @@ const create = async ({ shipmentId, fromStatusId, toStatusId, comment, userId, e
 };
 
 const getByShipmentId = async (shipmentId) => {
+    const { Status } = require('./status');
+    const { User } = require('./user');
+
     return withSchemaSelfHeal(() => ShipmentHistory.findAll({
         where: { shipmentId },
         include: [

@@ -1,11 +1,5 @@
 const { DataTypes, Op } = require('sequelize');
 const sequelize = require('../database/connection');
-const { Person }       = require('./person');
-const { Status }       = require('./status');
-const { Address }      = require('./address');
-const { Province }     = require('./province');
-const { TypeShipment } = require('./typeShipment');
-const { User } = require('./user');
 
 const Shipment = sequelize.define('shipment', {
     id: {
@@ -26,28 +20,46 @@ const Shipment = sequelize.define('shipment', {
 },
 { timestamps: true, tableName: 'shipment' });
 
-Shipment.belongsTo(Person,       { as: 'sender',       foreignKey: 'senderId'       });
-Shipment.belongsTo(Person,       { as: 'recipient',    foreignKey: 'recipientId'    });
-Shipment.belongsTo(Status,       { as: 'status',       foreignKey: 'statusId'       });
-Shipment.belongsTo(Address,      { as: 'address',      foreignKey: 'addressId'      });
-Shipment.belongsTo(TypeShipment, { as: 'shipmentType', foreignKey: 'shipmentTypeId' });
-Shipment.belongsTo(User, { as: 'deliveryUser', foreignKey: 'deliveryUserId' });
+const getAll = () => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Province } = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { User } = require('./user');
+    
+    return Shipment.findAll({ 
+        include: [
+            { model: Person, as: 'sender' },
+            { model: Person, as: 'recipient' },
+            { model: Status, as: 'status' },
+            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: TypeShipment, as: 'shipmentType' },
+            { model: User, as: 'deliveryUser', required: false }
+        ] 
+    });
+};
 
-const defaultIncludes = [
-    { model: Person,       as: 'sender'       },
-    { model: Person,       as: 'recipient'    },
-    { model: Status,       as: 'status'       },
-    { model: Address,      as: 'address',      include: [{ model: Province, as: 'province' }] },
-    { model: TypeShipment, as: 'shipmentType' },
-    { model: User, as: 'deliveryUser', required: false },
-];
+const getById = (id) => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Province } = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { User } = require('./user');
 
-const getAll = () => Shipment.findAll({ include: defaultIncludes });
-
-const getById = (id) => Shipment.findOne({
-    where: { id },
-    include: defaultIncludes
-});
+    return Shipment.findOne({
+        where: { id },
+        include: [
+            { model: Person, as: 'sender' },
+            { model: Person, as: 'recipient' },
+            { model: Status, as: 'status' },
+            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: TypeShipment, as: 'shipmentType' },
+            { model: User, as: 'deliveryUser', required: false }
+        ]
+    });
+};
 
 const generateTrackingId = async () => {
     const last = await Shipment.findOne({ order: [['id', 'DESC']] });
@@ -71,6 +83,10 @@ const create = async (data) => {
 };
 
 const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId }) => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    
     const shipmentWhere  = {};
     const senderWhere    = {};
     const recipientWhere = {};
@@ -122,6 +138,10 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
 };
 
 const update = async (data) => {
+    const { Status } = require('./status');
+    const { Person } = require('./person');
+    const { Address } = require('./address');
+    
     const shipment = await Shipment.findOne({ 
         where: { id: data.id },
         include: [{ model: Status, as: 'status' }]

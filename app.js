@@ -6,6 +6,8 @@ const app     = express();
 const port    = process.env.PORT || 3000;
 
 const sequelize = require('./src/database/connection');
+// Load models and associations
+require('./src/models/index');
 const { runMigrations } = require('./src/database/migrate');
 const swaggerSpec = require('./src/docs/swagger');
 const { requireAuth, requireSupervisor } = require('./src/middlewares/auth');
@@ -32,13 +34,15 @@ const portalRoutes        = require('./src/routes/portal');
 // Los cambios de schema van por src/database/migrations/. Las migraciones son
 // idempotentes, así que correrlas en cada arranque es seguro y se autorrepara
 // si otro server con la rama vieja borró columnas.
+const path = require('path');
+
 sequelize.authenticate()
     .then(() => runMigrations())
     .then(() => console.warn('Base de datos conectada y migrada'))
     .catch(err => console.error('Error de DB:', err));
 
 app.set('view engine', 'ejs');
-app.set('views', './src/views');
+app.set('views', path.join(__dirname, 'src', 'views'));
 
 app.use(express.static('public'));
 app.use(express.json());

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 require('dotenv').config();
 const { Sequelize } = require('sequelize');
 const s = new Sequelize(process.env.DATABASE_URL, {

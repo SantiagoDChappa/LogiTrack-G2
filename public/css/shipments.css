@@ -1676,6 +1676,7 @@
   to { transform: rotate(360deg); }
 }
 .pred-spin {
+  font-family: 'Material Symbols Outlined';
   animation: pred-spin 1s linear infinite;
   display: inline-block;
   font-size: 1rem;

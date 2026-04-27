@@ -9,8 +9,8 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "db:setup": "node src/database/setup.js",
-    "test": "jest --forceExit --detectOpenHandles",
-    "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
+    "test": "cross-env NODE_ENV=test jest --forceExit --detectOpenHandles",
+    "test:coverage": "cross-env NODE_ENV=test jest --forceExit --detectOpenHandles --coverage",
     "test:watch": "jest --watch",
     "lint": "eslint ."
   },
@@ -25,7 +25,11 @@
       "!src/database/seed.sql",
       "!src/docs/**"
     ],
-    "coverageReporters": ["text", "lcov", "json-summary"],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "json-summary"
+    ],
     "coverageThreshold": {
       "global": {
         "lines": 50,
@@ -56,11 +60,13 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "docx": "^9.6.1",
     "eslint": "^9.39.4",
     "jest": "^29.7.0",
     "lint-staged": "^16.4.0",
     "nodemon": "^3.1.14",
+    "sqlite3": "^6.0.1",
     "supertest": "^7.1.0"
   },
   "engines": {
