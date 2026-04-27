@@ -3,7 +3,15 @@ const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 
 const getLogin = async (req, res) => {
-    return res.render('login',);
+    if (req.cookies?.token) {
+        try {
+            require('jsonwebtoken').verify(req.cookies.token, process.env.JWT_SECRET);
+            return res.redirect('/home');
+        } catch {
+            res.clearCookie('token');
+        }
+    }
+    return res.render('login');
 };
 
 const login = async (req, res) => {
