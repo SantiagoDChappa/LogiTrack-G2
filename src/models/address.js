@@ -21,7 +21,7 @@ const Address = sequelize.define('address', {
 Address.belongsTo(Province, { as: 'province', foreignKey: 'provinceId' });
 
 const create = async (data) => {
-    return await Address.create({
+    return Address.create({
         street:         data.street,
         number:         data.number,
         provinceId:     data.provinceId,

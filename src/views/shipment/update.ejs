@@ -16,17 +16,43 @@
             <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
         </div>
 
-        <% const isOperator = !currentUser.getAccess; %>
-        <% const isNonEditable = isOperator && (shipment.statusId === 4 || shipment.statusId === 5); %>
-
-        <% if (isNonEditable) { %>
-        <div style="display:flex;align-items:center;gap:10px;background:#fee2e2;border:1px solid #f87171;border-radius:6px;padding:14px 18px;margin-bottom:20px;color:#991b1b;font-size:0.95rem;">
-            <span class="material-symbols-outlined">block</span>
-            <span>Este envío está <strong><%= shipment.status.description %></strong> y no puede modificarse en este estado.</span>
-        </div>
-        <% } %>
-
         <div class="page-update-wrapper">
+
+            <% if (errors && errors.length > 0) { %>
+                <div class="error-container" style="background:#fee2e2; border:1px solid #f87171; border-radius:6px; padding:12px 15px; margin-bottom:20px; color:#991b1b; display: flex; align-items: flex-start; gap: 10px; width: 100%; box-sizing: border-box;">
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem; margin-top: 2px;">error</span>
+                    <ul style="margin:0; padding-left:15px; font-size: 0.95rem;">
+                        <% errors.forEach(err => { %>
+                            <li><%= err %></li>
+                        <% }) %>
+                    </ul>
+                </div>
+            <% } %>
+
+            <% 
+                const statusId = shipment.statusId;
+                const isFinalStatus = statusId === 4 || statusId === 5;
+                const isAtBranch = statusId === 3;
+                const isInTransit = statusId === 2;
+                const isPending = statusId === 1;
+
+                const canEditAddress = isPending;
+                const canEditRecipientBasic = isPending;
+                const canEditContact = isPending || isInTransit;
+                const isGlobalNonEditable = isFinalStatus || isAtBranch;
+            %>
+
+            <% if (isGlobalNonEditable) { %>
+            <div style="display:flex;align-items:center;gap:8px;background:#fee2e2;border:1px solid #f87171;border-radius:6px;padding:10px 15px;margin-bottom:15px;color:#991b1b;font-size:0.9rem; width: 100%; box-sizing: border-box;">
+                <span class="material-symbols-outlined" style="font-size:1.2rem;">block</span>
+                <span>Envío <strong><%= shipment.status.description %></strong>: edición deshabilitada.</span>
+            </div>
+            <% } else if (isInTransit) { %>
+            <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 15px;margin-bottom:15px;color:#92400e;font-size:0.9rem; width: 100%; box-sizing: border-box;">
+                <span class="material-symbols-outlined" style="font-size:1.2rem;">info</span>
+                <span><strong>En Tránsito</strong>: solo editable Email y Teléfono.</span>
+            </div>
+            <% } %>
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
@@ -35,7 +61,7 @@
             %>
 
             <!-- Tracking ID + estado -->
-            <div class="detail-top">
+            <div class="detail-top" style="margin-bottom: 1rem;">
                 <div class="detail-tracking">
                     <span class="detail-tracking-label">ID Tracking</span>
                     <span class="detail-tracking-id"><%= shipment.trackingId %></span>
@@ -43,127 +69,133 @@
                 <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
             </div>
 
-            <!-- ══════════ TOP: 3 COLUMNAS ══════════ -->
-            <div class="update-top-grid">
+            <!-- ── Línea de tiempo HORIZONTAL DETALLADA ── -->
+            <div class="update-card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+                <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--color-border); padding-bottom: 1rem;">
+                    <span class="material-symbols-outlined">timeline</span> 
+                    Línea de tiempo
+                </h3>
+                <% if (history.length === 0) { %>
+                    <p class="historial-empty">Sin eventos registrados.</p>
+                <% } else { %>
+                    <div style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 20px; scrollbar-width: thin;">
+                        <% history.forEach(function(h, idx) { %>
+                            <%
+                                const _isCreated = h.eventType === 'CREATED';
+                                const _tk = h.toStatus.description.toLowerCase().replace(/[\s-]+/g, '_');
+                                const _tl = _slU[_tk] || h.toStatus.description;
+                                
+                                const _fromTk = h.fromStatus ? h.fromStatus.description.toLowerCase().replace(/[\s-]+/g, '_') : '';
+                                const _fromTl = h.fromStatus ? (_slU[_fromTk] || h.fromStatus.description) : '';
 
-                <!-- ── Resumen del envío + ML ── -->
-                <div class="update-card">
-                    <h3><span class="material-symbols-outlined">inventory_2</span> Resumen del envío</h3>
+                                const statusColors = {
+                                    pendiente: 'var(--color-warning)',
+                                    en_transito: 'var(--color-primary)',
+                                    en_sucursal: '#8b5cf6',
+                                    entregado: 'var(--color-success)',
+                                    cancelado: 'var(--color-danger)',
+                                    retrasado: '#f43f5e'
+                                };
+                                const currentColor = statusColors[_tk] || 'var(--color-text-secondary)';
+                            %>
+                            <div style="display: flex; flex-direction: column; min-width: 280px; position: relative;">
+                                
+                                <!-- Zona Superior: Icono y Cabecera -->
+                                <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; position: relative; z-index: 2;">
+                                    <!-- Icono circular -->
+                                    <div style="width: 30px; height: 30px; border-radius: 50%; background: <%= currentColor %>; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 0 0 4px var(--color-bg);">
+                                        <span class="material-symbols-outlined" style="font-size: 16px; color: white;"><%= _isCreated ? 'add' : 'swap_horiz' %></span>
+                                    </div>
 
-                    <div class="summary-stats-row">
+                                    <!-- Cabecera -->
+                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                                        <span class="status-badge <%= _tk %>" style="font-size: 0.75rem; padding: 2px 8px;"><%= _tl %></span>
+                                        <% if (!_isCreated && h.fromStatus) { %>
+                                            <span style="font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase;">DESDE <%= _fromTl %></span>
+                                        <% } else if (_isCreated) { %>
+                                            <span style="font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase;">CREACIÓN</span>
+                                        <% } %>
+                                    </div>
+                                </div>
+
+                                <!-- Línea conectora horizontal -->
+                                <% if (idx < history.length - 1) { %>
+                                    <div style="position: absolute; left: 42px; top: 14px; width: calc(100% - 22px); height: 2px; background: var(--color-border); z-index: 1;"></div>
+                                <% } %>
+
+                                <!-- Contenido (Metadatos y Comentario) -->
+                                <div style="margin-left: 42px;">
+                                    <!-- Metadatos -->
+                                    <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
+                                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-secondary);">
+                                            <span class="material-symbols-outlined" style="font-size: 0.95rem;">schedule</span>
+                                            <%= new Date(h.changedAt).toLocaleDateString('es-AR') %> <%= new Date(h.changedAt).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}) %>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-secondary);">
+                                            <span class="material-symbols-outlined" style="font-size: 0.95rem;">location_on</span>
+                                            <% if (_isCreated) { %>
+                                                <%= mapData.origin.label.toUpperCase() %>
+                                            <% } else { %>
+                                                <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() %>
+                                            <% } %>
+                                        </div>
+                                        <% if (h.user) { %>
+                                            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--color-text-secondary);">
+                                                <span class="material-symbols-outlined" style="font-size: 0.95rem;">person</span>
+                                                <%= h.user.fullName %>
+                                            </div>
+                                        <% } %>
+                                    </div>
+
+                                    <!-- Caja de Comentario -->
+                                    <% if (h.comment) { %>
+                                        <div style="background: var(--color-bg-alt); padding: 10px 12px; border-radius: 6px; font-style: italic; font-size: 0.85rem; color: var(--color-text); border: 1px solid var(--color-border); display: inline-block; max-width: 100%;">
+                                            "<%= h.comment %>"
+                                        </div>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                <% } %>
+            </div>
+
+            <!-- ══════════ TOP GRID: INFO + MAPA ══════════ -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+
+                <!-- ── Resumen del envío ── -->
+                <div class="update-card" style="margin-bottom: 0;">
+                    <h3><span class="material-symbols-outlined">inventory_2</span> Resumen</h3>
+                    <div class="summary-stats-row" style="margin-bottom: 1rem;">
                         <div class="summary-stat-item">
-                            <span class="summary-stat-label">Tipo de Envío</span>
-                            <span class="summary-stat-value">
-                                <span class="material-symbols-outlined">local_shipping</span>
-                                <%= shipment.shipmentType ? shipment.shipmentType.description : '-' %>
-                            </span>
+                            <span class="summary-stat-label">Tipo</span>
+                            <span class="summary-stat-value"><%= shipment.shipmentType ? shipment.shipmentType.description : '-' %></span>
                         </div>
                         <div class="summary-stat-item">
                             <span class="summary-stat-label">Peso</span>
-                            <span class="summary-stat-value">
-                                <span class="material-symbols-outlined">scale</span>
-                                <%= shipment.weightKg != null ? Number(shipment.weightKg).toFixed(2) + ' kg' : '-' %>
-                            </span>
+                            <span class="summary-stat-value"><%= shipment.weightKg != null ? Number(shipment.weightKg).toFixed(1) + 'kg' : '-' %></span>
                         </div>
                         <div class="summary-stat-item">
-                            <span class="summary-stat-label">Cantidad</span>
-                            <span class="summary-stat-value">
-                                <span class="material-symbols-outlined">widgets</span>
-                                <%= shipment.packageQty != null ? shipment.packageQty : '-' %>
-                            </span>
+                            <span class="summary-stat-label">Cant.</span>
+                            <span class="summary-stat-value"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
                         </div>
                     </div>
-
-                    <div class="summary-addresses">
-                        <div><span class="summary-addr-lbl">ORIGEN:</span> <%= mapData.origin.label.toUpperCase() %></div>
-                        <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
+                    <div style="font-size: 0.85rem; color: var(--color-text-secondary);">
+                        <div style="margin-bottom: 4px;"><strong>ORIGEN:</strong> <%= mapData.origin.label.toUpperCase() %></div>
+                        <div><strong>DESTINO:</strong> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
-
-                    <div id="prediction-widget"
-                         class="pred-card pred-card--embedded"
-                         data-autoload="true">
-                        <h3>
-                            <span class="material-symbols-outlined">query_stats</span>
-                            Detalles de la entrega
-                        </h3>
-                        <div id="prediction-result"></div>
+                    <div id="prediction-widget" class="pred-card pred-card--embedded" data-autoload="true" style="margin-top: 1rem; padding: 10px; border: 1px dashed var(--color-border); border-radius: 6px;">
+                        <div id="prediction-result" style="font-size: 0.85rem;"></div>
                     </div>
                 </div>
 
-                <!-- ── Trayecto del envío (mapa) ── -->
+                <!-- ── Mapa ── -->
                 <% if (mapData && mapData.destination) { %>
-                <div class="update-card update-map-card">
-                    <h3><span class="material-symbols-outlined">map</span> Trayecto del envío</h3>
-                    <div id="shipment-map"></div>
-                    <div class="map-legend">
-                        <div class="map-legend-item">
-                            <div class="map-dot map-dot--origin"></div>
-                            <span>Origen</span>
-                        </div>
-                        <div class="map-legend-item">
-                            <div class="map-dot map-dot--dest"></div>
-                            <span>Destino</span>
-                        </div>
-                    </div>
+                <div class="update-card update-map-card" style="margin-bottom: 0;">
+                    <h3><span class="material-symbols-outlined">map</span> Trayecto</h3>
+                    <div id="shipment-map" style="height: 180px; border-radius: 8px;"></div>
                 </div>
                 <% } %>
-
-                <!-- ── Línea de tiempo ── -->
-                <div class="update-card">
-                    <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo</h3>
-                    <% if (history.length === 0) { %>
-                        <p class="historial-empty">Sin eventos registrados.</p>
-                    <% } else { %>
-                        <%
-                            const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
-                            function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
-                        %>
-                        <ol class="shipment-timeline">
-                            <% history.forEach(function(h) { %>
-                                <%
-                                    const _isCreated = h.eventType === 'CREATED';
-                                    const _tk = _sk2(h.toStatus.description);
-                                    const _tl = _sl2[_tk] || h.toStatus.description;
-                                    const _icon = _isCreated ? 'add_circle' : 'swap_horiz';
-                                    const _author = h.user ? h.user.fullName : null;
-                                %>
-                                <li class="shipment-timeline-item">
-                                    <span class="shipment-timeline-dot <%= _tk %>">
-                                        <span class="material-symbols-outlined"><%= _icon %></span>
-                                    </span>
-                                    <div class="shipment-timeline-content">
-                                        <div class="shipment-timeline-header">
-                                            <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
-                                            <% if (_isCreated) { %>
-                                                <span class="shipment-timeline-tag">Creación del envío</span>
-                                            <% } else if (h.fromStatus) { %>
-                                                <%
-                                                    const _fk = _sk2(h.fromStatus.description);
-                                                    const _fl = _sl2[_fk] || h.fromStatus.description;
-                                                %>
-                                                <span class="shipment-timeline-tag">Desde <%= _fl %></span>
-                                            <% } %>
-                                        </div>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
-                                            <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
-                                            <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
-                                        </div>
-                                        <% if (_author) { %>
-                                            <div class="shipment-timeline-meta">
-                                                <span class="material-symbols-outlined shipment-timeline-meta-ico">person</span>
-                                                <%= _author %>
-                                            </div>
-                                        <% } %>
-                                        <% if (h.comment) { %>
-                                            <div class="shipment-timeline-comment">"<%= h.comment %>"</div>
-                                        <% } %>
-                                    </div>
-                                </li>
-                            <% }) %>
-                        </ol>
-                    <% } %>
-                </div>
 
             </div>
             <!-- ══════════ FIN TOP GRID ══════════ -->
@@ -181,38 +213,34 @@
                         <div class="update-fields">
                             <div class="field">
                                 <label for="recipient-name">Nombre y Apellido <span class="req">*</span></label>
-                                <input id="recipient-name" type="text" name="recipientName" value="<%= shipment.recipient.fullName || '' %>" placeholder="Ej: Juan Pérez">
+                                <input id="recipient-name" type="text" name="recipientName" value="<%= shipment.recipient.fullName || '' %>" placeholder="Ej: Juan Pérez" <%= !canEditRecipientBasic ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                             <div class="field">
                                 <label for="recipient-document">Documento <span class="req">*</span></label>
-                                <input id="recipient-document" type="text" name="recipientDocument" value="<%= shipment.recipient.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                                <input id="recipient-document" type="text" name="recipientDocument" value="<%= shipment.recipient.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" <%= !canEditRecipientBasic ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                             <div class="field">
                                 <label for="recipient-phone">Teléfono</label>
-                                <input id="recipient-phone" type="tel" name="recipientPhone" value="<%= shipment.recipient.phone || '' %>" placeholder="Ej: 1123456789" maxlength="10">
+                                <input id="recipient-phone" type="tel" name="recipientPhone" value="<%= shipment.recipient.phone || '' %>" placeholder="Ej: 1123456789" maxlength="10" <%= !canEditContact ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                             <div class="field">
                                 <label for="recipient-email">Email</label>
-                                <input id="recipient-email" type="email" name="recipientEmail" value="<%= shipment.recipient.email || '' %>" placeholder="Ej: juan@email.com">
+                                <input id="recipient-email" type="email" name="recipientEmail" value="<%= shipment.recipient.email || '' %>" placeholder="Ej: juan@email.com" <%= !canEditContact ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                         </div>
                     </div>
 
                     <div class="update-card" style="grid-area:infopaquete">
                         <h3>Información del paquete</h3>
-                        <% if (isOperator) { %>
-                        <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#92400e;font-size:0.88rem;">
+                        <div style="display:flex;align-items:center;gap:8px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#4b5563;font-size:0.88rem;">
                             <span class="material-symbols-outlined" style="font-size:1.1rem;">lock</span>
-                            No tenés permisos para modificar estos campos.
+                            Estos campos no pueden modificarse después de la creación.
                         </div>
-                        <% } %>
                         <div class="update-fields">
                             <div class="field">
                                 <label for="shipment-type">Tipo de envío <span class="req">*</span></label>
-                                <% if (isOperator) { %>
                                 <input type="hidden" name="shipmentTypeId" value="<%= shipment.shipmentTypeId || '' %>">
-                                <% } %>
-                                <select id="shipment-type" name="shipmentTypeId" <%= isOperator ? 'disabled' : '' %>>
+                                <select id="shipment-type" name="shipmentTypeId" disabled>
                                     <option value="">Seleccione un tipo</option>
                                     <% typesShipment.forEach(type => { %>
                                         <option value="<%= type.id %>" <%= shipment.shipmentTypeId == type.id ? 'selected' : '' %>><%= type.description %></option>
@@ -221,11 +249,11 @@
                             </div>
                             <div class="field">
                                 <label for="weight-kg">Peso (kg) <span class="req">*</span></label>
-                                <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= shipment.weightKg || '' %>" placeholder="Ej: 1.5" <%= isOperator ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
+                                <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= shipment.weightKg || '' %>" placeholder="Ej: 1.5" readonly style="pointer-events:none;opacity:0.6;">
                             </div>
                             <div class="field">
                                 <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
-                                <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= shipment.packageQty || '' %>" placeholder="Ej: 3" <%= isOperator ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
+                                <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= shipment.packageQty || '' %>" placeholder="Ej: 3" readonly style="pointer-events:none;opacity:0.6;">
                             </div>
                         </div>
                     </div>
@@ -233,10 +261,10 @@
                     <div class="update-card" style="grid-area:direccion">
                         <h3>Dirección de entrega</h3>
 
-                        <% if (isOperator) { %>
+                        <% if (!canEditAddress) { %>
                         <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#92400e;font-size:0.88rem;">
                             <span class="material-symbols-outlined" style="font-size:1.1rem;">lock</span>
-                            No tenés permisos para modificar estos campos.
+                            La dirección no puede modificarse en el estado actual.
                         </div>
                         <% } %>
 
@@ -249,7 +277,7 @@
 
                         <div class="update-fields" style="display:flex;flex-direction:column;gap:var(--space-3);">
 
-                            <% if (!isOperator) { %>
+                            <% if (canEditAddress) { %>
                             <div class="field addr-search-wrapper" style="position:relative;">
                                 <label for="address-search">Dirección completa</label>
                                 <input id="address-search" type="text" autocomplete="off"
@@ -267,7 +295,7 @@
                                         <strong><%= shipment.address.street %> <%= shipment.address.number %></strong><% if (currentProvName) { %> — <%= currentProvName %><% } %>
                                     </span>
                                 </div>
-                                <% if (!isOperator) { %>
+                                <% if (canEditAddress) { %>
                                 <button type="button" id="address-clear" class="addr-clear-btn">
                                     <span class="material-symbols-outlined">close</span> Cambiar
                                 </button>
@@ -276,7 +304,7 @@
 
                             <div class="field">
                                 <label for="floor-apartment">Piso y/o Depto <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
-                                <input id="floor-apartment" type="text" name="floorApartment" value="<%= shipment.address.floorApartment || '' %>" placeholder="Ej: 3° B" <%= isOperator ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
+                                <input id="floor-apartment" type="text" name="floorApartment" value="<%= shipment.address.floorApartment || '' %>" placeholder="Ej: 3° B" <%= !canEditAddress ? 'readonly style="pointer-events:none;opacity:0.6;"' : '' %>>
                             </div>
                         </div>
                     </div>
@@ -290,7 +318,7 @@
                         <% } %>
                         <div class="field">
                             <label for="deliveryUserId">Seleccionar Repartidor</label>
-                            <select name="deliveryUserId" id="deliveryUserId">
+                            <select name="deliveryUserId" id="deliveryUserId" <%= isGlobalNonEditable ? 'disabled' : '' %>>
                                 <option value="">-- Sin asignar --</option>
                                 <% deliveryUsers.forEach(user => { %>
                                     <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
@@ -313,7 +341,6 @@
 
                     <div class="timeline-track">
                         <% const currentId = shipment.statusId; %>
-                        <% const isSupervisor = currentUser.getAccess; %>
                         <% statuses.forEach(function(s, idx) { %>
                             <%
                                 var isDone      = s.id < currentId && currentId !== 5;
@@ -354,7 +381,7 @@
                         </div>
                     </div>
 
-                    <% if (!currentUser.getAccess) { %>
+                    <% if (!isSupervisor) { %>
                     <div class="status-info-message" style="background-color:var(--color-warning-bg,#fef3c7);border:1px solid var(--color-warning,#f59e0b);border-radius:4px;padding:12px;margin-top:16px;color:var(--color-warning-text,#92400e);font-size:0.9rem;">
                         <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">info</span>
                         Solo los supervisores pueden cambiar el estado del envío.
@@ -371,7 +398,7 @@
             <!-- ══════════ FIN FORM ══════════ -->
 
             <div class="update-form-actions">
-                <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes" <%= isNonEditable ? 'disabled' : '' %>>Guardar cambios</button>
+                <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes" <%= isGlobalNonEditable ? 'disabled' : '' %>>Guardar cambios</button>
             </div>
 
         </div>

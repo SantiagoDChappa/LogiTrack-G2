@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -10,7 +11,7 @@ const runMigrations = async () => {
         .filter(f => f.endsWith('.sql'))
         .sort();
 
-    if (files.length === 0) return;
+    if (files.length === 0) {return;}
 
     for (const file of files) {
         const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');

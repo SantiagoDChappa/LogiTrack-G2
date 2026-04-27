@@ -21,7 +21,7 @@ function statusLabel(description) {
 
 // ── Nodemailer transporter (opcional) ────────────────────────────────────────
 function buildTransporter() {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {return null;}
 
     if (process.env.SMTP_SERVICE) {
         return nodemailer.createTransport({
@@ -40,9 +40,9 @@ function buildTransporter() {
 
 // ── Email ────────────────────────────────────────────────────────────────────
 async function sendEmail(recipient, trackingId, label) {
-    if (!recipient?.email) return;
+    if (!recipient?.email) {return;}
     const transporter = buildTransporter();
-    if (!transporter) return;
+    if (!transporter) {return;}
 
     const from = process.env.SMTP_FROM || process.env.SMTP_USER;
 
@@ -79,13 +79,13 @@ async function sendEmail(recipient, trackingId, label) {
 
 // ── SMS vía Twilio (opcional) ─────────────────────────────────────────────────
 async function sendSms(recipient, trackingId, label) {
-    if (!process.env.TWILIO_SID || !process.env.TWILIO_TOKEN || !process.env.TWILIO_FROM) return;
-    if (!recipient?.phone) return;
+    if (!process.env.TWILIO_SID || !process.env.TWILIO_TOKEN || !process.env.TWILIO_FROM) {return;}
+    if (!recipient?.phone) {return;}
 
     let phone = String(recipient.phone).replace(/\D/g, '');
     // Formato Argentina: +549XXXXXXXXXX (móvil) o +5411XXXXXXXX (fijo CABA)
-    if (phone.startsWith('0')) phone = phone.slice(1);
-    if (!phone.startsWith('54'))  phone = '54' + phone;
+    if (phone.startsWith('0')) {phone = phone.slice(1);}
+    if (!phone.startsWith('54'))  {phone = '54' + phone;}
     phone = '+' + phone;
 
     try {

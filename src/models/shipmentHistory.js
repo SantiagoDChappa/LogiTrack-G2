@@ -30,14 +30,14 @@ const withSchemaSelfHeal = async (op) => {
             console.warn('[shipmentHistory] schema drift detectado, re-aplicando migraciones...');
             const { runMigrations } = require('../database/migrate');
             await runMigrations();
-            return await op();
+            return op();
         }
         throw e;
     }
 };
 
 const create = async ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType }) => {
-    return await withSchemaSelfHeal(() => ShipmentHistory.create({
+    return withSchemaSelfHeal(() => ShipmentHistory.create({
         shipmentId,
         fromStatusId: fromStatusId || null,
         toStatusId,
@@ -49,7 +49,7 @@ const create = async ({ shipmentId, fromStatusId, toStatusId, comment, userId, e
 };
 
 const getByShipmentId = async (shipmentId) => {
-    return await withSchemaSelfHeal(() => ShipmentHistory.findAll({
+    return withSchemaSelfHeal(() => ShipmentHistory.findAll({
         where: { shipmentId },
         include: [
             { model: Status, as: 'fromStatus' },

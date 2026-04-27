@@ -65,9 +65,7 @@ const getUpdateUser  = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const body = { ...req.body, id: req.params.id };
-    await userModel.update(body);
-
+    await userModel.update(req.params.id, req.body);
     res.redirect('/user?success=2');
   } catch (err) {
     console.error('ERROR updateuser:', err.message);

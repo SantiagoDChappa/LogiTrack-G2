@@ -39,19 +39,43 @@
                             <% }); %>
                         </select>
                     </div>
-                    <div class="field">
-                        <label for="active">Estado</label>
-                        <select id="active" name="active">
-                            <option value="true" <%= user.active ? 'selected' : '' %>>Alta</option>
-                            <option value="false" <%= !user.active ? 'selected' : '' %>>Baja</option>
-                        </select>
-                    </div>
                 </div>
 
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">Guardar cambios</button>
                 </div>
             </form>
+
+            <!-- Baja / Alta -->
+            <form id="form-toggle-active" action="/user/update/<%= user.id %>" method="POST" style="display:none">
+                <input type="hidden" name="fullName" value="<%= user.fullName %>">
+                <input type="hidden" name="document" value="<%= user.document %>">
+                <input type="hidden" name="email" value="<%= user.email %>">
+                <input type="hidden" name="roleId" value="<%= user.roleId %>">
+                <input type="hidden" name="active" id="active-toggle-val" value="">
+            </form>
+
+            <div class="update-card" style="margin-top:var(--space-4)">
+                <h3>Estado del usuario</h3>
+                <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+                    <span>Estado actual:
+                        <% if (user.active) { %>
+                            <span class="status-badge entregado">Alta</span>
+                        <% } else { %>
+                            <span class="status-badge retrasado">Baja</span>
+                        <% } %>
+                    </span>
+                    <% if (user.active) { %>
+                        <button type="button" id="btn-toggle-active" class="btn-danger">
+                            <span class="material-symbols-outlined">person_off</span>Dar de baja
+                        </button>
+                    <% } else { %>
+                        <button type="button" id="btn-toggle-active" class="btn-primary">
+                            <span class="material-symbols-outlined">person_add</span>Dar de alta
+                        </button>
+                    <% } %>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -60,5 +84,29 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+    document.getElementById('btn-toggle-active').addEventListener('click', function () {
+        const isActive = <%= user.active ? 'true' : 'false' %>;
+        const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+        Swal.fire({
+            icon: isActive ? 'warning' : 'question',
+            title: isActive ? '¿Dar de baja al usuario?' : '¿Dar de alta al usuario?',
+            text: isActive
+                ? 'El usuario perderá acceso al sistema.'
+                : 'El usuario recuperará acceso al sistema.',
+            showCancelButton: true,
+            confirmButtonText: isActive ? 'Sí, dar de baja' : 'Sí, dar de alta',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: isActive ? '#dc2626' : '#2563eb',
+            background: isDark ? '#1e293b' : '#ffffff',
+            color: isDark ? '#f1f5f9' : '#1e293b',
+        }).then(result => {
+            if (result.isConfirmed) {
+                document.getElementById('active-toggle-val').value = isActive ? 'false' : 'true';
+                document.getElementById('form-toggle-active').submit();
+            }
+        });
+    });
+    </script>
 </body>
 </html>

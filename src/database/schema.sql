@@ -7,53 +7,48 @@ CREATE SCHEMA "logitrack";
 
 CREATE TABLE "logitrack"."user" (
     "id"       SERIAL,
-    "fullName" varchar,
-    "email"    varchar,
-    "password" varchar,
-    "document" int,
-    "roleId"   int,
+    "fullName" varchar NOT NULL,
+    "email"    varchar NOT NULL UNIQUE,
+    "password" varchar NOT NULL,
+    "document" int NOT NULL UNIQUE,
+    "roleId"   int NOT NULL,
+    "isActive" boolean DEFAULT true,
     PRIMARY KEY ("id")
 );
 
 CREATE TABLE "logitrack"."shipment" (
     "id"             SERIAL,
-    "trackingId"     varchar,
-    "statusId"       int,
-    "createdAt"      date,
-    "senderId"       int,
-    "recipientId"    int,
-    "addressId"      int,
-    "shipmentTypeId" int,
-    "weightKg"       decimal(8,2),
-    "packageQty"     int,
+    "trackingId"     varchar NOT NULL UNIQUE,
+    "statusId"       int NOT NULL,
+    "createdAt"      timestamp NOT NULL DEFAULT NOW(),
+    "senderId"       int NOT NULL,
+    "recipientId"    int NOT NULL,
+    "addressId"      int NOT NULL,
+    "shipmentTypeId" int NOT NULL,
+    "weightKg"       decimal(8,2) NOT NULL CHECK ("weightKg" > 0),
+    "packageQty"     int NOT NULL CHECK ("packageQty" > 0),
+    "deliveryUserId" int,
     PRIMARY KEY ("id")
 );
 
 CREATE TABLE "logitrack"."status" (
     "id"          int NOT NULL,
-    "description" varchar,
+    "description" varchar NOT NULL,
     PRIMARY KEY ("id")
 );
 
 CREATE TABLE "logitrack"."person" (
     "id"           SERIAL,
-    "fullName"     text,
-    "document"     int,
+    "fullName"     text NOT NULL,
+    "document"     int NOT NULL,
     "phone"        varchar,
     "email"        varchar,
-    "personTypeId" int,
     PRIMARY KEY ("id")
 );
 
 CREATE TABLE "logitrack"."province" (
     "id"          int     NOT NULL,
     "description" varchar NOT NULL,
-    PRIMARY KEY ("id")
-);
-
-CREATE TABLE "logitrack"."personType" (
-    "id"          int NOT NULL,
-    "description" varchar,
     PRIMARY KEY ("id")
 );
 
@@ -71,7 +66,7 @@ CREATE TABLE "logitrack"."address" (
 
 CREATE TABLE "logitrack"."roleType" (
     "id"          int NOT NULL,
-    "description" varchar,
+    "description" varchar NOT NULL,
     PRIMARY KEY ("id")
 );
 
@@ -81,6 +76,23 @@ CREATE TABLE "logitrack"."shipmentType" (
     PRIMARY KEY ("id")
 );
 
+CREATE TABLE "logitrack"."shipment_history" (
+    "id"           SERIAL,
+    "shipmentId"   int       NOT NULL,
+    "fromStatusId" int,
+    "toStatusId"   int       NOT NULL,
+    "comment"      text,
+    "changedAt"    timestamp NOT NULL DEFAULT NOW(),
+    "userId"       int,
+    "eventType"    varchar   NOT NULL DEFAULT 'STATUS_CHANGE',
+    PRIMARY KEY ("id")
+);
+
+CREATE TABLE "logitrack"."settings" (
+    "key"   varchar PRIMARY KEY,
+    "value" text
+);
+
 -- ============================================================
 -- FK
 -- ============================================================
@@ -88,10 +100,6 @@ CREATE TABLE "logitrack"."shipmentType" (
 ALTER TABLE "logitrack"."address"
     ADD CONSTRAINT "fk_address_provinceId_province_id"
     FOREIGN KEY ("provinceId") REFERENCES "logitrack"."province" ("id");
-
-ALTER TABLE "logitrack"."person"
-    ADD CONSTRAINT "fk_person_personTypeId_personType_id"
-    FOREIGN KEY ("personTypeId") REFERENCES "logitrack"."personType" ("id");
 
 ALTER TABLE "logitrack"."user"
     ADD CONSTRAINT "fk_user_roleId_roleType_id"
@@ -117,17 +125,9 @@ ALTER TABLE "logitrack"."shipment"
     ADD CONSTRAINT "fk_shipment_shipmentTypeId_shipmentType_id"
     FOREIGN KEY ("shipmentTypeId") REFERENCES "logitrack"."shipmentType" ("id");
 
-CREATE TABLE "logitrack"."shipment_history" (
-    "id"           SERIAL,
-    "shipmentId"   int       NOT NULL,
-    "fromStatusId" int,
-    "toStatusId"   int       NOT NULL,
-    "comment"      text,
-    "changedAt"    timestamp NOT NULL,
-    "userId"       int,
-    "eventType"    varchar   NOT NULL DEFAULT 'STATUS_CHANGE',
-    PRIMARY KEY ("id")
-);
+ALTER TABLE "logitrack"."shipment"
+    ADD CONSTRAINT "fk_shipment_deliveryUserId"
+    FOREIGN KEY ("deliveryUserId") REFERENCES "logitrack"."user" ("id");
 
 ALTER TABLE "logitrack"."shipment_history"
     ADD CONSTRAINT "fk_history_shipmentId"

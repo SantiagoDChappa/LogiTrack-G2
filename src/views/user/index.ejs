@@ -98,13 +98,6 @@
                                     <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
                                         <span class="material-symbols-outlined">edit</span>
                                     </a>
-                                    <% if (user.active) { %>
-                                        <form action="/user/delete/<%= user.id %>" method="POST" style="display:inline">
-                                            <button type="submit" class="action-btn eliminar" data-tooltip="Baja">
-                                                <span class="material-symbols-outlined">delete</span>
-                                            </button>
-                                        </form>
-                                    <% } %>
                                 </td>
                             </tr>
                         <% }); %>

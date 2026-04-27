@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
     const { destinationProvinceId, destinationStreet, destinationNumber, destinationLat, destinationLng } = req.body;
 
     const destProvince = PROVINCES[parseInt(destinationProvinceId)];
-    if (!destProvince) return res.status(400).json({ error: 'Provincia inválida' });
+    if (!destProvince) {return res.status(400).json({ error: 'Provincia inválida' });}
 
     const [originLat, originLng, originProvinceMl] = await Promise.all([
         settingModel.get('origin_lat'),

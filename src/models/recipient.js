@@ -19,9 +19,7 @@ const Shipment = sequelize.define('shipment', {
 );
 
 const getAll = async () => {
-    const data = await Shipment.findAll();
-    console.log(data);
-    return data;
+    return Shipment.findAll();
 };
 
 const getById = (id) => {
@@ -49,28 +47,28 @@ const create = (data) => {
 
 const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument }) => {
     const hasFilter = trackingId || name || document || senderName || senderDocument || recipientName || recipientDocument;
-    if (!hasFilter) return getAll();
+    if (!hasFilter) {return getAll();}
 
     const isBoth      = !role || role === 'both';
     const isSender    = role === 'sender';
     const isRecipient = role === 'recipient';
 
     return getAll().filter(s => {
-        if (!s.sender || !s.recipient) return false;
+        if (!s.sender || !s.recipient) {return false;}
 
-        if (trackingId && !s.id.toLowerCase().includes(trackingId.toLowerCase())) return false;
+        if (trackingId && !s.id.toLowerCase().includes(trackingId.toLowerCase())) {return false;}
 
         if (isBoth) {
-            if (senderName        && !s.sender.name.toLowerCase().includes(senderName.toLowerCase()))       return false;
-            if (senderDocument    && !s.sender.document.includes(senderDocument))                           return false;
-            if (recipientName     && !s.recipient.name.toLowerCase().includes(recipientName.toLowerCase())) return false;
-            if (recipientDocument && !s.recipient.document.includes(recipientDocument))                     return false;
+            if (senderName        && !s.sender.name.toLowerCase().includes(senderName.toLowerCase()))       {return false;}
+            if (senderDocument    && !s.sender.document.includes(senderDocument))                           {return false;}
+            if (recipientName     && !s.recipient.name.toLowerCase().includes(recipientName.toLowerCase())) {return false;}
+            if (recipientDocument && !s.recipient.document.includes(recipientDocument))                     {return false;}
         } else if (isSender) {
-            if (name     && !s.sender.name.toLowerCase().includes(name.toLowerCase())) return false;
-            if (document && !s.sender.document.includes(document))                     return false;
+            if (name     && !s.sender.name.toLowerCase().includes(name.toLowerCase())) {return false;}
+            if (document && !s.sender.document.includes(document))                     {return false;}
         } else if (isRecipient) {
-            if (name     && !s.recipient.name.toLowerCase().includes(name.toLowerCase())) return false;
-            if (document && !s.recipient.document.includes(document))                     return false;
+            if (name     && !s.recipient.name.toLowerCase().includes(name.toLowerCase())) {return false;}
+            if (document && !s.recipient.document.includes(document))                     {return false;}
         }
 
         return true;

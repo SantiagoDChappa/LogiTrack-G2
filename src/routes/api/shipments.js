@@ -62,7 +62,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const shipment = await shipmentModel.getById(req.params.id);
-        if (!shipment) return res.status(404).json({ error: 'Envío no encontrado' });
+        if (!shipment) {return res.status(404).json({ error: 'Envío no encontrado' });}
         res.json(shipment);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -184,7 +184,7 @@ router.patch('/:id/status', async (req, res) => {
     try {
         const { statusId } = req.body;
         const shipment = await shipmentModel.getById(req.params.id);
-        if (!shipment) return res.status(404).json({ error: 'Envío no encontrado' });
+        if (!shipment) {return res.status(404).json({ error: 'Envío no encontrado' });}
 
         await shipmentModel.updateStatus(req.params.id, statusId);
         res.json({ message: 'Estado actualizado', statusId });
