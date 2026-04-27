@@ -1162,6 +1162,111 @@
   margin: 0;
 }
 
+/* ============================================================
+   Línea de tiempo del envío - SCRUM-23
+   Prefijo "shipment-timeline-" para no chocar con el "timeline-*"
+   que ya usa el selector de estados en update.ejs.
+   ============================================================ */
+
+.shipment-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.shipment-timeline-item {
+  position: relative;
+  padding-left: 2.5rem;
+  padding-bottom: var(--space-4);
+}
+
+.shipment-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+/* Línea conectora vertical entre dots */
+.shipment-timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 0.875rem;
+  top: 1.75rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.shipment-timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--badge-initial-bg, var(--color-border));
+  color: var(--badge-initial-text, var(--color-text));
+  border: 2px solid var(--color-card-bg, var(--color-bg, #fff));
+  box-shadow: 0 0 0 2px var(--color-border);
+}
+
+.shipment-timeline-dot .material-symbols-outlined {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.shipment-timeline-dot.pendiente    { background: var(--badge-pending-bg);    color: var(--badge-pending-text); }
+.shipment-timeline-dot.en_transito  { background: var(--badge-transit-bg);    color: var(--badge-transit-text); }
+.shipment-timeline-dot.entregado    { background: var(--badge-delivered-bg);  color: var(--badge-delivered-text); }
+.shipment-timeline-dot.retrasado    { background: var(--badge-delayed-bg);    color: var(--badge-delayed-text); }
+.shipment-timeline-dot.cancelado,
+.shipment-timeline-dot.cancelada    { background: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text); }
+.shipment-timeline-dot.en_sucursal  { background: var(--badge-warehouse-bg);  color: var(--badge-warehouse-text); }
+
+.shipment-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.shipment-timeline-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.shipment-timeline-tag {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shipment-timeline-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.shipment-timeline-meta-ico {
+  font-size: 0.95rem;
+}
+
+.shipment-timeline-comment {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-style: italic;
+  background: var(--color-border);
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.35rem;
+  margin-top: 0.25rem;
+}
+
 @media (max-width: 1024px) {
   .update-layout {
     grid-template-columns: 1fr;
