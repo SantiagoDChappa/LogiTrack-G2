@@ -6,6 +6,7 @@ const app     = express();
 const port    = process.env.PORT || 3000;
 
 const sequelize = require('./src/database/connection');
+const { runMigrations } = require('./src/database/migrate');
 const swaggerSpec = require('./src/docs/swagger');
 const { requireAuth, requireSupervisor } = require('./src/middlewares/auth');
 
@@ -25,9 +26,15 @@ const deliveryRoutes = require('./src/routes/delivery');
 const personRoutes = require('./src/routes/person')
 const portalRoutes        = require('./src/routes/portal');
 
-// Conecto la base de datos con el sistema
-sequelize.sync({ alter: true }) 
-    .then(() => console.log('Base de datos conectada y sincronizada'))
+// Conecto la base de datos con el sistema y aplico migraciones pendientes.
+// Nota: NO usamos sync({alter:true}) porque mutaba el schema en cada arranque
+// (creaba FKs duplicadas y borraba columnas que no estaban en el modelo).
+// Los cambios de schema van por src/database/migrations/. Las migraciones son
+// idempotentes, así que correrlas en cada arranque es seguro y se autorrepara
+// si otro server con la rama vieja borró columnas.
+sequelize.authenticate()
+    .then(() => runMigrations())
+    .then(() => console.log('Base de datos conectada y migrada'))
     .catch(err => console.error('Error de DB:', err));
 
 app.set('view engine', 'ejs');

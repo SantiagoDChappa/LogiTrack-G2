@@ -124,6 +124,8 @@ CREATE TABLE "logitrack"."shipment_history" (
     "toStatusId"   int       NOT NULL,
     "comment"      text,
     "changedAt"    timestamp NOT NULL,
+    "userId"       int,
+    "eventType"    varchar   NOT NULL DEFAULT 'STATUS_CHANGE',
     PRIMARY KEY ("id")
 );
 
@@ -138,3 +140,7 @@ ALTER TABLE "logitrack"."shipment_history"
 ALTER TABLE "logitrack"."shipment_history"
     ADD CONSTRAINT "fk_history_toStatusId"
     FOREIGN KEY ("toStatusId") REFERENCES "logitrack"."status" ("id");
+
+ALTER TABLE "logitrack"."shipment_history"
+    ADD CONSTRAINT "fk_history_userId"
+    FOREIGN KEY ("userId") REFERENCES "logitrack"."user" ("id");
