@@ -1,6 +1,5 @@
 const request = require('supertest');
 const express = require('express');
-const bodyParser = require('body-parser');
 
 // Mocks manuales ANTES de requerir las rutas
 jest.mock('../src/models/shipment');

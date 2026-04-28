@@ -7,7 +7,7 @@ const TypeShipment = sequelize.define('shipmentType', {
 },
 { tableName: 'shipmentType', timestamps: false });
 
-const getAll = async () => {
+const getAll = () => {
     return TypeShipment.findAll({ order: [['id', 'ASC']] });
 };
 

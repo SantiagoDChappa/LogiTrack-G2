@@ -27,7 +27,7 @@ const withSchemaSelfHeal = async (op) => {
     }
 };
 
-const create = async ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType }) => {
+const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType }) => {
     return withSchemaSelfHeal(() => ShipmentHistory.create({
         shipmentId,
         fromStatusId: fromStatusId || null,
@@ -39,7 +39,7 @@ const create = async ({ shipmentId, fromStatusId, toStatusId, comment, userId, e
     }));
 };
 
-const getByShipmentId = async (shipmentId) => {
+const getByShipmentId = (shipmentId) => {
     const { Status } = require('./status');
     const { User } = require('./user');
 

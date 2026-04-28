@@ -17,7 +17,7 @@ const Address = sequelize.define('address', {
 },
 { tableName: 'address' });
 
-const create = async (data) => {
+const create = (data) => {
     return Address.create({
         street:         data.street,
         number:         data.number,

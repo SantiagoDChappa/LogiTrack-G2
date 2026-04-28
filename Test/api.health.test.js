@@ -1,6 +1,5 @@
 const request = require('supertest');
 const app = require('../app');
-const sequelize = require('../src/database/connection');
 
 describe('Health and Auth check', () => {
     test('GET / responde 200 con status ok', async () => {

@@ -7,7 +7,7 @@ const Province = sequelize.define('province', {
 },
 { tableName: 'province', timestamps: false });
 
-const getAll = async () => {
+const getAll = () => {
     return Province.findAll();
 };
 

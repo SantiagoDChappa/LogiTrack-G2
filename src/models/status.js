@@ -7,11 +7,11 @@ const Status = sequelize.define('status', {
 },
 { tableName: 'status', timestamps: false });
 
-const getAll = async () => {
+const getAll = () => {
     return Status.findAll({ order: [['id', 'ASC']] });
 };
 
-const getById = async (id) => {
+const getById = (id) => {
     return Status.findOne({ where: { id } });
 };
 

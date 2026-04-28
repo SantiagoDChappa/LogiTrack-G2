@@ -1,5 +1,3 @@
-const sequelize = require('../database/connection');
-
 // Importar modelos SIN asociaciones
 const { Address }         = require('./address');
 const { Person }          = require('./person');
@@ -21,10 +19,10 @@ const safeAssociate = () => {
             Shipment.belongsTo(Person, { as: 'sender',    foreignKey: 'senderId' });
             Shipment.belongsTo(Person, { as: 'recipient', foreignKey: 'recipientId' });
         }
-        if (Status)       Shipment.belongsTo(Status,       { as: 'status',       foreignKey: 'statusId' });
-        if (Address)      Shipment.belongsTo(Address,      { as: 'address',      foreignKey: 'addressId' });
-        if (TypeShipment) Shipment.belongsTo(TypeShipment, { as: 'shipmentType', foreignKey: 'shipmentTypeId' });
-        if (User)         Shipment.belongsTo(User,         { as: 'deliveryUser', foreignKey: 'deliveryUserId' });
+        if (Status)       { Shipment.belongsTo(Status,       { as: 'status',       foreignKey: 'statusId' }); }
+        if (Address)      { Shipment.belongsTo(Address,      { as: 'address',      foreignKey: 'addressId' }); }
+        if (TypeShipment) { Shipment.belongsTo(TypeShipment, { as: 'shipmentType', foreignKey: 'shipmentTypeId' }); }
+        if (User)         { Shipment.belongsTo(User,         { as: 'deliveryUser', foreignKey: 'deliveryUserId' }); }
     }
 
     if (ShipmentHistory.belongsTo) {
@@ -32,7 +30,7 @@ const safeAssociate = () => {
             ShipmentHistory.belongsTo(Status, { as: 'fromStatus', foreignKey: 'fromStatusId' });
             ShipmentHistory.belongsTo(Status, { as: 'toStatus',   foreignKey: 'toStatusId'   });
         }
-        if (User) ShipmentHistory.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+        if (User) { ShipmentHistory.belongsTo(User, { as: 'user', foreignKey: 'userId' }); }
     }
 };
 
