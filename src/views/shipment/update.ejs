@@ -191,7 +191,7 @@
                             </div>
                             <div class="field">
                                 <label for="recipient-phone">Teléfono <span class="req">*</span></label>
-                                <input id="recipient-phone" type="tel" name="recipientPhone" value="<%= shipment.recipient.phone || '' %>" placeholder="Ej: 1123456789" maxlength="15" pattern="[0-9]*" inputmode="numeric" <%= canEditContact ? 'required' : 'readonly style="pointer-events:none;opacity:0.6;"' %>>
+                                <input id="recipient-phone" type="tel" name="recipientPhone" value="<%= shipment.recipient.phone || '' %>" placeholder="Ej: 1123456789" maxlength="10" pattern="[0-9]*" inputmode="numeric" <%= canEditContact ? 'required' : 'readonly style="pointer-events:none;opacity:0.6;"' %>>
                             </div>
                             <div class="field">
                                 <label for="recipient-email">Email <span class="req">*</span></label>
