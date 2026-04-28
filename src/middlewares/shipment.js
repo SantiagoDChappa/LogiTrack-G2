@@ -3,6 +3,10 @@ const provinceModel        = require("../models/province");
 const shipmentModel        = require("../models/shipment");
 const statusModel          = require("../models/status");
 const shipmentHistoryModel = require("../models/shipmentHistory");
+const userModel            = require("../models/user");
+const settingModel         = require("../models/setting");
+const { RoleType }         = require("../constants/enums");
+const { PROVINCES }        = require("../utils/provinces");
 
 const validateShipment = [
     body('senderName').notEmpty().trim().withMessage('El nombre del remitente es obligatorio'),
@@ -26,7 +30,6 @@ const validateShipment = [
     body('street').notEmpty().withMessage('La calle es obligatoria'),
     body('number').isInt({ min: 1 }).withMessage('La numeración debe ser un número positivo'),
     body('province').isInt().withMessage('Provincia inválida'),
-    body('postalCode').notEmpty().withMessage('El código postal es obligatorio'),
     body('weightKg').optional({ checkFalsy: true }).isFloat({ min: 0.1 }).withMessage('El peso debe ser mayor a 0'),
     body('packageQty').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('La cantidad debe ser al menos 1'),
 ];
@@ -40,7 +43,6 @@ const validateUpdateShipment = [
     body('street').notEmpty().trim().withMessage('La calle es obligatoria'),
     body('number').notEmpty().withMessage('La numeración es obligatoria'),
     body('province').notEmpty().withMessage('La provincia es obligatoria'),
-    body('postalCode').notEmpty().withMessage('El código postal es obligatorio'),
 
     body('shipmentTypeId').notEmpty().withMessage('El tipo de envío es obligatorio'),
     body('weightKg')
@@ -56,13 +58,36 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     if (errors.isEmpty()) { return next(); }
 
     const { id } = req.params;
-    const [provinces, statuses, shipment, history, typesShipment] = await Promise.all([
+    const [provinces, statuses, shipment, history, typesShipment, deliveryUsers, originLat, originLng, originStreet, originNumber] = await Promise.all([
         provinceModel.getAll(),
         statusModel.getAll(),
         shipmentModel.getById(id),
         shipmentHistoryModel.getByShipmentId(id),
         require('../models/typeShipment').getAll(),
+        userModel.search({ roleId: RoleType.DELIVERY.id }),
+        settingModel.get('origin_lat'),
+        settingModel.get('origin_lng'),
+        settingModel.get('origin_street'),
+        settingModel.get('origin_number'),
     ]);
+
+    const destProv = shipment ? PROVINCES[shipment.address?.provinceId] : null;
+    const destLat  = shipment?.address?.lat  || (destProv ? destProv.lat  : null);
+    const destLng  = shipment?.address?.lng  || (destProv ? destProv.lng  : null);
+    const mapData = {
+        origin: {
+            lat:   parseFloat(originLat)  || -34.6037,
+            lng:   parseFloat(originLng)  || -58.3816,
+            label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+        },
+        destination: destLat ? {
+            lat:   destLat,
+            lng:   destLng,
+            label: [shipment.address?.street, shipment.address?.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
+        } : null,
+    };
+
+    const isSupervisor = res.locals.currentUser?.roleId === RoleType.SUPERVISOR.id;
 
     return res.render('shipment/update', {
         errors: errors.array().map(e => e.msg),
@@ -71,8 +96,10 @@ const handleUpdateValidationErrors = async (req, res, next) => {
         statuses,
         history,
         typesShipment,
-        mapData: { origin: { lat: -34.6037, lng: -58.3816, label: 'Origen' }, destination: null },
-        returnUrl: '/shipment'
+        deliveryUsers,
+        mapData,
+        returnUrl: req.query.from || '/shipment',
+        isSupervisor,
     });
 };
 

@@ -77,9 +77,10 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     if (errorsArray.length > 0) {
         const user = { ...req.body, id };
         return res.render('user/update', {
-            errors:   errorsArray,
+            errors:    errorsArray,
             user,
-            RoleType: require('../constants/enums').RoleType
+            roleTypes: Object.values(RoleType),
+            returnUrl: req.query.from || '/user',
         });
     }
 
