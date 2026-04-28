@@ -87,13 +87,15 @@ const validateUpdateShipment = [
         .trim()
         .isLength({ max: 100 }).withMessage('El nombre del destinatario no puede superar 100 caracteres'),
     body('recipientEmail')
-        .optional({ checkFalsy: true })
+        .notEmpty().withMessage('El email del destinatario es obligatorio')
+        .bail()
         .isEmail().withMessage('Email del destinatario inválido')
         .bail()
         .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
         .normalizeEmail(),
     body('recipientPhone')
-        .optional({ checkFalsy: true })
+        .notEmpty().withMessage('El teléfono del destinatario es obligatorio')
+        .bail()
         .matches(/^\d+$/).withMessage('El teléfono solo debe contener dígitos')
         .bail()
         .isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido (8-15 dígitos)'),
