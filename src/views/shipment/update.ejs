@@ -31,13 +31,20 @@
                 const canEditAddress = isPending;
                 const canEditRecipientBasic = isPending;
                 const canEditContact = isPending || isInTransit;
-                const isGlobalNonEditable = isFinalStatus || isAtBranch;
+                const canEditDelivery = isPending || isAtBranch;
+                const isGlobalNonEditable = isFinalStatus;
             %>
 
             <% if (isInTransit) { %>
             <div style="display:flex;align-items:center;gap:8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 15px;margin-bottom:15px;color:#92400e;font-size:0.9rem; width: 100%; box-sizing: border-box;">
                 <span class="material-symbols-outlined" style="font-size:1.2rem;">info</span>
-                <span><strong>En Tránsito</strong>: solo editable Email y Teléfono.</span>
+                <span><strong>En Tránsito</strong>: solo editable Email y Teléfono. El repartidor asignado no puede cambiarse.</span>
+            </div>
+            <% } %>
+            <% if (isAtBranch) { %>
+            <div style="display:flex;align-items:center;gap:8px;background:#dbeafe;border:1px solid #3b82f6;border-radius:6px;padding:10px 15px;margin-bottom:15px;color:#1e40af;font-size:0.9rem; width: 100%; box-sizing: border-box;">
+                <span class="material-symbols-outlined" style="font-size:1.2rem;">info</span>
+                <span><strong>En Sucursal</strong>: solo se puede reasignar el transportista.</span>
             </div>
             <% } %>
 
@@ -281,7 +288,7 @@
                         <% } %>
                         <div class="field">
                             <label for="deliveryUserId">Seleccionar Repartidor</label>
-                            <select name="deliveryUserId" id="deliveryUserId" <%= isGlobalNonEditable ? 'disabled' : '' %>>
+                            <select name="deliveryUserId" id="deliveryUserId" <%= !canEditDelivery ? 'disabled' : '' %>>
                                 <option value="">-- Sin asignar --</option>
                                 <% deliveryUsers.forEach(user => { %>
                                     <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>

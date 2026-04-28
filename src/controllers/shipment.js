@@ -263,6 +263,10 @@ const updateShipment = async (req, res) => {
       body.shipmentTypeId = shipment.shipmentTypeId;
     }
 
+    if (shipment.statusId === Status.IN_TRANSIT.id) {
+      body.deliveryUserId = shipment.deliveryUserId;
+    }
+
     await shipmentModel.update(body);
     res.redirect('/shipment?success=2');
   } catch (err) {
