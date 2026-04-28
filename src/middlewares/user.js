@@ -4,24 +4,34 @@ const { RoleType } = require("../constants/enums");
 
 
 const validateUserGeneral = [
-    body('fullName').notEmpty().trim().withMessage('El nombre y apellido es obligatorio'),
+    body('fullName')
+        .notEmpty().withMessage('El nombre y apellido es obligatorio')
+        .bail()
+        .trim()
+        .isLength({ max: 100 }).withMessage('El nombre no puede superar 100 caracteres'),
     body('email')
         .notEmpty().withMessage('El email es obligatorio')
         .bail()
         .isEmail().withMessage('El email es inválido')
         .bail()
+        .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
         .normalizeEmail(),
     body('document')
         .notEmpty().withMessage('El documento es obligatorio')
         .bail()
-        .isInt({ min: 1000000 }).withMessage('El documento es inválido'),
-    body('roleId').notEmpty().withMessage('El rol es obligatorio'),
+        .isInt({ min: 1000000, max: 99999999 }).withMessage('El documento debe ser un DNI válido (entre 1.000.000 y 99.999.999)'),
+    body('roleId')
+        .notEmpty().withMessage('El rol es obligatorio')
+        .bail()
+        .isIn(Object.values(RoleType).map(r => String(r.id))).withMessage('El rol seleccionado no es válido'),
 ];
 const validateUser = [
     body('password')
         .notEmpty().withMessage('La contraseña es obligatoria')
         .bail()
         .isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres')
+        .bail()
+        .isLength({ max: 128 }).withMessage('La contraseña no puede superar 128 caracteres')
         .matches(/[A-Z]/).withMessage('Debe contener al menos una mayúscula')
         .matches(/\d/).withMessage('Debe contener al menos un número')
         .matches(/[^A-Za-z0-9]/).withMessage('Debe contener al menos un símbolo'),
@@ -77,9 +87,10 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     if (errorsArray.length > 0) {
         const user = { ...req.body, id };
         return res.render('user/update', {
-            errors:   errorsArray,
+            errors:    errorsArray,
             user,
-            RoleType: require('../constants/enums').RoleType
+            roleTypes: Object.values(RoleType),
+            returnUrl: req.query.from || '/user',
         });
     }
 

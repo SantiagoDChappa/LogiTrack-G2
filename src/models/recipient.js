@@ -18,7 +18,7 @@ const Shipment = sequelize.define('shipment', {
     { timestamps: true }
 );
 
-const getAll = async () => {
+const getAll = () => {
     return Shipment.findAll();
 };
 

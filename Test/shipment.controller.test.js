@@ -1,6 +1,5 @@
 const request = require('supertest');
 const express = require('express');
-const bodyParser = require('body-parser');
 
 // Mocks manuales ANTES de requerir las rutas
 jest.mock('../src/models/shipment');
@@ -71,10 +70,11 @@ describe('Shipment Controller - Validations', () => {
                 number: 123,
                 province: 1,
                 postalCode: '1663',
+                shipmentTypeId: 1,
                 weightKg: -5,
                 packageQty: 1
             });
 
-        expect(response.text).toContain('El peso debe ser mayor a 0');
+        expect(response.text).toContain('El peso debe ser entre 0.1 y 999 kg');
     });
 });

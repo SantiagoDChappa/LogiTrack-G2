@@ -201,6 +201,17 @@
   color: var(--btn-eliminar-text);
 }
 
+.action-btn.action-btn--disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.action-btn.action-btn--disabled:hover {
+  filter: none;
+  transform: none;
+}
+
 .form-new {
   padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
   width: 100%;
