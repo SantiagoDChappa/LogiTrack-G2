@@ -87,8 +87,10 @@ app.use('/api/persons',personRoutes);
     res.redirect('/login');
 });*/
 
-app.listen(port, () => {
-    console.warn(`LogiTrack running at http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => {
+        console.warn(`LogiTrack running at http://localhost:${port}`);
+    });
+}
 
 module.exports = app;
