@@ -9,47 +9,124 @@ const { RoleType }         = require("../constants/enums");
 const { PROVINCES }        = require("../utils/provinces");
 
 const validateShipment = [
-    body('senderName').notEmpty().trim().withMessage('El nombre del remitente es obligatorio'),
-    body('senderEmail').isEmail().normalizeEmail().withMessage('Email del remitente inválido'),
-    body('senderPhone').isLength({ min: 8, max: 15 }).withMessage('Teléfono del remitente inválido'),
-    body('senderDocument').isLength({ min: 7, max: 11 }).withMessage('Documento del remitente inválido'),
+    body('senderName')
+        .notEmpty().withMessage('El nombre del remitente es obligatorio')
+        .bail()
+        .trim()
+        .isLength({ max: 100 }).withMessage('El nombre del remitente no puede superar 100 caracteres'),
+    body('senderEmail')
+        .optional({ checkFalsy: true })
+        .isEmail().withMessage('Email del remitente inválido')
+        .bail()
+        .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
+        .normalizeEmail(),
+    body('senderPhone')
+        .optional({ checkFalsy: true })
+        .matches(/^\d+$/).withMessage('El teléfono del remitente solo debe contener dígitos')
+        .bail()
+        .isLength({ min: 8, max: 15 }).withMessage('Teléfono del remitente inválido (8-15 dígitos)'),
+    body('senderDocument')
+        .notEmpty().withMessage('El documento del remitente es obligatorio')
+        .bail()
+        .isInt({ min: 1000000, max: 99999999 }).withMessage('Documento del remitente inválido (DNI entre 1.000.000 y 99.999.999)'),
 
-    body('recipientName').notEmpty().trim().withMessage('El nombre del destinatario es obligatorio'),
-    body('recipientEmail').isEmail().normalizeEmail().withMessage('Email del destinatario inválido'),
-    body('recipientPhone').isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido'),
+    body('recipientName')
+        .notEmpty().withMessage('El nombre del destinatario es obligatorio')
+        .bail()
+        .trim()
+        .isLength({ max: 100 }).withMessage('El nombre del destinatario no puede superar 100 caracteres'),
+    body('recipientEmail')
+        .optional({ checkFalsy: true })
+        .isEmail().withMessage('Email del destinatario inválido')
+        .bail()
+        .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
+        .normalizeEmail(),
+    body('recipientPhone')
+        .optional({ checkFalsy: true })
+        .matches(/^\d+$/).withMessage('El teléfono del destinatario solo debe contener dígitos')
+        .bail()
+        .isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido (8-15 dígitos)'),
     body('recipientDocument')
-        .isLength({ min: 7, max: 11 }).withMessage('Documento del destinatario inválido')
+        .notEmpty().withMessage('El documento del destinatario es obligatorio')
+        .bail()
+        .isInt({ min: 1000000, max: 99999999 }).withMessage('Documento del destinatario inválido (DNI entre 1.000.000 y 99.999.999)')
         .custom((value, { req }) => {
-            const clean = v => v?.replace(/\./g, '');
-            if (clean(value) === clean(req.body.senderDocument)) {
+            if (String(value) === String(req.body.senderDocument)) {
                 throw new Error('El remitente y el destinatario no pueden ser la misma persona');
             }
             return true;
         }),
 
-    body('street').notEmpty().withMessage('La calle es obligatoria'),
+    body('street')
+        .notEmpty().withMessage('La calle es obligatoria')
+        .bail()
+        .isLength({ max: 200 }).withMessage('La calle no puede superar 200 caracteres'),
     body('number').isInt({ min: 1 }).withMessage('La numeración debe ser un número positivo'),
     body('province').isInt().withMessage('Provincia inválida'),
-    body('weightKg').optional({ checkFalsy: true }).isFloat({ min: 0.1 }).withMessage('El peso debe ser mayor a 0'),
-    body('packageQty').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('La cantidad debe ser al menos 1'),
+    body('floorApartment')
+        .optional({ checkFalsy: true })
+        .isLength({ max: 20 }).withMessage('Piso/Depto no puede superar 20 caracteres'),
+    body('shipmentTypeId')
+        .notEmpty().withMessage('El tipo de envío es obligatorio')
+        .bail()
+        .isInt({ min: 1 }).withMessage('Tipo de envío inválido'),
+    body('weightKg')
+        .notEmpty().withMessage('El peso es obligatorio')
+        .bail()
+        .isFloat({ min: 0.1, max: 999 }).withMessage('El peso debe ser entre 0.1 y 999 kg'),
+    body('packageQty')
+        .notEmpty().withMessage('La cantidad de paquetes es obligatoria')
+        .bail()
+        .isInt({ min: 1, max: 999 }).withMessage('La cantidad debe ser entre 1 y 999'),
 ];
 
 const validateUpdateShipment = [
-    body('recipientName').notEmpty().trim().withMessage('El nombre del destinatario es obligatorio'),
-    body('recipientEmail').isEmail().normalizeEmail().withMessage('Email del destinatario inválido'),
-    body('recipientPhone').isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido'),
-    body('recipientDocument').isLength({ min: 7, max: 11 }).withMessage('Documento del destinatario inválido'),
+    body('recipientName')
+        .notEmpty().withMessage('El nombre del destinatario es obligatorio')
+        .bail()
+        .trim()
+        .isLength({ max: 100 }).withMessage('El nombre del destinatario no puede superar 100 caracteres'),
+    body('recipientEmail')
+        .optional({ checkFalsy: true })
+        .isEmail().withMessage('Email del destinatario inválido')
+        .bail()
+        .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
+        .normalizeEmail(),
+    body('recipientPhone')
+        .optional({ checkFalsy: true })
+        .matches(/^\d+$/).withMessage('El teléfono solo debe contener dígitos')
+        .bail()
+        .isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido (8-15 dígitos)'),
+    body('recipientDocument')
+        .notEmpty().withMessage('El documento del destinatario es obligatorio')
+        .bail()
+        .isInt({ min: 1000000, max: 99999999 }).withMessage('Documento del destinatario inválido (DNI entre 1.000.000 y 99.999.999)'),
 
-    body('street').notEmpty().trim().withMessage('La calle es obligatoria'),
-    body('number').notEmpty().withMessage('La numeración es obligatoria'),
+    body('street')
+        .notEmpty().withMessage('La calle es obligatoria')
+        .bail()
+        .trim()
+        .isLength({ max: 200 }).withMessage('La calle no puede superar 200 caracteres'),
+    body('number')
+        .notEmpty().withMessage('La numeración es obligatoria')
+        .bail()
+        .isInt({ min: 1 }).withMessage('La numeración debe ser un número positivo'),
     body('province').notEmpty().withMessage('La provincia es obligatoria'),
+    body('floorApartment')
+        .optional({ checkFalsy: true })
+        .isLength({ max: 20 }).withMessage('Piso/Depto no puede superar 20 caracteres'),
+    body('statusComment')
+        .optional({ checkFalsy: true })
+        .isLength({ max: 500 }).withMessage('El comentario no puede superar 500 caracteres'),
 
     body('shipmentTypeId').notEmpty().withMessage('El tipo de envío es obligatorio'),
     body('weightKg')
         .notEmpty().withMessage('El peso es obligatorio')
+        .bail()
         .isFloat({ min: 0.1, max: 999 }).withMessage('El peso debe ser entre 0.1 y 999 kg'),
     body('packageQty')
         .notEmpty().withMessage('La cantidad de paquetes es obligatoria')
+        .bail()
         .isInt({ min: 1, max: 999 }).withMessage('La cantidad debe ser entre 1 y 999'),
 ];
 

@@ -17,20 +17,20 @@
                 <div class="usuario">
                     <h3>Usuario</h3>
                     <div class="field">
-                        <label for="fullName">Nombre y Apellido</label>
-                        <input id="fullName" type="text" name="fullName" value="<%= user.fullName || '' %>" maxlength="100">
+                        <label for="fullName">Nombre y Apellido <span style="color: red;">*</span></label>
+                        <input id="fullName" type="text" name="fullName" value="<%= user.fullName || '' %>" maxlength="100" required>
                     </div>
                     <div class="field">
-                        <label for="document">Documento</label>
-                        <input id="document" type="text" name="document" value="<%= user.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                        <label for="document">Documento <span style="color: red;">*</span></label>
+                        <input id="document" type="text" name="document" value="<%= user.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="email">Email</label>
-                        <input id="email" type="email" name="email" value="<%= user.email || '' %>" maxlength="100">
+                        <label for="email">Email <span style="color: red;">*</span></label>
+                        <input id="email" type="email" name="email" value="<%= user.email || '' %>" maxlength="100" required>
                     </div>
                     <div class="field">
-                        <label for="roleId">Rol</label>
-                        <select id="roleId" name="roleId">
+                        <label for="roleId">Rol <span style="color: red;">*</span></label>
+                        <select id="roleId" name="roleId" required>
                             <option value="">Seleccione un rol</option>
                             <% roleTypes.forEach(role => { %>
                                 <option value="<%= role.id %>" <%= user.roleId == role.id ? 'selected' : '' %>>

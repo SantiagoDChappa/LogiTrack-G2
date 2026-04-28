@@ -138,7 +138,11 @@
                                     </span>
                                 </td>
                                 <td class="col-actions">
-                                    <a href="/shipment/update/<%= shipment.id %>" class="action-btn modificar" data-tooltip="Modificar">
+                                    <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5; %>
+                                    <a href="<%= _isFinalS ? '#' : '/shipment/update/' + shipment.id %>"
+                                       class="action-btn modificar<%= _isFinalS ? ' action-btn--disabled' : '' %>"
+                                       data-tooltip="<%= _isFinalS ? 'No modificable' : 'Modificar' %>"
+                                       <%= _isFinalS ? 'aria-disabled="true" tabindex="-1"' : '' %>>
                                         <span class="material-symbols-outlined">edit</span>
                                     </a>
                                     <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">

@@ -18,19 +18,19 @@
                     <h3>Remitente</h3>
                     <div class="field">
                         <label for="sender-name">Nombre y Apellido <span class="req">*</span></label>
-                        <input id="sender-name" type="text" name="senderName" value="<%= body.senderName || '' %>" placeholder="Ej: Juan Pérez">
+                        <input id="sender-name" type="text" name="senderName" value="<%= body.senderName || '' %>" placeholder="Ej: Juan Pérez" maxlength="100" required>
                     </div>
                     <div class="field">
                         <label for="sender-document">Documento <span class="req">*</span></label>
-                        <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                        <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
                         <label for="sender-phone">Teléfono</label>
-                        <input id="sender-phone" type="tel" name="senderPhone" maxlength="10" value="<%= body.senderPhone || '' %>" placeholder="Ej: 1123456789">
+                        <input id="sender-phone" type="tel" name="senderPhone" maxlength="15" pattern="[0-9]*" inputmode="numeric" value="<%= body.senderPhone || '' %>" placeholder="Ej: 1123456789">
                     </div>
                     <div class="field">
                         <label for="sender-email">Email</label>
-                        <input id="sender-email" type="email" name="senderEmail" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
+                        <input id="sender-email" type="email" name="senderEmail" maxlength="100" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
                     </div>
                     <button type="button" id="sender-edit" class="btn-secondary btn-edit-persona">
                         <span class="material-symbols-outlined">edit</span>Editar
@@ -41,19 +41,19 @@
                     <h3>Destinatario</h3>
                     <div class="field">
                         <label for="recipient-name">Nombre y Apellido <span class="req">*</span></label>
-                        <input id="recipient-name" type="text" name="recipientName" value="<%= body.recipientName || '' %>" placeholder="Ej: María García">
+                        <input id="recipient-name" type="text" name="recipientName" value="<%= body.recipientName || '' %>" placeholder="Ej: María García" maxlength="100" required>
                     </div>
                     <div class="field">
                         <label for="recipient-document">Documento <span class="req">*</span></label>
-                        <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                        <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
                         <label for="recipient-phone">Teléfono</label>
-                        <input id="recipient-phone" type="tel" name="recipientPhone" maxlength="10" value="<%= body.recipientPhone || '' %>" placeholder="Ej: 1123456789">
+                        <input id="recipient-phone" type="tel" name="recipientPhone" maxlength="15" pattern="[0-9]*" inputmode="numeric" value="<%= body.recipientPhone || '' %>" placeholder="Ej: 1123456789">
                     </div>
                     <div class="field">
                         <label for="recipient-email">Email</label>
-                        <input id="recipient-email" type="email" name="recipientEmail" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
+                        <input id="recipient-email" type="email" name="recipientEmail" maxlength="100" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
                     </div>
                     <button type="button" id="recipient-edit" class="btn-secondary btn-edit-persona">
                         <span class="material-symbols-outlined">edit</span>Editar
@@ -104,7 +104,7 @@
                     <h3>Información del paquete</h3>
                     <div class="field">
                         <label for="shipment-type">Tipo de envío <span class="req">*</span></label>
-                        <select id="shipment-type" name="shipmentTypeId">
+                        <select id="shipment-type" name="shipmentTypeId" required>
                             <option value="">Seleccione un tipo de envío</option>
                             <% typesShipment.forEach(type => { %>
                                 <option value="<%= type.id %>" <%= body.shipmentTypeId == type.id ? 'selected' : '' %>><%= type.description %></option>
@@ -113,11 +113,11 @@
                     </div>
                     <div class="field">
                         <label for="weight-kg">Peso (kg) <span class="req">*</span></label>
-                        <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= body.weightKg || '' %>" placeholder="Ej: 1.5">
+                        <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= body.weightKg || '' %>" placeholder="Ej: 1.5" required>
                     </div>
                     <div class="field">
                         <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
-                        <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= body.packageQty || '' %>" placeholder="Ej: 3">
+                        <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= body.packageQty || '' %>" placeholder="Ej: 3" required>
                     </div>
                 </div>
 
