@@ -207,8 +207,8 @@ const updateShipment = async (req, res) => {
       const targetStatusId = Number(body.newStatusId);
 
       if (targetStatusId === Status.IN_TRANSIT.id) {
-          const currentDeliveryUserId = body.deliveryUserId || shipment.deliveryUserId;
-          if (!currentDeliveryUserId) {
+          const submittedDeliveryUserId = body.deliveryUserId || null;
+          if (!submittedDeliveryUserId) {
               const [provinces, statuses, history, typesShipment, deliveryUsers, originLat, originLng, originStreet, originNumber] = await Promise.all([
                   provinceModel.getAll(),
                   statusModel.getAll(),
@@ -220,15 +220,27 @@ const updateShipment = async (req, res) => {
                   settingModel.get('origin_street'),
                   settingModel.get('origin_number')
               ]);
-              
+
+              const destProv = PROVINCES[shipment.address?.provinceId];
+              const destLat  = shipment.address?.lat  || (destProv ? destProv.lat  : null);
+              const destLng  = shipment.address?.lng  || (destProv ? destProv.lng  : null);
               const mapData = {
-                  origin: { lat: parseFloat(originLat), lng: parseFloat(originLng), label: originStreet + ' ' + originNumber },
-                  destination: { lat: shipment.address.lat, lng: shipment.address.lng, label: shipment.address.street + ' ' + shipment.address.number }
+                  origin: {
+                      lat:   parseFloat(originLat)  || -34.6037,
+                      lng:   parseFloat(originLng)  || -58.3816,
+                      label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+                  },
+                  destination: destLat ? {
+                      lat:   destLat,
+                      lng:   destLng,
+                      label: [shipment.address?.street, shipment.address?.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
+                  } : null,
               };
 
               return res.render('shipment/update', {
                   errors: ['Debe asignar un repartidor antes de pasar el envío a estado "En Tránsito".'],
-                  shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl: '/shipment',
+                  shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers,
+                  returnUrl: req.query.from || '/shipment',
                   isSupervisor: currentUser?.roleId === RoleType.SUPERVISOR.id,
               });
           }
