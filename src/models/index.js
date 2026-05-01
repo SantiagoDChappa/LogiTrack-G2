@@ -1,5 +1,6 @@
 // Importar modelos SIN asociaciones
 const { Address }         = require('./address');
+const { Branch }          = require('./branch');
 const { Person }          = require('./person');
 const { Province }        = require('./province');
 const { Status }          = require('./status');
@@ -25,6 +26,10 @@ const safeAssociate = () => {
         if (User)         { Shipment.belongsTo(User,         { as: 'deliveryUser', foreignKey: 'deliveryUserId' }); }
     }
 
+    if (User.belongsTo && Branch) {
+        User.belongsTo(Branch, { as: 'branch', foreignKey: 'branchId' });
+    }
+
     if (ShipmentHistory.belongsTo) {
         if (Status) {
             ShipmentHistory.belongsTo(Status, { as: 'fromStatus', foreignKey: 'fromStatusId' });
@@ -38,6 +43,7 @@ safeAssociate();
 
 module.exports = {
     Address,
+    Branch,
     Person,
     Province,
     Status,

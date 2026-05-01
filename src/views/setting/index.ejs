@@ -7,6 +7,9 @@
     <style>
         .settings-content {
             padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
         }
 
         .settings-card {
@@ -61,6 +64,41 @@
         .settings-addr .span-full {
             grid-column: 1 / -1;
         }
+
+        /* Branch assignment table */
+        .branch-assign-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+        .branch-assign-row select {
+            flex: 1;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-surface);
+            color: var(--color-text);
+            font-size: var(--font-size-sm);
+        }
+        .branch-assign-row .btn-save {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.4rem 0.75rem;
+            background: var(--color-primary);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-sm);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .branch-assign-row .btn-save:hover {
+            opacity: 0.88;
+        }
+        .branch-assign-row .btn-save .material-symbols-outlined {
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -71,6 +109,8 @@
         </div>
 
         <div class="settings-content">
+
+            <!-- ── Card 1: Dirección de origen ─────────────────────────────── -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">location_on</span>
@@ -124,6 +164,70 @@
                     </div>
                 </form>
             </div>
+
+            <!-- ── Card 2: Asignación de sucursales a usuarios ─────────────── -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">store</span>
+                    Asignación de sucursales a usuarios
+                </h2>
+                <p class="settings-subtitle">
+                    Asigná una sucursal a cada usuario. Los usuarios sin sucursal asignada aparecen con "Sin sucursal".
+                </p>
+
+                <% if (branches.length === 0) { %>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                        No hay sucursales cargadas en el sistema. Ejecutá el script SQL de inserción de sucursales primero.
+                    </p>
+                <% } else if (users.length === 0) { %>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                        No hay usuarios registrados en el sistema.
+                    </p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre y Apellido</th>
+                                <th>Documento</th>
+                                <th>Email</th>
+                                <th>Sucursal asignada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% users.forEach(user => { %>
+                            <tr>
+                                <td><%= user.fullName %></td>
+                                <td><%= user.document %></td>
+                                <td><%= user.email %></td>
+                                <td>
+                                    <form method="POST" action="/setting/assign-branch">
+                                        <input type="hidden" name="userId" value="<%= user.id %>">
+                                        <div class="branch-assign-row">
+                                            <select name="branchId">
+                                                <option value="">— Sin sucursal —</option>
+                                                <% branches.forEach(branch => { %>
+                                                    <option value="<%= branch.id %>"
+                                                        <%= user.branchId === branch.id ? 'selected' : '' %>>
+                                                        <%= branch.name %>
+                                                    </option>
+                                                <% }); %>
+                                            </select>
+                                            <button type="submit" class="btn-save">
+                                                <span class="material-symbols-outlined">save</span>
+                                                Guardar
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
         </div>
     </main>
 
@@ -146,7 +250,7 @@
 
             const row  = document.getElementById('addr-selected-row');
             const text = document.getElementById('addr-chip-text');
-            if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' \u2014 ' + subLine : '');
+            if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' — ' + subLine : '');
             if (row)  row.style.display = 'flex';
 
             const box = document.getElementById('address-validation-result');
@@ -158,12 +262,13 @@
         });
         <% } %>
 
-        // ── SweetAlert al guardar con éxito ────────────────────────────────────
-        if (new URLSearchParams(window.location.search).get('success') === '1') {
+        // ── SweetAlerts ────────────────────────────────────────────────────────
+        const _param = new URLSearchParams(window.location.search).get('success');
+        if (_param === '1' || _param === '2') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             Swal.fire({
                 icon: 'success',
-                title: 'Ajustes guardados',
+                title: _param === '1' ? 'Ajustes guardados' : 'Sucursal asignada correctamente',
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
