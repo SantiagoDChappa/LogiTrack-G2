@@ -11,6 +11,7 @@ const User = sequelize.define('user', {
     document: { type: DataTypes.INTEGER, allowNull: false, unique: true },
     roleId:   { type: DataTypes.INTEGER, allowNull: false },
     active:   { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    branchId: { type: DataTypes.INTEGER, allowNull: true  },
 }, { tableName: 'user', timestamps: false });
 
 const getAll = () => User.findAll();

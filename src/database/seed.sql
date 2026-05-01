@@ -18,7 +18,9 @@ INSERT INTO "logitrack"."personType" ("id", "description") VALUES
 -- roleTypes
 INSERT INTO "logitrack"."roleType" ("id", "description") VALUES
     (1, 'Supervisor'),
-    (2, 'Operador');
+    (2, 'Operador'),
+    (3, 'Repartidor'),
+    (4, 'Administrador');
 
 -- users
 INSERT INTO "logitrack"."user" ("fullName", "email", "password", "document", "roleId") VALUES

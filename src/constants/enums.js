@@ -12,9 +12,10 @@ const PersonType = Object.freeze({
 });
 
 const RoleType = Object.freeze({
-    SUPERVISOR:     { id: 1, description: 'Supervisor'   },
-    OPERATOR:       { id: 2, description: 'Operador'     },
-    DELIVERY:       { id: 3, description: 'Repartidor'   },
+    SUPERVISOR: { id: 1, description: 'Supervisor'    },
+    OPERATOR:   { id: 2, description: 'Operador'      },
+    DELIVERY:   { id: 3, description: 'Repartidor'    },
+    ADMIN:      { id: 4, description: 'Administrador' },
 });
 
 module.exports = { Status, PersonType, RoleType };

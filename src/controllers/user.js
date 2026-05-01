@@ -7,6 +7,7 @@ const ROLE_CLASSES = {
     [RoleType.SUPERVISOR.id]: 'en_sucursal',
     [RoleType.OPERATOR.id]:   'en_transito',
     [RoleType.DELIVERY.id]:   'pendiente',
+    [RoleType.ADMIN.id]:      'en_sucursal',
 };
 
 const getIndex = (req, res) => {

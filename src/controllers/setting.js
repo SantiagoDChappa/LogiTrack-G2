@@ -1,16 +1,20 @@
 const settingModel  = require('../models/setting');
 const provinceModel = require('../models/province');
+const branchModel   = require('../models/branch');
+const userModel     = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 
 const getSettings = async (req, res) => {
-    const [settings, provinces] = await Promise.all([
+    const [settings, provinces, branches, users] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
+        branchModel.getAll(),
+        userModel.getAll(),
     ]);
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
-    res.render('setting/index', { settings, provinces });
+    res.render('setting/index', { settings, provinces, branches, users });
 };
 
 const GEOREF = 'https://apis.datos.gob.ar/georef/api';
@@ -61,4 +65,21 @@ const saveSettings = async (req, res) => {
     res.redirect('/setting?success=1');
 };
 
-module.exports = { getSettings, saveSettings };
+const assignBranch = async (req, res) => {
+    const userIds   = [].concat(req.body['userId[]']   || req.body.userId   || []);
+    const branchIds = [].concat(req.body['branchId[]'] || req.body.branchId || []);
+
+    if (userIds.length === 0) { return res.redirect('/setting'); }
+
+    await Promise.all(
+        userIds.map((uid, i) => {
+            const userId   = parseInt(uid);
+            const branchId = branchIds[i] ? parseInt(branchIds[i]) : null;
+            return userModel.update(userId, { branchId });
+        })
+    );
+
+    res.redirect('/setting?success=2');
+};
+
+module.exports = { getSettings, saveSettings, assignBranch };
