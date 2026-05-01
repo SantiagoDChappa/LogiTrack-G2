@@ -192,27 +192,18 @@
                                 <th>Nombre y Apellido</th>
                                 <th>Documento</th>
                                 <th>Email</th>
-<<<<<<< HEAD
-=======
                                 <th>Rol</th>
->>>>>>> ce7ef4e8a5c3234461b1354c97e9225b01f2b538
                                 <th>Sucursal asignada</th>
                             </tr>
                         </thead>
                         <tbody>
-<<<<<<< HEAD
-=======
                             <% const roleLabels = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor' }; %>
->>>>>>> ce7ef4e8a5c3234461b1354c97e9225b01f2b538
                             <% users.forEach(user => { %>
                             <tr>
                                 <td><%= user.fullName %></td>
                                 <td><%= user.document %></td>
                                 <td><%= user.email %></td>
-<<<<<<< HEAD
-=======
                                 <td><span class="status-badge"><%= roleLabels[user.roleId] || '-' %></span></td>
->>>>>>> ce7ef4e8a5c3234461b1354c97e9225b01f2b538
                                 <td>
                                     <form method="POST" action="/setting/assign-branch">
                                         <input type="hidden" name="userId" value="<%= user.id %>">
