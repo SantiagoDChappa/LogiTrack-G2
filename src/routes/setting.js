@@ -1,9 +1,10 @@
 const express           = require('express');
 const router            = express.Router();
 const settingController = require('../controllers/setting');
+const { requireAdmin }  = require('../middlewares/auth');
 
-router.get('/',              settingController.getSettings);
-router.post('/',             settingController.saveSettings);
-router.post('/assign-branch', settingController.assignBranch);
+router.get('/',              requireAdmin, settingController.getSettings);
+router.post('/',             requireAdmin, settingController.saveSettings);
+router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 
 module.exports = router;

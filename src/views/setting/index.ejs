@@ -66,39 +66,15 @@
         }
 
         /* Branch assignment table */
-        .branch-assign-row {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-        .branch-assign-row select {
-            flex: 1;
-            min-width: 220px;
+        .branch-select {
+            width: 100%;
+            min-width: 180px;
             padding: 0.4rem 0.6rem;
             border: 1px solid var(--color-border);
             border-radius: var(--radius-sm);
             background: var(--color-surface);
             color: var(--color-text);
             font-size: var(--font-size-sm);
-        }
-        .branch-assign-row .btn-save {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            padding: 0.4rem 0.75rem;
-            background: var(--color-primary);
-            color: #fff;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: var(--font-size-sm);
-            cursor: pointer;
-            white-space: nowrap;
-        }
-        .branch-assign-row .btn-save:hover {
-            opacity: 0.88;
-        }
-        .branch-assign-row .btn-save .material-symbols-outlined {
-            font-size: 1rem;
         }
     </style>
 </head>
@@ -185,6 +161,7 @@
                         No hay usuarios registrados en el sistema.
                     </p>
                 <% } else { %>
+                <form method="POST" action="/setting/assign-branch">
                 <div class="table-wrapper">
                     <table>
                         <thead>
@@ -197,7 +174,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <% const roleLabels = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor' }; %>
+                            <% const roleLabels = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' }; %>
                             <% users.forEach(user => { %>
                             <tr>
                                 <td><%= user.fullName %></td>
@@ -205,30 +182,29 @@
                                 <td><%= user.email %></td>
                                 <td><span class="status-badge"><%= roleLabels[user.roleId] || '-' %></span></td>
                                 <td>
-                                    <form method="POST" action="/setting/assign-branch">
-                                        <input type="hidden" name="userId" value="<%= user.id %>">
-                                        <div class="branch-assign-row">
-                                            <select name="branchId">
-                                                <option value="">— Sin sucursal —</option>
-                                                <% branches.forEach(branch => { %>
-                                                    <option value="<%= branch.id %>"
-                                                        <%= user.branchId === branch.id ? 'selected' : '' %>>
-                                                        <%= branch.name %>
-                                                    </option>
-                                                <% }); %>
-                                            </select>
-                                            <button type="submit" class="btn-save">
-                                                <span class="material-symbols-outlined">save</span>
-                                                Guardar
-                                            </button>
-                                        </div>
-                                    </form>
+                                    <input type="hidden" name="userId[]" value="<%= user.id %>">
+                                    <select name="branchId[]" class="branch-select">
+                                        <option value="">— Sin sucursal —</option>
+                                        <% branches.forEach(branch => { %>
+                                            <option value="<%= branch.id %>"
+                                                <%= user.branchId === branch.id ? 'selected' : '' %>>
+                                                <%= branch.name %>
+                                            </option>
+                                        <% }); %>
+                                    </select>
                                 </td>
                             </tr>
                             <% }); %>
                         </tbody>
                     </table>
                 </div>
+                <div class="settings-actions">
+                    <button type="submit" class="btn-primary">
+                        <span class="material-symbols-outlined">save</span>
+                        Guardar ajustes
+                    </button>
+                </div>
+                </form>
                 <% } %>
             </div>
 

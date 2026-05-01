@@ -181,8 +181,8 @@ const getUpdateShipment = async (req, res) => {
   };
 
   const returnUrl = req.query.from || '/shipment';
-  const isSupervisor = res.locals.currentUser?.roleId === RoleType.SUPERVISOR.id;
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor });
+  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(res.locals.currentUser?.roleId);
+  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus });
 };
 
 const updateShipment = async (req, res) => {
@@ -200,10 +200,6 @@ const updateShipment = async (req, res) => {
     }
 
     if (body.newStatusId) {
-      if (isOperator) {
-          return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
-      }
-
       const targetStatusId = Number(body.newStatusId);
 
       if (targetStatusId === Status.IN_TRANSIT.id) {
@@ -241,7 +237,7 @@ const updateShipment = async (req, res) => {
                   errors: ['Debe asignar un repartidor antes de pasar el envío a estado "En Tránsito".'],
                   shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers,
                   returnUrl: req.query.from || '/shipment',
-                  isSupervisor: currentUser?.roleId === RoleType.SUPERVISOR.id,
+                  isSupervisor: [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(currentUser?.roleId),
               });
           }
       }

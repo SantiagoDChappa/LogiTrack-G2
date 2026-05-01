@@ -8,8 +8,9 @@ jest.mock('../src/middlewares/auth', () => ({
         res.locals.currentUser = { id: 1, roleId: 1, fullName: 'Admin User' };
         next();
     },
+    requireAdmin: (req, res, next) => next(),
     requireSupervisor: (req, res, next) => next(),
-    requireOperator: (req, res, next) => next(),
+    requireSupervisorOrOperator: (req, res, next) => next(),
     requireDelivery: (req, res, next) => next()
 }));
 

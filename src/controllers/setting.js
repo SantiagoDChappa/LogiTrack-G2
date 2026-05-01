@@ -66,12 +66,19 @@ const saveSettings = async (req, res) => {
 };
 
 const assignBranch = async (req, res) => {
-    const userId   = parseInt(req.body.userId);
-    const branchId = req.body.branchId ? parseInt(req.body.branchId) : null;
+    const userIds   = [].concat(req.body['userId[]']   || req.body.userId   || []);
+    const branchIds = [].concat(req.body['branchId[]'] || req.body.branchId || []);
 
-    if (!userId) { return res.redirect('/setting'); }
+    if (userIds.length === 0) { return res.redirect('/setting'); }
 
-    await userModel.update(userId, { branchId });
+    await Promise.all(
+        userIds.map((uid, i) => {
+            const userId   = parseInt(uid);
+            const branchId = branchIds[i] ? parseInt(branchIds[i]) : null;
+            return userModel.update(userId, { branchId });
+        })
+    );
+
     res.redirect('/setting?success=2');
 };
 

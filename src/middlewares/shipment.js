@@ -166,7 +166,7 @@ const handleUpdateValidationErrors = async (req, res, next) => {
         } : null,
     };
 
-    const isSupervisor = res.locals.currentUser?.roleId === RoleType.SUPERVISOR.id;
+    const isSupervisor = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(res.locals.currentUser?.roleId);
 
     return res.render('shipment/update', {
         errors: errors.array().map(e => e.msg),
