@@ -235,38 +235,41 @@
         </div>
     </main>
 
+    <%
+        const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
+    %>
+    <script id="setting-addr-data" type="application/json"><%- JSON.stringify({
+        street: settings.origin_street || null,
+        number: settings.origin_number || null,
+        prov:   _currentProv ? _currentProv.description : ''
+    }) %></script>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
     <script>
-        // ── Mostrar dirección actual si ya hay una guardada ────────────────────
-        <% if (settings.origin_street && settings.origin_number) { %>
-        document.addEventListener('DOMContentLoaded', function () {
-            const street  = '<%= (settings.origin_street  || '').replace(/'/g, "\\'") %>';
-            const number  = '<%= (settings.origin_number  || '').replace(/'/g, "\\'") %>';
-            <%
-                const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
-            %>
-            const prov    = '<%= _currentProv ? _currentProv.description.replace(/'/g, "\\'") : "" %>';
-            const mainLine = street + ' ' + number;
-            const subLine  = prov;
+        const _addr = JSON.parse(document.getElementById('setting-addr-data').textContent);
 
-            const row  = document.getElementById('addr-selected-row');
-            const text = document.getElementById('addr-chip-text');
-            if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' — ' + subLine : '');
-            if (row)  row.style.display = 'flex';
+        if (_addr.street && _addr.number) {
+            document.addEventListener('DOMContentLoaded', function () {
+                const mainLine = _addr.street + ' ' + _addr.number;
+                const subLine  = _addr.prov;
 
-            const box = document.getElementById('address-validation-result');
-            if (box) {
-                box.className = 'addr-validation-box addr-validation-box--valid addr-full';
-                box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
-            }
-            window.addrValid = true;
-        });
-        <% } %>
+                const row  = document.getElementById('addr-selected-row');
+                const text = document.getElementById('addr-chip-text');
+                if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' — ' + subLine : '');
+                if (row)  row.style.display = 'flex';
 
-        // ── SweetAlerts ────────────────────────────────────────────────────────
+                const box = document.getElementById('address-validation-result');
+                if (box) {
+                    box.className = 'addr-validation-box addr-validation-box--valid addr-full';
+                    box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
+                }
+                window.addrValid = true;
+            });
+        }
+
         const _param = new URLSearchParams(window.location.search).get('success');
         if (_param === '1' || _param === '2') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
