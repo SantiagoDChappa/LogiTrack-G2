@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etiqueta - <%= shipment.trackingId %></title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; padding: 2rem; }
+        .no-print { margin-bottom: 1.5rem; display: flex; gap: 0.75rem; }
+        .no-print button {
+            padding: 0.5rem 1.5rem; cursor: pointer; border: none; border-radius: 6px;
+            font-size: 0.9rem; font-weight: 600;
+        }
+        .btn-print { background: #2563eb; color: #fff; }
+        .btn-close { background: #e2e8f0; color: #1e293b; }
+        .label {
+            width: 360px; background: #fff; border: 2px solid #1e293b;
+            border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+        }
+        .label-header { text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; margin-bottom: 1rem; }
+        .label-header .logo { font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; color: #1e293b; }
+        .label-tracking { text-align: center; font-size: 1.6rem; font-weight: 800; color: #1e293b; margin-bottom: 1rem; }
+        .label-qr { text-align: center; margin-bottom: 1rem; }
+        .label-qr img { width: 200px; height: 200px; }
+        .label-divider { border: none; border-top: 1px dashed #cbd5e1; margin: 0.75rem 0; }
+        .label-info { font-size: 0.82rem; color: #334155; }
+        .label-info .label-row { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
+        .label-info .label-key { font-weight: 700; min-width: 90px; color: #64748b; text-transform: uppercase; font-size: 0.72rem; padding-top: 1px; }
+        .label-info .label-val { flex: 1; }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .no-print { display: none; }
+            .label { box-shadow: none; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">Imprimir</button>
+        <button class="btn-close" onclick="window.close()">Cerrar</button>
+    </div>
+
+    <div class="label">
+        <div class="label-header">
+            <div class="logo">LogiTrack</div>
+        </div>
+
+        <div class="label-tracking"><%= shipment.trackingId %></div>
+
+        <div class="label-qr">
+            <img src="/shipment/<%= shipment.id %>/qr" alt="QR <%= shipment.trackingId %>">
+        </div>
+
+        <hr class="label-divider">
+
+        <div class="label-info">
+            <div class="label-row">
+                <span class="label-key">Remitente</span>
+                <span class="label-val"><%= shipment.sender.fullName %></span>
+            </div>
+            <div class="label-row">
+                <span class="label-key">Destinatario</span>
+                <span class="label-val"><%= shipment.recipient.fullName %></span>
+            </div>
+            <div class="label-row">
+                <span class="label-key">Destino</span>
+                <span class="label-val">
+                    <%= shipment.address.street %> <%= shipment.address.number %>
+                    <% if (shipment.address.floorApartment) { %>, <%= shipment.address.floorApartment %><% } %>
+                    <% if (shipment.address.province) { %> — <%= shipment.address.province.description %><% } %>
+                </span>
+            </div>
+            <% if (shipment.shipmentType) { %>
+            <div class="label-row">
+                <span class="label-key">Tipo</span>
+                <span class="label-val"><%= shipment.shipmentType.description %></span>
+            </div>
+            <% } %>
+            <div class="label-row">
+                <span class="label-key">Peso</span>
+                <span class="label-val"><%= shipment.weightKg != null ? Number(shipment.weightKg).toFixed(2) + ' kg' : '-' %></span>
+            </div>
+            <div class="label-row">
+                <span class="label-key">Bultos</span>
+                <span class="label-val"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

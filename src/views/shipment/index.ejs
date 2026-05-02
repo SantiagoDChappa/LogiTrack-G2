@@ -148,6 +148,10 @@
                                     <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
                                         <span class="material-symbols-outlined">info</span>
                                     </a>
+                                    <button type="button" class="action-btn" data-tooltip="Ver QR"
+                                            onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
+                                        <span class="material-symbols-outlined">qr_code</span>
+                                    </button>
                                 </td>
                             </tr>
                         <% }); %>
@@ -212,6 +216,22 @@
                 rows.forEach(function(r) { tbody.appendChild(r); });
             });
         });
+
+        function showQR(id, trackingId) {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                title: trackingId,
+                html: '<img src="/shipment/' + id + '/qr" style="width:220px;height:220px;display:block;margin:0 auto;" alt="QR">',
+                showCancelButton: true,
+                confirmButtonText: '<span style="display:flex;align-items:center;gap:6px">Imprimir Etiqueta</span>',
+                cancelButtonText: 'Cerrar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(function (result) {
+                if (result.isConfirmed) window.open('/shipment/' + id + '/label', '_blank');
+            });
+        }
 
         if (new URLSearchParams(window.location.search).get('success') === '1') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
