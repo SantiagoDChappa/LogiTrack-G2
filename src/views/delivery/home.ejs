@@ -55,6 +55,10 @@
                                         <a href="/shipment/detail/<%= shipment.id %>?from=/delivery&fromLabel=Mis%20Env%C3%ADos" class="action-btn detalle" data-tooltip="Detalle">
                                             <span class="material-symbols-outlined">info</span>
                                         </a>
+                                        <button type="button" class="action-btn" data-tooltip="Ver QR"
+                                                onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
+                                            <span class="material-symbols-outlined">qr_code</span>
+                                        </button>
                                     </td>
                                 </tr>
                             <% }) %>
@@ -65,8 +69,22 @@
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+        function showQR(id, trackingId) {
+            Swal.fire({
+                title: trackingId,
+                html: '<img src="/shipment/' + id + '/qr" style="width:200px;height:200px;display:block;margin:0 auto;" alt="QR">',
+                showCancelButton: true,
+                confirmButtonText: '<span style="display:flex;align-items:center;gap:6px"><span class="material-symbols-outlined" style="font-size:18px">print</span>Imprimir</span>',
+                cancelButtonText: 'Cerrar',
+            }).then(function(result) {
+                if (result.isConfirmed) window.open('/shipment/' + id + '/label', '_blank');
+            });
+        }
+    </script>
     <script>
         document.querySelectorAll('.th-sortable').forEach(function(th) {
             th.addEventListener('click', function() {
