@@ -423,3 +423,101 @@
         grid-template-columns: 1fr;
     }
 }
+/* Modal repartidores */
+.stat-card--clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-card--clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+
+.delivery-modal {
+    border: none;
+    border-radius: 12px;
+    padding: 0;
+    width: 480px;
+    max-width: 95vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    background: var(--color-surface, #1e2a3a);
+    color: var(--color-text, #f1f5f9);
+}
+
+.delivery-modal::backdrop {
+    background: rgba(0,0,0,0.5);
+}
+
+.delivery-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.delivery-modal-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text, #f1f5f9);
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.modal-close-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.delivery-modal-body {
+    padding: 1.2rem 1.5rem;
+}
+
+.delivery-modal-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.delivery-modal-table th {
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted, #94a3b8);
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.delivery-modal-table td {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.95rem;
+}
+
+.badge-count {
+    background: #f97316;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.badge-available {
+    background: #22c55e;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}

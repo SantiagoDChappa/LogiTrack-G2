@@ -49,6 +49,24 @@
                         <span class="material-symbols-outlined">note_add</span>
                     </div>
                 </div>
+                <div class="stat-card stat-card--clickable" onclick="document.getElementById('modal-ocupados').showModal()">
+                    <div class="stat-info">
+                        <span class="stat-label">Repartidores Ocupados</span>
+                        <span class="stat-value"><%= busyDeliveryUsers.length %></span>
+                    </div>
+                    <div class="stat-icon icon-orange">
+                        <span class="material-symbols-outlined">directions_bike</span>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--clickable" onclick="document.getElementById('modal-disponibles').showModal()">
+                    <div class="stat-info">
+                        <span class="stat-label">Repartidores Disponibles</span>
+                        <span class="stat-value"><%= availableDeliveryUsers.length %></span>
+                    </div>
+                    <div class="stat-icon icon-green">
+                        <span class="material-symbols-outlined">check_circle</span>
+                    </div>
+                </div>
             </div>
             <div class="bottom-grid">
                 <div class="card acceso-rapido">
@@ -122,6 +140,69 @@
             </div>
         </div>
     </main>
+    <!-- Modal Ocupados -->
+<dialog id="modal-ocupados" class="delivery-modal">
+    <div class="delivery-modal-header">
+        <h2><span class="material-symbols-outlined">directions_bike</span> Repartidores Ocupados</h2>
+        <button onclick="document.getElementById('modal-ocupados').close()" class="modal-close-btn">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+    </div>
+    <div class="delivery-modal-body">
+        <% if (busyDeliveryUsers.length === 0) { %>
+            <p class="empty-state">No hay repartidores ocupados.</p>
+        <% } else { %>
+            <table class="delivery-modal-table">
+                <thead>
+                    <tr>
+                        <th>Repartidor</th>
+                        <th>Envíos Activos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% busyDeliveryUsers.forEach(u => { %>
+                        <tr>
+                            <td><%= u.fullName %></td>
+                            <td><span class="badge-count"><%= u.shipmentCount %></span></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        <% } %>
+    </div>
+</dialog>
+
+<!-- Modal Disponibles -->
+<dialog id="modal-disponibles" class="delivery-modal">
+    <div class="delivery-modal-header">
+        <h2><span class="material-symbols-outlined">check_circle</span> Repartidores Disponibles</h2>
+        <button onclick="document.getElementById('modal-disponibles').close()" class="modal-close-btn">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+    </div>
+    <div class="delivery-modal-body">
+        <% if (availableDeliveryUsers.length === 0) { %>
+            <p class="empty-state">No hay repartidores disponibles.</p>
+        <% } else { %>
+            <table class="delivery-modal-table">
+                <thead>
+                    <tr>
+                        <th>Repartidor</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% availableDeliveryUsers.forEach(u => { %>
+                        <tr>
+                            <td><%= u.fullName %></td>
+                            <td><span class="badge-available">Disponible</span></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        <% } %>
+    </div>
+</dialog>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
 </body>
