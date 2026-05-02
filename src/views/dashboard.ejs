@@ -64,6 +64,21 @@
                         </a>
                     </div>
                 </div>
+                <div class="card estado-envios">
+                    <h2>Total de envíos por estado</h2>
+                    <% if (statusTotals.length === 0) { %>
+                        <p class="empty-state">Todavía no hay envíos registrados.</p>
+                    <% } else { %>
+                        <div class="status-total-list">
+                            <% statusTotals.forEach(item => { %>
+                                <div class="status-total-row">
+                                    <span class="status-badge <%= item.key %>"><%= item.label %></span>
+                                    <span class="status-total-value"><%= item.total %></span>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } %>
+                </div>
                 <div class="card ultima-actividad">
                     <h2>Última Actividad</h2>
                     <table class="activity-table">
