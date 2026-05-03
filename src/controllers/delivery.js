@@ -43,7 +43,8 @@ const saveEvidence = async (req, res) => {
             receiverDni,
             latitude,
             longitude,
-            photoBase64
+            photoBase64,
+            signatureBase64
         } = req.body;
 
         await DeliveryEvidence.create({
@@ -53,7 +54,8 @@ const saveEvidence = async (req, res) => {
             receiverDni,
             latitude:    latitude    || null,
             longitude:   longitude   || null,
-            photoBase64: photoBase64 || null
+            photoBase64: photoBase64 || null,
+            signatureBase64: signatureBase64 || null
         });
 
         await shipmentHistoryModel.create({
