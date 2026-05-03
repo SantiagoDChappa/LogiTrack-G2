@@ -1,11 +1,19 @@
-const { DeliveryEvidence } = require('../models');
+const { DeliveryEvidence, Shipment } = require('../models');
 
 const showEvidenceForm = async (req, res) => {
     try {
-        const shipmentId = req.params.id;
+        const trackingCode = req.params.id;
+
+        const shipment = await Shipment.findOne({
+            where: { trackingId: trackingCode }
+        });
+
+        if (!shipment) {
+            return res.status(404).send('Envío no encontrado');
+        }
 
         res.render('delivery/evidence', {
-            shipmentId
+            shipmentId: shipment.id
         });
 
     } catch (error) {
@@ -17,7 +25,16 @@ const showEvidenceForm = async (req, res) => {
 const saveEvidence = async (req, res) => {
     try {
 
-        const shipmentId = req.params.id;
+        const trackingCode = req.params.id;
+
+        const shipment = await Shipment.findOne({
+            where: { trackingId: trackingCode }
+        });
+
+        if (!shipment) {
+            return res.status(404).send('Envío no encontrado');
+        }
+
         const {
             receiverName,
             receiverLastname,
@@ -25,7 +42,7 @@ const saveEvidence = async (req, res) => {
         } = req.body;
 
         await DeliveryEvidence.create({
-            shipmentId,
+            shipmentId: shipment.id,
             receiverName,
             receiverLastname,
             receiverDni

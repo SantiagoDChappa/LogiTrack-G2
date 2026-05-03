@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireDelivery } = require('../middlewares/auth');
+const { requireAuth, requireDelivery } = require('../middlewares/auth');
 const shipmentModel = require('../models/shipment');
 const deliveryController = require('../controllers/delivery');
 
@@ -18,11 +18,13 @@ router.get('/', requireDelivery, async (req, res) => {
 });
 
 router.get('/evidence/:id',
+    requireAuth,
     requireDelivery,
     deliveryController.showEvidenceForm
 );
 
 router.post('/evidence/:id',
+    requireAuth,
     requireDelivery,
     deliveryController.saveEvidence
 );
