@@ -1,3 +1,4 @@
+const QRCode               = require('qrcode');
 const shipmentModel        = require('../models/shipment');
 const personModel          = require('../models/person');
 const provinceModel        = require('../models/province');
@@ -135,7 +136,7 @@ const createShipment = async (req, res) => {
         userId:       res.locals.currentUser?.id || null,
     });
 
-    res.redirect('/shipment?success=1');
+    res.redirect(`/shipment/detail/${shipment.id}?created=true`);
   } catch (err) {
     console.error('ERROR createShipment:', err.message);
     const provinces     = await provinceModel.getAll();
@@ -323,4 +324,30 @@ const assignDelivery = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery };
+const getQR = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const shipment = await shipmentModel.getById(id);
+        if (!shipment) return res.status(404).send('Envío no encontrado');
+        const buffer = await QRCode.toBuffer(shipment.trackingId, { width: 300, margin: 2 });
+        res.setHeader('Content-Type', 'image/png');
+        res.send(buffer);
+    } catch (err) {
+        console.error('ERROR getQR:', err.message);
+        res.status(500).send('Error al generar QR');
+    }
+};
+
+const getLabel = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const shipment = await shipmentModel.getById(id);
+        if (!shipment) return res.status(404).send('Envío no encontrado');
+        res.render('shipment/label', { shipment });
+    } catch (err) {
+        console.error('ERROR getLabel:', err.message);
+        res.status(500).send('Error al generar etiqueta');
+    }
+};
+
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel };
