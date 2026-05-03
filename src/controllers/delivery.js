@@ -40,14 +40,20 @@ const saveEvidence = async (req, res) => {
         const {
             receiverName,
             receiverLastname,
-            receiverDni
+            receiverDni,
+            latitude,
+            longitude,
+            photoBase64
         } = req.body;
 
         await DeliveryEvidence.create({
             shipmentId: shipment.id,
             receiverName,
             receiverLastname,
-            receiverDni
+            receiverDni,
+            latitude:    latitude    || null,
+            longitude:   longitude   || null,
+            photoBase64: photoBase64 || null
         });
 
         await shipmentHistoryModel.create({

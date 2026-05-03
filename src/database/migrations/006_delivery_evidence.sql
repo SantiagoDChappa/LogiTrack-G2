@@ -1,4 +1,4 @@
-CREATE TABLE "logitrack"."deliveryEvidence" (
+CREATE TABLE IF NOT EXISTS "logitrack"."deliveryEvidence" (
     "id" SERIAL PRIMARY KEY,
     "shipmentId" INT NOT NULL,
     "receiverName" VARCHAR NOT NULL,

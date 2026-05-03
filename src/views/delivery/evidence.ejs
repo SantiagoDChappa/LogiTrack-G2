@@ -91,6 +91,21 @@
             >
         </div>
 
+        <input type="hidden" name="latitude" id="latitude">
+        <input type="hidden" name="longitude" id="longitude">
+        <div class="form-group" id="gps-status">
+            📍 Obteniendo ubicación...
+        </div>
+
+        <div class="form-group">
+            <label>Foto del paquete</label>
+            <input type="file" name="photoFile" id="photoFile" accept="image/*" capture="environment" style="display:none;">
+            <button type="button" onclick="document.getElementById('photoFile').click()">📷 Sacar foto del paquete</button>
+            <canvas id="photoCanvas" style="display:none;"></canvas>
+            <img id="photoPreview" style="display:none; width:100%; border-radius:5px; margin-top:10px;">
+            <input type="hidden" name="photoBase64" id="photoBase64">
+        </div>
+
         <button type="submit">
             Guardar evidencia
         </button>
@@ -98,6 +113,39 @@
     </form>
 
 </div>
+
+<script>
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                document.getElementById('latitude').value = position.coords.latitude;
+                document.getElementById('longitude').value = position.coords.longitude;
+                document.getElementById('gps-status').innerHTML = '📍 Ubicación obtenida';
+                document.getElementById('gps-status').style.color = 'green';
+            },
+            () => {
+                document.getElementById('gps-status').innerHTML = '⚠️ No se pudo obtener ubicación';
+                document.getElementById('gps-status').style.color = 'orange';
+            }
+        );
+    } else {
+        document.getElementById('gps-status').innerHTML = '⚠️ GPS no disponible';
+    }
+
+    document.getElementById('photoFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = document.getElementById('photoPreview');
+        img.src = event.target.result;
+        img.style.display = 'block';
+        document.getElementById('photoBase64').value = event.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+</script>
 
 </body>
 </html>

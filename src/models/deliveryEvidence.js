@@ -26,6 +26,26 @@ const DeliveryEvidence = sequelize.define('deliveryEvidence', {
     receiverDni: {
         type: DataTypes.STRING,
         allowNull: false
+    },
+
+    photoBase64: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+
+    signatureBase64: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+
+    latitude: {
+        type: DataTypes.DECIMAL(10, 7),
+        allowNull: true
+    },
+
+    longitude: {
+        type: DataTypes.DECIMAL(10, 7),
+        allowNull: true
     }
 
 }, {
