@@ -433,19 +433,43 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.18);
 }
 
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes backdrop-in {
+    from { background: rgba(0,0,0,0); }
+    to   { background: rgba(0,0,0,0.5); }
+}
+
 .delivery-modal {
     border: none;
     border-radius: 12px;
     padding: 0;
     width: 480px;
     max-width: 95vw;
+    max-height: 90vh;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
     background: var(--color-surface, #1e2a3a);
     color: var(--color-text, #f1f5f9);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    animation: modal-in 0.2s ease-out;
 }
 
 .delivery-modal::backdrop {
     background: rgba(0,0,0,0.5);
+    animation: backdrop-in 0.2s ease-out;
 }
 
 .delivery-modal-header {
