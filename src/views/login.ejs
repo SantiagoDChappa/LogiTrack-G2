@@ -25,6 +25,9 @@
 
             <!-- Formulario -->
             <form class="login-form" action="/login" method="post">
+                <% if (locals.returnTo) { %>
+                <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                <% } %>
 
                 <div class="login-field">
                     <label for="user-email">Correo electrónico</label>

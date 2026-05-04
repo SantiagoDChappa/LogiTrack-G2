@@ -35,7 +35,8 @@ const safeAssociate = () => {
             ShipmentHistory.belongsTo(Status, { as: 'fromStatus', foreignKey: 'fromStatusId' });
             ShipmentHistory.belongsTo(Status, { as: 'toStatus',   foreignKey: 'toStatusId'   });
         }
-        if (User) { ShipmentHistory.belongsTo(User, { as: 'user', foreignKey: 'userId' }); }
+        if (User)   { ShipmentHistory.belongsTo(User,   { as: 'user',   foreignKey: 'userId'   }); }
+        if (Branch) { ShipmentHistory.belongsTo(Branch, { as: 'branch', foreignKey: 'branchId' }); }
     }
 };
 

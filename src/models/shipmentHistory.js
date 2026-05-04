@@ -9,7 +9,8 @@ const ShipmentHistory = sequelize.define('shipment_history', {
     comment:      { type: DataTypes.TEXT,    allowNull: true },
     changedAt:    { type: DataTypes.DATE },
     userId:       { type: DataTypes.INTEGER, allowNull: true },
-    eventType:    { type: DataTypes.STRING,  allowNull: false, defaultValue: 'STATUS_CHANGE' }
+    eventType:    { type: DataTypes.STRING,  allowNull: false, defaultValue: 'STATUS_CHANGE' },
+    branchId:     { type: DataTypes.INTEGER, allowNull: true, field: 'branch_id' }
 }, { tableName: 'shipment_history', timestamps: false });
 
 const withSchemaSelfHeal = async (op) => {
@@ -27,7 +28,7 @@ const withSchemaSelfHeal = async (op) => {
     }
 };
 
-const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType }) => {
+const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId }) => {
     return withSchemaSelfHeal(() => ShipmentHistory.create({
         shipmentId,
         fromStatusId: fromStatusId || null,
@@ -35,20 +36,23 @@ const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventTy
         comment:      comment   || null,
         userId:       userId    || null,
         eventType:    eventType || 'STATUS_CHANGE',
+        branchId:     branchId  || null,
         changedAt:    new Date()
     }));
 };
 
 const getByShipmentId = (shipmentId) => {
     const { Status } = require('./status');
-    const { User } = require('./user');
+    const { User }   = require('./user');
+    const { Branch } = require('./branch');
 
     return withSchemaSelfHeal(() => ShipmentHistory.findAll({
         where: { shipmentId },
         include: [
-            { model: Status, as: 'fromStatus' },
-            { model: Status, as: 'toStatus'   },
-            { model: User,   as: 'user', attributes: ['id', 'fullName'] }
+            { model: Status,  as: 'fromStatus' },
+            { model: Status,  as: 'toStatus'   },
+            { model: User,    as: 'user',   attributes: ['id', 'fullName'] },
+            { model: Branch,  as: 'branch', required: false }
         ],
         order: [['changedAt', 'ASC']]
     }));
