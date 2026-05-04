@@ -80,7 +80,28 @@ const saveEvidence = async (req, res) => {
     }
 };
 
+const showActionScreen = async (req, res) => {
+    try {
+        const trackingCode = req.params.id;
+
+        const shipment = await Shipment.findOne({
+            where: { trackingId: trackingCode }
+        });
+
+        if (!shipment) {
+            return res.status(404).send('Envío no encontrado');
+        }
+
+        res.render('delivery/action', { trackingCode });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).send(error.message);
+    }
+};
+
 module.exports = {
+    showActionScreen,
     showEvidenceForm,
     saveEvidence
 };

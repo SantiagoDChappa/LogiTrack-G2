@@ -20,10 +20,16 @@ router.get('/', requireDelivery, async (req, res) => {
 router.get('/evidence/:id',
     requireAuth,
     requireDelivery,
+    deliveryController.showActionScreen
+);
+
+router.get('/evidence/:id/pod',
+    requireAuth,
+    requireDelivery,
     deliveryController.showEvidenceForm
 );
 
-router.post('/evidence/:id',
+router.post('/evidence/:id/pod',
     requireAuth,
     requireDelivery,
     deliveryController.saveEvidence
