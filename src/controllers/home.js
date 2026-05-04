@@ -1,5 +1,6 @@
 const shipmentModel = require('../models/shipment');
 const userModel = require('../models/user');
+const historyModel = require('../models/shipmentHistory');
 const { RoleType } = require('../constants/enums');
 
 const getIndex = async (req, res) => {
@@ -45,11 +46,31 @@ const getIndex = async (req, res) => {
         .filter(u => !busyDeliveryUsers.find(b => b.id === u.id))
         .map(u => ({ id: u.id, fullName: u.fullName }));
 
+    // Entregas completadas por día (últimos 7 días)
+    const allHistory = await historyModel.ShipmentHistory.findAll({
+        where: { toStatusId: 4 }
+    });
+
+    const today = new Date();
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() - (6 - i));
+        return d.toISOString().split('T')[0];
+    });
+
+    const deliveriesByDay = last7Days.map(date => {
+        const count = allHistory.filter(h => {
+            return h.changedAt.toISOString().split('T')[0] === date;
+        }).length;
+        return { date, count };
+    });
+
     res.render('dashboard', {
         activeShipments, deliveriesToday, delayAlerts, newRecords, lastActivity,
         statusTotals,
         busyDeliveryUsers,
-        availableDeliveryUsers
+        availableDeliveryUsers,
+        deliveriesByDay
     });
 };
 

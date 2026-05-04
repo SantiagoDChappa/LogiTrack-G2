@@ -68,7 +68,74 @@
                     </div>
                 </div>
             </div>
+            <!-- Modal Ocupados -->
+            <dialog id="modal-ocupados" class="delivery-modal">
+                <div class="delivery-modal-header">
+                    <h2><span class="material-symbols-outlined">directions_bike</span> Repartidores Ocupados</h2>
+                    <button onclick="document.getElementById('modal-ocupados').close()" class="modal-close-btn">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="delivery-modal-body">
+                    <% if (busyDeliveryUsers.length === 0) { %>
+                        <p class="empty-state">No hay repartidores ocupados.</p>
+                    <% } else { %>
+                        <table class="delivery-modal-table">
+                            <thead>
+                                <tr>
+                                    <th>Repartidor</th>
+                                    <th>Envíos Activos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% busyDeliveryUsers.forEach(u => { %>
+                                    <tr>
+                                        <td><%= u.fullName %></td>
+                                        <td><span class="badge-count"><%= u.shipmentCount %></span></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    <% } %>
+                </div>
+            </dialog>
+
+            <!-- Modal Disponibles -->
+            <dialog id="modal-disponibles" class="delivery-modal">
+                <div class="delivery-modal-header">
+                    <h2><span class="material-symbols-outlined">check_circle</span> Repartidores Disponibles</h2>
+                    <button onclick="document.getElementById('modal-disponibles').close()" class="modal-close-btn">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="delivery-modal-body">
+                    <% if (availableDeliveryUsers.length === 0) { %>
+                        <p class="empty-state">No hay repartidores disponibles.</p>
+                    <% } else { %>
+                        <table class="delivery-modal-table">
+                            <thead>
+                                <tr>
+                                    <th>Repartidor</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% availableDeliveryUsers.forEach(u => { %>
+                                    <tr>
+                                        <td><%= u.fullName %></td>
+                                        <td><span class="badge-available">Disponible</span></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    <% } %>
+                </div>
+            </dialog>
             <div class="bottom-grid">
+                <div class="card">
+                    <h2>Entregas Completadas por Día</h2>
+                    <canvas id="chart-entregas" height="120"></canvas>
+                </div>
                 <div class="card acceso-rapido">
                     <h2>Acceso Rápido</h2>
                     <div class="quick-actions">
@@ -140,69 +207,49 @@
             </div>
         </div>
     </main>
-    <!-- Modal Ocupados -->
-<dialog id="modal-ocupados" class="delivery-modal">
-    <div class="delivery-modal-header">
-        <h2><span class="material-symbols-outlined">directions_bike</span> Repartidores Ocupados</h2>
-        <button onclick="document.getElementById('modal-ocupados').close()" class="modal-close-btn">
-            <span class="material-symbols-outlined">close</span>
-        </button>
-    </div>
-    <div class="delivery-modal-body">
-        <% if (busyDeliveryUsers.length === 0) { %>
-            <p class="empty-state">No hay repartidores ocupados.</p>
-        <% } else { %>
-            <table class="delivery-modal-table">
-                <thead>
-                    <tr>
-                        <th>Repartidor</th>
-                        <th>Envíos Activos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% busyDeliveryUsers.forEach(u => { %>
-                        <tr>
-                            <td><%= u.fullName %></td>
-                            <td><span class="badge-count"><%= u.shipmentCount %></span></td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        <% } %>
-    </div>
-</dialog>
+    <!-- Gráfico entregas por día -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const deliveriesByDay = <%- JSON.stringify(deliveriesByDay) %>;
+        const labels = deliveriesByDay.map(d => {
+            const date = new Date(d.date + 'T00:00:00');
+            return date.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
+        });
+        const data = deliveriesByDay.map(d => d.count);
 
-<!-- Modal Disponibles -->
-<dialog id="modal-disponibles" class="delivery-modal">
-    <div class="delivery-modal-header">
-        <h2><span class="material-symbols-outlined">check_circle</span> Repartidores Disponibles</h2>
-        <button onclick="document.getElementById('modal-disponibles').close()" class="modal-close-btn">
-            <span class="material-symbols-outlined">close</span>
-        </button>
-    </div>
-    <div class="delivery-modal-body">
-        <% if (availableDeliveryUsers.length === 0) { %>
-            <p class="empty-state">No hay repartidores disponibles.</p>
-        <% } else { %>
-            <table class="delivery-modal-table">
-                <thead>
-                    <tr>
-                        <th>Repartidor</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% availableDeliveryUsers.forEach(u => { %>
-                        <tr>
-                            <td><%= u.fullName %></td>
-                            <td><span class="badge-available">Disponible</span></td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        <% } %>
-    </div>
-</dialog>
+        const ctx = document.getElementById('chart-entregas').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Entregas',
+                    data,
+                    backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                    borderColor: 'rgba(34, 197, 94, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#94a3b8' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    </script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
 </body>
