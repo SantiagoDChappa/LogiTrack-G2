@@ -28,13 +28,18 @@ const getIndex = async (req, res) => {
 
     // Repartidores ocupados y disponibles
     const activeStatusIds = [1, 2, 3];
+
     const allDeliveryUsers = await userModel.search({ roleId: RoleType.DELIVERY.id });
 
     const busyDeliveryUsers = allDeliveryUsers.map(u => {
         const assignedShipments = shipments.filter(s =>
             activeStatusIds.includes(s.statusId) && s.deliveryUserId === u.id
         );
-        return { id: u.id, fullName: u.fullName, shipmentCount: assignedShipments.length };
+        return {
+            id: u.id,
+            fullName: u.fullName,
+            shipmentCount: assignedShipments.length
+        };
     }).filter(u => u.shipmentCount > 0);
 
     const availableDeliveryUsers = allDeliveryUsers
