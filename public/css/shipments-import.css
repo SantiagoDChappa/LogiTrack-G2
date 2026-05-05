@@ -99,6 +99,10 @@
     border-color: rgba(239, 68, 68, 0.5);
 }
 
+.import-stat--warn {
+    border-color: rgba(234, 179, 8, 0.5);
+}
+
 .import-stat__num {
     font-size: 2rem;
     font-weight: var(--font-weight-bold);
@@ -111,6 +115,10 @@
 
 .import-stat--err .import-stat__num {
     color: rgb(220, 38, 38);
+}
+
+.import-stat--warn .import-stat__num {
+    color: rgb(217, 119, 6);
 }
 
 .import-stat__label {

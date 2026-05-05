@@ -119,6 +119,10 @@ const validate = (row) => {
         errors.push({ field: 'floorApartment', message: 'Piso/Depto no puede superar 20 caracteres' });
     }
 
+    if (row.legacyTrackingId && String(row.legacyTrackingId).length > 100) {
+        errors.push({ field: 'legacyTrackingId', message: 'legacyTrackingId no puede superar 100 caracteres' });
+    }
+
     let provinceId = null;
     const provErr = required(row.province, 'province', 'La provincia');
     if (provErr) {
@@ -189,6 +193,7 @@ const validate = (row) => {
             weightKg:          parseFloat(row.weightKg),
             packageQty:        parseInt(row.packageQty, 10),
             statusId,
+            legacyTrackingId:  row.legacyTrackingId ? String(row.legacyTrackingId).trim() : null,
         } : null,
     };
 };

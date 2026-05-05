@@ -7,16 +7,17 @@ const Shipment = sequelize.define('shipment', {
         primaryKey: true,
         autoIncrement: true,
     },
-    trackingId:      { type: DataTypes.STRING },
-    statusId:        { type: DataTypes.INTEGER },
-    createdAt:       { type: DataTypes.DATE },
-    senderId:        { type: DataTypes.INTEGER },
-    recipientId:     { type: DataTypes.INTEGER },
-    addressId:       { type: DataTypes.INTEGER },
-    shipmentTypeId:  { type: DataTypes.INTEGER },
-    weightKg:        { type: DataTypes.DECIMAL(8, 2) },
-    packageQty:      { type: DataTypes.INTEGER },
-    deliveryUserId: { type: DataTypes.INTEGER },
+    trackingId:       { type: DataTypes.STRING },
+    statusId:         { type: DataTypes.INTEGER },
+    createdAt:        { type: DataTypes.DATE },
+    senderId:         { type: DataTypes.INTEGER },
+    recipientId:      { type: DataTypes.INTEGER },
+    addressId:        { type: DataTypes.INTEGER },
+    shipmentTypeId:   { type: DataTypes.INTEGER },
+    weightKg:         { type: DataTypes.DECIMAL(8, 2) },
+    packageQty:       { type: DataTypes.INTEGER },
+    deliveryUserId:   { type: DataTypes.INTEGER },
+    legacyTrackingId: { type: DataTypes.STRING },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -71,14 +72,34 @@ const create = async (data) => {
     const trackingId = await generateTrackingId();
     return Shipment.create({
         trackingId,
-        statusId:       data.statusId || 1,
-        senderId:       data.senderId,
-        recipientId:    data.recipientId,
-        addressId:      data.addressId,
-        shipmentTypeId: data.shipmentTypeId || null,
-        weightKg:       data.weightKg       || null,
-        packageQty:     data.packageQty      || null,
-        createdAt:      new Date().toISOString().split('T')[0]
+        statusId:         data.statusId || 1,
+        senderId:         data.senderId,
+        recipientId:      data.recipientId,
+        addressId:        data.addressId,
+        shipmentTypeId:   data.shipmentTypeId || null,
+        weightKg:         data.weightKg       || null,
+        packageQty:       data.packageQty      || null,
+        legacyTrackingId: data.legacyTrackingId || null,
+        createdAt:        new Date().toISOString().split('T')[0]
+    });
+};
+
+const findByLegacyTrackingId = (legacyTrackingId) => {
+    if (!legacyTrackingId) { return Promise.resolve(null); }
+    return Shipment.findOne({ where: { legacyTrackingId } });
+};
+
+const findPotentialDuplicate = ({ senderDocument, recipientDocument, street, number, provinceId, statusId }) => {
+    const { Person } = require('./person');
+    const { Address } = require('./address');
+
+    return Shipment.findOne({
+        where: { statusId },
+        include: [
+            { model: Person,  as: 'sender',    where: { document: senderDocument },    required: true },
+            { model: Person,  as: 'recipient', where: { document: recipientDocument }, required: true },
+            { model: Address, as: 'address',   where: { street, number, provinceId },  required: true },
+        ]
     });
 };
 
@@ -228,4 +249,4 @@ const getByTrackingId = (trackingId) => {
 
 const updateStatus = (id, newStatusId) => Shipment.update({ statusId: newStatusId }, { where: { id } });
 
-module.exports = { Shipment, getAll, getById, getByTrackingId, create, update, search, updateStatus };
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId };

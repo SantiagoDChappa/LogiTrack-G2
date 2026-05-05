@@ -358,15 +358,18 @@ const getLabel = async (req, res) => {
 };
 
 // ── Importación masiva por CSV (LGT-102) ─────────────────────────────────────
-// Reportes de errores temporales en memoria. TTL 1h para evitar leaks.
-const importReports = new Map();
-const REPORT_TTL_MS = 60 * 60 * 1000;
+// Estado en memoria con TTL: previews del análisis (30 min) y reportes de errores
+// post-commit (1h). Se limpian al insertar nuevas entradas.
+const importPreviews = new Map();
+const importReports  = new Map();
+const PREVIEW_TTL_MS = 30 * 60 * 1000;
+const REPORT_TTL_MS  = 60 * 60 * 1000;
 
-const cleanupExpiredReports = () => {
+const cleanupExpired = (map, ttl) => {
     const now = Date.now();
-    for (const [id, entry] of importReports.entries()) {
-        if (now - entry.createdAt > REPORT_TTL_MS) {
-            importReports.delete(id);
+    for (const [id, entry] of map.entries()) {
+        if (now - entry.createdAt > ttl) {
+            map.delete(id);
         }
     }
 };
@@ -375,7 +378,7 @@ const showImportForm = (req, res) => {
     res.render('shipment/import', { result: null, error: null });
 };
 
-const processImport = async (req, res) => {
+const processImportPreview = async (req, res) => {
     if (!req.file) {
         return res.render('shipment/import', {
             result: null,
@@ -383,27 +386,61 @@ const processImport = async (req, res) => {
         });
     }
 
-    const userId = res.locals.currentUser?.id || null;
-    const result = await csvImport.processBuffer(req.file.buffer, { userId });
+    const analysis = await csvImport.analyzeBuffer(req.file.buffer);
 
-    // Persistir el registro en el historial de importes (solo métricas).
-    // Si la persistencia falla, no bloqueamos al usuario — la importación ya ocurrió.
+    cleanupExpired(importPreviews, PREVIEW_TTL_MS);
+    const previewId = crypto.randomUUID();
+    importPreviews.set(previewId, {
+        analysis,
+        filename:  req.file.originalname,
+        createdAt: Date.now(),
+    });
+
+    res.render('shipment/import-preview', {
+        previewId,
+        analysis,
+        filename: req.file.originalname,
+    });
+};
+
+const commitImport = async (req, res) => {
+    cleanupExpired(importPreviews, PREVIEW_TTL_MS);
+    const previewId = req.body.previewId;
+    const entry = importPreviews.get(previewId);
+    if (!entry) {
+        return res.status(410).render('shipment/import', {
+            result: null,
+            error:  'El preview expiró o no existe. Volvé a subir el archivo.',
+        });
+    }
+
+    const userId = res.locals.currentUser?.id || null;
+    const force  = req.body.force === 'true';
+
+    const commit = await csvImport.commitAnalysis(entry.analysis, { userId, includeDuplicates: force });
+
+    const result = csvImport.buildResultFromAnalysisAndCommit(entry.analysis, commit);
+
     try {
         await shipmentImportModel.create({
             userId,
-            filename:      req.file.originalname,
-            totalRows:     result.total,
-            importedCount: result.imported.length,
-            errorCount:    result.errors.length,
-            aborted:       result.aborted,
+            filename:       entry.filename,
+            totalRows:      entry.analysis.total,
+            importedCount:  commit.imported.length,
+            errorCount:     result.errors.length,
+            duplicateCount: entry.analysis.summary.duplicates,
+            forced:         force,
+            aborted:        entry.analysis.aborted,
         });
     } catch (err) {
         console.error('ERROR persistiendo shipment_import:', err.message);
     }
 
+    importPreviews.delete(previewId);
+
     let reportId = null;
     if (result.errors.length > 0) {
-        cleanupExpiredReports();
+        cleanupExpired(importReports, REPORT_TTL_MS);
         reportId = crypto.randomUUID();
         importReports.set(reportId, {
             csv:       csvImport.buildErrorReportCsv(result.errors),
@@ -411,15 +448,11 @@ const processImport = async (req, res) => {
         });
     }
 
-    res.render('shipment/import-result', {
-        result,
-        reportId,
-        error: null,
-    });
+    res.render('shipment/import-result', { result, reportId, error: null });
 };
 
 const downloadImportReport = (req, res) => {
-    cleanupExpiredReports();
+    cleanupExpired(importReports, REPORT_TTL_MS);
     const entry = importReports.get(req.params.id);
     if (!entry) {
         return res.status(404).send('El reporte expiró o no existe');
@@ -448,4 +481,4 @@ const exportShipments = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel, showImportForm, processImport, downloadImportReport, showImportHistory, exportShipments };
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments };

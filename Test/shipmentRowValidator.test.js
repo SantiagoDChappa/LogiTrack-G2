@@ -130,6 +130,30 @@ describe('shipmentRowValidator.validate', () => {
         expect(r.errors).toContainEqual(expect.objectContaining({ field: 'floorApartment' }));
     });
 
+    test('legacyTrackingId opcional se preserva en normalized', () => {
+        const row = validRow();
+        row.legacyTrackingId = 'LEG-001';
+        const r = validate(row);
+        expect(r.ok).toBe(true);
+        expect(r.normalized.legacyTrackingId).toBe('LEG-001');
+    });
+
+    test('legacyTrackingId vacío deja el campo null', () => {
+        const row = validRow();
+        row.legacyTrackingId = '';
+        const r = validate(row);
+        expect(r.ok).toBe(true);
+        expect(r.normalized.legacyTrackingId).toBe(null);
+    });
+
+    test('legacyTrackingId > 100 caracteres genera error', () => {
+        const row = validRow();
+        row.legacyTrackingId = 'X'.repeat(105);
+        const r = validate(row);
+        expect(r.ok).toBe(false);
+        expect(r.errors).toContainEqual(expect.objectContaining({ field: 'legacyTrackingId' }));
+    });
+
     test('status faltante genera error', () => {
         const row = validRow();
         delete row.status;
