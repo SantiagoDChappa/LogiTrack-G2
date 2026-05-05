@@ -1,3 +1,5 @@
+const crypto               = require('crypto');
+const QRCode               = require('qrcode');
 const shipmentModel        = require('../models/shipment');
 const personModel          = require('../models/person');
 const provinceModel        = require('../models/province');
@@ -11,6 +13,9 @@ const { PROVINCES }        = require('../utils/provinces');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status }   = require('../constants/enums');
 const { validationResult }   = require('express-validator');
+const csvImport            = require('../services/csvImport');
+const csvExport            = require('../services/csvExport');
+const shipmentImportModel  = require('../models/shipmentImport');
 
 const home = async (req, res) => {
     const statuses = await statusModel.getAll();
@@ -135,7 +140,7 @@ const createShipment = async (req, res) => {
         userId:       res.locals.currentUser?.id || null,
     });
 
-    res.redirect('/shipment?success=1');
+    res.redirect(`/shipment/detail/${shipment.id}?created=true`);
   } catch (err) {
     console.error('ERROR createShipment:', err.message);
     const provinces     = await provinceModel.getAll();
@@ -181,8 +186,8 @@ const getUpdateShipment = async (req, res) => {
   };
 
   const returnUrl = req.query.from || '/shipment';
-  const isSupervisor = res.locals.currentUser?.roleId === RoleType.SUPERVISOR.id;
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor });
+  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(res.locals.currentUser?.roleId);
+  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus });
 };
 
 const updateShipment = async (req, res) => {
@@ -200,10 +205,6 @@ const updateShipment = async (req, res) => {
     }
 
     if (body.newStatusId) {
-      if (isOperator) {
-          return res.status(403).send('Solo los supervisores pueden cambiar el estado del envío');
-      }
-
       const targetStatusId = Number(body.newStatusId);
 
       if (targetStatusId === Status.IN_TRANSIT.id) {
@@ -241,7 +242,7 @@ const updateShipment = async (req, res) => {
                   errors: ['Debe asignar un repartidor antes de pasar el envío a estado "En Tránsito".'],
                   shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers,
                   returnUrl: req.query.from || '/shipment',
-                  isSupervisor: currentUser?.roleId === RoleType.SUPERVISOR.id,
+                  isSupervisor: [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(currentUser?.roleId),
               });
           }
       }
@@ -327,4 +328,157 @@ const assignDelivery = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery };
+const getQR = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const shipment = await shipmentModel.getById(id);
+        if (!shipment) return res.status(404).send('Envío no encontrado');
+        const scanUrl = `${req.protocol}://${req.get('host')}/scan/${shipment.trackingId}`;
+        const buffer = await QRCode.toBuffer(scanUrl, { width: 300, margin: 2 });
+        const appUrl = process.env.APP_URL || 'https://logitrack-prototype.onrender.com';
+        const qrContent = `${appUrl}/delivery/evidence/${shipment.trackingId}`;
+        res.setHeader('Content-Type', 'image/png');
+        res.send(buffer);
+    } catch (err) {
+        console.error('ERROR getQR:', err.message);
+        res.status(500).send('Error al generar QR');
+    }
+};
+
+const getLabel = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const shipment = await shipmentModel.getById(id);
+        if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+        res.render('shipment/label', { shipment });
+    } catch (err) {
+        console.error('ERROR getLabel:', err.message);
+        res.status(500).send('Error al generar etiqueta');
+    }
+};
+
+// ── Importación masiva por CSV (LGT-102) ─────────────────────────────────────
+// Estado en memoria con TTL: previews del análisis (30 min) y reportes de errores
+// post-commit (1h). Se limpian al insertar nuevas entradas.
+const importPreviews = new Map();
+const importReports  = new Map();
+const PREVIEW_TTL_MS = 30 * 60 * 1000;
+const REPORT_TTL_MS  = 60 * 60 * 1000;
+
+const cleanupExpired = (map, ttl) => {
+    const now = Date.now();
+    for (const [id, entry] of map.entries()) {
+        if (now - entry.createdAt > ttl) {
+            map.delete(id);
+        }
+    }
+};
+
+const showImportForm = (req, res) => {
+    res.render('shipment/import', { result: null, error: null });
+};
+
+const processImportPreview = async (req, res) => {
+    if (!req.file) {
+        return res.render('shipment/import', {
+            result: null,
+            error:  'Debe seleccionar un archivo CSV',
+        });
+    }
+
+    const analysis = await csvImport.analyzeBuffer(req.file.buffer);
+
+    cleanupExpired(importPreviews, PREVIEW_TTL_MS);
+    const previewId = crypto.randomUUID();
+    importPreviews.set(previewId, {
+        analysis,
+        filename:  req.file.originalname,
+        createdAt: Date.now(),
+    });
+
+    res.render('shipment/import-preview', {
+        previewId,
+        analysis,
+        filename: req.file.originalname,
+    });
+};
+
+const commitImport = async (req, res) => {
+    cleanupExpired(importPreviews, PREVIEW_TTL_MS);
+    const previewId = req.body.previewId;
+    const entry = importPreviews.get(previewId);
+    if (!entry) {
+        return res.status(410).render('shipment/import', {
+            result: null,
+            error:  'El preview expiró o no existe. Volvé a subir el archivo.',
+        });
+    }
+
+    const userId = res.locals.currentUser?.id || null;
+    const force  = req.body.force === 'true';
+
+    const commit = await csvImport.commitAnalysis(entry.analysis, { userId, includeDuplicates: force });
+
+    const result = csvImport.buildResultFromAnalysisAndCommit(entry.analysis, commit);
+
+    try {
+        await shipmentImportModel.create({
+            userId,
+            filename:       entry.filename,
+            totalRows:      entry.analysis.total,
+            importedCount:  commit.imported.length,
+            errorCount:     result.errors.length,
+            duplicateCount: entry.analysis.summary.duplicates,
+            forced:         force,
+            aborted:        entry.analysis.aborted,
+        });
+    } catch (err) {
+        console.error('ERROR persistiendo shipment_import:', err.message);
+    }
+
+    importPreviews.delete(previewId);
+
+    let reportId = null;
+    if (result.errors.length > 0) {
+        cleanupExpired(importReports, REPORT_TTL_MS);
+        reportId = crypto.randomUUID();
+        importReports.set(reportId, {
+            csv:       csvImport.buildErrorReportCsv(result.errors),
+            createdAt: Date.now(),
+        });
+    }
+
+    res.render('shipment/import-result', { result, reportId, error: null });
+};
+
+const downloadImportReport = (req, res) => {
+    cleanupExpired(importReports, REPORT_TTL_MS);
+    const entry = importReports.get(req.params.id);
+    if (!entry) {
+        return res.status(404).send('El reporte expiró o no existe');
+    }
+    res.setHeader('Content-Type',        'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="errores-import-${req.params.id}.csv"`);
+    res.send(entry.csv);
+};
+
+const showImportHistory = async (req, res) => {
+    const imports = await shipmentImportModel.getAll({ limit: 100 });
+    res.render('shipment/import-history', { imports });
+};
+
+const exportShipments = async (req, res) => {
+    try {
+        const shipments = await shipmentModel.getAll();
+        const csv = csvExport.buildShipmentsCsv(shipments);
+        const today = new Date().toISOString().split('T')[0];
+        res.setHeader('Content-Type',        'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="envios-${today}.csv"`);
+        res.send(csv);
+    } catch (err) {
+        console.error('ERROR exportShipments:', err.message);
+        res.status(500).send('Error al exportar envíos');
+    }
+};
+
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments };

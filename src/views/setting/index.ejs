@@ -7,6 +7,9 @@
     <style>
         .settings-content {
             padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
         }
 
         .settings-card {
@@ -15,7 +18,7 @@
             border-radius: var(--radius-md);
             padding: var(--space-6);
             box-shadow: var(--shadow-sm);
-            max-width: 900px;
+            max-width: 1100px;
         }
 
         .settings-card-title {
@@ -61,6 +64,18 @@
         .settings-addr .span-full {
             grid-column: 1 / -1;
         }
+
+        /* Branch assignment table */
+        .branch-select {
+            width: 100%;
+            min-width: 180px;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-surface);
+            color: var(--color-text);
+            font-size: var(--font-size-sm);
+        }
     </style>
 </head>
 <body>
@@ -71,6 +86,8 @@
         </div>
 
         <div class="settings-content">
+
+            <!-- ── Card 1: Dirección de origen ─────────────────────────────── -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">location_on</span>
@@ -124,46 +141,117 @@
                     </div>
                 </form>
             </div>
+
+            <!-- ── Card 2: Asignación de sucursales a usuarios ─────────────── -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">store</span>
+                    Asignación de sucursales a usuarios
+                </h2>
+                <p class="settings-subtitle">
+                    Asigná una sucursal a cada usuario. Los usuarios sin sucursal asignada aparecen con "Sin sucursal".
+                </p>
+
+                <% if (branches.length === 0) { %>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                        No hay sucursales cargadas en el sistema. Ejecutá el script SQL de inserción de sucursales primero.
+                    </p>
+                <% } else if (users.length === 0) { %>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                        No hay usuarios registrados en el sistema.
+                    </p>
+                <% } else { %>
+                <form method="POST" action="/setting/assign-branch">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre y Apellido</th>
+                                <th>Documento</th>
+                                <th>Email</th>
+                                <th>Rol</th>
+                                <th>Sucursal asignada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% const roleLabels = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' }; %>
+                            <% users.forEach(user => { %>
+                            <tr>
+                                <td><%= user.fullName %></td>
+                                <td><%= user.document %></td>
+                                <td><%= user.email %></td>
+                                <td><span class="status-badge"><%= roleLabels[user.roleId] || '-' %></span></td>
+                                <td>
+                                    <input type="hidden" name="userId[]" value="<%= user.id %>">
+                                    <select name="branchId[]" class="branch-select">
+                                        <option value="">— Sin sucursal —</option>
+                                        <% branches.forEach(branch => { %>
+                                            <option value="<%= branch.id %>"
+                                                <%= user.branchId === branch.id ? 'selected' : '' %>>
+                                                <%= branch.name %>
+                                            </option>
+                                        <% }); %>
+                                    </select>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="settings-actions">
+                    <button type="submit" class="btn-primary">
+                        <span class="material-symbols-outlined">save</span>
+                        Guardar ajustes
+                    </button>
+                </div>
+                </form>
+                <% } %>
+            </div>
+
         </div>
     </main>
+
+    <%
+        const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
+    %>
+    <script id="setting-addr-data" type="application/json"><%- JSON.stringify({
+        street: settings.origin_street || null,
+        number: settings.origin_number || null,
+        prov:   _currentProv ? _currentProv.description : ''
+    }) %></script>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
     <script>
-        // ── Mostrar dirección actual si ya hay una guardada ────────────────────
-        <% if (settings.origin_street && settings.origin_number) { %>
-        document.addEventListener('DOMContentLoaded', function () {
-            const street  = '<%= (settings.origin_street  || '').replace(/'/g, "\\'") %>';
-            const number  = '<%= (settings.origin_number  || '').replace(/'/g, "\\'") %>';
-            <%
-                const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
-            %>
-            const prov    = '<%= _currentProv ? _currentProv.description.replace(/'/g, "\\'") : "" %>';
-            const mainLine = street + ' ' + number;
-            const subLine  = prov;
+        const _addr = JSON.parse(document.getElementById('setting-addr-data').textContent);
 
-            const row  = document.getElementById('addr-selected-row');
-            const text = document.getElementById('addr-chip-text');
-            if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' \u2014 ' + subLine : '');
-            if (row)  row.style.display = 'flex';
+        if (_addr.street && _addr.number) {
+            document.addEventListener('DOMContentLoaded', function () {
+                const mainLine = _addr.street + ' ' + _addr.number;
+                const subLine  = _addr.prov;
 
-            const box = document.getElementById('address-validation-result');
-            if (box) {
-                box.className = 'addr-validation-box addr-validation-box--valid addr-full';
-                box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
-            }
-            window.addrValid = true;
-        });
-        <% } %>
+                const row  = document.getElementById('addr-selected-row');
+                const text = document.getElementById('addr-chip-text');
+                if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' — ' + subLine : '');
+                if (row)  row.style.display = 'flex';
 
-        // ── SweetAlert al guardar con éxito ────────────────────────────────────
-        if (new URLSearchParams(window.location.search).get('success') === '1') {
+                const box = document.getElementById('address-validation-result');
+                if (box) {
+                    box.className = 'addr-validation-box addr-validation-box--valid addr-full';
+                    box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
+                }
+                window.addrValid = true;
+            });
+        }
+
+        const _param = new URLSearchParams(window.location.search).get('success');
+        if (_param === '1' || _param === '2') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             Swal.fire({
                 icon: 'success',
-                title: 'Ajustes guardados',
+                title: _param === '1' ? 'Ajustes guardados' : 'Sucursal asignada correctamente',
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',

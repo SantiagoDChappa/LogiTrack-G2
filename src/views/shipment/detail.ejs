@@ -95,6 +95,11 @@
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
                                             <%= mapData.origin.label.toUpperCase() %>
                                         </div>
+                                    <% } else if (h.branch) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
+                                            <%= h.branch.name.toUpperCase() %>
+                                        </div>
                                     <% } else if (_refLocation) { %>
                                         <div class="shipment-timeline-meta">
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
@@ -269,12 +274,22 @@
                     </div>
                 </div>
 
+                <div class="update-card" style="text-align:center;">
+                    <h3><span class="material-symbols-outlined">qr_code</span> Código QR</h3>
+                    <img src="/shipment/<%= shipment.id %>/qr" alt="QR <%= shipment.trackingId %>"
+                         style="width:180px;height:180px;margin:1rem auto;display:block;">
+                    <a href="/shipment/<%= shipment.id %>/label" target="_blank" class="btn-secondary" style="margin-top:0.5rem;display:inline-flex;align-items:center;gap:0.4rem;">
+                        <span class="material-symbols-outlined">print</span>Imprimir Etiqueta
+                    </a>
+                </div>
+
             </div>
             <!-- ══════════ FIN BOTTOM GRID ══════════ -->
 
         </div>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/prediction.js" defer></script>
@@ -314,5 +329,27 @@
     })();
     </script>
     <% } %>
+    <script>
+    (function () {
+        if (new URLSearchParams(window.location.search).get('created') !== 'true') return;
+        const id = '<%= shipment.id %>';
+        const trackingId = '<%= shipment.trackingId %>';
+        const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+        Swal.fire({
+            title: '¡Envío creado!',
+            html: '<p style="margin-bottom:1rem;font-size:0.95rem">Código QR generado para <strong>' + trackingId + '</strong></p>'
+                + '<img src="/shipment/' + id + '/qr" style="width:220px;height:220px;display:block;margin:0 auto;" alt="QR">',
+            showCancelButton: true,
+            confirmButtonText: '<span style="display:flex;align-items:center;gap:6px"><span class="material-symbols-outlined" style="font-size:18px">print</span>Imprimir Etiqueta</span>',
+            cancelButtonText: 'Cerrar',
+            confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+            background: isDark ? '#1e293b' : '#ffffff',
+            color: isDark ? '#f1f5f9' : '#1e293b',
+        }).then(function (result) {
+            if (result.isConfirmed) window.open('/shipment/' + id + '/label', '_blank');
+            history.replaceState(null, '', window.location.pathname);
+        });
+    })();
+    </script>
 </body>
 </html>

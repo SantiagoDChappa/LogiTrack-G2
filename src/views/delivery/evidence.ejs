@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <title>Prueba de Entrega</title>
+    <style>
+        body {
+            background: var(--color-bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: var(--space-6) var(--space-4);
+        }
+
+        .pod-card {
+            width: 100%;
+            max-width: 480px;
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .pod-header {
+            background: var(--color-primary);
+            padding: var(--space-6);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .pod-header .material-symbols-outlined {
+            font-size: 2rem;
+            color: white;
+        }
+
+        .pod-header-text h1 {
+            color: white;
+            font-size: var(--font-size-xl);
+            margin: 0;
+        }
+
+        .pod-header-text p {
+            color: rgba(255,255,255,0.75);
+            font-size: var(--font-size-sm);
+            margin-top: var(--space-1);
+        }
+
+        .pod-body {
+            padding: var(--space-6);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-5);
+        }
+
+        .pod-section {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .pod-section-title {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding-bottom: var(--space-2);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .pod-section-title .material-symbols-outlined {
+            font-size: 1.1rem;
+            color: var(--color-primary);
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
+        }
+
+        /* GPS status */
+        .gps-status {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-3);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-sm);
+            background: var(--color-bg);
+            border: 1.5px solid var(--color-border);
+        }
+
+        .gps-status.success {
+            background: var(--color-success-bg);
+            border-color: var(--color-success);
+            color: var(--color-success);
+        }
+
+        .gps-status.warning {
+            background: var(--color-warning-bg);
+            border-color: var(--color-warning);
+            color: var(--color-warning);
+        }
+
+        .gps-status .material-symbols-outlined {
+            font-size: 1.1rem;
+        }
+
+        /* Foto */
+        .photo-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            width: 100%;
+            padding: var(--space-3) var(--space-4);
+            background: var(--color-bg);
+            border: 1.5px dashed var(--color-border);
+            border-radius: var(--radius-md);
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .photo-btn:hover {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            background: var(--color-primary-light);
+        }
+
+        .photo-btn .material-symbols-outlined {
+            font-size: 1.3rem;
+        }
+
+        #photoPreview {
+            width: 100%;
+            border-radius: var(--radius-md);
+            border: 1.5px solid var(--color-border);
+            display: none;
+        }
+
+        /* Firma */
+        #signatureCanvas {
+            width: 100%;
+            border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-md);
+            background: var(--color-surface);
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        .clear-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            padding: var(--space-2) var(--space-3);
+            background: var(--color-bg);
+            border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-xs);
+            align-self: flex-end;
+            transition: all var(--transition);
+        }
+
+        .clear-btn:hover {
+            border-color: var(--color-danger);
+            color: var(--color-danger);
+        }
+
+        .clear-btn .material-symbols-outlined {
+            font-size: 1rem;
+        }
+
+        /* Botón submit */
+        .submit-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            width: 100%;
+            padding: var(--space-4);
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-base);
+            font-weight: var(--font-weight-semibold);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .submit-btn:hover {
+            background: var(--color-primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn .material-symbols-outlined {
+            font-size: 1.3rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="pod-card">
+
+    <div class="pod-header">
+        <span class="material-symbols-outlined">local_shipping</span>
+        <div class="pod-header-text">
+            <h1>Prueba de Entrega</h1>
+            <p>Completá los datos para confirmar la entrega</p>
+        </div>
+    </div>
+
+    <div class="pod-body">
+        <form method="POST" action="/delivery/evidence/<%= shipmentId %>/pod">
+
+            <!-- Identidad -->
+            <div class="pod-section">
+                <div class="pod-section-title">
+                    <span class="material-symbols-outlined">badge</span>
+                    Datos del receptor
+                </div>
+
+                <div class="form-field">
+                    <label>Nombre</label>
+                    <input type="text" name="receiverName" placeholder="Nombre del receptor" required>
+                </div>
+
+                <div class="form-field">
+                    <label>Apellido</label>
+                    <input type="text" name="receiverLastname" placeholder="Apellido del receptor" required>
+                </div>
+
+                <div class="form-field">
+                    <label>DNI</label>
+                    <input type="text" name="receiverDni" placeholder="Número de documento" required>
+                </div>
+            </div>
+
+            <!-- GPS -->
+            <div class="pod-section">
+                <div class="pod-section-title">
+                    <span class="material-symbols-outlined">location_on</span>
+                    Ubicación
+                </div>
+                <input type="hidden" name="latitude" id="latitude">
+                <input type="hidden" name="longitude" id="longitude">
+                <div class="gps-status" id="gps-status">
+                    <span class="material-symbols-outlined">my_location</span>
+                    <span>Obteniendo ubicación...</span>
+                </div>
+            </div>
+
+            <!-- Foto -->
+            <div class="pod-section">
+                <div class="pod-section-title">
+                    <span class="material-symbols-outlined">photo_camera</span>
+                    Foto del paquete
+                </div>
+                <input type="file" name="photoFile" id="photoFile" accept="image/*" capture="environment" style="display:none;">
+                <input type="hidden" name="photoBase64" id="photoBase64">
+                <button type="button" class="photo-btn" onclick="document.getElementById('photoFile').click()">
+                    <span class="material-symbols-outlined">add_a_photo</span>
+                    Sacar foto del paquete
+                </button>
+                <img id="photoPreview" alt="Preview foto">
+            </div>
+
+            <!-- Firma -->
+            <div class="pod-section">
+                <div class="pod-section-title">
+                    <span class="material-symbols-outlined">draw</span>
+                    Firma del receptor
+                </div>
+                <canvas id="signatureCanvas" width="440" height="160"></canvas>
+                <button type="button" class="clear-btn" id="clearSignature">
+                    <span class="material-symbols-outlined">delete</span>
+                    Limpiar firma
+                </button>
+                <input type="hidden" name="signatureBase64" id="signatureBase64">
+            </div>
+
+            <button type="submit" class="submit-btn">
+                <span class="material-symbols-outlined">check_circle</span>
+                Confirmar entrega
+            </button>
+
+        </form>
+    </div>
+</div>
+
+<script>
+    // GPS
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                document.getElementById('latitude').value = position.coords.latitude;
+                document.getElementById('longitude').value = position.coords.longitude;
+                const el = document.getElementById('gps-status');
+                el.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span>Ubicación obtenida</span>';
+                el.classList.add('success');
+            },
+            () => {
+                const el = document.getElementById('gps-status');
+                el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>No se pudo obtener ubicación</span>';
+                el.classList.add('warning');
+            }
+        );
+    } else {
+        const el = document.getElementById('gps-status');
+        el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>GPS no disponible</span>';
+        el.classList.add('warning');
+    }
+
+    // Foto
+    document.getElementById('photoFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = document.getElementById('photoPreview');
+            img.src = event.target.result;
+            img.style.display = 'block';
+            document.getElementById('photoBase64').value = event.target.result;
+            document.querySelector('.photo-btn').innerHTML = '<span class="material-symbols-outlined">check_circle</span> Foto cargada';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Firma
+    const canvas = document.getElementById('signatureCanvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    function getPos(e) {
+        const r = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / r.width;
+        const scaleY = canvas.height / r.height;
+        const t = e.touches[0];
+        return {
+            x: (t.clientX - r.left) * scaleX,
+            y: (t.clientY - r.top) * scaleY
+        };
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        drawing = true;
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!drawing) return;
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim();
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+    });
+
+    canvas.addEventListener('touchend', () => {
+        drawing = false;
+        document.getElementById('signatureBase64').value = canvas.toDataURL('image/png');
+    });
+
+    document.getElementById('clearSignature').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('signatureBase64').value = '';
+    });
+</script>
+
+</body>
+</html>

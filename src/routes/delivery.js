@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { requireDelivery } = require('../middlewares/auth');
+const { requireAuth, requireDelivery } = require('../middlewares/auth');
 const shipmentModel = require('../models/shipment');
+const deliveryController = require('../controllers/delivery');
 
 router.get('/', requireDelivery, async (req, res) => {
     try {
@@ -15,5 +16,23 @@ router.get('/', requireDelivery, async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+
+router.get('/evidence/:id',
+    requireAuth,
+    requireDelivery,
+    deliveryController.showActionScreen
+);
+
+router.get('/evidence/:id/pod',
+    requireAuth,
+    requireDelivery,
+    deliveryController.showEvidenceForm
+);
+
+router.post('/evidence/:id/pod',
+    requireAuth,
+    requireDelivery,
+    deliveryController.saveEvidence
+);
 
 module.exports = router;
