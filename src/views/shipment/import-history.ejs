@@ -31,7 +31,9 @@
                                 <th>Archivo</th>
                                 <th>Procesadas</th>
                                 <th>Importadas</th>
+                                <th>Duplicados</th>
                                 <th>Errores</th>
+                                <th>Forzado</th>
                                 <th>Estado</th>
                             </tr>
                         </thead>
@@ -47,7 +49,9 @@
                                     <td><%= imp.filename || '-' %></td>
                                     <td><%= imp.totalRows %></td>
                                     <td><%= imp.importedCount %></td>
+                                    <td><%= imp.duplicateCount || 0 %></td>
                                     <td><%= imp.errorCount %></td>
+                                    <td><%= imp.forced ? 'Sí' : 'No' %></td>
                                     <td>
                                         <% if (imp.aborted) { %>
                                             <span class="status-badge cancelado">Abortado</span>
