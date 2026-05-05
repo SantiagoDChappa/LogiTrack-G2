@@ -11,7 +11,8 @@ jest.mock('../src/middlewares/auth', () => ({
     requireAdmin: (req, res, next) => next(),
     requireSupervisor: (req, res, next) => next(),
     requireSupervisorOrOperator: (req, res, next) => next(),
-    requireDelivery: (req, res, next) => next()
+    requireDelivery: (req, res, next) => next(),
+    requireSupervisorOrAdmin: (req, res, next) => next()
 }));
 
 describe('Shipment API Integration', () => {

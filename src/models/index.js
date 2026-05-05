@@ -8,6 +8,7 @@ const { TypeShipment }    = require('./typeShipment');
 const { User }            = require('./user');
 const { Shipment }        = require('./shipment');
 const { ShipmentHistory } = require('./shipmentHistory');
+const { ShipmentImport }  = require('./shipmentImport');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -37,6 +38,10 @@ const safeAssociate = () => {
         }
         if (User) { ShipmentHistory.belongsTo(User, { as: 'user', foreignKey: 'userId' }); }
     }
+
+    if (ShipmentImport.belongsTo && User) {
+        ShipmentImport.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+    }
 };
 
 safeAssociate();
@@ -50,5 +55,6 @@ module.exports = {
     TypeShipment,
     User,
     Shipment,
-    ShipmentHistory
+    ShipmentHistory,
+    ShipmentImport
 };
