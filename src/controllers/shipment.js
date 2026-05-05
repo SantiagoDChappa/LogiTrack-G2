@@ -333,10 +333,9 @@ const getQR = async (req, res) => {
         const { id } = req.params;
         const shipment = await shipmentModel.getById(id);
         if (!shipment) return res.status(404).send('Envío no encontrado');
-        const scanUrl = `${req.protocol}://${req.get('host')}/scan/${shipment.trackingId}`;
+        const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+        const scanUrl = `${appUrl}/scan/${shipment.trackingId}`;
         const buffer = await QRCode.toBuffer(scanUrl, { width: 300, margin: 2 });
-        const appUrl = process.env.APP_URL || 'https://logitrack-prototype.onrender.com';
-        const qrContent = `${appUrl}/delivery/evidence/${shipment.trackingId}`;
         res.setHeader('Content-Type', 'image/png');
         res.send(buffer);
     } catch (err) {

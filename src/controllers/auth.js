@@ -16,36 +16,41 @@ const getLogin = (req, res) => {
 };
 
 const login = async (req, res) => {
-    const {email, password} = req.body;
+    try {
+        const {email, password} = req.body;
 
-    const user = await userModel.findByEmail(email);
-    if(!user){
-        return res.render('login', { error: 'Email o contraseña incorrectos'});
+        const user = await userModel.findByEmail(email);
+        if(!user){
+            return res.render('login', { error: 'Email o contraseña incorrectos'});
+        }
+
+        const match = await bcrypt.compare(password, user.password);
+        if(!match){
+            return res.render('login', { error: 'Email o contraseña incorrectos'});
+        }
+
+        const token = JWT.sign(
+            {id: user.id, email: user.email, roleId: user.roleId, fullName: user.fullName},
+            process.env.JWT_SECRET,
+            {expiresIn: req.body.remember ? '30d' : '8h'}
+        );
+
+        const cookieOptions = {
+            httpOnly: true,
+            sameSite: 'lax',
+            secure:   process.env.NODE_ENV === 'production',
+        };
+        if (req.body.remember) {
+            cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000;
+        }
+        res.cookie('token', token, cookieOptions);
+        const returnTo = req.body.returnTo;
+        const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+        res.redirect(safeReturn || (user.roleId === 3 ? '/delivery' : '/home'));
+    } catch (err) {
+        console.error('Login error:', err.message);
+        res.status(500).render('login', { error: 'Error interno del servidor. Intentá de nuevo.' });
     }
-
-    const match = await bcrypt.compare(password, user.password);
-    if(!match){
-        return res.render('login', { error: 'Email o contraseña incorrectos'});
-    }
-
-    const token = JWT.sign(
-        {id: user.id, email: user.email, roleId: user.roleId, fullName: user.fullName},
-        process.env.JWT_SECRET,
-        {expiresIn: req.body.remember ? '30d' : '8h'}
-    );
-
-    const cookieOptions = {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure:   process.env.NODE_ENV === 'production',
-    };
-    if (req.body.remember) {
-        cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000;
-    }
-    res.cookie('token', token, cookieOptions);
-    const returnTo = req.body.returnTo;
-    const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
-    res.redirect(safeReturn || (user.roleId === 3 ? '/delivery' : '/home'));
 };
 
 const logout = (req, res) => {
