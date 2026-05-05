@@ -1,13 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel } = require('../controllers/shipment.js');
+const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel, showImportForm, processImport, downloadImportReport, showImportHistory, exportShipments } = require('../controllers/shipment.js');
 const { validateShipment, validateUpdateShipment, handleUpdateValidationErrors } = require('../middlewares/shipment.js');
-const { requireAuth, requireSupervisor, requireSupervisorOrOperator } = require('../middlewares/auth.js');
+const { requireAuth, requireSupervisor, requireSupervisorOrOperator, requireAdmin, requireSupervisorOrAdmin } = require('../middlewares/auth.js');
+const { csvUpload } = require('../middlewares/upload.js');
 
 router.get('/', home);
 router.get('/search', searchShipments);
+router.get('/export', requireSupervisorOrAdmin, exportShipments);
 router.get('/new', getNewShipmentForm);
 router.post('/new', validateShipment, createShipment);
+router.get('/import', requireAdmin, showImportForm);
+router.post('/import', requireAdmin, csvUpload.single('csvFile'), processImport);
+router.get('/import/history', requireAdmin, showImportHistory);
+router.get('/import/report/:id', requireAdmin, downloadImportReport);
 router.get('/detail/:id', getDetail);
 router.get('/update/:id', getUpdateShipment);
 router.post('/update/:id', validateUpdateShipment, handleUpdateValidationErrors, updateShipment);

@@ -61,4 +61,16 @@ const requireDelivery = (req, res, next) => {
     next();
 };
 
-module.exports = { requireAuth, requireAdmin, requireSupervisor, requireSupervisorOrOperator, requireDelivery };
+const requireSupervisorOrAdmin = (req, res, next) => {
+    const { RoleType } = require('../constants/enums');
+    const roleId = res.locals.currentUser?.roleId;
+    if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.ADMIN.id) {
+        if (req.path.startsWith('/api/')) {
+            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de supervisor o administrador' });
+        }
+        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor o administrador');
+    }
+    next();
+};
+
+module.exports = { requireAuth, requireAdmin, requireSupervisor, requireSupervisorOrOperator, requireDelivery, requireSupervisorOrAdmin };
