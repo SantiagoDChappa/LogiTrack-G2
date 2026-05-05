@@ -10,9 +10,16 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Administrador de envios</h1>
-            <a href="/shipment/new" class="btn-primary">
-                <span class="material-symbols-outlined">add</span>Alta
-            </a>
+            <div class="page-header__actions">
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/shipment/export" class="btn-secondary" download>
+                        <span class="material-symbols-outlined">download</span>Exportar CSV
+                    </a>
+                <% } %>
+                <a href="/shipment/new" class="btn-primary">
+                    <span class="material-symbols-outlined">add</span>Alta
+                </a>
+            </div>
         </div>
 
         <div class="shipments-wrapper">

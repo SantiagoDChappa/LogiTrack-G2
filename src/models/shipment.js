@@ -71,7 +71,7 @@ const create = async (data) => {
     const trackingId = await generateTrackingId();
     return Shipment.create({
         trackingId,
-        statusId:       1,
+        statusId:       data.statusId || 1,
         senderId:       data.senderId,
         recipientId:    data.recipientId,
         addressId:      data.addressId,
