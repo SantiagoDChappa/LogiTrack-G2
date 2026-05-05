@@ -74,6 +74,6 @@ module.exports = {
     Shipment,
     ShipmentHistory,
     DeliveryEvidence,
-    FailedAttempt
+    FailedAttempt,
     ShipmentImport
 };
