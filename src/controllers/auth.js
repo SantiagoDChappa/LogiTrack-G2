@@ -11,7 +11,8 @@ const getLogin = (req, res) => {
             res.clearCookie('token');
         }
     }
-    return res.render('login');
+    const returnTo = req.query.returnTo || '';
+    return res.render('login', { returnTo });
 };
 
 const login = async (req, res) => {
@@ -42,7 +43,9 @@ const login = async (req, res) => {
         cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000;
     }
     res.cookie('token', token, cookieOptions);
-    res.redirect(user.roleId === 3 ? '/delivery' : '/home');
+    const returnTo = req.body.returnTo;
+    const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+    res.redirect(safeReturn || (user.roleId === 3 ? '/delivery' : '/home'));
 };
 
 const logout = (req, res) => {

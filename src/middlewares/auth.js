@@ -4,7 +4,8 @@ const requireAuth = (req, res, next) => {
     const token = req.cookies.token;
 
     if (!token) {
-        return res.status(401).redirect('/login');
+        const returnTo = req.originalUrl;
+        return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
 
     try {
@@ -12,7 +13,8 @@ const requireAuth = (req, res, next) => {
         res.locals.currentUser = decoded;
         next();
     } catch {
-        return res.status(401).redirect('/login');
+        const returnTo = req.originalUrl;
+        return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
 };
 

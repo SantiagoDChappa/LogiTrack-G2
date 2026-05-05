@@ -25,6 +25,7 @@ const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const authRoutes        = require('./src/routes/auth');
 const deliveryRoutes = require('./src/routes/delivery');
+const scanRoutes     = require('./src/routes/scan');
 const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
 
@@ -46,8 +47,8 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'src', 'views'));
 
 app.use(express.static('public'));
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: false, limit: '20mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
 
 // Rutas Publicas
@@ -70,6 +71,7 @@ app.use('/api/validate-address',  requireAuth, apiValidateAddressRoutes);
 app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/delivery', requireAuth, deliveryRoutes);
+app.use('/scan',     requireAuth, scanRoutes);
 
 ;
 app.use('/api/persons',personRoutes);

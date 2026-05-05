@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>Escaneo de Envío - LogiTrack</title>
+    <style>
+        .scan-wrapper { max-width: 520px; margin: 0 auto; }
+        .scan-btn { display: flex; align-items: center; justify-content: center; gap: var(--space-2); width: 100%; padding: var(--space-4); border: none; border-radius: var(--radius-md); font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); cursor: pointer; transition: opacity var(--transition); -webkit-tap-highlight-color: transparent; font-family: var(--font-family); }
+        .scan-btn:active { opacity: 0.75; }
+        .scan-btn--transit { background: var(--color-primary);  color: var(--color-text-inverse); }
+        .scan-btn--branch  { background: var(--badge-warehouse-text); color: #fff; }
+        .scan-btn--deliver { background: var(--color-success);  color: #fff; }
+        .scan-btn .material-symbols-outlined { font-size: 1.3rem; }
+        .scan-actions-label { font-size: var(--font-size-xs); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: var(--font-weight-semibold); margin-bottom: var(--space-3); }
+        .scan-alert { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); font-size: var(--font-size-sm); margin-bottom: var(--space-4); }
+        .scan-alert--error   { background: var(--color-danger-bg);  border: 1px solid var(--color-danger);  color: var(--color-danger); }
+        .scan-alert--success { background: var(--color-success-bg); border: 1px solid var(--color-success); color: var(--color-success); }
+        .scan-alert .material-symbols-outlined { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+        .scan-final { text-align: center; color: var(--color-text-muted); font-size: var(--font-size-sm); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) 0; }
+        .scan-final .material-symbols-outlined { font-size: 2.5rem; }
+        .detail-field { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+        .detail-field:last-child { border-bottom: none; }
+        .detail-label { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+        .detail-value { font-size: var(--font-size-sm); color: var(--color-text); font-weight: var(--font-weight-medium); }
+        .scan-status-row { display: flex; align-items: center; justify-content: space-between; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Escaneo de envío</h1>
+            <a href="/delivery" class="btn-secondary">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Mis envíos
+            </a>
+        </div>
+
+        <div class="page-update-wrapper">
+            <div class="scan-wrapper">
+
+                <% if (error) { %>
+                    <div class="scan-alert scan-alert--error">
+                        <span class="material-symbols-outlined">error</span>
+                        <span><%= error %></span>
+                    </div>
+
+                <% } else { %>
+                    <% if (success) { %>
+                        <div class="scan-alert scan-alert--success">
+                            <span class="material-symbols-outlined">check_circle</span>
+                            <span>Estado actualizado correctamente.</span>
+                        </div>
+                    <% } %>
+
+                    <%
+                        const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                        const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',en_sucursal:'En Sucursal'};
+                        const _slL = _sl[_sk] || shipment.status.description;
+                        const isFinal = shipment.statusId === 4 || shipment.statusId === 5;
+                    %>
+
+                    <!-- Info del envío -->
+                    <div class="update-card" style="margin-bottom: var(--space-5);">
+                        <h3><span class="material-symbols-outlined">inventory_2</span> Información del envío</h3>
+                        <div class="detail-field">
+                            <span class="detail-label">Tracking ID</span>
+                            <span class="detail-value" style="font-size: 1.1rem; font-weight: 700; letter-spacing: 1px;"><%= shipment.trackingId %></span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-label">Destinatario</span>
+                            <span class="detail-value"><%= shipment.recipient.fullName %></span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-label">Dirección</span>
+                            <span class="detail-value"><%= shipment.address.street %> <%= shipment.address.number %><% if (shipment.address.province) { %>, <%= shipment.address.province.description %><% } %></span>
+                        </div>
+                        <div class="detail-field" style="border-bottom: none;">
+                            <span class="detail-label">Estado actual</span>
+                            <span class="detail-value"><span class="status-badge <%= _sk %>"><%= _slL %></span></span>
+                        </div>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="update-card">
+                        <h3><span class="material-symbols-outlined">swap_horiz</span> Registrar acción</h3>
+
+                        <% if (isFinal) { %>
+                            <div class="scan-final">
+                                <span class="material-symbols-outlined">lock</span>
+                                <span>Este envío está en estado final y no puede modificarse.</span>
+                            </div>
+                        <% } else if (transitions.length === 0) { %>
+                            <div class="scan-final">
+                                <span class="material-symbols-outlined">info</span>
+                                <span>No hay acciones disponibles para este estado.</span>
+                            </div>
+                        <% } else { %>
+                            <p class="scan-actions-label">¿Qué querés registrar?</p>
+                            <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+                                <% transitions.forEach(function(t) { %>
+                                    <%
+                                        const btnClass = t.id === 2 ? 'scan-btn--transit'
+                                                       : t.id === 3 ? 'scan-btn--branch'
+                                                       : 'scan-btn--deliver';
+                                        const btnIcon  = t.id === 2 ? 'local_shipping'
+                                                       : t.id === 3 ? 'store'
+                                                       : 'check_circle';
+                                    %>
+                                    <form method="POST" action="/scan/<%= shipment.trackingId %>" onsubmit="return confirmAction(this)">
+                                        <input type="hidden" name="newStatusId" value="<%= t.id %>">
+                                        <button type="submit" class="scan-btn <%= btnClass %>">
+                                            <span class="material-symbols-outlined"><%= btnIcon %></span>
+                                            <%= t.label %>
+                                        </button>
+                                    </form>
+                                <% }) %>
+                            </div>
+                        <% } %>
+                    </div>
+                <% } %>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        function confirmAction(form) {
+            var btn    = form.querySelector('button');
+            var label  = btn.querySelector('.material-symbols-outlined').nextSibling.textContent.trim();
+            var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+
+            Swal.fire({
+                title: '¿Confirmás?',
+                html: '<span style="font-size:0.95rem">Vas a registrar: <strong>' + label + '</strong></span>',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Confirmar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+                reverseButtons: true,
+            }).then(function(result) {
+                if (result.isConfirmed) form.submit();
+            });
+
+            return false;
+        }
+    </script>
+</body>
+</html>

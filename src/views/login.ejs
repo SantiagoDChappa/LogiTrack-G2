@@ -25,6 +25,9 @@
 
             <!-- Formulario -->
             <form class="login-form" action="/login" method="post">
+                <% if (locals.returnTo) { %>
+                <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                <% } %>
 
                 <div class="login-field">
                     <label for="user-email">Correo electrónico</label>
@@ -65,6 +68,7 @@
                     <a href="#" class="login-forgot">¿Olvidaste tu contraseña?</a>
                 </div>
 
+                <input type="hidden" name="returnTo" value="<%= locals.returnTo || '' %>">
                 <button type="submit" class="login-btn">Ingresar</button>
 
             </form>

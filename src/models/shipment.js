@@ -226,6 +226,27 @@ const update = async (data) => {
     return shipment;
 };
 
+const getByTrackingId = (trackingId) => {
+    const { Person }       = require('./person');
+    const { Status }       = require('./status');
+    const { Address }      = require('./address');
+    const { Province }     = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { User }         = require('./user');
+
+    return Shipment.findOne({
+        where: { trackingId },
+        include: [
+            { model: Person, as: 'sender' },
+            { model: Person, as: 'recipient' },
+            { model: Status, as: 'status' },
+            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: TypeShipment, as: 'shipmentType' },
+            { model: User, as: 'deliveryUser', required: false }
+        ]
+    });
+};
+
 const updateStatus = (id, newStatusId) => Shipment.update({ statusId: newStatusId }, { where: { id } });
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate };
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId };
