@@ -42,7 +42,7 @@ const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventTy
         latitude:     latitude  !== null && latitude  !== undefined ? latitude  : null,
         longitude:    longitude !== null && longitude !== undefined ? longitude : null,
         changedAt:    new Date()
-    }, { transaction }));
+    }));
 };
 
 const getByShipmentId = (shipmentId) => {
