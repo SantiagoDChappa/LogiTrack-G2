@@ -50,7 +50,7 @@
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
-                const _slU = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _slU = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                 const _slLabel = _slU[_sk] || shipment.status.description;
             %>
 
@@ -180,8 +180,6 @@
             <div class="update-bottom-grid">
 
                 <form id="main-update-form" style="display:contents" action="/shipment/update/<%= shipment.id %>" method="post">
-                    <input type="hidden" name="newStatusId" id="hidden-new-status-id">
-                    <input type="hidden" name="statusComment" id="hidden-status-comment">
 
                     <div class="update-card" style="grid-area:destinatario">
                         <h3>Destinatario</h3>
@@ -284,29 +282,37 @@
                         </div>
                     </div>
 
-                    <div class="update-card" style="grid-area:repartidor">
-                        <h3>Asignar Repartidor</h3>
-                        <% if (shipment.deliveryUser) { %>
-                            <p style="margin-bottom:var(--space-3);color:var(--color-text-secondary);font-size:var(--font-size-sm);">Repartidor actual: <strong style="color:var(--color-text)"><%= shipment.deliveryUser.fullName %></strong></p>
-                        <% } else { %>
-                            <p style="margin-bottom:var(--space-3);color:var(--color-text-secondary);font-size:var(--font-size-sm);">Sin repartidor asignado</p>
-                        <% } %>
-                        <div class="field">
-                            <label for="deliveryUserId">Seleccionar Repartidor</label>
-                            <select name="deliveryUserId" id="deliveryUserId" <%= !canEditDelivery ? 'disabled' : '' %>>
-                                <option value="">-- Sin asignar --</option>
-                                <% deliveryUsers.forEach(user => { %>
-                                    <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
-                                        <%= user.fullName %>
-                                    </option>
-                                <% }) %>
-                            </select>
-                        </div>
-                    </div>
 
                 </form>
 
-                <!-- Gestión de estado -->
+                <!-- Modal asignar repartidor (LGT-109) -->
+                <div id="assign-modal" class="app-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="assign-modal-title">
+                    <div class="app-modal">
+                        <h3 id="assign-modal-title">
+                            <span class="material-symbols-outlined">person_add</span>
+                            Asignar repartidor
+                        </h3>
+                        <form action="/shipment/update/<%= shipment.id %>/assign" method="post" id="assign-modal-form">
+                            <div class="field">
+                                <label for="modal-deliveryUserId">Seleccionar repartidor</label>
+                                <select name="deliveryUserId" id="modal-deliveryUserId" required>
+                                    <option value="">-- Elegir repartidor --</option>
+                                    <% deliveryUsers.forEach(user => { %>
+                                        <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
+                                            <%= user.fullName %>
+                                        </option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="app-modal-actions">
+                                <button type="button" class="btn-secondary" id="btn-close-assign-modal">Cancelar</button>
+                                <button type="submit" class="btn-primary">Confirmar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Gestión de estado: flujo dinámico (LGT-109) -->
                 <div class="gestion-estado" style="grid-area:gestion">
                     <h3>Gestión de Estado</h3>
 
@@ -314,59 +320,70 @@
                         ESTADO ACTUAL: <%= shipment.status.description.toUpperCase() %>
                     </div>
 
-                    <div class="timeline-track">
-                        <% const currentId = shipment.statusId; %>
-                        <% statuses.forEach(function(s, idx) { %>
-                            <%
-                                var isDone      = s.id < currentId && currentId !== 5;
-                                var isCurrent   = s.id === currentId;
-                                var isCancel    = s.id === 5;
-                                var isFilled    = (currentId !== 5 && s.id <= currentId) || (currentId === 5 && s.id === 5);
-                                var isClickable = isSupervisor && (
-                                    (!isCancel && s.id === currentId + 1 && currentId < 4 && currentId !== 5) ||
-                                    (isCancel && currentId >= 1 && currentId <= 3)
-                                );
-                                var stateClass  = isDone ? 'done' : (isCurrent ? 'active' : 'pending');
-                            %>
-                            <% if (idx > 0) { %>
-                                <div class="timeline-connector <%= isFilled ? 'filled' : '' %>"></div>
-                            <% } %>
-                            <div class="timeline-step">
-                                <button
-                                    type="button"
-                                    class="timeline-dot status-dot-<%= s.id %> <%= stateClass %>"
-                                    <% if (isClickable) { %>data-clickable data-status-id="<%= s.id %>" data-status-name="<%= s.description %>"<% } %>
-                                    <% if (!isClickable) { %>disabled<% } %>
-                                >
-                                    <% if (isDone) { %><span class="material-symbols-outlined">check</span><% } %>
-                                    <% if (isCurrent && isCancel) { %><span class="material-symbols-outlined">close</span><% } %>
-                                </button>
-                                <span class="timeline-label"><%= s.description %></span>
-                            </div>
-                        <% }) %>
-                    </div>
-
-                    <div id="status-confirm-panel" class="status-confirm-panel" style="display:none;">
-                        <p class="confirm-title">Confirmar nuevo estado: <strong id="confirm-status-name"></strong></p>
-                        <input type="hidden" id="confirm-status-id">
-                        <textarea id="status-comment-input" placeholder="Describa el motivo del cambio de estado..." rows="3"></textarea>
-                        <div class="confirm-actions">
-                            <button type="button" id="btn-cancel-confirm" class="btn-secondary btn-sm">Cancelar</button>
-                            <button type="button" id="btn-confirm-status" class="btn-primary btn-sm">Confirmar cambio</button>
+                    <% const isTerminal = [4, 5, 8].includes(shipment.statusId); %>
+                    <% if (isTerminal) { %>
+                        <div class="status-info-message" style="background-color:#e5e7eb;border:1px solid #9ca3af;border-radius:4px;padding:12px;margin-top:16px;color:#374151;font-size:0.9rem;">
+                            <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">flag</span>
+                            Este envío está en estado final. No se admiten más cambios.
                         </div>
-                    </div>
+                    <% } else if (!availableActions || availableActions.length === 0) { %>
+                        <div class="status-info-message" style="background-color:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:12px;margin-top:16px;color:#92400e;font-size:0.9rem;">
+                            <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">info</span>
+                            No hay acciones disponibles para tu rol en este estado.
+                        </div>
+                    <% } else { %>
+                        <%
+                            const _actionIcons = {
+                                6: 'person_add', 7: 'play_arrow', 2: 'local_shipping',
+                                3: 'store', 4: 'check_circle', 5: 'cancel',
+                                8: 'report', 9: 'warning'
+                            };
+                        %>
+                        <div class="dynamic-actions">
+                            <% availableActions.forEach(function(action) { %>
+                                <% const url = action.endpoint.replace(':id', shipment.id); %>
+                                <% const icon = _actionIcons[action.toStatusId] || 'arrow_forward'; %>
+                                <% const isAssign = url.includes('/assign'); %>
+                                <% if (isAssign) { %>
+                                    <button type="button" class="action-btn-dyn action-btn-status-<%= action.toStatusId %>" id="btn-open-assign-modal">
+                                        <span class="material-symbols-outlined"><%= icon %></span>
+                                        <%= action.label %>
+                                    </button>
+                                <% } else if (action.requireComment) { %>
+                                    <button type="button" class="action-btn-dyn action-btn-status-<%= action.toStatusId %> action-with-comment"
+                                            data-endpoint="<%= url %>"
+                                            data-label="<%= action.label %>">
+                                        <span class="material-symbols-outlined"><%= icon %></span>
+                                        <%= action.label %>
+                                    </button>
+                                <% } else { %>
+                                    <form action="<%= url %>" method="post" style="margin:0;">
+                                        <button type="submit" class="action-btn-dyn action-btn-status-<%= action.toStatusId %>">
+                                            <span class="material-symbols-outlined"><%= icon %></span>
+                                            <%= action.label %>
+                                        </button>
+                                    </form>
+                                <% } %>
+                            <% }) %>
+                        </div>
 
-                    <% if (!isSupervisor) { %>
-                    <div class="status-info-message" style="background-color:var(--color-warning-bg,#fef3c7);border:1px solid var(--color-warning,#f59e0b);border-radius:4px;padding:12px;margin-top:16px;color:var(--color-warning-text,#92400e);font-size:0.9rem;">
-                        <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">info</span>
-                        Solo los supervisores pueden cambiar el estado del envío.
-                    </div>
+                        <div id="comment-modal" class="app-modal-backdrop" role="dialog" aria-modal="true">
+                            <div class="app-modal">
+                                <h3 id="comment-modal-title"></h3>
+                                <form id="comment-modal-form" method="post" action="">
+                                    <div class="field" style="margin-bottom:12px;">
+                                        <label for="comment-modal-input">Motivo</label>
+                                        <textarea name="comment" id="comment-modal-input" rows="4" required minlength="3"
+                                                  placeholder="Motivo obligatorio..."></textarea>
+                                    </div>
+                                    <div class="app-modal-actions">
+                                        <button type="button" class="btn-secondary" id="comment-modal-cancel">Cancelar</button>
+                                        <button type="submit" class="btn-primary">Confirmar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     <% } %>
-
-                    <div id="pending-status-badge" style="display:none;" class="pending-status-badge">
-                        Cambio de estado pendiente: <strong id="pending-status-name"></strong>
-                        <button type="button" id="btn-undo-status" class="btn-secondary btn-sm">Deshacer</button>
-                    </div>
                 </div>
 
             </div>
@@ -380,42 +397,44 @@
     </main>
 
     <script>
-        document.querySelectorAll('.timeline-dot[data-clickable]').forEach(function(dot) {
-            dot.addEventListener('click', function() {
-                var panel = document.getElementById('status-confirm-panel');
-                document.getElementById('confirm-status-id').value = this.dataset.statusId;
-                document.getElementById('confirm-status-name').textContent = this.dataset.statusName;
-                document.getElementById('status-comment-input').value = '';
-                panel.style.display = 'flex';
+        (function() {
+            // ── Modal motivo (cancelar, paquete fallido, etc.) ──
+            var cModal  = document.getElementById('comment-modal');
+            var cForm   = document.getElementById('comment-modal-form');
+            var cTitle  = document.getElementById('comment-modal-title');
+            var cInput  = document.getElementById('comment-modal-input');
+            var cCancel = document.getElementById('comment-modal-cancel');
+
+            document.querySelectorAll('.action-with-comment').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    if (!cModal) return;
+                    cForm.action = this.dataset.endpoint;
+                    cTitle.textContent = this.dataset.label;
+                    cInput.value = '';
+                    cModal.classList.add('is-open');
+                });
             });
-        });
+            if (cCancel) cCancel.addEventListener('click', function() { cModal.classList.remove('is-open'); });
+            if (cModal)  cModal.addEventListener('click', function(e) { if (e.target === cModal) cModal.classList.remove('is-open'); });
 
-        document.getElementById('btn-cancel-confirm').addEventListener('click', function() {
-            document.getElementById('status-confirm-panel').style.display = 'none';
-        });
+            // ── Modal asignar repartidor ──
+            var aModal  = document.getElementById('assign-modal');
+            var aOpen   = document.getElementById('btn-open-assign-modal');
+            var aClose  = document.getElementById('btn-close-assign-modal');
 
-        document.getElementById('btn-confirm-status').addEventListener('click', function() {
-            var statusId   = document.getElementById('confirm-status-id').value;
-            var statusName = document.getElementById('confirm-status-name').textContent;
-            var comment    = document.getElementById('status-comment-input').value;
-            document.getElementById('hidden-new-status-id').value  = statusId;
-            document.getElementById('hidden-status-comment').value = comment;
-            document.getElementById('pending-status-name').textContent = statusName;
-            document.getElementById('pending-status-badge').style.display = 'flex';
-            document.getElementById('status-confirm-panel').style.display = 'none';
-        });
+            if (aOpen && aModal)  aOpen.addEventListener('click',  function() { aModal.classList.add('is-open'); });
+            if (aClose)           aClose.addEventListener('click',  function() { aModal.classList.remove('is-open'); });
+            if (aModal)           aModal.addEventListener('click',  function(e) { if (e.target === aModal) aModal.classList.remove('is-open'); });
+        })();
 
-        document.getElementById('btn-undo-status').addEventListener('click', function() {
-            document.getElementById('hidden-new-status-id').value  = '';
-            document.getElementById('hidden-status-comment').value = '';
-            document.getElementById('pending-status-badge').style.display = 'none';
-        });
-
-        // Prevenir doble submit
-        document.getElementById('main-update-form').addEventListener('submit', function() {
-            var btn = document.getElementById('btn-save-changes');
-            if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
-        });
+        // Prevenir doble submit del form de datos.
+        var mainForm = document.getElementById('main-update-form');
+        if (mainForm) {
+            mainForm.addEventListener('submit', function() {
+                var btn = document.getElementById('btn-save-changes');
+                if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+            });
+        }
     </script>
 
     <% if (mapData && mapData.destination) { %>

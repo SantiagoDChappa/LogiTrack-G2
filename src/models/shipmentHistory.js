@@ -28,7 +28,7 @@ const withSchemaSelfHeal = async (op) => {
     }
 };
 
-const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId }) => {
+const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId, transaction } = {}) => {
     return withSchemaSelfHeal(() => ShipmentHistory.create({
         shipmentId,
         fromStatusId: fromStatusId || null,
@@ -38,7 +38,7 @@ const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventTy
         eventType:    eventType || 'STATUS_CHANGE',
         branchId:     branchId  || null,
         changedAt:    new Date()
-    }));
+    }, { transaction }));
 };
 
 const getByShipmentId = (shipmentId) => {

@@ -8,7 +8,12 @@ INSERT INTO "logitrack"."status" ("id", "description") VALUES
     (2, 'En Transito'),
     (3, 'En Sucursal'),
     (4, 'Entregado'),
-    (5, 'Cancelado');
+    (5, 'Cancelado'),
+    (6, 'Asignado'),
+    (7, 'En Preparacion'),
+    (8, 'Paquete Fallido'),
+    (9, 'Intento Fallido')
+ON CONFLICT ("id") DO NOTHING;
 
 -- personTypes
 INSERT INTO "logitrack"."personType" ("id", "description") VALUES
