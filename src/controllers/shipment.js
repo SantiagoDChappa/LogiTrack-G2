@@ -17,6 +17,22 @@ const csvImport            = require('../services/csvImport');
 const csvExport            = require('../services/csvExport');
 const shipmentImportModel  = require('../models/shipmentImport');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
+const stateMachine         = require('../services/shipmentStateMachine');
+
+const renderStateMachineError = (err, res, redirectUrl) => {
+    if (err && err.name === 'StateMachineError') {
+        const map = {
+            INVALID_TRANSITION: 422,
+            FORBIDDEN_ROLE:     403,
+            COMMENT_REQUIRED:   400,
+            SHIPMENT_NOT_FOUND: 404,
+        };
+        const status = map[err.code] || 400;
+        const qs = `smError=${encodeURIComponent(err.code)}&smMsg=${encodeURIComponent(err.message)}`;
+        return res.status(status).redirect(`${redirectUrl}?${qs}`);
+    }
+    return null;
+};
 
 const home = async (req, res) => {
     const statuses = await statusModel.getAll();
@@ -213,8 +229,10 @@ const getUpdateShipment = async (req, res) => {
   };
 
   const returnUrl = req.query.from || '/shipment';
-  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(res.locals.currentUser?.roleId);
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus });
+  const currentUser = res.locals.currentUser;
+  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
+  const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
+  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
 };
 
 const updateShipment = async (req, res) => {
@@ -353,13 +371,99 @@ const updateShipmentStatus = async (req, res) => {
 
 const assignDelivery = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { id }             = req.params;
         const { deliveryUserId } = req.body;
-        await shipmentModel.update({ id, deliveryUserId: deliveryUserId || null });
+        const currentUser        = res.locals.currentUser;
+
+        await stateMachine.assignDelivery({
+            shipmentId: Number(id),
+            deliveryUserId: deliveryUserId || null,
+            actor: currentUser,
+        });
+
+        const fresh = await shipmentModel.getById(id);
+        const newStatus = await statusModel.getById(fresh.statusId);
+        if (newStatus) { notifyStatusChange(fresh, newStatus.description); }
+
         res.redirect(`/shipment/update/${id}?success=3`);
     } catch (err) {
+        const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
+        if (handled) { return; }
         console.error('ERROR assignDelivery:', err.message);
         res.status(500).send('Error interno al asignar repartidor');
+    }
+};
+
+const prepareShipment = async (req, res) => {
+    try {
+        const { id }      = req.params;
+        const currentUser = res.locals.currentUser;
+
+        await stateMachine.transition({
+            shipmentId: Number(id),
+            toStatusId: Status.IN_PREPARATION.id,
+            actor: currentUser,
+        });
+
+        const fresh = await shipmentModel.getById(id);
+        notifyStatusChange(fresh, Status.IN_PREPARATION.description);
+
+        res.redirect(`/shipment/update/${id}?success=4`);
+    } catch (err) {
+        const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
+        if (handled) { return; }
+        console.error('ERROR prepareShipment:', err.message);
+        res.status(500).send('Error interno al iniciar preparación');
+    }
+};
+
+const cancelShipment = async (req, res) => {
+    try {
+        const { id }      = req.params;
+        const { comment } = req.body;
+        const currentUser = res.locals.currentUser;
+
+        await stateMachine.transition({
+            shipmentId: Number(id),
+            toStatusId: Status.CANCELLED.id,
+            actor: currentUser,
+            comment,
+        });
+
+        const fresh = await shipmentModel.getById(id);
+        notifyStatusChange(fresh, Status.CANCELLED.description);
+
+        res.redirect(`/shipment/update/${id}?success=5`);
+    } catch (err) {
+        const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
+        if (handled) { return; }
+        console.error('ERROR cancelShipment:', err.message);
+        res.status(500).send('Error interno al cancelar envío');
+    }
+};
+
+const markPackageFailed = async (req, res) => {
+    try {
+        const { id }      = req.params;
+        const { comment } = req.body;
+        const currentUser = res.locals.currentUser;
+
+        await stateMachine.transition({
+            shipmentId: Number(id),
+            toStatusId: Status.PACKAGE_FAILED.id,
+            actor: currentUser,
+            comment,
+        });
+
+        const fresh = await shipmentModel.getById(id);
+        notifyStatusChange(fresh, Status.PACKAGE_FAILED.description);
+
+        res.redirect(`/shipment/update/${id}?success=6`);
+    } catch (err) {
+        const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
+        if (handled) { return; }
+        console.error('ERROR markPackageFailed:', err.message);
+        res.status(500).send('Error interno al marcar paquete fallido');
     }
 };
 
@@ -516,4 +620,4 @@ const exportShipments = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments };
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments };

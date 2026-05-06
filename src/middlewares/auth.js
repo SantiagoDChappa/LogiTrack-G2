@@ -31,11 +31,12 @@ const requireAdmin = (req, res, next) => {
 
 const requireSupervisor = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
-    if (res.locals.currentUser?.roleId !== RoleType.ADMIN.id) {
+    const roleId = res.locals.currentUser?.roleId;
+    if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.ADMIN.id) {
         if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de administrador' });
+            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de supervisor' });
         }
-        return res.status(403).send('Acceso denegado: se requieren permisos de administrador');
+        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor');
     }
     next();
 };

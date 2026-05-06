@@ -18,7 +18,7 @@
             <h1>Detalle de Envío</h1>
             <div style="display:flex;gap:var(--space-3)">
                 <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
-                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && shipment.statusId !== 3 && shipment.statusId !== 4 && shipment.statusId !== 5) { %>
+                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
                 <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="btn-primary">
                     <span class="material-symbols-outlined">edit</span>Modificar
                 </a>
@@ -30,7 +30,7 @@
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
-                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                 const _slLabel = _sl[_sk] || shipment.status.description;
             %>
 
@@ -50,7 +50,7 @@
                     <p class="historial-empty">Sin eventos registrados.</p>
                 <% } else { %>
                     <%
-                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                         function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         const _refLocation = [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || null;
                     %>

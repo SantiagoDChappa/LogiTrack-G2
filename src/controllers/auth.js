@@ -43,8 +43,9 @@ const login = async (req, res) => {
         cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000;
     }
     res.cookie('token', token, cookieOptions);
-    const returnTo = req.body.returnTo;
-    const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+    const rawReturn = req.body.returnTo;
+    const returnTo  = typeof rawReturn === 'string' ? rawReturn : (Array.isArray(rawReturn) ? rawReturn[0] : null);
+    const safeReturn = typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
     res.redirect(safeReturn || (user.roleId === 3 ? '/delivery' : '/home'));
 };
 

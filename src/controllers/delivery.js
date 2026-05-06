@@ -1,5 +1,5 @@
 const { DeliveryEvidence, Shipment } = require('../models');
-const shipmentHistoryModel = require('../models/shipmentHistory');
+const stateMachine = require('../services/shipmentStateMachine');
 const { Status } = require('../constants/enums');
 
 const showEvidenceForm = async (req, res) => {
@@ -47,6 +47,14 @@ const saveEvidence = async (req, res) => {
             signatureBase64
         } = req.body;
 
+        if (!stateMachine.canTransition({
+            fromStatusId: shipment.statusId,
+            toStatusId:   Status.DELIVERED.id,
+            actorRoleId:  res.locals.currentUser?.roleId,
+        })) {
+            return res.status(422).send('No se puede confirmar entrega desde el estado actual.');
+        }
+
         await DeliveryEvidence.create({
             shipmentId: shipment.id,
             receiverName,
@@ -70,11 +78,6 @@ const saveEvidence = async (req, res) => {
             latitude:     Number.isFinite(podLat) ? podLat : null,
             longitude:    Number.isFinite(podLng) ? podLng : null,
         });
-
-        await Shipment.update(
-            { statusId: Status.DELIVERED.id },
-            { where: { id: shipment.id } }
-        );
 
         res.redirect('/delivery?delivered=true');
 

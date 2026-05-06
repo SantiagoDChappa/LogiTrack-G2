@@ -672,6 +672,10 @@
 .status-badge.cancelada    { background-color: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text);  }
 .status-badge.en_sucursal  { background-color: var(--badge-warehouse-bg);  color: var(--badge-warehouse-text);  }
 .status-badge.inicial      { background-color: var(--badge-initial-bg);    color: var(--badge-initial-text);    }
+.status-badge.asignado        { background-color: var(--badge-assigned-bg);        color: var(--badge-assigned-text);        }
+.status-badge.en_preparacion  { background-color: var(--badge-preparing-bg);       color: var(--badge-preparing-text);       }
+.status-badge.paquete_fallido { background-color: var(--badge-package-failed-bg);  color: var(--badge-package-failed-text);  }
+.status-badge.intento_fallido { background-color: var(--badge-failed-attempt-bg);  color: var(--badge-failed-attempt-text);  }
 
 .detail-wrapper {
   padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
@@ -1051,6 +1055,10 @@
 .timeline-dot.status-dot-3 { --dot-solid: #7c3aed; --dot-bg: var(--badge-warehouse-bg);  --dot-text: var(--badge-warehouse-text); }
 .timeline-dot.status-dot-4 { --dot-solid: #16a34a; --dot-bg: var(--badge-delivered-bg);  --dot-text: var(--badge-delivered-text); }
 .timeline-dot.status-dot-5 { --dot-solid: #dc2626; --dot-bg: var(--badge-cancelled-bg);  --dot-text: var(--badge-cancelled-text); }
+.timeline-dot.status-dot-6 { --dot-solid: #0891b2; --dot-bg: var(--badge-assigned-bg);       --dot-text: var(--badge-assigned-text);       }
+.timeline-dot.status-dot-7 { --dot-solid: #ea580c; --dot-bg: var(--badge-preparing-bg);      --dot-text: var(--badge-preparing-text);      }
+.timeline-dot.status-dot-8 { --dot-solid: #be123c; --dot-bg: var(--badge-package-failed-bg); --dot-text: var(--badge-package-failed-text); }
+.timeline-dot.status-dot-9 { --dot-solid: #ca8a04; --dot-bg: var(--badge-failed-attempt-bg); --dot-text: var(--badge-failed-attempt-text); }
 
 /* Estado activo: relleno sólido con el color del estado */
 .timeline-dot.active {
@@ -1272,6 +1280,136 @@
 .shipment-timeline-dot.retrasado    { background: var(--badge-delayed-bg);    color: var(--badge-delayed-text); }
 .shipment-timeline-dot.cancelado,
 .shipment-timeline-dot.cancelada    { background: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text); }
+.shipment-timeline-dot.asignado        { background: var(--badge-assigned-bg);        color: var(--badge-assigned-text); }
+.shipment-timeline-dot.en_preparacion  { background: var(--badge-preparing-bg);       color: var(--badge-preparing-text); }
+.shipment-timeline-dot.paquete_fallido { background: var(--badge-package-failed-bg);  color: var(--badge-package-failed-text); }
+.shipment-timeline-dot.intento_fallido { background: var(--badge-failed-attempt-bg);  color: var(--badge-failed-attempt-text); }
+
+/* ─── Botones acción dinámica (LGT-109) ─────────────────────────── */
+.dynamic-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+}
+.dynamic-actions form { margin: 0; }
+.action-btn-dyn {
+    --btn-bg:   var(--color-primary, #2563eb);
+    --btn-text: #fff;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius-md, 8px);
+    font-family: inherit;
+    font-size: var(--font-size-sm, 0.9rem);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    background: linear-gradient(180deg, var(--btn-bg) 0%, color-mix(in srgb, var(--btn-bg) 88%, #000 12%) 100%);
+    color: var(--btn-text);
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), inset 0 -2px 0 rgba(0,0,0,.10);
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+.action-btn-dyn:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,.18); filter: brightness(1.05); }
+.action-btn-dyn:active { transform: translateY(0); filter: brightness(0.96); }
+.action-btn-dyn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.action-btn-dyn .material-symbols-outlined { font-size: 1.15rem; }
+
+.action-btn-status-1 { --btn-bg:#d97706; }
+.action-btn-status-2 { --btn-bg:#2563eb; }
+.action-btn-status-3 { --btn-bg:#7c3aed; }
+.action-btn-status-4 { --btn-bg:#16a34a; }
+.action-btn-status-5 { --btn-bg:#dc2626; }
+.action-btn-status-6 { --btn-bg:#0891b2; }
+.action-btn-status-7 { --btn-bg:#ea580c; }
+.action-btn-status-8 { --btn-bg:#be123c; }
+.action-btn-status-9 { --btn-bg:#ca8a04; }
+
+/* ─── Tarjeta repartidor + botón abrir modal ────────────────────── */
+.assign-driver-current {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-bg-soft, var(--color-bg));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    color: var(--color-text);
+    font-size: var(--font-size-sm, 0.9rem);
+}
+.assign-driver-current .material-symbols-outlined { color: var(--color-text-secondary); }
+.assign-driver-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0.7rem 1rem;
+    border: none;
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-primary, #2563eb);
+    color: #fff;
+    font-family: inherit;
+    font-size: var(--font-size-sm, 0.9rem);
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter .15s ease, transform .12s ease;
+}
+.assign-driver-btn:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); }
+.assign-driver-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ─── Modal genérico ────────────────────────────────────────────── */
+.app-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    backdrop-filter: blur(2px);
+}
+.app-modal-backdrop.is-open { display: flex; }
+.app-modal {
+    background: var(--color-card-bg, var(--color-bg, #fff));
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 12px);
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    animation: appModalIn .18s ease-out;
+}
+@keyframes appModalIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.app-modal h3 { margin: 0 0 1rem 0; display: flex; align-items: center; gap: 8px; }
+.app-modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+}
+.app-modal textarea,
+.app-modal select,
+.app-modal input[type="text"] {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 6px);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: var(--font-size-sm, 0.9rem);
+}
 .shipment-timeline-dot.en_sucursal  { background: var(--badge-warehouse-bg);  color: var(--badge-warehouse-text); }
 
 .shipment-timeline-content {

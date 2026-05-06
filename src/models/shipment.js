@@ -247,6 +247,18 @@ const getByTrackingId = (trackingId) => {
     });
 };
 
-const updateStatus = (id, newStatusId) => Shipment.update({ statusId: newStatusId }, { where: { id } });
+const updateStatus = (id, newStatusId, options = {}) => {
+    const updates = { statusId: newStatusId };
+    if (options.deliveryUserId !== undefined) {
+        updates.deliveryUserId = options.deliveryUserId;
+    }
+    return Shipment.update(updates, { where: { id }, transaction: options.transaction });
+};
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId };
+const findByIdForUpdate = (id, transaction) => Shipment.findOne({
+    where: { id },
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined,
+});
+
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate };
