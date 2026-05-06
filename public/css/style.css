@@ -41,6 +41,14 @@
   --badge-delayed-text:    #9a3412;
   --badge-initial-bg:      #f1f5f9;
   --badge-initial-text:    #475569;
+  --badge-assigned-bg:        #cffafe;
+  --badge-assigned-text:      #155e75;
+  --badge-preparing-bg:       #fed7aa;
+  --badge-preparing-text:     #9a3412;
+  --badge-package-failed-bg:  #ffe4e6;
+  --badge-package-failed-text:#9f1239;
+  --badge-failed-attempt-bg:  #fef08a;
+  --badge-failed-attempt-text:#854d0e;
 
   --btn-modificar-bg:      #fef3c7;
   --btn-modificar-text:    #b45309;
@@ -126,6 +134,14 @@
   --badge-delayed-text:    #fdba74;
   --badge-initial-bg:      #1e293b;
   --badge-initial-text:    #94a3b8;
+  --badge-assigned-bg:        #164e63;
+  --badge-assigned-text:      #67e8f9;
+  --badge-preparing-bg:       #7c2d12;
+  --badge-preparing-text:     #fdba74;
+  --badge-package-failed-bg:  #881337;
+  --badge-package-failed-text:#fda4af;
+  --badge-failed-attempt-bg:  #713f12;
+  --badge-failed-attempt-text:#fde047;
 
   --btn-modificar-bg:      #451a03;
   --btn-modificar-text:    #fcd34d;

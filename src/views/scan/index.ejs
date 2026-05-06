@@ -58,7 +58,7 @@
                         const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
                         const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',en_sucursal:'En Sucursal'};
                         const _slL = _sl[_sk] || shipment.status.description;
-                        const isFinal = shipment.statusId === 4 || shipment.statusId === 5;
+                        const isFinal = [4, 5, 8].includes(shipment.statusId);
                     %>
 
                     <!-- Info del envío -->
@@ -91,7 +91,7 @@
                                 <span class="material-symbols-outlined">lock</span>
                                 <span>Este envío está en estado final y no puede modificarse.</span>
                             </div>
-                        <% } else if (transitions.length === 0) { %>
+                        <% } else if (!actions || actions.length === 0) { %>
                             <div class="scan-final">
                                 <span class="material-symbols-outlined">info</span>
                                 <span>No hay acciones disponibles para este estado.</span>
@@ -99,20 +99,28 @@
                         <% } else { %>
                             <p class="scan-actions-label">¿Qué querés registrar?</p>
                             <div style="display: flex; flex-direction: column; gap: var(--space-3);">
-                                <% transitions.forEach(function(t) { %>
+                                <% actions.forEach(function(a) { %>
                                     <%
-                                        const btnClass = t.id === 2 ? 'scan-btn--transit'
-                                                       : t.id === 3 ? 'scan-btn--branch'
-                                                       : 'scan-btn--deliver';
-                                        const btnIcon  = t.id === 2 ? 'local_shipping'
-                                                       : t.id === 3 ? 'store'
-                                                       : 'check_circle';
+                                        const btnClass = a.toStatusId === 2 ? 'scan-btn--transit'
+                                                       : a.toStatusId === 3 ? 'scan-btn--branch'
+                                                       : a.toStatusId === 4 ? 'scan-btn--deliver'
+                                                       : a.toStatusId === 8 ? 'scan-btn--branch'
+                                                       : a.toStatusId === 9 ? 'scan-btn--branch'
+                                                       : 'scan-btn--transit';
+                                        const btnIcon  = a.toStatusId === 2 ? 'local_shipping'
+                                                       : a.toStatusId === 3 ? 'store'
+                                                       : a.toStatusId === 4 ? 'check_circle'
+                                                       : a.toStatusId === 8 ? 'report'
+                                                       : a.toStatusId === 9 ? 'cancel'
+                                                       : 'swap_horiz';
                                     %>
-                                    <form method="POST" action="/scan/<%= shipment.trackingId %>" onsubmit="return confirmAction(this)">
-                                        <input type="hidden" name="newStatusId" value="<%= t.id %>">
+                                    <form method="POST" action="<%= a.endpoint %>" onsubmit="return confirmAction(this, <%= a.requireComment ? 'true' : 'false' %>)">
+                                        <% if (a.requireComment) { %>
+                                            <input type="hidden" name="comment" value="">
+                                        <% } %>
                                         <button type="submit" class="scan-btn <%= btnClass %>">
                                             <span class="material-symbols-outlined"><%= btnIcon %></span>
-                                            <%= t.label %>
+                                            <%= a.label %>
                                         </button>
                                     </form>
                                 <% }) %>
@@ -129,10 +137,36 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script>
-        function confirmAction(form) {
+        function confirmAction(form, requireComment) {
             var btn    = form.querySelector('button');
             var label  = btn.querySelector('.material-symbols-outlined').nextSibling.textContent.trim();
             var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+
+            if (requireComment) {
+                Swal.fire({
+                    title: label,
+                    input: 'textarea',
+                    inputLabel: 'Motivo (obligatorio)',
+                    inputPlaceholder: 'Describí el motivo...',
+                    inputAttributes: { 'aria-label': 'Motivo' },
+                    showCancelButton: true,
+                    confirmButtonText: 'Confirmar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#f1f5f9' : '#1e293b',
+                    reverseButtons: true,
+                    inputValidator: function(value) {
+                        if (!value || value.trim().length < 3) { return 'Debés escribir un motivo (mín. 3 caracteres).'; }
+                    },
+                }).then(function(result) {
+                    if (result.isConfirmed) {
+                        form.querySelector('input[name="comment"]').value = result.value.trim();
+                        form.submit();
+                    }
+                });
+                return false;
+            }
 
             Swal.fire({
                 title: '¿Confirmás?',
