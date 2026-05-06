@@ -73,12 +73,22 @@
 
                     <div class="field">
                         <label for="roleId">Rol <span style="color: red;">*</span></label>
-                        <select id="roleId" name="roleId" required>
+                        <select id="roleId" name="roleId" required onchange="toggleBranchField(this.value)">
                             <option value="">Seleccione un rol </option>
                             <% roleTypes.forEach(role => { %>
                                 <option value="<%= role.id %>" <%= body.roleId == role.id ? 'selected' : '' %>>
                                     <%= role.description %>
                                 </option>
+                            <% }); %>
+                        </select>
+                    </div>
+
+                    <div class="field" id="branch-field" style="display:<%= body.roleId == 3 ? 'block' : 'none' %>">
+                        <label for="branchId">Sucursal <span style="color:red">*</span></label>
+                        <select id="branchId" name="branchId">
+                            <option value="">Seleccione una sucursal</option>
+                            <% (branches || []).forEach(b => { %>
+                                <option value="<%= b.id %>" <%= body.branchId == b.id ? 'selected' : '' %>><%= b.name %></option>
                             <% }); %>
                         </select>
                     </div>
@@ -97,6 +107,7 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>function toggleBranchField(v){document.getElementById('branch-field').style.display=v==3?'block':'none';}</script>
     <script src="/js/document-format.js" defer></script>
     <script>
         const passwordInput  = document.getElementById('password');
