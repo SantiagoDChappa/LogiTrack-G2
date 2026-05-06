@@ -10,7 +10,9 @@ const ShipmentHistory = sequelize.define('shipment_history', {
     changedAt:    { type: DataTypes.DATE },
     userId:       { type: DataTypes.INTEGER, allowNull: true },
     eventType:    { type: DataTypes.STRING,  allowNull: false, defaultValue: 'STATUS_CHANGE' },
-    branchId:     { type: DataTypes.INTEGER, allowNull: true, field: 'branch_id' }
+    branchId:     { type: DataTypes.INTEGER, allowNull: true, field: 'branch_id' },
+    latitude:     { type: DataTypes.DECIMAL(10, 7), allowNull: true },
+    longitude:    { type: DataTypes.DECIMAL(10, 7), allowNull: true }
 }, { tableName: 'shipment_history', timestamps: false });
 
 const withSchemaSelfHeal = async (op) => {
@@ -28,7 +30,7 @@ const withSchemaSelfHeal = async (op) => {
     }
 };
 
-const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId }) => {
+const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId, latitude, longitude }) => {
     return withSchemaSelfHeal(() => ShipmentHistory.create({
         shipmentId,
         fromStatusId: fromStatusId || null,
@@ -37,6 +39,8 @@ const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventTy
         userId:       userId    || null,
         eventType:    eventType || 'STATUS_CHANGE',
         branchId:     branchId  || null,
+        latitude:     latitude  !== null && latitude  !== undefined ? latitude  : null,
+        longitude:    longitude !== null && longitude !== undefined ? longitude : null,
         changedAt:    new Date()
     }));
 };

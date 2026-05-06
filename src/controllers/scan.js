@@ -4,6 +4,7 @@ const shipmentHistoryModel = require('../models/shipmentHistory');
 const userModel            = require('../models/user');
 const { notifyStatusChange } = require('../utils/notifications');
 const { Status }             = require('../constants/enums');
+const { resolveBranchCoords, resolveUserBranchCoords } = require('../utils/eventLocation');
 
 const DELIVERY_TRANSITIONS = {
     [Status.PENDING.id]:    [Status.IN_TRANSIT.id],
@@ -71,6 +72,9 @@ const postScanStatus = async (req, res) => {
             const userRecord = await userModel.getById(currentUser.id);
             branchId = userRecord?.branchId || null;
         }
+        const coords = branchId
+            ? await resolveBranchCoords(branchId)
+            : await resolveUserBranchCoords(currentUser.id);
         const newStatus  = await statusModel.getById(targetStatusId);
 
         await shipmentHistoryModel.create({
@@ -79,7 +83,9 @@ const postScanStatus = async (req, res) => {
             toStatusId:   targetStatusId,
             userId:       currentUser.id,
             eventType:    'STATUS_CHANGE',
-            branchId,
+            branchId:     coords.branchId || branchId,
+            latitude:     coords.latitude,
+            longitude:    coords.longitude,
         });
 
         await shipmentModel.updateStatus(shipment.id, targetStatusId);

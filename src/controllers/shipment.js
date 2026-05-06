@@ -16,6 +16,7 @@ const { validationResult }   = require('express-validator');
 const csvImport            = require('../services/csvImport');
 const csvExport            = require('../services/csvExport');
 const shipmentImportModel  = require('../models/shipmentImport');
+const { resolveUserBranchCoords } = require('../utils/eventLocation');
 
 const home = async (req, res) => {
     const statuses = await statusModel.getAll();
@@ -56,8 +57,29 @@ const getDetail = async (req, res) => {
     const destProv = PROVINCES[shipment.address.provinceId];
     const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
     const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
+    const stops = history
+        .filter(h => h.latitude !== null && h.latitude !== undefined && h.longitude !== null && h.longitude !== undefined)
+        .map(h => {
+            const isPOD = h.eventType === 'POD' || (h.toStatus && h.toStatus.id === Status.DELIVERED.id);
+            const branchName = h.branch?.name || null;
+            return {
+                lat:       Number(h.latitude),
+                lng:       Number(h.longitude),
+                label:     isPOD ? 'Entrega final (GPS)' : (branchName || h.eventType),
+                status:    h.toStatus?.description || '',
+                timestamp: h.changedAt,
+                isPOD,
+                isCreated: h.eventType === 'CREATED',
+            };
+        });
+    const firstBranchEvent = history.find(h => h.branch);
+    const originBranch     = firstBranchEvent?.branch || null;
     const mapData = {
-        origin: {
+        origin: originBranch ? {
+            lat:   Number(originBranch.latitude),
+            lng:   Number(originBranch.longitude),
+            label: `Sucursal ${originBranch.name}`,
+        } : {
             lat:   parseFloat(originLat)  || -34.6037,
             lng:   parseFloat(originLng)  || -58.3816,
             label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
@@ -68,6 +90,7 @@ const getDetail = async (req, res) => {
             label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ')
                    || (destProv ? destProv.name : ''),
         } : null,
+        stops,
     };
 
     const returnUrl   = req.query.from || '/shipment';
@@ -132,12 +155,16 @@ const createShipment = async (req, res) => {
         packageQty:     body.packageQty      || null,
     });
 
+    const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
     await shipmentHistoryModel.create({
         shipmentId:   shipment.id,
         fromStatusId: null,
         toStatusId:   shipment.statusId,
         eventType:    'CREATED',
         userId:       res.locals.currentUser?.id || null,
+        branchId:     creatorCoords.branchId,
+        latitude:     creatorCoords.latitude,
+        longitude:    creatorCoords.longitude,
     });
 
     res.redirect(`/shipment/detail/${shipment.id}?created=true`);
@@ -249,6 +276,7 @@ const updateShipment = async (req, res) => {
 
       const newStatus = await statusModel.getById(targetStatusId);
       if (shipment.statusId !== targetStatusId) {
+        const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await shipmentHistoryModel.create({
           shipmentId:   id,
           fromStatusId: shipment.statusId,
@@ -256,6 +284,9 @@ const updateShipment = async (req, res) => {
           comment:      body.statusComment || null,
           userId:       currentUser?.id    || null,
           eventType:    'STATUS_CHANGE',
+          branchId:     actorCoords.branchId,
+          latitude:     actorCoords.latitude,
+          longitude:    actorCoords.longitude,
         });
 
         await shipmentModel.updateStatus(id, Number(body.newStatusId));
@@ -297,6 +328,7 @@ const updateShipmentStatus = async (req, res) => {
         statusModel.getById(Number(newStatusId)),
     ]);
 
+    const actorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
     await shipmentHistoryModel.create({
         shipmentId:   id,
         fromStatusId: shipment.statusId,
@@ -304,6 +336,9 @@ const updateShipmentStatus = async (req, res) => {
         comment:      comment || null,
         userId:       res.locals.currentUser?.id || null,
         eventType:    'STATUS_CHANGE',
+        branchId:     actorCoords.branchId,
+        latitude:     actorCoords.latitude,
+        longitude:    actorCoords.longitude,
     });
 
     await shipmentModel.updateStatus(id, Number(newStatusId));

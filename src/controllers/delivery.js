@@ -58,13 +58,17 @@ const saveEvidence = async (req, res) => {
             signatureBase64: signatureBase64 || null
         });
 
+        const podLat = latitude  !== null && latitude  !== undefined && latitude  !== '' ? Number(latitude)  : null;
+        const podLng = longitude !== null && longitude !== undefined && longitude !== '' ? Number(longitude) : null;
         await shipmentHistoryModel.create({
             shipmentId:   shipment.id,
             fromStatusId: shipment.statusId,
             toStatusId:   Status.DELIVERED.id,
             comment:      'Entrega confirmada por repartidor',
             userId:       res.locals.currentUser?.id || null,
-            eventType:    'STATUS_CHANGE',
+            eventType:    'POD',
+            latitude:     Number.isFinite(podLat) ? podLat : null,
+            longitude:    Number.isFinite(podLng) ? podLng : null,
         });
 
         await Shipment.update(
