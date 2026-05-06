@@ -62,14 +62,18 @@ const getById = (id) => {
     });
 };
 
-const generateTrackingId = async () => {
-    const last = await Shipment.findOne({ order: [['id', 'DESC']] });
-    const next = last ? last.id + 1 : 1;
-    return `ENV-${String(next).padStart(3, '0')}`;
+const generateTrackingId = async (prefix = 'ENV') => {
+    const last = await Shipment.findOne({
+        where: { trackingId: { [Op.like]: `${prefix}-%` } },
+        order: [['id', 'DESC']],
+    });
+    if (!last) { return `${prefix}-001`; }
+    const lastNum = parseInt(String(last.trackingId).split('-').pop(), 10) || 0;
+    return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
 };
 
 const create = async (data) => {
-    const trackingId = await generateTrackingId();
+    const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
     return Shipment.create({
         trackingId,
         statusId:         data.statusId || 1,
@@ -79,6 +83,7 @@ const create = async (data) => {
         shipmentTypeId:   data.shipmentTypeId || null,
         weightKg:         data.weightKg       || null,
         packageQty:       data.packageQty      || null,
+        deliveryUserId:   data.deliveryUserId  || null,
         legacyTrackingId: data.legacyTrackingId || null,
         createdAt:        new Date().toISOString().split('T')[0]
     });
@@ -261,4 +266,4 @@ const findByIdForUpdate = (id, transaction) => Shipment.findOne({
     lock: transaction ? transaction.LOCK.UPDATE : undefined,
 });
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate };
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate, generateTrackingId };
