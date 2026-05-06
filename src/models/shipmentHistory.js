@@ -30,7 +30,7 @@ const withSchemaSelfHeal = async (op) => {
     }
 };
 
-const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId, latitude, longitude }) => {
+const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventType, branchId, latitude, longitude, transaction }) => {
     return withSchemaSelfHeal(() => ShipmentHistory.create({
         shipmentId,
         fromStatusId: fromStatusId || null,
@@ -42,7 +42,7 @@ const create = ({ shipmentId, fromStatusId, toStatusId, comment, userId, eventTy
         latitude:     latitude  !== null && latitude  !== undefined ? latitude  : null,
         longitude:    longitude !== null && longitude !== undefined ? longitude : null,
         changedAt:    new Date()
-    }, { transaction }));
+    }, { transaction: transaction || null }));
 };
 
 const getByShipmentId = (shipmentId) => {

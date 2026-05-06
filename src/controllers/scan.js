@@ -51,17 +51,17 @@ const buildHandler = (toStatusId, options = {}) => async (req, res) => {
         const coords = branchId
             ? await resolveBranchCoords(branchId)
             : await resolveUserBranchCoords(currentUser.id);
-        const newStatus  = await statusModel.getById(targetStatusId);
 
-        await shipmentHistoryModel.create({
-            shipmentId:   shipment.id,
-            fromStatusId: shipment.statusId,
-            toStatusId:   targetStatusId,
-            userId:       currentUser.id,
-            eventType:    'STATUS_CHANGE',
-            branchId:     coords.branchId || branchId,
-            latitude:     coords.latitude,
-            longitude:    coords.longitude,
+        const comment = req.body?.comment || null;
+
+        await stateMachine.transition({
+            shipmentId: shipment.id,
+            toStatusId,
+            actor:      currentUser,
+            comment,
+            branchId:   coords.branchId || branchId,
+            latitude:   coords.latitude,
+            longitude:  coords.longitude,
         });
 
         const newStatus = await statusModel.getById(toStatusId);
