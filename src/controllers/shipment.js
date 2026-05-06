@@ -16,6 +16,7 @@ const { validationResult }   = require('express-validator');
 const csvImport            = require('../services/csvImport');
 const csvExport            = require('../services/csvExport');
 const shipmentImportModel  = require('../models/shipmentImport');
+const { resolveUserBranchCoords } = require('../utils/eventLocation');
 const stateMachine         = require('../services/shipmentStateMachine');
 
 const renderStateMachineError = (err, res, redirectUrl) => {
@@ -72,8 +73,29 @@ const getDetail = async (req, res) => {
     const destProv = PROVINCES[shipment.address.provinceId];
     const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
     const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
+    const stops = history
+        .filter(h => h.latitude !== null && h.latitude !== undefined && h.longitude !== null && h.longitude !== undefined)
+        .map(h => {
+            const isPOD = h.eventType === 'POD' || (h.toStatus && h.toStatus.id === Status.DELIVERED.id);
+            const branchName = h.branch?.name || null;
+            return {
+                lat:       Number(h.latitude),
+                lng:       Number(h.longitude),
+                label:     isPOD ? 'Entrega final (GPS)' : (branchName || h.eventType),
+                status:    h.toStatus?.description || '',
+                timestamp: h.changedAt,
+                isPOD,
+                isCreated: h.eventType === 'CREATED',
+            };
+        });
+    const firstBranchEvent = history.find(h => h.branch);
+    const originBranch     = firstBranchEvent?.branch || null;
     const mapData = {
-        origin: {
+        origin: originBranch ? {
+            lat:   Number(originBranch.latitude),
+            lng:   Number(originBranch.longitude),
+            label: `Sucursal ${originBranch.name}`,
+        } : {
             lat:   parseFloat(originLat)  || -34.6037,
             lng:   parseFloat(originLng)  || -58.3816,
             label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
@@ -84,6 +106,7 @@ const getDetail = async (req, res) => {
             label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ')
                    || (destProv ? destProv.name : ''),
         } : null,
+        stops,
     };
 
     const returnUrl   = req.query.from || '/shipment';
@@ -148,12 +171,16 @@ const createShipment = async (req, res) => {
         packageQty:     body.packageQty      || null,
     });
 
+    const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
     await shipmentHistoryModel.create({
         shipmentId:   shipment.id,
         fromStatusId: null,
         toStatusId:   shipment.statusId,
         eventType:    'CREATED',
         userId:       res.locals.currentUser?.id || null,
+        branchId:     creatorCoords.branchId,
+        latitude:     creatorCoords.latitude,
+        longitude:    creatorCoords.longitude,
     });
 
     res.redirect(`/shipment/detail/${shipment.id}?created=true`);
@@ -222,6 +249,69 @@ const updateShipment = async (req, res) => {
       return res.redirect(`/shipment/update/${id}`);
     }
 
+    if (body.newStatusId) {
+      const targetStatusId = Number(body.newStatusId);
+
+      if (targetStatusId === Status.IN_TRANSIT.id) {
+          const submittedDeliveryUserId = body.deliveryUserId || null;
+          if (!submittedDeliveryUserId) {
+              const [provinces, statuses, history, typesShipment, deliveryUsers, originLat, originLng, originStreet, originNumber] = await Promise.all([
+                  provinceModel.getAll(),
+                  statusModel.getAll(),
+                  shipmentHistoryModel.getByShipmentId(id),
+                  typeShipmentModel.getAll(),
+                  userModel.search({ roleId: RoleType.DELIVERY.id }),
+                  settingModel.get('origin_lat'),
+                  settingModel.get('origin_lng'),
+                  settingModel.get('origin_street'),
+                  settingModel.get('origin_number')
+              ]);
+
+              const destProv = PROVINCES[shipment.address?.provinceId];
+              const destLat  = shipment.address?.lat  || (destProv ? destProv.lat  : null);
+              const destLng  = shipment.address?.lng  || (destProv ? destProv.lng  : null);
+              const mapData = {
+                  origin: {
+                      lat:   parseFloat(originLat)  || -34.6037,
+                      lng:   parseFloat(originLng)  || -58.3816,
+                      label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+                  },
+                  destination: destLat ? {
+                      lat:   destLat,
+                      lng:   destLng,
+                      label: [shipment.address?.street, shipment.address?.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
+                  } : null,
+              };
+
+              return res.render('shipment/update', {
+                  errors: ['Debe asignar un repartidor antes de pasar el envío a estado "En Tránsito".'],
+                  shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers,
+                  returnUrl: req.query.from || '/shipment',
+                  isSupervisor: [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id].includes(currentUser?.roleId),
+              });
+          }
+      }
+
+      const newStatus = await statusModel.getById(targetStatusId);
+      if (shipment.statusId !== targetStatusId) {
+        const actorCoords = await resolveUserBranchCoords(currentUser?.id);
+        await shipmentHistoryModel.create({
+          shipmentId:   id,
+          fromStatusId: shipment.statusId,
+          toStatusId:   Number(body.newStatusId),
+          comment:      body.statusComment || null,
+          userId:       currentUser?.id    || null,
+          eventType:    'STATUS_CHANGE',
+          branchId:     actorCoords.branchId,
+          latitude:     actorCoords.latitude,
+          longitude:    actorCoords.longitude,
+        });
+
+        await shipmentModel.updateStatus(id, Number(body.newStatusId));
+        if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+      }
+    }
+
     if (isOperator) {
       body.street         = shipment.address.street;
       body.number         = shipment.address.number;
@@ -244,6 +334,38 @@ const updateShipment = async (req, res) => {
   } catch (err) {
     console.error('ERROR updateShipment:', err.message);
     res.status(500).send('Error interno al actualizar el envío');
+  }
+};
+
+const updateShipmentStatus = async (req, res) => {
+  try {
+    const { id }                   = req.params;
+    const { newStatusId, comment } = req.body;
+    const [shipment, newStatus]    = await Promise.all([
+        shipmentModel.getById(id),
+        statusModel.getById(Number(newStatusId)),
+    ]);
+
+    const actorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
+    await shipmentHistoryModel.create({
+        shipmentId:   id,
+        fromStatusId: shipment.statusId,
+        toStatusId:   Number(newStatusId),
+        comment:      comment || null,
+        userId:       res.locals.currentUser?.id || null,
+        eventType:    'STATUS_CHANGE',
+        branchId:     actorCoords.branchId,
+        latitude:     actorCoords.latitude,
+        longitude:    actorCoords.longitude,
+    });
+
+    await shipmentModel.updateStatus(id, Number(newStatusId));
+    if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+
+    res.redirect(`/shipment/update/${id}`);
+  } catch (err) {
+    console.error('ERROR updateShipmentStatus:', err.message);
+    res.status(500).send('Error interno al actualizar estado');
   }
 };
 

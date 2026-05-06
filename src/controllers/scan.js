@@ -4,6 +4,7 @@ const userModel            = require('../models/user');
 const stateMachine         = require('../services/shipmentStateMachine');
 const { notifyStatusChange } = require('../utils/notifications');
 const { Status }             = require('../constants/enums');
+const { resolveBranchCoords, resolveUserBranchCoords } = require('../utils/eventLocation');
 
 const renderError = (res, message, status = 200) => {
     return res.status(status).render('scan/index', { shipment: null, actions: [], error: message, success: null });
@@ -47,13 +48,20 @@ const buildHandler = (toStatusId, options = {}) => async (req, res) => {
             const userRecord = await userModel.getById(currentUser.id);
             branchId = userRecord?.branchId || null;
         }
+        const coords = branchId
+            ? await resolveBranchCoords(branchId)
+            : await resolveUserBranchCoords(currentUser.id);
+        const newStatus  = await statusModel.getById(targetStatusId);
 
-        await stateMachine.transition({
-            shipmentId: shipment.id,
-            toStatusId,
-            actor: currentUser,
-            comment: req.body?.comment,
-            branchId,
+        await shipmentHistoryModel.create({
+            shipmentId:   shipment.id,
+            fromStatusId: shipment.statusId,
+            toStatusId:   targetStatusId,
+            userId:       currentUser.id,
+            eventType:    'STATUS_CHANGE',
+            branchId:     coords.branchId || branchId,
+            latitude:     coords.latitude,
+            longitude:    coords.longitude,
         });
 
         const newStatus = await statusModel.getById(toStatusId);
