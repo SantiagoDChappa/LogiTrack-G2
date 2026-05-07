@@ -306,8 +306,9 @@
 
         } else if (toSid === 7) {
             const drvName = card.dataset.drvName || '';
-            const info = drvName
-                ? `El repartidor <strong>${card.querySelector('.card-driver')?.textContent?.trim() || drvName}</strong> podrá retirarlo desde sucursal.`
+            const drvFull = card.dataset.drvFull || drvName;
+            const info = drvFull
+                ? `El repartidor <strong>${drvFull}</strong> podrá retirarlo desde sucursal.`
                 : '<strong>No tiene repartidor asignado.</strong> Podés asignarlo desde la tarjeta.';
 
             openModal({
