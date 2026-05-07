@@ -4,6 +4,8 @@ const Status = Object.freeze({
     AT_BRANCH:  { id: 3, description: 'En Sucursal' },
     DELIVERED:  { id: 4, description: 'Entregado'   },
     CANCELLED:  { id: 5, description: 'Cancelado'   },
+    DELIVERY_FAILED: { id: 6, description: 'Falla en Entrega' },   
+    PACKAGE_INCIDENT: { id: 7, description: 'Incidente con Paquete' }
 });
 
 const PersonType = Object.freeze({
@@ -18,4 +20,16 @@ const RoleType = Object.freeze({
     ADMIN:      { id: 4, description: 'Administrador' },
 });
 
-module.exports = { Status, PersonType, RoleType };
+const ShipmentType = Object.freeze({
+    EXPRESS:  { id: 1, description: 'Express'  },
+    STANDARD: { id: 2, description: 'Standard' },
+});
+
+const ShipmentPriority = Object.freeze({
+    LOW:    { id: 1, description: 'Baja'   },
+    MEDIUM: { id: 2, description: 'Media'   },
+    HIGH:   { id: 3, description: 'Alta'    },
+    URGENT: { id: 4, description: 'Urgente' },
+});
+
+module.exports = { Status, PersonType, RoleType, ShipmentType, ShipmentPriority };

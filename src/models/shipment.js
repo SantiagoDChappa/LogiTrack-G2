@@ -17,6 +17,8 @@ const Shipment = sequelize.define('shipment', {
     weightKg:        { type: DataTypes.DECIMAL(8, 2) },
     packageQty:      { type: DataTypes.INTEGER },
     deliveryUserId: { type: DataTypes.INTEGER },
+    priority:       { type: DataTypes.INTEGER, defaultValue: 1 },
+    basePriority:   { type: DataTypes.INTEGER, defaultValue: 1 },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -205,6 +207,18 @@ const update = async (data) => {
     return shipment;
 };
 
-const updateStatus = (id, newStatusId) => Shipment.update({ statusId: newStatusId }, { where: { id } });
+const updateStatus = (id, newStatusId) => { 
+    return Shipment.update({ statusId: newStatusId }, { where: { id } });
+ };
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus };
+function updatePriority(id, newPriority) {
+    return Shipment.update({ priority: newPriority }, { where: { id } });
+}
+
+const getActiveShipments = () => {
+    return Shipment.findAll({
+        where: { statusId: { [Op.notIn]: [4, 5] } }
+    });
+};
+
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, getActiveShipments };

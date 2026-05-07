@@ -54,4 +54,12 @@ const getByShipmentId = (shipmentId) => {
     }));
 };
 
-module.exports = { ShipmentHistory, create, getByShipmentId };
+const getLastStatusChange = async (shipmentId) => {
+    return withSchemaSelfHeal(() => ShipmentHistory.findOne({
+        where: { shipmentId },
+        order: [['changedAt', 'DESC']]
+    }));
+};
+
+
+module.exports = { ShipmentHistory, create, getByShipmentId, getLastStatusChange };
