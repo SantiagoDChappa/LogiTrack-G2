@@ -2063,62 +2063,17 @@
 .kanban-filter-bar {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-3);
-  padding: var(--space-2) clamp(var(--space-4), 2vw, var(--space-6));
+  padding: var(--space-3) clamp(var(--space-4), 2vw, var(--space-6));
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
 
-.k-search-box {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: 1;
-  max-width: 300px;
-  background-color: var(--color-surface);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-3);
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-
-.k-search-box:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.k-search-box .material-symbols-outlined { font-size: 0.95rem; color: var(--color-text-secondary); flex-shrink: 0; }
-
-.k-search-box input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  padding: 0.55rem 0;
-  outline: none;
-}
-
-.k-search-box input::placeholder { color: var(--color-text-muted); }
-
-.k-filter-sel {
-  background-color: var(--color-surface);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  padding: 0.55rem 2rem 0.55rem var(--space-3);
-  outline: none;
-  cursor: pointer;
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-
-.k-filter-sel:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+.kanban-filter-bar .search-field {
+  flex: 0 0 auto;
+  min-width: 180px;
+  max-width: 260px;
 }
 
 .k-filter-hint {
@@ -2505,6 +2460,11 @@
 @keyframes kanban-pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.65; }
+}
+
+@keyframes kanban-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .k-card-shake { animation: kanban-shake 0.35s ease; }

@@ -466,7 +466,7 @@
             7: ['cancel', 'failed'],
             2: ['cancel', 'failed'],
             3: ['failed'],
-            9: ['failed'],
+            9: [],
         };
 
         const btns   = CARD_BTNS[newSid] || [];
@@ -531,8 +531,18 @@
         m.addEventListener('animationend', () => m.classList.remove('k-card-shake'), { once: true });
     }
 
+    /* ── Refresh ────────────────────────────────────────────── */
+
+    function refresh() {
+        const btn  = document.getElementById('k-refresh-btn');
+        const icon = btn?.querySelector('.material-symbols-outlined');
+        if (icon) icon.style.animation = 'kanban-spin 0.6s linear';
+        icon?.addEventListener('animationend', () => { icon.style.animation = ''; }, { once: true });
+        window.location.reload();
+    }
+
     /* ── Public API ─────────────────────────────────────────── */
 
-    window.kanban = { applyFilters, closeModal, confirmModal, _checkTa };
+    window.kanban = { applyFilters, closeModal, confirmModal, _checkTa, refresh };
 
 })();

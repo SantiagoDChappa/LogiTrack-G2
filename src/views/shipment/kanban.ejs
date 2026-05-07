@@ -25,7 +25,7 @@
                 7: ['cancel', 'failed'],
                 2: ['cancel', 'failed'],
                 3: ['failed'],
-                9: ['failed'],
+                9: [],
             };
         %>
 
@@ -35,6 +35,9 @@
                 <h1>Tablero Kanban</h1>
                 <p class="kanban-subtitle">Vista operativa de envíos activos</p>
             </div>
+            <button class="btn-secondary btn-sm" id="k-refresh-btn" onclick="kanban.refresh()" title="Actualizar tablero">
+                <span class="material-symbols-outlined">refresh</span>
+            </button>
         </div>
 
         <!-- ── Métricas ──────────────────────────────────────────── -->
@@ -55,29 +58,32 @@
 
         <!-- ── Filtros ────────────────────────────────────────────── -->
         <div class="kanban-filter-bar">
-            <div class="k-search-box">
-                <span class="material-symbols-outlined">search</span>
-                <input type="text" id="k-filter-search"
-                       placeholder="Buscar por tracking o destinatario…"
+            <div class="search-field">
+                <label for="k-filter-search">Buscar</label>
+                <input type="text" id="k-filter-search" class="search-input"
+                       placeholder="Tracking o destinatario…"
                        oninput="kanban.applyFilters()">
             </div>
-            <select class="k-filter-sel" id="k-filter-driver" onchange="kanban.applyFilters()">
-                <option value="">Todos los repartidores</option>
-                <option value="__none__">Sin asignar</option>
-                <%
-                    const driversSeen = new Set();
-                    KANBAN_COLS.forEach(col => {
-                        (columns[col.id] || []).forEach(s => {
-                            if (s.deliveryUser && !driversSeen.has(s.deliveryUser.id)) {
-                                driversSeen.add(s.deliveryUser.id);
-                %>
-                                <option value="<%= s.deliveryUser.id %>"><%= s.deliveryUser.fullName %></option>
-                <%
-                            }
+            <div class="search-field">
+                <label for="k-filter-driver">Repartidor</label>
+                <select id="k-filter-driver" class="search-input" onchange="kanban.applyFilters()">
+                    <option value="">Todos</option>
+                    <option value="__none__">Sin asignar</option>
+                    <%
+                        const driversSeen = new Set();
+                        KANBAN_COLS.forEach(col => {
+                            (columns[col.id] || []).forEach(s => {
+                                if (s.deliveryUser && !driversSeen.has(s.deliveryUser.id)) {
+                                    driversSeen.add(s.deliveryUser.id);
+                    %>
+                                    <option value="<%= s.deliveryUser.id %>"><%= s.deliveryUser.fullName %></option>
+                    <%
+                                }
+                            });
                         });
-                    });
-                %>
-            </select>
+                    %>
+                </select>
+            </div>
             <span class="k-filter-hint">
                 <span class="material-symbols-outlined">drag_indicator</span>
                 Arrastrá las tarjetas para cambiar el estado
