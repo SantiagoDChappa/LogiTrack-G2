@@ -170,7 +170,9 @@
                          data-weight-kg="<%= shipment.weightKg || '' %>"
                          data-package-qty="<%= shipment.packageQty || '' %>"
                          data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
-                         data-autoload="true">
+                         data-autoload="true"
+                        data-shipment-id="<%= shipment.id %>">
+                         
                         <h3>
                             <span class="material-symbols-outlined">query_stats</span>
                             Detalles de la entrega

@@ -1985,3 +1985,50 @@
 .pred-card--embedded #prediction-result {
   min-height: 82px;
 }
+/* Predicción ML - etiquetas y alerta */
+.pred-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.pred-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.pred-alert {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #fca5a5;
+    line-height: 1.4;
+}
+.btn-assign-suggested {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: background 0.15s ease;
+}
+
+.btn-assign-suggested:hover {
+    background: #dc2626;
+}
