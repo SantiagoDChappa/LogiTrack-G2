@@ -1,9 +1,13 @@
 const Status = Object.freeze({
-    PENDING:    { id: 1, description: 'Pendiente'   },
-    IN_TRANSIT: { id: 2, description: 'En Transito' },
-    AT_BRANCH:  { id: 3, description: 'En Sucursal' },
-    DELIVERED:  { id: 4, description: 'Entregado'   },
-    CANCELLED:  { id: 5, description: 'Cancelado'   },
+    PENDING:        { id: 1, description: 'Pendiente'       },
+    IN_TRANSIT:     { id: 2, description: 'En Transito'     },
+    AT_BRANCH:      { id: 3, description: 'En Sucursal'     },
+    DELIVERED:      { id: 4, description: 'Entregado'       },
+    CANCELLED:      { id: 5, description: 'Cancelado'       },
+    ASSIGNED:       { id: 6, description: 'Asignado'        },
+    IN_PREPARATION: { id: 7, description: 'En Preparacion'  },
+    FAILED_PACKAGE: { id: 8, description: 'Paquete Fallido' },
+    FAILED_ATTEMPT: { id: 9, description: 'Intento Fallido' },
 });
 
 const PersonType = Object.freeze({
