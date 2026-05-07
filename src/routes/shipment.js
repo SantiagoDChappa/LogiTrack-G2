@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments } = require('../controllers/shipment.js');
+const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments } = require('../controllers/shipment.js');
 const { validateShipment, validateUpdateShipment, handleUpdateValidationErrors } = require('../middlewares/shipment.js');
-const { requireAuth, requireAdmin, requireSupervisorOrAdmin } = require('../middlewares/auth.js');
+const { requireAuth, requireAdmin, requireSupervisor, requireSupervisorOrAdmin } = require('../middlewares/auth.js');
 const { csvUpload } = require('../middlewares/upload.js');
 
 router.get('/', home);
 router.get('/search', searchShipments);
+router.get('/kanban', requireSupervisor, getKanban);
 router.get('/export', requireSupervisorOrAdmin, exportShipments);
 router.get('/new', getNewShipmentForm);
 router.post('/new', validateShipment, createShipment);

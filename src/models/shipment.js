@@ -261,4 +261,23 @@ const findByIdForUpdate = (id, transaction) => Shipment.findOne({
     lock: transaction ? transaction.LOCK.UPDATE : undefined,
 });
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate };
+const getForKanban = (statusIds) => {
+    const { Person }    = require('./person');
+    const { Status }    = require('./status');
+    const { Address }   = require('./address');
+    const { Province }  = require('./province');
+    const { User }      = require('./user');
+
+    return Shipment.findAll({
+        where: { statusId: { [Op.in]: statusIds } },
+        include: [
+            { model: Person,  as: 'recipient' },
+            { model: Status,  as: 'status' },
+            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: User,    as: 'deliveryUser', required: false },
+        ],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban };
