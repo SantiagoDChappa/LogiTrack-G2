@@ -237,8 +237,8 @@ describe('csvImport.commitAnalysis', () => {
         expect(shipmentModel.create).toHaveBeenCalledTimes(2);
     });
 
-    test('persiste legacyTrackingId y trackingPrefix HIST al insertar el shipment', async () => {
-        const buffer = buildCsv([validRow({ legacy: 'LEG-001' })]);
+    test('persiste legacyTrackingId y trackingPrefix HIST para estado terminal (Entregado)', async () => {
+        const buffer = buildCsv([validRow({ legacy: 'LEG-001', status: 'Entregado' })]);
         const analysis = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
         await csvImport.commitAnalysis(analysis, { userId: 7, includeDuplicates: false });
 
@@ -247,6 +247,30 @@ describe('csvImport.commitAnalysis', () => {
             statusId:         4,
             trackingPrefix:   'HIST',
         }));
+    });
+
+    test('usa trackingPrefix IENV para estado activo (Pendiente)', async () => {
+        const buffer = buildCsv([validRow({ status: 'Pendiente', recipientDoc: '11111111' })]);
+        const analysis = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
+        await csvImport.commitAnalysis(analysis, { userId: 7, includeDuplicates: false });
+
+        expect(shipmentModel.create).toHaveBeenCalledWith(expect.objectContaining({
+            statusId:       1,
+            trackingPrefix: 'IENV',
+        }));
+    });
+
+    test('usa trackingPrefix IENV para En Transito y HIST para Cancelado', async () => {
+        const buffer = buildCsv([
+            validRow({ status: 'En Transito', recipientDoc: '11111111' }),
+            validRow({ status: 'Cancelado', recipientDoc: '22222222' }),
+        ]);
+        const analysis = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
+        await csvImport.commitAnalysis(analysis, { userId: 7, includeDuplicates: false });
+
+        expect(shipmentModel.create).toHaveBeenCalledTimes(2);
+        expect(shipmentModel.create.mock.calls[0][0].trackingPrefix).toBe('IENV');
+        expect(shipmentModel.create.mock.calls[1][0].trackingPrefix).toBe('HIST');
     });
 
     test('no toca DB si todas las filas son inválidas', async () => {
