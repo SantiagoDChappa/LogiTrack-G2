@@ -16,6 +16,7 @@ const Shipment = sequelize.define('shipment', {
     shipmentTypeId:   { type: DataTypes.INTEGER },
     weightKg:         { type: DataTypes.DECIMAL(8, 2) },
     packageQty:       { type: DataTypes.INTEGER },
+    volumeM3:         { type: DataTypes.DECIMAL(8, 3) },
     deliveryUserId:   { type: DataTypes.INTEGER },
     legacyTrackingId: { type: DataTypes.STRING },
 },
@@ -84,6 +85,7 @@ const create = async (data) => {
         weightKg:         data.weightKg       || null,
         packageQty:       data.packageQty      || null,
         deliveryUserId:   data.deliveryUserId  || null,
+        volumeM3:         data.volumeM3 || null,
         legacyTrackingId: data.legacyTrackingId || null,
         createdAt:        new Date().toISOString().split('T')[0]
     });

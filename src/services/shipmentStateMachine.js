@@ -97,7 +97,7 @@ const getAvailableActions = ({ shipment, actor }) => {
     return actions;
 };
 
-const transition = ({ shipmentId, toStatusId, actor, comment, branchId, deliveryUserId, eventTypeOverride }) => {
+const transition = ({ shipmentId, toStatusId, actor, comment, branchId, deliveryUserId, eventTypeOverride, latitude, longitude }) => {
     if (!actor || actor.roleId === undefined) {
         return Promise.reject(new StateMachineError('FORBIDDEN_ROLE', 'Actor sin rol'));
     }
@@ -138,6 +138,8 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
             userId: actor.id || null,
             eventType: eventTypeOverride || rule.eventType,
             branchId: branchId || null,
+            latitude:  latitude  != null ? latitude  : null,
+            longitude: longitude != null ? longitude : null,
             transaction: t,
         });
 

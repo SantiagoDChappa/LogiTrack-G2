@@ -62,6 +62,16 @@ const buildHandler = (toStatusId, options = {}) => async (req, res) => {
             branchId:     coords.branchId || branchId,
             latitude:     coords.latitude,
             longitude:    coords.longitude,
+        const comment = req.body?.comment || null;
+
+        await stateMachine.transition({
+            shipmentId: shipment.id,
+            toStatusId,
+            actor:      currentUser,
+            comment,
+            branchId:   coords.branchId || branchId,
+            latitude:   coords.latitude,
+            longitude:  coords.longitude,
         });
 
         const newStatus = await statusModel.getById(toStatusId);

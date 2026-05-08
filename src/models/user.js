@@ -26,6 +26,7 @@ const create = async (data) => {
         password: hashedPassword,
         document: data.document,
         roleId:   data.roleId,
+        branchId: data.branchId || null,
         active:   true,
     });
 };
