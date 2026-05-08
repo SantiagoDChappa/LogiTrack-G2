@@ -113,5 +113,35 @@
             });
         });
     </script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    if (new URLSearchParams(window.location.search).get('delivered') === 'true') {
+        Swal.fire({
+            icon: 'success',
+            title: '¡Entrega confirmada!',
+            text: 'La evidencia fue registrada correctamente.',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#2563eb',
+        }).then(() => {
+            history.replaceState(null, '', '/delivery');
+        });
+    }
+</script>
+
+<script>
+    if (new URLSearchParams(window.location.search).get('failed') === 'true') {
+        Swal.fire({
+            icon: 'warning',
+            title: '¡Intento fallido registrado!',
+            text: 'El operador recibirá la notificación para reprogramar la entrega.',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#2563eb',
+        }).then(() => {
+            history.replaceState(null, '', '/delivery');
+        });
+    }
+</script>
+
 </body>
 </html>

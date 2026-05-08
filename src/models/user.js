@@ -26,6 +26,7 @@ const create = async (data) => {
         password: hashedPassword,
         document: data.document,
         roleId:   data.roleId,
+        branchId: data.branchId || null,
         active:   true,
     });
 };
@@ -87,4 +88,6 @@ const existsByEmailExcluding = async (email, id) => {
 
 const findByEmail = (email) => User.findOne({ where: { email } });
 
-module.exports = { User, getAll, getById, create, update, deleteById, search, existsByDocument, existsByEmail, existsByDocumentExcluding, existsByEmailExcluding, findByEmail };
+const findByDocument = (document) => User.findOne({ where: { document } });
+
+module.exports = { User, getAll, getById, create, update, deleteById, search, existsByDocument, existsByEmail, existsByDocumentExcluding, existsByEmailExcluding, findByEmail, findByDocument };

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments-import.css">
+    <title>Resultado de importación - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Resultado de la importación</h1>
+            <div class="page-header__actions">
+                <a href="/shipment/import/history" class="btn-secondary">
+                    <span class="material-symbols-outlined">history</span>Historial
+                </a>
+                <a href="/shipment" class="btn-secondary">Volver al listado</a>
+            </div>
+        </div>
+
+        <div class="form-new">
+            <% if (result.aborted) { %>
+                <div class="import-alert import-alert--error">
+                    <strong>La importación fue rechazada.</strong>
+                    <ul>
+                        <% result.errors.forEach(function(e) { %>
+                            <li><%= e.message %></li>
+                        <% }); %>
+                    </ul>
+                </div>
+                <div class="form-actions">
+                    <a href="/shipment/import" class="btn-primary">Probar de nuevo</a>
+                </div>
+            <% } else { %>
+                <div class="import-summary">
+                    <div class="import-stat">
+                        <span class="import-stat__num"><%= result.total %></span>
+                        <span class="import-stat__label">Filas procesadas</span>
+                    </div>
+                    <div class="import-stat import-stat--ok">
+                        <span class="import-stat__num"><%= result.imported.length %></span>
+                        <span class="import-stat__label">Envíos creados</span>
+                    </div>
+                    <div class="import-stat import-stat--err">
+                        <span class="import-stat__num"><%= result.errors.length %></span>
+                        <span class="import-stat__label">Errores</span>
+                    </div>
+                </div>
+
+                <% if (result.imported.length > 0) { %>
+                    <section class="import-section">
+                        <h3>Envíos creados</h3>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr><th>#</th><th>Tracking ID</th><th>Acción</th></tr>
+                                </thead>
+                                <tbody>
+                                    <% result.imported.forEach(function(s, i) { %>
+                                        <tr>
+                                            <td><%= i + 1 %></td>
+                                            <td class="tracking-id"><%= s.trackingId %></td>
+                                            <td>
+                                                <a href="/shipment/detail/<%= s.id %>" class="action-btn detalle" data-tooltip="Ver detalle">
+                                                    <span class="material-symbols-outlined">info</span>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                <% } %>
+
+                <% if (result.errors.length > 0) { %>
+                    <section class="import-section">
+                        <div class="import-section__head">
+                            <h3>Filas con errores</h3>
+                            <% if (reportId) { %>
+                                <a href="/shipment/import/report/<%= reportId %>" class="btn-secondary" download>
+                                    <span class="material-symbols-outlined">download</span>Descargar reporte CSV
+                                </a>
+                            <% } %>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr><th>Fila</th><th>Campo</th><th>Mensaje</th></tr>
+                                </thead>
+                                <tbody>
+                                    <% result.errors.forEach(function(e) { %>
+                                        <tr>
+                                            <td><%= e.row %></td>
+                                            <td><code><%= e.field %></code></td>
+                                            <td><%= e.message %></td>
+                                        </tr>
+                                    <% }); %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                <% } %>
+
+                <div class="form-actions">
+                    <a href="/shipment/import" class="btn-secondary">Importar otro archivo</a>
+                    <a href="/shipment" class="btn-primary">Ir al listado</a>
+                </div>
+            <% } %>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

@@ -8,7 +8,12 @@ INSERT INTO "logitrack"."status" ("id", "description") VALUES
     (2, 'En Transito'),
     (3, 'En Sucursal'),
     (4, 'Entregado'),
-    (5, 'Cancelado');
+    (5, 'Cancelado'),
+    (6, 'Asignado'),
+    (7, 'En Preparacion'),
+    (8, 'Paquete Fallido'),
+    (9, 'Intento Fallido')
+ON CONFLICT ("id") DO NOTHING;
 
 -- personTypes
 INSERT INTO "logitrack"."personType" ("id", "description") VALUES
@@ -22,15 +27,25 @@ INSERT INTO "logitrack"."roleType" ("id", "description") VALUES
     (3, 'Repartidor'),
     (4, 'Administrador');
 
+-- branches
+INSERT INTO "logitrack"."branch" ("name", "province_id", "latitude", "longitude", "address", "postal_code") VALUES
+    ('Sucursal Buenos Aires', 24, -34.6037,  -58.3816, 'Av. Corrientes 1234', 'C1043'),
+    ('Sucursal Córdoba',       5, -31.4201,  -64.1888, 'Bv. San Juan 500',    'X5000'),
+    ('Sucursal Rosario',      20, -32.9468,  -60.6393, 'Córdoba 1200',        'S2000')
+ON CONFLICT DO NOTHING;
+
 -- users
-INSERT INTO "logitrack"."user" ("fullName", "email", "password", "document", "roleId") VALUES
-    ('Santiago Chappa',         'santiagochappa@logitrack.com.ar',      '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 45202349,   1),
-    ('Amin',                    'amin@logitrack.com.ar',                '$2b$12$eqMriItP1Z9X7kKZL9iHyurmsTwsYX8OBGSvibhvM6eGfZlgFK/za', 1123233434, 1),
-    ('Juan',                    'juan@logitrack.com.ar',                '$2b$12$A4eIs04S45G3LAenyjt8h.Etu57ieZpjHdD.P3WSdmnLWeO4rNxnK',  1109987765, 1),
-    ('Juan OP',                 'juanoperador@logitrack.com.ar',        '$2b$12$0FghDPRkMXlET7XfKvRNXOORzwmo0qP7OJ.becrlMtDmUtuP4Uv82', 1198989898, 2),
-    ('Amin OP',                 'aminoperador@logitrack.com.ar',        '$2b$12$Y2tw4Fb5Vu3hB2x6boSVCulGoYLRDAcjhpviVgBNxatfcQnVz72wS', 11099087,   2),
-    ('Maximo Valentin Flores',  'floresmaximovalentin@gmail.com',       '$2b$12$QeMel/akGF9KTkQXqnXtWeP4.TyyNeUJdcW6gChg.5iu7kK7O2JUG', 43503918,   1),
-    ('Rubi Rose',               'rubirose@gmail.com',                   '$2b$12$zPvoebtpukk2aNU276GJXOLDtgOk2IBeG6eMhlDnRm.eJnO7PQL92', 1111,       2);
+INSERT INTO "logitrack"."user" ("fullName", "email", "password", "document", "roleId", "branchId") VALUES
+    ('Santiago Chappa',         'santiagochappa@logitrack.com.ar',      '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 45202349,   1, 1),
+    ('Amin',                    'amin@logitrack.com.ar',                '$2b$12$eqMriItP1Z9X7kKZL9iHyurmsTwsYX8OBGSvibhvM6eGfZlgFK/za', 1123233434, 1, 2),
+    ('Juan',                    'juan@logitrack.com.ar',                '$2b$12$A4eIs04S45G3LAenyjt8h.Etu57ieZpjHdD.P3WSdmnLWeO4rNxnK',  1109987765, 1, 1),
+    ('Juan OP',                 'juanoperador@logitrack.com.ar',        '$2b$12$0FghDPRkMXlET7XfKvRNXOORzwmo0qP7OJ.becrlMtDmUtuP4Uv82', 1198989898, 2, NULL),
+    ('Amin OP',                 'aminoperador@logitrack.com.ar',        '$2b$12$Y2tw4Fb5Vu3hB2x6boSVCulGoYLRDAcjhpviVgBNxatfcQnVz72wS', 11099087,   2, NULL),
+    ('Maximo Valentin Flores',  'floresmaximovalentin@gmail.com',       '$2b$12$QeMel/akGF9KTkQXqnXtWeP4.TyyNeUJdcW6gChg.5iu7kK7O2JUG', 43503918,   1, 3),
+    ('Rubi Rose',               'rubirose@gmail.com',                   '$2b$12$zPvoebtpukk2aNU276GJXOLDtgOk2IBeG6eMhlDnRm.eJnO7PQL92', 1111,       2, NULL),
+    ('Carlos Repartidor',       'carlos@logitrack.com.ar',              '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30111222,   3, 1),
+    ('Maria Repartidora',       'maria@logitrack.com.ar',               '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30333444,   3, 2),
+    ('Pedro Repartidor',        'pedro@logitrack.com.ar',               '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30555666,   3, 3);
 
 -- shipmentTypes
 INSERT INTO "logitrack"."shipmentType" ("id", "description") VALUES

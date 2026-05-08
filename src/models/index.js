@@ -8,6 +8,9 @@ const { TypeShipment }    = require('./typeShipment');
 const { User }            = require('./user');
 const { Shipment }        = require('./shipment');
 const { ShipmentHistory } = require('./shipmentHistory');
+const { DeliveryEvidence } = require('./deliveryEvidence');
+const { FailedAttempt }    = require('./failedAttempt');
+const { ShipmentImport }  = require('./shipmentImport');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -35,7 +38,26 @@ const safeAssociate = () => {
             ShipmentHistory.belongsTo(Status, { as: 'fromStatus', foreignKey: 'fromStatusId' });
             ShipmentHistory.belongsTo(Status, { as: 'toStatus',   foreignKey: 'toStatusId'   });
         }
-        if (User) { ShipmentHistory.belongsTo(User, { as: 'user', foreignKey: 'userId' }); }
+        if (User)   { ShipmentHistory.belongsTo(User,   { as: 'user',   foreignKey: 'userId'   }); }
+        if (Branch) { ShipmentHistory.belongsTo(Branch, { as: 'branch', foreignKey: 'branchId' }); }
+    }
+
+    if (DeliveryEvidence.belongsTo && Shipment) {
+        DeliveryEvidence.belongsTo(Shipment, {
+            as: 'shipment',
+            foreignKey: 'shipmentId'
+        });
+    }
+
+    if (FailedAttempt.belongsTo && Shipment) {
+    FailedAttempt.belongsTo(Shipment, {
+        as: 'shipment',
+        foreignKey: 'shipmentId'
+    });
+}
+
+    if (ShipmentImport.belongsTo && User) {
+        ShipmentImport.belongsTo(User, { as: 'user', foreignKey: 'userId' });
     }
 };
 
@@ -50,5 +72,8 @@ module.exports = {
     TypeShipment,
     User,
     Shipment,
-    ShipmentHistory
+    ShipmentHistory,
+    DeliveryEvidence,
+    FailedAttempt,
+    ShipmentImport
 };

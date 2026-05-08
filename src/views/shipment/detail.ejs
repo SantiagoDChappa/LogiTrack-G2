@@ -3,7 +3,8 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <% if (mapData && mapData.destination) { %>
+    <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0)); %>
+    <% if (_hasMap) { %>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <% } %>
     <title>Detalle de Envío - LogiTrack</title>
@@ -17,7 +18,7 @@
             <h1>Detalle de Envío</h1>
             <div style="display:flex;gap:var(--space-3)">
                 <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
-                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && shipment.statusId !== 3 && shipment.statusId !== 4 && shipment.statusId !== 5) { %>
+                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
                 <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="btn-primary">
                     <span class="material-symbols-outlined">edit</span>Modificar
                 </a>
@@ -29,7 +30,7 @@
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
-                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                 const _slLabel = _sl[_sk] || shipment.status.description;
             %>
 
@@ -49,7 +50,7 @@
                     <p class="historial-empty">Sin eventos registrados.</p>
                 <% } else { %>
                     <%
-                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                         function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         const _refLocation = [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || null;
                     %>
@@ -90,7 +91,12 @@
                                             <%= _author %>
                                         </div>
                                     <% } %>
-                                    <% if (_isCreated) { %>
+                                    <% if (h.branch) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
+                                            SUCURSAL <%= h.branch.name.toUpperCase() %>
+                                        </div>
+                                    <% } else if (_isCreated) { %>
                                         <div class="shipment-timeline-meta">
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
                                             <%= mapData.origin.label.toUpperCase() %>
@@ -99,6 +105,15 @@
                                         <div class="shipment-timeline-meta">
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
                                             <%= _refLocation.toUpperCase() %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.latitude != null && h.longitude != null) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">my_location</span>
+                                            <%= Number(h.latitude).toFixed(5) %>, <%= Number(h.longitude).toFixed(5) %>
+                                            <% if (_hasMap) { %>
+                                                <a href="#shipment-map" class="timeline-map-link" data-lat="<%= h.latitude %>" data-lng="<%= h.longitude %>" style="margin-left:.5rem;">Ver en mapa</a>
+                                            <% } %>
                                         </div>
                                     <% } %>
                                     <% if (h.comment) { %>
@@ -147,15 +162,18 @@
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 
-                    <div id="prediction-widget"
-                         class="pred-card pred-card--embedded"
-                         data-province-id="<%= shipment.address.provinceId %>"
-                         data-street="<%= shipment.address.street || '' %>"
-                         data-number="<%= shipment.address.number || '' %>"
-                         data-weight-kg="<%= shipment.weightKg || '' %>"
-                         data-package-qty="<%= shipment.packageQty || '' %>"
-                         data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
-                         data-autoload="true">
+                   <div id="prediction-widget"
+                    class="pred-card pred-card--embedded"
+                    data-province-id="<%= shipment.address.provinceId %>"
+                    data-street="<%= shipment.address.street || '' %>"
+                    data-number="<%= shipment.address.number || '' %>"
+                    data-weight-kg="<%= shipment.weightKg || '' %>"
+                    data-package-qty="<%= shipment.packageQty || '' %>"
+                    data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
+                    data-autoload="true"
+                    data-shipment-id="<%= shipment.id %>"
+                    data-delivery-user-id="<%= shipment.deliveryUserId || '' %>">
+                         
                         <h3>
                             <span class="material-symbols-outlined">query_stats</span>
                             Detalles de la entrega
@@ -165,19 +183,25 @@
                 </div>
 
                 <!-- ── Trayecto del envío (mapa) ── -->
-                <% if (mapData && mapData.destination) { %>
+                <% if (_hasMap) { %>
                 <div class="update-card update-map-card">
                     <h3><span class="material-symbols-outlined">map</span> Trayecto del envío</h3>
                     <div id="shipment-map"></div>
                     <div class="map-legend">
                         <div class="map-legend-item">
                             <div class="map-dot map-dot--origin"></div>
-                            <span>Origen: <%= mapData.origin.label %></span>
+                            <span>Sucursal / evento</span>
                         </div>
                         <div class="map-legend-item">
                             <div class="map-dot map-dot--dest"></div>
+                            <span>Entrega final (GPS)</span>
+                        </div>
+                        <% if (mapData.destination) { %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#9ca3af"></div>
                             <span>Destino: <%= mapData.destination.label %></span>
                         </div>
+                        <% } %>
                     </div>
                 </div>
                 <% } %>
@@ -267,6 +291,10 @@
                         <span class="detail-label">Cantidad de paquetes</span>
                         <span class="detail-value"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
                     </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Volumen</span>
+                        <span class="detail-value"><%= shipment.volumeM3 != null ? shipment.volumeM3 + ' m³' : '-' %></span>
+                    </div>
                 </div>
 
                 <div class="update-card" style="text-align:center;">
@@ -289,12 +317,12 @@
     <script src="/js/ui.js" defer></script>
     <script src="/js/prediction.js" defer></script>
 
-    <% if (mapData && mapData.destination) { %>
+    <% if (_hasMap) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
     (function () {
-        const origin = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %> };
-        const dest   = { lat: <%- mapData.destination.lat %>, lng: <%- mapData.destination.lng %> };
+        const stops = <%- JSON.stringify(mapData.stops || []) %>;
+        const destination = <%- mapData.destination ? JSON.stringify(mapData.destination) : 'null' %>;
 
         const map = L.map('shipment-map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -302,25 +330,67 @@
             maxZoom: 18,
         }).addTo(map);
 
-        const blueIcon = L.divIcon({
+        const mkIcon = (color) => L.divIcon({
             className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
+            html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [14, 14], iconAnchor: [7, 7],
         });
-        const redIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
+        const podIcon    = mkIcon('#dc2626');
+        const branchIcon = mkIcon('#2563eb');
+        const destIcon   = mkIcon('#9ca3af');
+
+        const fmtTs = (iso) => {
+            const d = new Date(iso);
+            return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        const escapeHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+        const markers = [];
+        const latlngs = [];
+        stops.forEach((s, idx) => {
+            const icon = s.isPOD ? podIcon : branchIcon;
+            const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+            const popup = '<strong>' + escapeHtml(s.label) + '</strong>'
+                + (s.status ? '<br>Estado: ' + escapeHtml(s.status) : '')
+                + '<br>' + escapeHtml(fmtTs(s.timestamp))
+                + '<br><small>' + s.lat.toFixed(5) + ', ' + s.lng.toFixed(5) + '</small>';
+            m.bindPopup(popup);
+            m.__idx = idx;
+            markers.push(m);
+            latlngs.push([s.lat, s.lng]);
         });
 
-        L.marker([origin.lat, origin.lng], { icon: blueIcon })
-            .addTo(map).bindPopup('<strong>Origen</strong><br><%- mapData.origin.label %>');
-        L.marker([dest.lat, dest.lng], { icon: redIcon })
-            .addTo(map).bindPopup('<strong>Destino</strong><br><%- mapData.destination.label %>');
-        L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
-            color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
-        }).addTo(map);
-        map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+        if (destination && (!stops.length || !stops[stops.length - 1].isPOD)) {
+            L.marker([destination.lat, destination.lng], { icon: destIcon })
+                .addTo(map)
+                .bindPopup('<strong>Destino</strong><br>' + escapeHtml(destination.label));
+            latlngs.push([destination.lat, destination.lng]);
+        }
+
+        if (latlngs.length >= 2) {
+            L.polyline(latlngs, { color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.7 }).addTo(map);
+            map.fitBounds(latlngs, { padding: [30, 30] });
+        } else if (latlngs.length === 1) {
+            map.setView(latlngs[0], 13);
+        } else {
+            map.setView([-34.6037, -58.3816], 11);
+        }
+
+        document.querySelectorAll('.timeline-map-link').forEach(link => {
+            link.addEventListener('click', (ev) => {
+                const lat = parseFloat(link.dataset.lat);
+                const lng = parseFloat(link.dataset.lng);
+                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                    map.setView([lat, lng], 15);
+                    const hit = markers.find(m => {
+                        const ll = m.getLatLng();
+                        return Math.abs(ll.lat - lat) < 1e-6 && Math.abs(ll.lng - lng) < 1e-6;
+                    });
+                    if (hit) hit.openPopup();
+                }
+            });
+        });
     })();
     </script>
     <% } %>
