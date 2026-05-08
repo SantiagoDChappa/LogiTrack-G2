@@ -15,9 +15,13 @@ const Shipment = sequelize.define('shipment', {
     addressId:        { type: DataTypes.INTEGER },
     shipmentTypeId:   { type: DataTypes.INTEGER },
     weightKg:         { type: DataTypes.DECIMAL(8, 2) },
+    volumeM3:         { type: DataTypes.DECIMAL(8, 3) },
     packageQty:       { type: DataTypes.INTEGER },
     deliveryUserId:   { type: DataTypes.INTEGER },
     legacyTrackingId: { type: DataTypes.STRING },
+    zoneId:           { type: DataTypes.INTEGER },
+    currentBranchId:  { type: DataTypes.INTEGER },
+    expectedDeliveryDate: { type: DataTypes.DATEONLY },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -78,7 +82,11 @@ const create = async (data) => {
         addressId:        data.addressId,
         shipmentTypeId:   data.shipmentTypeId || null,
         weightKg:         data.weightKg       || null,
+        volumeM3:         data.volumeM3        || null,
         packageQty:       data.packageQty      || null,
+        zoneId:           data.zoneId          || null,
+        currentBranchId:  data.currentBranchId || null,
+        expectedDeliveryDate: data.expectedDeliveryDate || null,
         legacyTrackingId: data.legacyTrackingId || null,
         createdAt:        new Date().toISOString().split('T')[0]
     });

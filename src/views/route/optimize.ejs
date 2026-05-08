@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Optimización de Ruteo - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Optimizar Ruteo</h1>
+            <p>Sucursal asignada: #<%= branchId %> · Envíos pendientes en tu sucursal: <%= shipments.length %></p>
+        </div>
+
+        <% if (shipments.length === 0) { %>
+            <p>No hay envíos pendientes en tu sucursal.</p>
+        <% } else if (transports.length === 0) { %>
+            <p>No hay transportes habilitados disponibles.</p>
+        <% } else { %>
+        <form id="optimize-form">
+            <h2>Envíos pendientes</h2>
+            <div class="shipments-wrapper">
+                <table class="shipments-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all-shipments"></th>
+                            <th>Tracking</th><th>Destinatario</th><th>Zona</th>
+                            <th>Peso (kg)</th><th>Volumen (m³)</th><th>CP</th><th>Fecha estimada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% shipments.forEach(s => { %>
+                            <tr>
+                                <td><input type="checkbox" name="shipmentIds" value="<%= s.id %>" class="ship-cb"></td>
+                                <td><%= s.trackingId %></td>
+                                <td><%= s.recipient ? s.recipient.fullName : '-' %></td>
+                                <td><%= s.zone ? s.zone.name : '<sin zona>' %></td>
+                                <td><%= s.weightKg || '-' %></td>
+                                <td><%= s.volumeM3 || '-' %></td>
+                                <td><%= s.address ? s.address.postalCode : '-' %></td>
+                                <td><%= s.expectedDeliveryDate || '-' %></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+
+            <h2>Transportes habilitados</h2>
+            <div class="shipments-wrapper">
+                <table class="shipments-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all-transports"></th>
+                            <th>Nombre</th><th>Patente</th><th>Peso máx</th><th>Vol máx</th>
+                            <th>Costo fijo</th><th>$/km</th><th>Conductor</th><th>Zonas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% transports.forEach(t => { %>
+                            <tr>
+                                <td><input type="checkbox" name="transportIds" value="<%= t.id %>" class="tx-cb"></td>
+                                <td><%= t.name %></td>
+                                <td><%= t.plate || '-' %></td>
+                                <td><%= t.maxWeightKg %></td>
+                                <td><%= t.maxVolumeM3 %></td>
+                                <td>$<%= t.fixedCost %></td>
+                                <td>$<%= t.costPerKm %></td>
+                                <td><%= t.driver ? t.driver.fullName : '-' %></td>
+                                <td><%= (t.zones && t.zones.length) ? t.zones.map(z => z.name).join(', ') : 'Todas' %></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+
+            <button type="submit" class="btn-primary">Calcular ruta óptima</button>
+        </form>
+
+        <section id="results" style="margin-top: 2rem; display: none;">
+            <h2>Propuestas</h2>
+            <div id="proposals"></div>
+            <div id="unassigned"></div>
+            <button id="confirm-btn" class="btn-primary" style="display:none">Confirmar y aplicar</button>
+        </section>
+        <% } %>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    document.getElementById('select-all-shipments')?.addEventListener('change', e => {
+        document.querySelectorAll('.ship-cb').forEach(cb => { cb.checked = e.target.checked; });
+    });
+    document.getElementById('select-all-transports')?.addEventListener('change', e => {
+        document.querySelectorAll('.tx-cb').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    let lastProposals = null;
+
+    document.getElementById('optimize-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const shipmentIds = fd.getAll('shipmentIds');
+        const transportIds = fd.getAll('transportIds');
+        if (shipmentIds.length === 0 || transportIds.length === 0) {
+            alert('Seleccioná al menos un envío y un transporte.');
+            return;
+        }
+
+        const res = await fetch('/route/optimize/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipmentIds, transportIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Error'); return; }
+
+        lastProposals = data.proposals;
+        renderProposals(data);
+    });
+
+    function renderProposals(data) {
+        const container = document.getElementById('proposals');
+        container.innerHTML = '';
+        document.getElementById('results').style.display = 'block';
+
+        data.proposals.forEach((p, idx) => {
+            const card = document.createElement('div');
+            card.className = 'proposal-card';
+            card.style.cssText = 'border:1px solid #ccc; padding:1rem; margin:1rem 0; border-radius:8px';
+            card.innerHTML = `
+                <h3>${p.transport.name} ${p.transport.plate ? '(' + p.transport.plate + ')' : ''}</h3>
+                <p>Conductor: ${p.transport.driver ? p.transport.driver.fullName : 'Sin asignar'}</p>
+                <p>Distancia total: ${p.totalDistanceKm} km · Costo total: $${p.totalCost}</p>
+                <p>Utilización peso: ${(p.utilizationWeight*100).toFixed(0)}% (${p.totalWeightKg}/${p.transport.maxWeightKg} kg)</p>
+                <p>Utilización volumen: ${(p.utilizationVolume*100).toFixed(0)}% (${p.totalVolumeM3}/${p.transport.maxVolumeM3} m³)</p>
+                <ol>${p.stops.map(s => `<li><b>${s.stopType === 'pickup' ? '📦 Pickup' : '🏠 Entrega'}</b> · ${s.label || ''} · +${s.distanceFromPrevKm} km</li>`).join('')}</ol>
+                <div id="map-${idx}" style="height:300px; margin-top:1rem"></div>
+            `;
+            container.appendChild(card);
+
+            setTimeout(() => {
+                const map = L.map('map-' + idx).setView([p.stops[0]?.lat || -34.6, p.stops[0]?.lng || -58.4], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+                const latlngs = [];
+                p.stops.forEach(s => {
+                    L.marker([s.lat, s.lng]).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label || ''}`).addTo(map);
+                    latlngs.push([s.lat, s.lng]);
+                });
+                if (latlngs.length > 1) {
+                    L.polyline(latlngs, { color: 'blue' }).addTo(map);
+                    map.fitBounds(latlngs);
+                }
+            }, 50);
+        });
+
+        const un = document.getElementById('unassigned');
+        un.innerHTML = data.unassigned && data.unassigned.length
+            ? `<p><b>Envíos sin asignar:</b> ${data.unassigned.join(', ')}</p>`
+            : '';
+        document.getElementById('confirm-btn').style.display = data.proposals.length > 0 ? 'inline-block' : 'none';
+    }
+
+    document.getElementById('confirm-btn')?.addEventListener('click', async () => {
+        if (!lastProposals || !lastProposals.length) { return; }
+        if (!confirm('¿Confirmar y aplicar estas asignaciones?')) { return; }
+        const res = await fetch('/route/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proposals: lastProposals }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Rutas creadas: ' + data.routeIds.join(', '));
+            window.location.href = '/route';
+        } else {
+            alert(data.error || 'Error');
+        }
+    });
+    </script>
+</body>
+</html>

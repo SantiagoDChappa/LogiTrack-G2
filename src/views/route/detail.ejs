@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Ruta #<%= route.id %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Ruta #<%= route.id %></h1>
+            <p>Transporte: <%= route.transport ? route.transport.name : '-' %> · Conductor: <%= route.transport && route.transport.driver ? route.transport.driver.fullName : '-' %></p>
+            <p>Distancia: <%= route.totalDistanceKm %> km · Costo: $<%= route.totalCost %></p>
+        </div>
+
+        <h2>Paradas</h2>
+        <ol>
+            <% (route.stops || []).forEach(s => { %>
+                <li>
+                    <b><%= s.stopType === 'pickup' ? 'Pickup' : 'Entrega' %></b> ·
+                    <% if (s.stopType === 'pickup') { %>
+                        Sucursal: <%= s.branch ? s.branch.name : '#' + s.branchId %>
+                    <% } else { %>
+                        Envío: <%= s.shipment ? s.shipment.trackingId : '#' + s.shipmentId %>
+                        <% if (s.shipment && s.shipment.address) { %>
+                            (<%= s.shipment.address.street %> <%= s.shipment.address.number %>)
+                        <% } %>
+                    <% } %>
+                    · +<%= s.distanceFromPrevKm %> km
+                    <%= s.completed ? '✓' : '' %>
+                </li>
+            <% }) %>
+        </ol>
+
+        <div id="map" style="height: 500px; margin-top: 1rem"></div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const stops = <%- JSON.stringify((route.stops || []).map(s => ({
+            sequence: s.sequence, stopType: s.stopType, lat: Number(s.lat), lng: Number(s.lng),
+            label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
+        }))) %>;
+        const map = L.map('map').setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+        const latlngs = [];
+        stops.forEach(s => {
+            L.marker([s.lat, s.lng]).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label}`).addTo(map);
+            latlngs.push([s.lat, s.lng]);
+        });
+        if (latlngs.length > 1) {
+            L.polyline(latlngs, { color: 'blue' }).addTo(map);
+            map.fitBounds(latlngs);
+        }
+    </script>
+</body>
+</html>

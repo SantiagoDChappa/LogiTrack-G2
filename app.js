@@ -28,6 +28,9 @@ const deliveryRoutes = require('./src/routes/delivery');
 const scanRoutes     = require('./src/routes/scan');
 const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
+const routeRoutes      = require('./src/routes/route');
+const transportRoutes  = require('./src/routes/transport');
+const zoneRoutes       = require('./src/routes/zone');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -72,6 +75,9 @@ app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/delivery', requireAuth, deliveryRoutes);
 app.use('/scan',     requireAuth, scanRoutes);
+app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
+app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
+app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 
 ;
 app.use('/api/persons',personRoutes);

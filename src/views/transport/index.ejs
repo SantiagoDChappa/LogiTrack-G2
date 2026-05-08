@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Transportes - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Transportes</h1>
+            <div class="page-header__actions">
+                <a href="/transport/new" class="btn-primary">
+                    <span class="material-symbols-outlined">add</span>Nuevo
+                </a>
+            </div>
+        </div>
+
+        <div class="shipments-wrapper">
+            <table class="shipments-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Patente</th>
+                        <th>Peso máx (kg)</th>
+                        <th>Volumen máx (m³)</th>
+                        <th>Costo fijo</th>
+                        <th>Costo/km</th>
+                        <th>Conductor</th>
+                        <th>Sucursal</th>
+                        <th>Habilitado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% transports.forEach(t => { %>
+                        <tr>
+                            <td><%= t.name %></td>
+                            <td><%= t.plate || '-' %></td>
+                            <td><%= t.maxWeightKg %></td>
+                            <td><%= t.maxVolumeM3 %></td>
+                            <td>$<%= t.fixedCost %></td>
+                            <td>$<%= t.costPerKm %></td>
+                            <td><%= t.driver ? t.driver.fullName : '-' %></td>
+                            <td><%= t.branch ? t.branch.name : '-' %></td>
+                            <td><%= t.enabled ? 'Sí' : 'No' %></td>
+                            <td>
+                                <a href="/transport/update/<%= t.id %>" class="btn-secondary">Editar</a>
+                                <form method="POST" action="/transport/toggle/<%= t.id %>" style="display:inline">
+                                    <button class="btn-secondary" type="submit"><%= t.enabled ? 'Deshabilitar' : 'Habilitar' %></button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }) %>
+                    <% if (transports.length === 0) { %>
+                        <tr><td colspan="10">No hay transportes cargados.</td></tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

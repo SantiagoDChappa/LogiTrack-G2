@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Mi Ruta - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Mi Ruta #<%= route.id %></h1>
+            <p>Transporte: <%= route.transport.name %> · Distancia: <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</p>
+        </div>
+
+        <div id="map" style="height: 400px; margin-bottom: 1rem"></div>
+
+        <h2>Recorrido</h2>
+        <ol id="stops-list">
+            <% (route.stops || []).forEach(s => { %>
+                <li data-stop-id="<%= s.id %>" style="padding: .5rem; border-bottom: 1px solid #eee">
+                    <strong>
+                        <% if (s.stopType === 'pickup') { %>
+                            📦 Pickup en <%= s.branch ? s.branch.name : 'sucursal' %>
+                        <% } else { %>
+                            🏠 Entrega <%= s.shipment ? s.shipment.trackingId : '' %>
+                        <% } %>
+                    </strong>
+                    <br>
+                    <% if (s.stopType === 'delivery' && s.shipment && s.shipment.address) { %>
+                        <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                        <% if (s.shipment.recipient) { %> · Destinatario: <%= s.shipment.recipient.fullName %><% } %>
+                    <% } else if (s.branch) { %>
+                        <%= s.branch.address %>
+                    <% } %>
+                    <br>
+                    <small>+<%= s.distanceFromPrevKm %> km · <%= s.completed ? '✅ Completado' : 'Pendiente' %></small>
+                    <% if (!s.completed) { %>
+                        <button class="btn-secondary complete-btn" data-stop-id="<%= s.id %>">Marcar completado</button>
+                    <% } %>
+                </li>
+            <% }) %>
+        </ol>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const routeId = <%= route.id %>;
+        const stops = <%- JSON.stringify((route.stops || []).map(s => ({
+            id: s.id, sequence: s.sequence, stopType: s.stopType,
+            lat: Number(s.lat), lng: Number(s.lng), completed: s.completed,
+            label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
+        }))) %>;
+
+        const map = L.map('map').setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+        const latlngs = [];
+        stops.forEach(s => {
+            const icon = L.divIcon({ html: `<div style="background:${s.stopType==='pickup'?'orange':'#1976d2'};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold">${s.sequence}</div>`, className: '' });
+            L.marker([s.lat, s.lng], { icon }).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label}`).addTo(map);
+            latlngs.push([s.lat, s.lng]);
+        });
+        if (latlngs.length > 1) {
+            L.polyline(latlngs, { color: '#1976d2', weight: 4 }).addTo(map);
+            map.fitBounds(latlngs);
+        }
+
+        document.querySelectorAll('.complete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const stopId = btn.dataset.stopId;
+                const res = await fetch(`/delivery/route/${routeId}/stop/${stopId}/complete`, { method: 'POST' });
+                if (res.ok) { location.reload(); } else { alert('Error'); }
+            });
+        });
+    </script>
+</body>
+</html>

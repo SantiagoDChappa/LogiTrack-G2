@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Rutas - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Rutas</h1>
+            <div class="page-header__actions">
+                <a class="btn-primary" href="/route/optimize"><span class="material-symbols-outlined">add</span>Optimizar</a>
+            </div>
+        </div>
+        <div class="shipments-wrapper">
+            <table class="shipments-table">
+                <thead>
+                    <tr><th>ID</th><th>Transporte</th><th>Conductor</th><th>Sucursal</th><th>Distancia</th><th>Costo</th><th>Estado</th><th>Creada</th><th></th></tr>
+                </thead>
+                <tbody>
+                    <% routes.forEach(r => { %>
+                        <tr>
+                            <td>#<%= r.id %></td>
+                            <td><%= r.transport ? r.transport.name : '-' %></td>
+                            <td><%= r.transport && r.transport.driver ? r.transport.driver.fullName : '-' %></td>
+                            <td><%= r.originBranch ? r.originBranch.name : '-' %></td>
+                            <td><%= r.totalDistanceKm %> km</td>
+                            <td>$<%= r.totalCost %></td>
+                            <td><%= r.statusId %></td>
+                            <td><%= r.createdAt ? new Date(r.createdAt).toLocaleString('es-AR') : '-' %></td>
+                            <td><a class="btn-secondary" href="/route/<%= r.id %>">Ver</a></td>
+                        </tr>
+                    <% }) %>
+                    <% if (routes.length === 0) { %><tr><td colspan="9">Sin rutas creadas.</td></tr><% } %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
