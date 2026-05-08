@@ -56,6 +56,9 @@
             // shipTypeId: 1=Express→0, 2=Estándar→1
             const shipType = parseInt(shipTypeId) === 1 ? 0 : 1;
 
+            const widget = document.getElementById('prediction-widget');
+            const shipmentId = widget?.dataset.shipmentId || null;
+
             const predRes = await fetch('/api/predict', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -68,6 +71,7 @@
                     month,
                     origin_province:         distData.origin_province_ml,
                     destination_province:    distData.destination_province_ml,
+                    shipmentId:              shipmentId ? parseInt(shipmentId) : null,
                 }),
             });
             const pred = await predRes.json();
@@ -101,27 +105,87 @@
         el.innerHTML = `<span class="pred-error"><span class="material-symbols-outlined">error_outline</span> ${msg}</span>`;
     }
 
-    function showResult(pred, distKm) {
+   function showResult(pred, distKm) {
         const el = document.getElementById('prediction-result');
         if (!el) return;
-        const isDelayed  = pred.delayed;
-        const badgeClass = isDelayed ? 'retrasado' : 'entregado';
-        const label      = isDelayed ? 'Posible demora' : 'A tiempo';
-        const days       = pred.delivery_days;
+
+        // Semáforo de 3 colores
+        const prob = pred.probability;
+        let semaforoColor, semaforoLabel, semaforoClass;
+        if (prob < 20) {
+            semaforoColor = '🟢';
+            semaforoLabel = 'Riesgo bajo';
+            semaforoClass = 'entregado';
+        } else if (prob <= 50) {
+            semaforoColor = '🟡';
+            semaforoLabel = 'Riesgo medio';
+            semaforoClass = 'en_sucursal';
+        } else {
+            semaforoColor = '🔴';
+            semaforoLabel = 'Riesgo alto';
+            semaforoClass = 'retrasado';
+        }
+
+        // Fecha estimada en lenguaje natural
+        const days = pred.delivery_days;
+        const fechaEstimada = new Date();
+        fechaEstimada.setDate(fechaEstimada.getDate() + days);
+        const fechaLabel = fechaEstimada.toLocaleDateString('es-AR', {
+            weekday: 'long', day: 'numeric', month: 'long'
+        });
+
+        // Etiquetas de justificación
+        const etiquetas = [];
+        if (distKm > 800)        etiquetas.push('Larga distancia');
+        if (pred.delivery_days > 5) etiquetas.push('Entrega lenta');
+        if (prob > 50)           etiquetas.push('Riesgo alto');
+        if (prob <= 20)          etiquetas.push('Alta fiabilidad');
+
         el.innerHTML = `
             <div class="pred-row">
-                <span class="status-badge ${badgeClass}">${label}</span>
-                <span class="pred-prob">Prob. de demora: <strong>${pred.probability}%</strong></span>
+                <span class="status-badge ${semaforoClass}">${semaforoColor} ${semaforoLabel}</span>
+                <span class="pred-prob">Prob. de demora: <strong>${prob}%</strong></span>
             </div>
             <div class="pred-days">
-                <span class="material-symbols-outlined">schedule</span>
-                Tiempo estimado: <strong>${days} día${days !== 1 ? 's' : ''}</strong>
+                <span class="material-symbols-outlined">event</span>
+                Llega estimado: <strong>${fechaLabel}</strong> (${days} día${days !== 1 ? 's' : ''})
             </div>
             <div class="pred-dist">
                 <span class="material-symbols-outlined">route</span>
                 Distancia aprox.: <strong>${distKm} km</strong>
             </div>
+            ${etiquetas.length > 0 ? `
+            <div class="pred-tags">
+                ${etiquetas.map(e => `<span class="pred-tag">${e}</span>`).join('')}
+            </div>` : ''}
+            ${prob > 50 ? `
+            <div class="pred-alert" id="pred-alert-high-risk">
+                <span class="material-symbols-outlined">warning</span>
+                Riesgo alto — cargando sugerencia...
+            </div>` : ''}
         `;
+
+        // Si riesgo > 50%, buscar repartidor sugerido
+        if (prob > 50) {
+            fetch('/api/suggest-delivery')
+                .then(r => r.json())
+                .then(data => {
+                    const alertEl = document.getElementById('pred-alert-high-risk');
+                    if (!alertEl) return;
+                    if (data.suggested) {
+                       const widget = document.getElementById('prediction-widget');
+                        const shipmentId = widget?.dataset.shipmentId;
+                        const alreadyAssigned = widget?.dataset.deliveryUserId && widget.dataset.deliveryUserId !== '';
+                        alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Riesgo alto — Repartidor sugerido: <strong>${data.suggested.fullName}</strong> (${data.suggested.activeShipments} envío${data.suggested.activeShipments !== 1 ? 's' : ''} activo${data.suggested.activeShipments !== 1 ? 's' : ''})`;
+                    } else {
+                        alertEl.innerHTML = '<span class="material-symbols-outlined">warning</span> Riesgo alto — No hay repartidores disponibles';
+                    }
+                })
+                .catch(() => {
+                    const alertEl = document.getElementById('pred-alert-high-risk');
+                    if (alertEl) alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Riesgo alto`;
+                });
+        }
     }
 
     function trigger() {
@@ -151,4 +215,18 @@
     } else {
         initPrediction();
     }
+    window.assignSuggestedDelivery = async function(shipmentId, deliveryUserId) {
+        try {
+            const res = await fetch(`/shipment/update/${shipmentId}/assign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `deliveryUserId=${deliveryUserId}`
+            });
+            if (res.ok || res.redirected) {
+                window.location.reload();
+            }
+        } catch {
+            alert('Error al asignar repartidor');
+        }
+    };
 })();
