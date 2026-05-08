@@ -162,23 +162,28 @@ describe('shipmentRowValidator.validate', () => {
         expect(r.errors).toContainEqual(expect.objectContaining({ field: 'status' }));
     });
 
-    test('status "Pendiente" se rechaza (no es estado terminal)', () => {
+    test('status "Pendiente" se acepta y devuelve statusId 1', () => {
         const row = validRow();
         row.status = 'Pendiente';
         const r = validate(row);
-        expect(r.ok).toBe(false);
-        expect(r.errors).toContainEqual(expect.objectContaining({
-            field:   'status',
-            message: expect.stringContaining('Solo se aceptan envíos cerrados'),
-        }));
+        expect(r.ok).toBe(true);
+        expect(r.normalized.statusId).toBe(1);
     });
 
-    test('status "En Transito" se rechaza', () => {
+    test('status "En Transito" se acepta y devuelve statusId 2', () => {
         const row = validRow();
         row.status = 'En Transito';
         const r = validate(row);
-        expect(r.ok).toBe(false);
-        expect(r.errors).toContainEqual(expect.objectContaining({ field: 'status' }));
+        expect(r.ok).toBe(true);
+        expect(r.normalized.statusId).toBe(2);
+    });
+
+    test('status "En Sucursal" se acepta y devuelve statusId 3', () => {
+        const row = validRow();
+        row.status = 'En Sucursal';
+        const r = validate(row);
+        expect(r.ok).toBe(true);
+        expect(r.normalized.statusId).toBe(3);
     });
 
     test('status "Cancelado" devuelve statusId 5', () => {
@@ -189,27 +194,49 @@ describe('shipmentRowValidator.validate', () => {
         expect(r.normalized.statusId).toBe(5);
     });
 
-    test('status como id numérico también funciona (4 y 5)', () => {
+    test('status como id numérico funciona para los 5 estados', () => {
         const row = validRow();
-        row.status = '4';
-        const r1 = validate(row);
-        expect(r1.ok).toBe(true);
-        expect(r1.normalized.statusId).toBe(4);
-
-        row.status = '5';
-        const r2 = validate(row);
-        expect(r2.ok).toBe(true);
-        expect(r2.normalized.statusId).toBe(5);
+        for (const id of [1, 2, 3, 4, 5]) {
+            row.status = String(id);
+            const r = validate(row);
+            expect(r.ok).toBe(true);
+            expect(r.normalized.statusId).toBe(id);
+        }
     });
 
-    test('status con id de estado activo (1, 2, 3) se rechaza', () => {
+    test('status con valor desconocido se rechaza con mensaje listando los 5 estados', () => {
         const row = validRow();
-        for (const invalid of ['1', '2', '3']) {
-            row.status = invalid;
-            const r = validate(row);
-            expect(r.ok).toBe(false);
-            expect(r.errors).toContainEqual(expect.objectContaining({ field: 'status' }));
-        }
+        row.status = 'ChupaCabras';
+        const r = validate(row);
+        expect(r.ok).toBe(false);
+        expect(r.errors).toContainEqual(expect.objectContaining({
+            field:   'status',
+            message: expect.stringContaining('Estados permitidos'),
+        }));
+    });
+
+    test('deliveryUserDocument opcional se preserva en normalized', () => {
+        const row = validRow();
+        row.deliveryUserDocument = '30000001';
+        const r = validate(row);
+        expect(r.ok).toBe(true);
+        expect(r.normalized.deliveryUserDocument).toBe(30000001);
+    });
+
+    test('deliveryUserDocument vacío deja el campo null', () => {
+        const row = validRow();
+        row.deliveryUserDocument = '';
+        const r = validate(row);
+        expect(r.ok).toBe(true);
+        expect(r.normalized.deliveryUserDocument).toBe(null);
+    });
+
+    test('deliveryUserDocument fuera de rango genera error', () => {
+        const row = validRow();
+        row.deliveryUserDocument = '99';
+        const r = validate(row);
+        expect(r.ok).toBe(false);
+        expect(r.errors).toContainEqual(expect.objectContaining({ field: 'deliveryUserDocument' }));
     });
 });
 
@@ -232,6 +259,23 @@ describe('resolveProvinceId', () => {
 });
 
 describe('resolveStatusId', () => {
+    test('acepta PENDING en variantes y devuelve 1', () => {
+        expect(resolveStatusId('Pendiente')).toBe(1);
+        expect(resolveStatusId('pending')).toBe(1);
+        expect(resolveStatusId('1')).toBe(1);
+    });
+    test('acepta IN_TRANSIT en variantes y devuelve 2', () => {
+        expect(resolveStatusId('En Transito')).toBe(2);
+        expect(resolveStatusId('en_transito')).toBe(2);
+        expect(resolveStatusId('in transit')).toBe(2);
+        expect(resolveStatusId('2')).toBe(2);
+    });
+    test('acepta AT_BRANCH en variantes y devuelve 3', () => {
+        expect(resolveStatusId('En Sucursal')).toBe(3);
+        expect(resolveStatusId('en_sucursal')).toBe(3);
+        expect(resolveStatusId('at_branch')).toBe(3);
+        expect(resolveStatusId('3')).toBe(3);
+    });
     test('acepta DELIVERED en variantes y devuelve 4', () => {
         expect(resolveStatusId('Entregado')).toBe(4);
         expect(resolveStatusId('entregado')).toBe(4);
@@ -245,11 +289,10 @@ describe('resolveStatusId', () => {
         expect(resolveStatusId('canceled')).toBe(5);
         expect(resolveStatusId('5')).toBe(5);
     });
-    test('rechaza estados activos y desconocidos', () => {
-        expect(resolveStatusId('Pendiente')).toBe(null);
-        expect(resolveStatusId('En Transito')).toBe(null);
-        expect(resolveStatusId('1')).toBe(null);
+    test('rechaza valores desconocidos', () => {
         expect(resolveStatusId('cualquiercosa')).toBe(null);
+        expect(resolveStatusId('6')).toBe(null);
+        expect(resolveStatusId('0')).toBe(null);
     });
     test('valor vacío devuelve null', () => {
         expect(resolveStatusId('')).toBe(null);

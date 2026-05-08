@@ -169,6 +169,7 @@ const createShipment = async (req, res) => {
         shipmentTypeId: body.shipmentTypeId || null,
         weightKg:       body.weightKg       || null,
         packageQty:     body.packageQty      || null,
+        volumeM3:       body.volumeM3        || null,
     });
 
     const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
@@ -360,6 +361,21 @@ const updateShipmentStatus = async (req, res) => {
     });
 
     await shipmentModel.updateStatus(id, Number(newStatusId));
+
+// Si se marca como Entregado, actualizar resultado real de la predicción
+if (Number(newStatusId) === 4) {
+    try {
+        const { updateActualResult } = require('../models/shipmentPrediction');
+        const { ShipmentHistory } = require('../models/shipmentHistory');
+        const historial = await ShipmentHistory.findAll({ where: { shipmentId: id }, order: [['changedAt', 'ASC']] });
+        const fechaCreacion = historial.length > 0 ? historial[0].changedAt : new Date();
+        const diasReales = Math.ceil((new Date() - new Date(fechaCreacion)) / (1000 * 60 * 60 * 24));
+        const wasDelayed = diasReales > 3;
+        await updateActualResult(id, diasReales, wasDelayed);
+    } catch (e) {
+        console.error('Error actualizando predicción real:', e.message);
+    }
+}
     if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
 
     res.redirect(`/shipment/update/${id}`);
