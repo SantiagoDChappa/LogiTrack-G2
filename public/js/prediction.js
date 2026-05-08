@@ -176,7 +176,7 @@
                        const widget = document.getElementById('prediction-widget');
                         const shipmentId = widget?.dataset.shipmentId;
                         const alreadyAssigned = widget?.dataset.deliveryUserId && widget.dataset.deliveryUserId !== '';
-                        alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Riesgo alto — Repartidor sugerido: <strong>${data.suggested.fullName}</strong> (${data.suggested.activeShipments} envío${data.suggested.activeShipments !== 1 ? 's' : ''} activo${data.suggested.activeShipments !== 1 ? 's' : ''}) ${shipmentId && !alreadyAssigned ? '<button onclick="assignSuggestedDelivery(' + shipmentId + ', ' + data.suggested.id + ')" class="btn-assign-suggested">Asignar</button>' : ''}`;
+                        alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Riesgo alto — Repartidor sugerido: <strong>${data.suggested.fullName}</strong> (${data.suggested.activeShipments} envío${data.suggested.activeShipments !== 1 ? 's' : ''} activo${data.suggested.activeShipments !== 1 ? 's' : ''})`;
                     } else {
                         alertEl.innerHTML = '<span class="material-symbols-outlined">warning</span> Riesgo alto — No hay repartidores disponibles';
                     }

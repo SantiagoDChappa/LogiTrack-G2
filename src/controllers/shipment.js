@@ -169,6 +169,7 @@ const createShipment = async (req, res) => {
         shipmentTypeId: body.shipmentTypeId || null,
         weightKg:       body.weightKg       || null,
         packageQty:     body.packageQty      || null,
+        volumeM3:       body.volumeM3        || null,
     });
 
     const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);

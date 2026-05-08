@@ -291,6 +291,10 @@
                         <span class="detail-label">Cantidad de paquetes</span>
                         <span class="detail-value"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
                     </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Volumen</span>
+                        <span class="detail-value"><%= shipment.volumeM3 != null ? shipment.volumeM3 + ' m³' : '-' %></span>
+                    </div>
                 </div>
 
                 <div class="update-card" style="text-align:center;">
