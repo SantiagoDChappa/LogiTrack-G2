@@ -129,5 +129,19 @@
     }
 </script>
 
+<script>
+    if (new URLSearchParams(window.location.search).get('failed') === 'true') {
+        Swal.fire({
+            icon: 'warning',
+            title: '¡Intento fallido registrado!',
+            text: 'El operador recibirá la notificación para reprogramar la entrega.',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#2563eb',
+        }).then(() => {
+            history.replaceState(null, '', '/delivery');
+        });
+    }
+</script>
+
 </body>
 </html>

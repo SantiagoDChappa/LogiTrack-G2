@@ -6,7 +6,7 @@ const Status = Object.freeze({
     CANCELLED:      { id: 5, description: 'Cancelado'       },
     ASSIGNED:       { id: 6, description: 'Asignado'        },
     IN_PREPARATION: { id: 7, description: 'En Preparacion'  },
-    PACKAGE_FAILED: { id: 8, description: 'Paquete Fallido' },
+    FAILED_PACKAGE: { id: 8, description: 'Paquete Fallido' },
     FAILED_ATTEMPT: { id: 9, description: 'Intento Fallido' },
 });
 
