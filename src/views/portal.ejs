@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <link rel="shortcut icon" href="/images/favicon.ico">
 </head>
 <body>
@@ -264,6 +265,23 @@
                     </div>
                     <% } %>
 
+                    <!-- Mapa de seguimiento -->
+                    <% if (s.mapData && (s.mapData.stops.length > 0 || s.mapData.destination)) { %>
+                    <div class="portal-map-section">
+                        <span class="portal-map-title">Recorrido del envío</span>
+                        <div class="portal-map" id="map-<%= s.trackingId %>"></div>
+                        <div class="portal-map-legend">
+                            <span class="portal-map-legend-item"><span class="portal-map-legend-line portal-map-legend-line--done"></span> Recorrido</span>
+                            <span class="portal-map-legend-item"><span class="portal-map-legend-line portal-map-legend-line--pending"></span> Por recorrer</span>
+                            <span class="portal-map-legend-item"><span class="portal-map-dot portal-map-dot--stop"></span> Sucursal visitada</span>
+                            <span class="portal-map-legend-item"><span class="portal-map-dot portal-map-dot--dest"></span> Destino (zona)</span>
+                            <% if (s.mapData.currentStatusId === 2) { %>
+                            <span class="portal-map-legend-item"><span class="portal-map-dot portal-map-dot--truck">🚚</span> En camino</span>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% } %>
+
                 </div>
                 <% }); %>
             </div>
@@ -347,6 +365,104 @@
     </footer>
 
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="/js/theme.js" defer></script>
+    <% if (typeof shipments !== 'undefined' && shipments) { %>
+    <script>
+    (function() {
+        var allMapData = <%- JSON.stringify(shipments.map(function(s) {
+            return { trackingId: s.trackingId, mapData: s.mapData };
+        })) %>;
+
+        var stopIcon = L.divIcon({
+            className: 'portal-marker-stop',
+            html: '<span class="material-symbols-outlined">warehouse</span>',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -20]
+        });
+
+        var destIcon = L.divIcon({
+            className: 'portal-marker-dest',
+            html: '<span class="material-symbols-outlined">location_on</span>',
+            iconSize: [36, 36],
+            iconAnchor: [18, 36],
+            popupAnchor: [0, -36]
+        });
+
+        var truckIcon = L.divIcon({
+            className: 'portal-marker-truck',
+            html: '🚚',
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+            popupAnchor: [0, -20]
+        });
+
+        allMapData.forEach(function(item) {
+            var el = document.getElementById('map-' + item.trackingId);
+            if (!el || !item.mapData) return;
+
+            var md = item.mapData;
+            if (md.stops.length === 0 && !md.destination) return;
+
+            var map = L.map(el, { scrollWheelZoom: false });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap',
+                maxZoom: 18
+            }).addTo(map);
+
+            var bounds = [];
+            var traveledPoints = [];
+
+            md.stops.forEach(function(stop, i) {
+                var latlng = [stop.lat, stop.lng];
+                bounds.push(latlng);
+                traveledPoints.push(latlng);
+                var dateStr = stop.date
+                    ? new Date(stop.date).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '';
+                var order = i + 1;
+                L.marker(latlng, { icon: stopIcon })
+                    .addTo(map)
+                    .bindPopup('<strong>' + order + '. ' + stop.label + '</strong>' + (dateStr ? '<br>' + dateStr : ''));
+            });
+
+            if (traveledPoints.length >= 2) {
+                L.polyline(traveledPoints, { color: '#2563eb', weight: 4, opacity: 0.9 }).addTo(map);
+            }
+
+            if (md.destination) {
+                var destLL = [md.destination.lat, md.destination.lng];
+                bounds.push(destLL);
+
+                var lastStop = traveledPoints.length > 0 ? traveledPoints[traveledPoints.length - 1] : null;
+                if (lastStop) {
+                    L.polyline([lastStop, destLL], {
+                        color: '#94a3b8', weight: 3, dashArray: '10 8', opacity: 0.6
+                    }).addTo(map);
+                }
+
+                L.marker(destLL, { icon: destIcon })
+                    .addTo(map)
+                    .bindPopup('<strong>Destino: ' + md.destination.label + '</strong>');
+            }
+
+            if (md.currentStatusId === 2 && traveledPoints.length > 0 && md.destination) {
+                var origin = traveledPoints[traveledPoints.length - 1];
+                var target = [md.destination.lat, md.destination.lng];
+                var midLat = origin[0] + (target[0] - origin[0]) * 0.4;
+                var midLng = origin[1] + (target[1] - origin[1]) * 0.4;
+                L.marker([midLat, midLng], { icon: truckIcon, zIndexOffset: 1000 })
+                    .addTo(map)
+                    .bindPopup('<strong>En camino</strong>');
+            }
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+            }
+        });
+    })();
+    </script>
+    <% } %>
 </body>
 </html>
