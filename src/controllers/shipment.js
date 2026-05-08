@@ -483,6 +483,32 @@ const markPackageFailed = async (req, res) => {
     }
 };
 
+const getKanban = async (req, res) => {
+    const KANBAN_STATUS_IDS = [
+        Status.PENDING.id,
+        Status.ASSIGNED.id,
+        Status.IN_PREPARATION.id,
+        Status.IN_TRANSIT.id,
+        Status.AT_BRANCH.id,
+        Status.FAILED_ATTEMPT.id,
+    ];
+
+    const [shipments, deliveryUsers] = await Promise.all([
+        shipmentModel.getForKanban(KANBAN_STATUS_IDS),
+        userModel.search({ roleId: RoleType.DELIVERY.id, active: 'true' }),
+    ]);
+
+    const columns = {};
+    KANBAN_STATUS_IDS.forEach(sid => { columns[sid] = []; });
+    shipments.forEach(s => { if (columns[s.statusId]) columns[s.statusId].push(s); });
+
+    const driversJson = JSON.stringify(
+        deliveryUsers.map(u => ({ id: u.id, fullName: u.fullName }))
+    );
+
+    res.render('shipment/kanban', { columns, driversJson });
+};
+
 const getQR = async (req, res) => {
     try {
         const { id } = req.params;
@@ -636,4 +662,4 @@ const exportShipments = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments };
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments };
