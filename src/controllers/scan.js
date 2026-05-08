@@ -1,7 +1,8 @@
-const shipmentModel        = require('../models/shipment');
-const statusModel          = require('../models/status');
-const userModel            = require('../models/user');
-const stateMachine         = require('../services/shipmentStateMachine');
+const shipmentModel          = require('../models/shipment');
+const statusModel            = require('../models/status');
+const userModel              = require('../models/user');
+const shipmentHistoryModel   = require('../models/shipmentHistory');
+const stateMachine           = require('../services/shipmentStateMachine');
 const { notifyStatusChange } = require('../utils/notifications');
 const { Status }             = require('../constants/enums');
 const { resolveBranchCoords, resolveUserBranchCoords } = require('../utils/eventLocation');
@@ -52,6 +53,15 @@ const buildHandler = (toStatusId, options = {}) => async (req, res) => {
             ? await resolveBranchCoords(branchId)
             : await resolveUserBranchCoords(currentUser.id);
 
+        await shipmentHistoryModel.create({
+            shipmentId:   shipment.id,
+            fromStatusId: shipment.statusId,
+            toStatusId,
+            userId:       currentUser.id,
+            eventType:    'STATUS_CHANGE',
+            branchId:     coords.branchId || branchId,
+            latitude:     coords.latitude,
+            longitude:    coords.longitude,
         const comment = req.body?.comment || null;
 
         await stateMachine.transition({

@@ -14,6 +14,7 @@ jest.mock('../src/models/person');
 jest.mock('../src/models/address');
 jest.mock('../src/models/shipment');
 jest.mock('../src/models/shipmentHistory');
+jest.mock('../src/models/user');
 jest.mock('../src/services/geocode', () => ({
     geocodeAddress: jest.fn(),
     GeocodeError:   jest.requireActual('../src/services/geocode').GeocodeError,
@@ -23,6 +24,7 @@ const personModel          = require('../src/models/person');
 const addressModel         = require('../src/models/address');
 const shipmentModel        = require('../src/models/shipment');
 const shipmentHistoryModel = require('../src/models/shipmentHistory');
+const userModel            = require('../src/models/user');
 const { geocodeAddress }   = require('../src/services/geocode');
 const { GeocodeError }     = realGeocode;
 
@@ -30,12 +32,12 @@ const csvImport = require('../src/services/csvImport');
 
 const HEADER = 'senderName,senderDocument,senderPhone,senderEmail,'
              + 'recipientName,recipientDocument,recipientPhone,recipientEmail,'
-             + 'street,number,floorApartment,province,postalCode,shipmentTypeId,weightKg,packageQty,status,legacyTrackingId';
+             + 'street,number,floorApartment,province,postalCode,shipmentTypeId,weightKg,packageQty,status,legacyTrackingId,deliveryUserDocument';
 
-const validRow = ({ status = 'Entregado', legacy = '', recipientDoc = '87654321' } = {}) =>
+const validRow = ({ status = 'Entregado', legacy = '', recipientDoc = '87654321', deliveryDoc = '' } = {}) =>
     `Juan Perez,12345678,1123456789,juan@example.com,`
   + `Maria Garcia,${recipientDoc},1198765432,maria@example.com,`
-  + `Av. Corrientes,1234,3 B,24,C1043,1,2.5,1,${status},${legacy}`;
+  + `Av. Corrientes,1234,3 B,24,C1043,1,2.5,1,${status},${legacy},${deliveryDoc}`;
 
 const buildCsv = (rows) => Buffer.from([HEADER, ...rows].join('\n'), 'utf-8');
 
@@ -43,6 +45,7 @@ const setupAnalyzeMocks = () => {
     geocodeAddress.mockResolvedValue({ lat: -34.6, lng: -58.4, postalCode: 'C1043' });
     shipmentModel.findByLegacyTrackingId.mockResolvedValue(null);
     shipmentModel.findPotentialDuplicate.mockResolvedValue(null);
+    userModel.findByDocument.mockResolvedValue(null);
 };
 
 const setupCommitMocks = () => {
@@ -75,7 +78,7 @@ describe('csvImport.analyzeBuffer', () => {
     });
 
     test('fila inválida queda con status invalid sin tocar dedup', async () => {
-        const buffer = buildCsv([validRow({ status: 'Pendiente' })]);
+        const buffer = buildCsv([validRow({ status: 'Inexistente' })]);
         const result = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
 
         expect(result.summary.invalid).toBe(1);
@@ -150,6 +153,49 @@ describe('csvImport.analyzeBuffer', () => {
         expect(result.rows[0].status).toBe('invalid');
         expect(result.rows[0].errors[0].field).toBe('address');
     });
+
+    test('deliveryUserDocument válido con repartidor existente asigna deliveryUserId', async () => {
+        userModel.findByDocument.mockResolvedValueOnce({ id: 42, roleId: 3 });
+
+        const buffer = buildCsv([validRow({ deliveryDoc: '30000001' })]);
+        const result = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
+
+        expect(result.summary.ok).toBe(1);
+        expect(result.rows[0].status).toBe('ok');
+        expect(result.rows[0].data.deliveryUserId).toBe(42);
+    });
+
+    test('deliveryUserDocument con usuario inexistente marca fila como invalid', async () => {
+        userModel.findByDocument.mockResolvedValueOnce(null);
+
+        const buffer = buildCsv([validRow({ deliveryDoc: '30000001' })]);
+        const result = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
+
+        expect(result.summary.invalid).toBe(1);
+        expect(result.rows[0].status).toBe('invalid');
+        expect(result.rows[0].errors[0].field).toBe('deliveryUserDocument');
+        expect(result.rows[0].errors[0].message).toMatch(/No se encontró/);
+    });
+
+    test('deliveryUserDocument con usuario que no es repartidor marca fila como invalid', async () => {
+        userModel.findByDocument.mockResolvedValueOnce({ id: 10, roleId: 2 });
+
+        const buffer = buildCsv([validRow({ deliveryDoc: '30000001' })]);
+        const result = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
+
+        expect(result.summary.invalid).toBe(1);
+        expect(result.rows[0].status).toBe('invalid');
+        expect(result.rows[0].errors[0].field).toBe('deliveryUserDocument');
+        expect(result.rows[0].errors[0].message).toMatch(/no es un repartidor/);
+    });
+
+    test('los 5 estados son aceptados como válidos', async () => {
+        for (const status of ['Pendiente', 'En Transito', 'En Sucursal', 'Entregado', 'Cancelado']) {
+            const buffer = buildCsv([validRow({ status })]);
+            const result = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
+            expect(result.rows[0].status).toBe('ok');
+        }
+    });
 });
 
 describe('csvImport.commitAnalysis', () => {
@@ -191,7 +237,7 @@ describe('csvImport.commitAnalysis', () => {
         expect(shipmentModel.create).toHaveBeenCalledTimes(2);
     });
 
-    test('persiste legacyTrackingId al insertar el shipment', async () => {
+    test('persiste legacyTrackingId y trackingPrefix HIST al insertar el shipment', async () => {
         const buffer = buildCsv([validRow({ legacy: 'LEG-001' })]);
         const analysis = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
         await csvImport.commitAnalysis(analysis, { userId: 7, includeDuplicates: false });
@@ -199,11 +245,12 @@ describe('csvImport.commitAnalysis', () => {
         expect(shipmentModel.create).toHaveBeenCalledWith(expect.objectContaining({
             legacyTrackingId: 'LEG-001',
             statusId:         4,
+            trackingPrefix:   'HIST',
         }));
     });
 
     test('no toca DB si todas las filas son inválidas', async () => {
-        const buffer = buildCsv([validRow({ status: 'Pendiente' })]);
+        const buffer = buildCsv([validRow({ status: 'Inexistente' })]);
         const analysis = await csvImport.analyzeBuffer(buffer, { throttleMs: 0 });
         const commit   = await csvImport.commitAnalysis(analysis, { userId: 7 });
 
