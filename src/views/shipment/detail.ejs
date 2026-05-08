@@ -3,10 +3,49 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0)); %>
+    <% const _hasRoute = mapData && mapData.route && mapData.route.stops && mapData.route.stops.length > 0; %>
+    <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0) || _hasRoute); %>
     <% if (_hasMap) { %>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <% } %>
+    <style>
+        .route-stop-badge {
+            position: relative;
+            cursor: default;
+            border-bottom: 1px dashed var(--color-text-secondary);
+            padding-bottom: 1px;
+        }
+        .route-seg-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-md);
+            padding: .5rem .75rem;
+            font-size: .8rem;
+            line-height: 1.6;
+            z-index: 50;
+            min-width: 220px;
+            pointer-events: none;
+        }
+        .route-seg-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: var(--color-border);
+        }
+        .route-stop-badge:hover .route-seg-tooltip,
+        .route-stop-badge:focus .route-seg-tooltip {
+            display: block;
+        }
+    </style>
     <title>Detalle de Envío - LogiTrack</title>
 </head>
 
@@ -182,9 +221,66 @@
                 <!-- ── Trayecto del envío (mapa) ── -->
                 <% if (_hasMap) { %>
                 <div class="update-card update-map-card">
-                    <h3><span class="material-symbols-outlined">map</span> Trayecto del envío</h3>
+                    <h3>
+                        <span class="material-symbols-outlined">map</span>
+                        <% if (_hasRoute) { %>Ruta del repartidor<% } else { %>Trayecto del envío<% } %>
+                    </h3>
                     <div id="shipment-map"></div>
+                    <% if (_hasRoute) { %>
+                        <%
+                            var _intermediateCount = mapData.route.stops.filter(s => s.kind === 'branch').length;
+                        %>
+                        <div class="route-summary" style="margin-top:.6rem;font-size:.9rem;display:flex;gap:1rem;flex-wrap:wrap;">
+                            <span><strong><%= mapData.route.totalKm.toFixed(1) %></strong> km de ruta</span>
+                            <% if (_intermediateCount > 0) { %>
+                                <%
+                                    const _hvSeg = (a, b) => {
+                                        const R = 6371, dLat = (b.lat-a.lat)*Math.PI/180, dLng = (b.lng-a.lng)*Math.PI/180;
+                                        const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+                                        return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+                                    };
+                                    const _segs = mapData.route.stops.map((s, i, arr) =>
+                                        i < arr.length - 1
+                                            ? { from: s.label, to: arr[i+1].label, km: _hvSeg(s, arr[i+1]).toFixed(1) }
+                                            : null
+                                    ).filter(Boolean);
+                                %>
+                                <span class="route-stop-badge" tabindex="0">
+                                    <strong><%= _intermediateCount %></strong> sucursal<%= _intermediateCount > 1 ? 'es' : '' %> intermedia<%= _intermediateCount > 1 ? 's' : '' %>
+                                    <div class="route-seg-tooltip">
+                                        <% _segs.forEach(seg => { %>
+                                            <div style="white-space:nowrap">
+                                                <span style="color:#6b7280"><%= seg.from %> → <%= seg.to %></span>
+                                                <strong><%= seg.km %> km</strong>
+                                            </div>
+                                        <% }) %>
+                                    </div>
+                                </span>
+                            <% } else { %>
+                                <span>Ruta directa</span>
+                            <% } %>
+                            <span style="color:#6b7280;font-size:.8rem;">
+                                <%= mapData.route.provider === 'osrm' ? 'Calculado por OSRM (red vial real)' : 'Estimado en línea recta' %>
+                            </span>
+                        </div>
+                    <% } %>
                     <div class="map-legend">
+                        <% if (_hasRoute) { %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#2563eb"></div>
+                            <span>Sucursal de origen</span>
+                        </div>
+                        <% if (_intermediateCount > 0) { %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#f59e0b"></div>
+                            <span>Sucursal intermedia (escala)</span>
+                        </div>
+                        <% } %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#dc2626"></div>
+                            <span>Destino del envío</span>
+                        </div>
+                        <% } else { %>
                         <div class="map-legend-item">
                             <div class="map-dot map-dot--origin"></div>
                             <span>Sucursal / evento</span>
@@ -198,6 +294,7 @@
                             <div class="map-dot" style="background:#9ca3af"></div>
                             <span>Destino: <%= mapData.destination.label %></span>
                         </div>
+                        <% } %>
                         <% } %>
                     </div>
                 </div>
@@ -316,12 +413,50 @@
     (function () {
         const stops = <%- JSON.stringify(mapData.stops || []) %>;
         const destination = <%- mapData.destination ? JSON.stringify(mapData.destination) : 'null' %>;
+        const route = <%- mapData.route ? JSON.stringify(mapData.route) : 'null' %>;
+        const origin = <%- JSON.stringify(mapData.origin) %>;
 
         const map = L.map('shipment-map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
             maxZoom: 18,
         }).addTo(map);
+
+        if (route && route.stops && route.stops.length) {
+            const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+            const colorByKind = { origin: '#2563eb', branch: '#f59e0b', destination: '#dc2626' };
+            const labelByKind = { origin: 'Origen', branch: 'Escala intermedia', destination: 'Destino del envío' };
+            const dotIcon = (color, size) => L.divIcon({
+                className: '',
+                html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+                iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+            });
+            const numberedIcon = (n, color) => L.divIcon({
+                className: '',
+                html: '<div style="width:30px;height:30px;border-radius:50%;background:' + color + ';color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">' + n + '</div>',
+                iconSize: [30, 30], iconAnchor: [15, 15],
+            });
+
+            const bounds = [];
+            route.stops.forEach((s, idx) => {
+                const color = colorByKind[s.kind] || '#10b981';
+                const icon = s.kind === 'branch' ? numberedIcon(idx, color) : dotIcon(color, 20);
+                const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+                m.bindPopup(
+                    '<strong>' + escHtml(labelByKind[s.kind] || 'Parada') + '</strong>'
+                    + '<br>' + escHtml(s.label)
+                );
+                if (s.kind === 'destination') { m.openPopup(); }
+                bounds.push([s.lat, s.lng]);
+            });
+
+            if (route.polyline && route.polyline.length >= 2) {
+                L.polyline(route.polyline, { color: '#2563eb', weight: 4, opacity: 0.75 }).addTo(map);
+            }
+            map.fitBounds(bounds, { padding: [40, 40] });
+            return;
+        }
 
         const mkIcon = (color) => L.divIcon({
             className: '',

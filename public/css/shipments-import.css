@@ -35,7 +35,7 @@
 
 .import-section h3 {
     margin: 0 0 var(--space-2);
-    font-size: var(--font-size-md, 1rem);
+    font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
     color: var(--color-text);
 }
@@ -44,6 +44,43 @@
     margin: 0 0 var(--space-3);
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
+}
+
+/* File input */
+input[type="file"] {
+    width: 100%;
+    padding: 0.55rem var(--space-3);
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color var(--transition);
+}
+
+input[type="file"]:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+input[type="file"]::file-selector-button {
+    background-color: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.75rem;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    margin-right: var(--space-3);
+    transition: background-color var(--transition);
+}
+
+input[type="file"]::file-selector-button:hover {
+    background-color: var(--color-primary-dark);
 }
 
 .import-section__head {
@@ -56,21 +93,51 @@
 }
 
 .import-cols {
-    margin: 0 0 var(--space-3) 1.25rem;
+    margin: 0 0 var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.import-cols li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+    line-height: 1.8;
 }
 
 .import-cols code {
-    background: var(--color-surface-2, var(--color-surface));
-    padding: 0.1rem 0.35rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    padding: 0.15rem 0.4rem;
     border-radius: var(--radius-sm);
-    font-size: 0.85em;
+    font-family: monospace;
+    font-size: 0.82em;
+    color: var(--color-text);
+    white-space: nowrap;
 }
 
 .import-hint {
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
+    line-height: var(--line-height-loose);
+}
+
+.import-hint code {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 0.82em;
+    color: var(--color-text);
 }
 
 .import-summary {

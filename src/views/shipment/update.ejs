@@ -3,9 +3,45 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <% if (mapData && mapData.destination) { %>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-    <% } %>
+    <style>
+        .route-stop-badge {
+            position: relative;
+            cursor: default;
+            border-bottom: 1px dashed var(--color-text-secondary);
+            padding-bottom: 1px;
+        }
+        .route-seg-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-md);
+            padding: .5rem .75rem;
+            font-size: .8rem;
+            line-height: 1.6;
+            z-index: 50;
+            min-width: 220px;
+            pointer-events: none;
+        }
+        .route-seg-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: var(--color-border);
+        }
+        .route-stop-badge:hover .route-seg-tooltip,
+        .route-stop-badge:focus .route-seg-tooltip {
+            display: block;
+        }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
     <script src="/js/new_shipment_popup.js" defer></script>
@@ -165,12 +201,12 @@
                 </div>
 
                 <!-- ── Mapa ── -->
-                <% if (mapData && mapData.destination) { %>
                 <div class="update-card update-map-card" style="margin-bottom: 0;">
                     <h3><span class="material-symbols-outlined">map</span> Trayecto</h3>
-                    <div id="shipment-map" style="height: 180px; border-radius: 8px;"></div>
+                    <div id="shipment-map" style="height: 200px; border-radius: 8px;"></div>
+                    <div id="route-summary" style="margin-top:.5rem;font-size:.85rem;color:var(--color-text-secondary);display:flex;gap:1rem;flex-wrap:wrap;min-height:1.2em;"></div>
+                    <div id="route-legend" class="map-legend" style="margin-top:.4rem;"></div>
                 </div>
-                <% } %>
 
             </div>
             <!-- ══════════ FIN TOP GRID ══════════ -->
@@ -437,41 +473,150 @@
         }
     </script>
 
-    <% if (mapData && mapData.destination) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
     (function () {
-        const origin = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %> };
-        const dest   = { lat: <%- mapData.destination.lat %>, lng: <%- mapData.destination.lng %> };
+        var ORIGIN       = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %>, label: '<%- mapData.origin.label.replace(/'/g, "\\'") %>' };
+        var DEST         = <%- mapData.destination ? JSON.stringify({ lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label }) : 'null' %>;
+        var INIT_ROUTE   = <%- mapData.route ? JSON.stringify(mapData.route) : 'null' %>;
+        var BRANCH_ID    = <%= (currentUser && currentUser.branchId) ? currentUser.branchId : 'null' %>;
 
-        const map = L.map('shipment-map');
+        var map = L.map('shipment-map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
             maxZoom: 18,
         }).addTo(map);
 
-        const blueIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
-        });
-        const redIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
-        });
+        var routeLayer   = null;
+        var markersLayer = L.layerGroup().addTo(map);
 
-        L.marker([origin.lat, origin.lng], { icon: blueIcon }).addTo(map)
-            .bindPopup('<strong>Origen</strong><br><%- mapData.origin.label %>');
-        L.marker([dest.lat, dest.lng], { icon: redIcon }).addTo(map)
-            .bindPopup('<strong>Destino</strong><br><%- mapData.destination.label %>');
-        L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
-            color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
-        }).addTo(map);
-        map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+        function makeIcon(color) {
+            return L.divIcon({
+                className: '',
+                html: '<div style="width:12px;height:12px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+                iconSize: [12, 12], iconAnchor: [6, 6],
+            });
+        }
+
+        function renderRoute(route, origin, dest) {
+            markersLayer.clearLayers();
+            if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+
+            if (!dest) {
+                L.marker([origin.lat, origin.lng], { icon: makeIcon('#2563eb') })
+                    .addTo(markersLayer).bindPopup('<strong>Origen</strong><br>' + origin.label);
+                map.setView([origin.lat, origin.lng], 10);
+                updateSummary(null);
+                updateLegend(null);
+                return;
+            }
+
+            if (route && route.polyline && route.polyline.length > 1) {
+                routeLayer = L.polyline(route.polyline, { color: '#2563eb', weight: 3, opacity: 0.8 }).addTo(map);
+
+                route.stops.forEach(function (s) {
+                    var color = s.kind === 'origin' ? '#2563eb' : s.kind === 'destination' ? '#dc2626' : '#f59e0b';
+                    L.marker([s.lat, s.lng], { icon: makeIcon(color) })
+                        .addTo(markersLayer)
+                        .bindPopup('<strong>' + s.label + '</strong>');
+                });
+
+                map.fitBounds(routeLayer.getBounds(), { padding: [25, 25] });
+            } else {
+                L.marker([origin.lat, origin.lng], { icon: makeIcon('#2563eb') })
+                    .addTo(markersLayer).bindPopup('<strong>Origen</strong><br>' + origin.label);
+                L.marker([dest.lat, dest.lng], { icon: makeIcon('#dc2626') })
+                    .addTo(markersLayer).bindPopup('<strong>Destino</strong><br>' + dest.label);
+                L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
+                    color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
+                }).addTo(map);
+                map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+            }
+
+            updateSummary(route);
+            updateLegend(route);
+        }
+
+        function haversineKm(a, b) {
+            var R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+            var x = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+            return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+        }
+
+        function updateSummary(route) {
+            var el = document.getElementById('route-summary');
+            if (!el) return;
+            if (!route) { el.innerHTML = ''; return; }
+            var intermediates = route.stops.filter(function(s){ return s.kind === 'branch'; }).length;
+            var providerLabel = route.provider === 'osrm' ? 'Red vial real (OSRM)' : 'Estimado en línea recta';
+
+            var stopSpan = '';
+            if (intermediates > 0) {
+                var segLines = [];
+                for (var i = 0; i < route.stops.length - 1; i++) {
+                    var from = route.stops[i], to = route.stops[i + 1];
+                    var km = haversineKm(from, to).toFixed(1);
+                    segLines.push('<div style="white-space:nowrap"><span style="color:#6b7280">' + from.label + ' → ' + to.label + '</span> <strong>' + km + ' km</strong></div>');
+                }
+                var tooltip = '<div class="route-seg-tooltip">' + segLines.join('') + '</div>';
+                stopSpan = '<span class="route-stop-badge" tabindex="0">'
+                    + '<strong>' + intermediates + '</strong> sucursal' + (intermediates > 1 ? 'es intermedias' : ' intermedia')
+                    + tooltip
+                    + '</span>';
+            } else {
+                stopSpan = '<span>Ruta directa</span>';
+            }
+
+            el.innerHTML = '<span><strong>' + route.totalKm.toFixed(1) + '</strong> km</span>'
+                + stopSpan
+                + '<span style="color:#9ca3af;font-size:.8rem;">' + providerLabel + '</span>';
+        }
+
+        function updateLegend(route) {
+            var el = document.getElementById('route-legend');
+            if (!el) return;
+            if (!route) { el.innerHTML = ''; return; }
+            var intermediates = route.stops.filter(function(s){ return s.kind === 'branch'; }).length;
+            var html = '<div class="map-legend-item"><div class="map-dot" style="background:#2563eb"></div><span>Origen</span></div>';
+            if (intermediates > 0) {
+                html += '<div class="map-legend-item"><div class="map-dot" style="background:#f59e0b"></div><span>Sucursal intermedia</span></div>';
+            }
+            html += '<div class="map-legend-item"><div class="map-dot" style="background:#dc2626"></div><span>Destino</span></div>';
+            el.innerHTML = html;
+        }
+
+        // Render inicial
+        renderRoute(INIT_ROUTE, ORIGIN, DEST);
+
+        // Recalcular al seleccionar nueva dirección
+        var streetInput = document.getElementById('street');
+        if (streetInput) {
+            streetInput.addEventListener('change', function () {
+                var lat = parseFloat(document.getElementById('address-lat').value);
+                var lng = parseFloat(document.getElementById('address-lng').value);
+                if (!isFinite(lat) || !isFinite(lng)) return;
+
+                var destLabel = (document.getElementById('street').value || '') + ' ' + (document.getElementById('number').value || '');
+                var url = '/api/route?originLat=' + ORIGIN.lat + '&originLng=' + ORIGIN.lng
+                    + '&originLabel=' + encodeURIComponent(ORIGIN.label)
+                    + '&destLat=' + lat + '&destLng=' + lng
+                    + '&destLabel=' + encodeURIComponent(destLabel.trim())
+                    + (BRANCH_ID ? '&originBranchId=' + BRANCH_ID : '');
+
+                var summaryEl = document.getElementById('route-summary');
+                if (summaryEl) summaryEl.innerHTML = '<span style="color:#6b7280">Calculando ruta...</span>';
+
+                fetch(url)
+                    .then(function(r){ return r.json(); })
+                    .then(function(data){
+                        var newDest = { lat: lat, lng: lng, label: destLabel.trim() };
+                        renderRoute(data.route, ORIGIN, newDest);
+                    })
+                    .catch(function(){ if (summaryEl) summaryEl.innerHTML = ''; });
+            });
+        }
     })();
     </script>
-    <% } %>
 
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>

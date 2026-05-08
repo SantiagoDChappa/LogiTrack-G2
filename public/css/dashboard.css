@@ -84,6 +84,14 @@
     margin-bottom: 1.25rem;
 }
 
+/* Repartidores cards (5th & 6th) span 2 cols each to fill row cleanly */
+.stat-card:nth-child(5) {
+    grid-column: 1 / span 2;
+}
+.stat-card:nth-child(6) {
+    grid-column: 3 / span 2;
+}
+
 .stat-card {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -152,7 +160,7 @@
 
 .bottom-grid {
     display: grid;
-    grid-template-columns: minmax(220px, 0.85fr) minmax(240px, 0.9fr) minmax(420px, 1.4fr);
+    grid-template-columns: 1fr 1fr 1.6fr;
     gap: 1rem;
     align-items: start;
 }
@@ -191,6 +199,11 @@
 
 .estado-envios {
     min-width: 0;
+}
+
+/* Última actividad spans all 3 columns */
+.ultima-actividad {
+    grid-column: 1 / -1;
 }
 
 .status-total-list {
@@ -330,6 +343,26 @@
     color: var(--badge-initial-text);
 }
 
+.status-badge.asignado {
+    background-color: var(--badge-assigned-bg);
+    color: var(--badge-assigned-text);
+}
+
+.status-badge.en_preparacion {
+    background-color: var(--badge-preparing-bg);
+    color: var(--badge-preparing-text);
+}
+
+.status-badge.paquete_fallido {
+    background-color: var(--badge-package-failed-bg);
+    color: var(--badge-package-failed-text);
+}
+
+.status-badge.intento_fallido {
+    background-color: var(--badge-failed-attempt-bg);
+    color: var(--badge-failed-attempt-text);
+}
+
 /* ===== BOTÓN VER DETALLE ===== */
 
 .btn-ver-detalle {
@@ -356,13 +389,23 @@
 
 @media (max-width: 1200px) {
     .bottom-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+    }
+    .ultima-actividad {
+        grid-column: 1 / -1;
     }
 }
 
 @media (max-width: 900px) {
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+    .stat-card:nth-child(5),
+    .stat-card:nth-child(6) {
+        grid-column: span 1;
+    }
+    .bottom-grid {
+        grid-template-columns: 1fr;
     }
 }
 
