@@ -26,12 +26,13 @@
 
             <section class="import-section">
                 <div class="import-alert import-alert--warn">
-                    <strong>Importante:</strong> esta funcionalidad está pensada para migrar envíos
-                    desde un sistema anterior. Los importados se identifican con el prefijo
-                    <code>HIST-</code> en el tracking ID (ej: <code>HIST-001</code>),
-                    independientes del contador <code>ENV-</code> del alta individual.
-                    Se aceptan envíos en cualquier estado: <em>Pendiente, En Tránsito, En Sucursal,
-                    Entregado, Cancelado</em>.
+                    <strong>Importante:</strong> esta funcionalidad permite importar envíos
+                    desde un sistema anterior o cargar envíos activos en lote.
+                    Los envíos terminados (<em>Entregado, Cancelado</em>) se identifican con
+                    <code>HIST-</code> (ej: <code>HIST-001</code>).
+                    Los envíos activos (<em>Pendiente, En Tránsito, En Sucursal</em>) se identifican con
+                    <code>IENV-</code> (ej: <code>IENV-001</code>).
+                    Ambos contadores son independientes del <code>ENV-</code> del alta individual.
                 </div>
             </section>
 

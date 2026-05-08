@@ -261,6 +261,9 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 lng:            data.lng,
             });
 
+            const isTerminal = data.statusId === 4 || data.statusId === 5;
+            const trackingPrefix = isTerminal ? 'HIST' : 'IENV';
+
             const shipment = await shipmentModel.create({
                 senderId:         sender.id,
                 recipientId:      recipient.id,
@@ -271,7 +274,7 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 statusId:         data.statusId,
                 legacyTrackingId: data.legacyTrackingId,
                 deliveryUserId:   data.deliveryUserId || null,
-                trackingPrefix:   'HIST',
+                trackingPrefix,
             });
 
             await shipmentHistoryModel.create({
@@ -279,7 +282,9 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 fromStatusId: null,
                 toStatusId:   shipment.statusId,
                 eventType:    'CREATED',
-                comment:      'Importación masiva CSV — envío histórico',
+                comment:      isTerminal
+                    ? 'Importación masiva CSV — envío histórico'
+                    : 'Importación masiva CSV — envío activo importado',
                 userId:       userId || null,
             });
 
