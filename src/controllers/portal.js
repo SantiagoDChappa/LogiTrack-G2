@@ -5,12 +5,14 @@ const { Status }          = require('../models/status');
 const { Address }         = require('../models/address');
 const { Province }        = require('../models/province');
 const { TypeShipment }    = require('../models/typeShipment');
+const { Branch }          = require('../models/branch');
+const { PROVINCES }       = require('../utils/provinces');
 
 const publicIncludes = [
     { model: Person,       as: 'sender',       attributes: ['fullName'] },
     { model: Person,       as: 'recipient',    attributes: ['fullName', 'document'] },
-    { model: Status,       as: 'status',       attributes: ['description'] },
-    { model: Address,      as: 'address',      attributes: ['street', 'number', 'postalCode'],
+    { model: Status,       as: 'status',       attributes: ['id', 'description'] },
+    { model: Address,      as: 'address',      attributes: ['street', 'number', 'postalCode', 'provinceId'],
       include: [{ model: Province, as: 'province', attributes: ['description'] }] },
     { model: TypeShipment, as: 'shipmentType', attributes: ['description'] },
 ];
@@ -66,17 +68,38 @@ const getPortal = async (req, res) => {
                     where: { shipmentId: s.id },
                     include: [
                         { model: Status, as: 'fromStatus', attributes: ['description'] },
-                        { model: Status, as: 'toStatus',   attributes: ['description'] },
+                        { model: Status, as: 'toStatus',   attributes: ['id', 'description'] },
+                        { model: Branch, as: 'branch',     required: false },
                     ],
                     order: [['changedAt', 'ASC']],
                 })
             )
         );
 
-        const shipmentsWithHistory = shipments.map((s, i) => ({
-            ...s.toJSON(),
-            history: histories[i],
-        }));
+        const shipmentsWithHistory = shipments.map((s, i) => {
+            const sJson = s.toJSON();
+            const history = histories[i];
+
+            const stops = history
+                .filter(h => h.latitude != null && h.longitude != null)
+                .map(h => ({
+                    lat:   Number(h.latitude),
+                    lng:   Number(h.longitude),
+                    label: h.branch ? h.branch.name : (h.toStatus ? h.toStatus.description : 'Evento'),
+                    date:  h.changedAt,
+                }));
+
+            const prov = PROVINCES[sJson.address.provinceId];
+            const destination = prov
+                ? { lat: prov.lat, lng: prov.lng, label: prov.name }
+                : null;
+
+            return {
+                ...sJson,
+                history,
+                mapData: { stops, destination, currentStatusId: sJson.status.id },
+            };
+        });
 
         res.render('portal', { searched: true, query: q, shipments: shipmentsWithHistory });
     } catch (err) {

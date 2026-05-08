@@ -1,0 +1,5 @@
+senderName,senderDocument,senderPhone,senderEmail,recipientName,recipientDocument,recipientPhone,recipientEmail,street,number,floorApartment,province,postalCode,shipmentTypeId,weightKg,packageQty,status,legacyTrackingId,deliveryUserDocument
+Juan Perez,12345678,1123456789,juan@example.com,Maria Garcia,87654321,1198765432,maria@example.com,Av. Corrientes,1234,3 B,24,C1043,1,2.5,1,Entregado,LEG-001,
+Carlos Lopez,30111222,,carlos@example.com,Ana Rodriguez,30222333,1145556666,,Belgrano,567,,Buenos Aires,1900,2,5.0,2,Cancelado,,
+Pedro Diaz,40555666,1133334444,pedro@example.com,Lucia Romero,40666777,1144445555,lucia@example.com,Av. Rivadavia,5000,,Buenos Aires,1424,1,1.5,2,Pendiente,LEG-003,
+Marta Soto,28999888,,marta@example.com,Diego Torres,28111000,1166667777,,Florida,500,5 A,24,C1005,1,3.0,1,En Transito,LEG-004,30000001

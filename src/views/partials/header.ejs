@@ -14,7 +14,11 @@
 <% } else { %>
     <a href="/shipment"><ul><span class="material-symbols-outlined">local_shipping</span>Envios</ul></a>
 <% } %>
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/shipment/kanban"><ul><span class="material-symbols-outlined">view_kanban</span>Kanban</ul></a>
+                <% } %>
                 <% if (currentUser.roleId === 4) { %>
+                    <a href="/shipment/import"><ul><span class="material-symbols-outlined">upload_file</span>Importar CSV</ul></a>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
                 <% } %>
                 <!-- <a href="/"><ul><span class="material-symbols-outlined">bar_chart</span>Reportes</ul></a> -->

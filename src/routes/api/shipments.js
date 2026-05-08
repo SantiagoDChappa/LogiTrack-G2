@@ -150,47 +150,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /api/shipments/{id}/status:
- *   patch:
- *     summary: Cambia el estado de un envío
- *     tags: [API Envíos]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [statusId]
- *             properties:
- *               statusId:
- *                 type: integer
- *                 description: "1=Pendiente, 2=En Tránsito, 3=En Sucursal, 4=Entregado, 5=Cancelado"
- *                 example: 2
- *     responses:
- *       200:
- *         description: Estado actualizado
- *       404:
- *         description: Envío no encontrado
- */
-router.patch('/:id/status', async (req, res) => {
-    try {
-        const { statusId } = req.body;
-        const shipment = await shipmentModel.getById(req.params.id);
-        if (!shipment) {return res.status(404).json({ error: 'Envío no encontrado' });}
-
-        await shipmentModel.updateStatus(req.params.id, statusId);
-        res.json({ message: 'Estado actualizado', statusId });
-    } catch (err) {
-        res.status(500).json({ error: 'Error al actualizar el estado del envío: ' + err.message });
-    }
-});
+// PATCH /api/shipments/:id/status fue eliminado en LGT-109.
+// Los cambios de estado deben hacerse via endpoints semanticos (ver /shipment y /scan)
+// que pasan por src/services/shipmentStateMachine.js (valida transicion + RBAC + historial).
 
 module.exports = router;

@@ -10,9 +10,16 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Administrador de envios</h1>
-            <a href="/shipment/new" class="btn-primary">
-                <span class="material-symbols-outlined">add</span>Alta
-            </a>
+            <div class="page-header__actions">
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/shipment/export" class="btn-secondary" download>
+                        <span class="material-symbols-outlined">download</span>Exportar CSV
+                    </a>
+                <% } %>
+                <a href="/shipment/new" class="btn-primary">
+                    <span class="material-symbols-outlined">add</span>Alta
+                </a>
+            </div>
         </div>
 
         <div class="shipments-wrapper">
@@ -76,7 +83,7 @@
                     <span class="filter-label">Estado</span>
                     <div class="filter-chips">
                         <%
-                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                             function _fsk(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         %>
                         <% statuses.forEach(function(s) { %>
@@ -132,13 +139,13 @@
                                 <td><%= shipment.recipient.document %></td>
                                 <td>
                                     <% const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
-                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'}; %>
+                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'}; %>
                                     <span class="status-badge <%= _sk %>">
                                         <%= _sl[_sk] || shipment.status.description %>
                                     </span>
                                 </td>
                                 <td class="col-actions">
-                                    <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5; %>
+                                    <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5 || shipment.statusId === 8; %>
                                     <a href="<%= _isFinalS ? '#' : '/shipment/update/' + shipment.id %>"
                                        class="action-btn modificar<%= _isFinalS ? ' action-btn--disabled' : '' %>"
                                        data-tooltip="<%= _isFinalS ? 'No modificable' : 'Modificar' %>"

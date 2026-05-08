@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments-import.css">
+    <title>Importar envíos por CSV - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Importación masiva de envíos históricos</h1>
+            <div class="page-header__actions">
+                <a href="/shipment/import/history" class="btn-secondary">
+                    <span class="material-symbols-outlined">history</span>Historial
+                </a>
+                <a href="/shipment" class="btn-secondary">Volver</a>
+            </div>
+        </div>
+
+        <div class="form-new">
+            <% if (error) { %>
+                <div class="import-alert import-alert--error"><%= error %></div>
+            <% } %>
+
+            <section class="import-section">
+                <div class="import-alert import-alert--warn">
+                    <strong>Importante:</strong> esta funcionalidad está pensada para migrar envíos
+                    desde un sistema anterior. Los importados se identifican con el prefijo
+                    <code>HIST-</code> en el tracking ID (ej: <code>HIST-001</code>),
+                    independientes del contador <code>ENV-</code> del alta individual.
+                    Se aceptan envíos en cualquier estado: <em>Pendiente, En Tránsito, En Sucursal,
+                    Entregado, Cancelado</em>.
+                </div>
+            </section>
+
+            <section class="import-section">
+                <h3>1. Descargá el template</h3>
+                <p>Usá este archivo como base. Mantené los nombres de las columnas; el orden no importa.</p>
+                <a href="/templates/shipments-import-template.csv" class="btn-secondary" download>
+                    <span class="material-symbols-outlined">download</span>Descargar template CSV
+                </a>
+            </section>
+
+            <section class="import-section">
+                <h3>2. Subí tu archivo</h3>
+                <p>Tamaño máximo: <strong>10 MB</strong>. Cantidad máxima: <strong>1.000 filas</strong>.</p>
+                <form action="/shipment/import" method="post" enctype="multipart/form-data" id="import-form">
+                    <div class="field">
+                        <label for="csvFile">Archivo CSV <span class="req">*</span></label>
+                        <input id="csvFile" name="csvFile" type="file" accept=".csv,text/csv" required>
+                    </div>
+                    <div class="form-actions">
+                        <a href="/shipment" class="btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">upload</span>Importar
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="import-section">
+                <h3>Columnas esperadas</h3>
+                <ul class="import-cols">
+                    <li><code>senderName</code>, <code>senderDocument</code>, <code>senderPhone</code>, <code>senderEmail</code></li>
+                    <li><code>recipientName</code>, <code>recipientDocument</code>, <code>recipientPhone</code>, <code>recipientEmail</code></li>
+                    <li><code>street</code>, <code>number</code>, <code>floorApartment</code>, <code>province</code>, <code>postalCode</code></li>
+                    <li><code>shipmentTypeId</code>, <code>weightKg</code>, <code>packageQty</code>, <code>status</code></li>
+                    <li><code>legacyTrackingId</code> (opcional), <code>deliveryUserDocument</code> (opcional)</li>
+                </ul>
+                <p class="import-hint">
+                    <code>province</code> acepta el id numérico o el nombre (ej: <em>"Buenos Aires"</em>).
+                    <code>status</code> acepta los 5 estados (<em>Pendiente</em>, <em>En Tránsito</em>,
+                    <em>En Sucursal</em>, <em>Entregado</em>, <em>Cancelado</em>) o sus ids 1 a 5.
+                    <code>legacyTrackingId</code> es opcional: si lo completás con el id del envío en el sistema viejo,
+                    el sistema detecta reimports idempotentes (subir el mismo CSV dos veces no genera duplicados).
+                    <code>deliveryUserDocument</code> es opcional: DNI del repartidor que tenía asignado el envío;
+                    si el usuario no existe o no es repartidor, la fila se rechaza.
+                    Las coordenadas se obtienen automáticamente del servicio de geocodificación —
+                    no es necesario incluirlas en el CSV.
+                </p>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

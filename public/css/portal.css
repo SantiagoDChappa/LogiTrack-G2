@@ -50,6 +50,8 @@ html { scroll-behavior: smooth; }
     color: #f1f5f9;
 }
 [data-theme="dark"] .portal-timeline-line { background: #334155; }
+[data-theme="dark"] .portal-map-section  { border-color: #334155; }
+[data-theme="dark"] .portal-map          { border-color: #334155; }
 
 /* ─── Navbar right group ─── */
 .portal-nav-right {
@@ -750,6 +752,129 @@ ul { list-style: none; }
     margin-left: 4px;
 }
 
+/* ─── MAP ─── */
+.portal-map-section {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--c-border);
+}
+
+.portal-map-title {
+    display: block;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--c-text-3);
+    margin-bottom: 12px;
+}
+
+.portal-map {
+    width: 100%;
+    height: 340px;
+    border-radius: 10px;
+    border: 1px solid var(--c-border);
+    overflow: hidden;
+    z-index: 0;
+}
+
+.portal-map-legend {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 10px;
+    font-size: .8125rem;
+    color: var(--c-text-2);
+    flex-wrap: wrap;
+}
+
+.portal-map-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.portal-map-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.portal-map-dot--stop { background: #2563eb; }
+.portal-map-dot--dest { background: #16a34a; }
+
+.portal-map-legend-line {
+    display: inline-block;
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.portal-map-legend-line--done {
+    background: #2563eb;
+}
+
+.portal-map-legend-line--pending {
+    background: repeating-linear-gradient(
+        90deg,
+        #94a3b8 0, #94a3b8 6px,
+        transparent 6px, transparent 10px
+    );
+}
+.portal-map-dot--truck {
+    background: none;
+    width: auto;
+    height: auto;
+    font-size: .85rem;
+    line-height: 1;
+}
+
+.portal-marker-stop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px !important;
+    height: 36px !important;
+    background: #2563eb;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+.portal-marker-stop .material-symbols-outlined {
+    font-size: 20px;
+    color: #fff;
+}
+
+.portal-marker-dest {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px !important;
+    height: 36px !important;
+}
+.portal-marker-dest .material-symbols-outlined {
+    font-size: 34px;
+    color: #16a34a;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.3));
+}
+
+.portal-marker-truck {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1.5rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.25));
+    animation: portal-truck-bounce 2s ease-in-out infinite;
+}
+
+@keyframes portal-truck-bounce {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+}
+
 /* ─── RESPONSIVE ─── */
 @media (max-width: 900px) {
     .portal-hero-wrapper {
@@ -776,4 +901,6 @@ ul { list-style: none; }
     .portal-search-panel { padding: 20px; }
     .portal-search-panel-title { font-size: 1.125rem; }
     .portal-hero-title { font-size: 1.5rem; }
+    .portal-map { height: 250px; }
+    .portal-map-legend { gap: 10px; font-size: .75rem; }
 }

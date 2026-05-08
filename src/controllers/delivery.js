@@ -1,5 +1,5 @@
 const { DeliveryEvidence, Shipment } = require('../models');
-const shipmentHistoryModel = require('../models/shipmentHistory');
+const stateMachine = require('../services/shipmentStateMachine');
 const { Status } = require('../constants/enums');
 
 const { getSuggestedDate } = require('../utils/failedAttempt');
@@ -111,6 +111,14 @@ const saveEvidence = async (req, res) => {
             signatureBase64
         } = req.body;
 
+        if (!stateMachine.canTransition({
+            fromStatusId: shipment.statusId,
+            toStatusId:   Status.DELIVERED.id,
+            actorRoleId:  res.locals.currentUser?.roleId,
+        })) {
+            return res.status(422).send('No se puede confirmar entrega desde el estado actual.');
+        }
+
         await DeliveryEvidence.create({
             shipmentId: shipment.id,
             receiverName,
@@ -122,19 +130,18 @@ const saveEvidence = async (req, res) => {
             signatureBase64: signatureBase64 || null
         });
 
+        const podLat = latitude  !== null && latitude  !== undefined && latitude  !== '' ? Number(latitude)  : null;
+        const podLng = longitude !== null && longitude !== undefined && longitude !== '' ? Number(longitude) : null;
         await shipmentHistoryModel.create({
             shipmentId:   shipment.id,
             fromStatusId: shipment.statusId,
             toStatusId:   Status.DELIVERED.id,
             comment:      'Entrega confirmada por repartidor',
             userId:       res.locals.currentUser?.id || null,
-            eventType:    'STATUS_CHANGE',
+            eventType:    'POD',
+            latitude:     Number.isFinite(podLat) ? podLat : null,
+            longitude:    Number.isFinite(podLng) ? podLng : null,
         });
-
-        await Shipment.update(
-            { statusId: Status.DELIVERED.id },
-            { where: { id: shipment.id } }
-        );
 
         res.redirect('/delivery?delivered=true');
 
