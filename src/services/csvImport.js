@@ -4,6 +4,8 @@ const personModel          = require('../models/person');
 const addressModel         = require('../models/address');
 const shipmentModel        = require('../models/shipment');
 const shipmentHistoryModel = require('../models/shipmentHistory');
+const userModel            = require('../models/user');
+const { RoleType }         = require('../constants/enums');
 const { validate }         = require('./shipmentRowValidator');
 const { geocodeAddress, GeocodeError } = require('./geocode');
 
@@ -50,6 +52,35 @@ const analyzeRow = async (row, rowNumber, deps, intraCsv) => {
 
     const data = validation.normalized;
 
+    // Resolver repartidor si vino el DNI (opcional).
+    let deliveryUserId = null;
+    if (data.deliveryUserDocument) {
+        const user = await deps.findUserByDocument(data.deliveryUserDocument);
+        if (!user) {
+            return {
+                rowNumber,
+                status: 'invalid',
+                raw:    row,
+                errors: [{
+                    field:   'deliveryUserDocument',
+                    message: `No se encontró un usuario con DNI ${data.deliveryUserDocument}`,
+                }],
+            };
+        }
+        if (user.roleId !== RoleType.DELIVERY.id) {
+            return {
+                rowNumber,
+                status: 'invalid',
+                raw:    row,
+                errors: [{
+                    field:   'deliveryUserDocument',
+                    message: `El usuario con DNI ${data.deliveryUserDocument} no es un repartidor`,
+                }],
+            };
+        }
+        deliveryUserId = user.id;
+    }
+
     let coords;
     try {
         coords = await deps.geocode({
@@ -67,7 +98,13 @@ const analyzeRow = async (row, rowNumber, deps, intraCsv) => {
         };
     }
 
-    const enriched = { ...data, lat: coords.lat, lng: coords.lng, postalCode: data.postalCode || coords.postalCode || null };
+    const enriched = {
+        ...data,
+        lat:            coords.lat,
+        lng:            coords.lng,
+        postalCode:     data.postalCode || coords.postalCode || null,
+        deliveryUserId,
+    };
 
     // 1. Detección intra-CSV (mismo archivo)
     const fingerprint = buildFingerprint(enriched);
@@ -137,6 +174,7 @@ const analyzeBuffer = async (buffer, { deps = {}, throttleMs = GEOCODE_THROTTLE_
         geocode:                 deps.geocode                 || geocodeAddress,
         findByLegacyTrackingId:  deps.findByLegacyTrackingId  || shipmentModel.findByLegacyTrackingId,
         findPotentialDuplicate:  deps.findPotentialDuplicate  || shipmentModel.findPotentialDuplicate,
+        findUserByDocument:      deps.findUserByDocument      || userModel.findByDocument,
     };
 
     let rows;
@@ -223,6 +261,9 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 lng:            data.lng,
             });
 
+            const isTerminal = data.statusId === 4 || data.statusId === 5;
+            const trackingPrefix = isTerminal ? 'HIST' : 'IENV';
+
             const shipment = await shipmentModel.create({
                 senderId:         sender.id,
                 recipientId:      recipient.id,
@@ -232,6 +273,8 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 packageQty:       data.packageQty,
                 statusId:         data.statusId,
                 legacyTrackingId: data.legacyTrackingId,
+                deliveryUserId:   data.deliveryUserId || null,
+                trackingPrefix,
             });
 
             await shipmentHistoryModel.create({
@@ -239,7 +282,9 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 fromStatusId: null,
                 toStatusId:   shipment.statusId,
                 eventType:    'CREATED',
-                comment:      'Importación masiva CSV — envío histórico',
+                comment:      isTerminal
+                    ? 'Importación masiva CSV — envío histórico'
+                    : 'Importación masiva CSV — envío activo importado',
                 userId:       userId || null,
             });
 

@@ -26,10 +26,13 @@
 
             <section class="import-section">
                 <div class="import-alert import-alert--warn">
-                    <strong>Importante:</strong> esta funcionalidad está pensada para migrar
-                    <strong>envíos cerrados desde un sistema anterior</strong>.
-                    Solo se aceptan filas con estado <em>Entregado</em> o <em>Cancelado</em>.
-                    Para envíos activos (Pendiente, En Tránsito, En Sucursal) usá el alta individual.
+                    <strong>Importante:</strong> esta funcionalidad permite importar envíos
+                    desde un sistema anterior o cargar envíos activos en lote.
+                    Los envíos terminados (<em>Entregado, Cancelado</em>) se identifican con
+                    <code>HIST-</code> (ej: <code>HIST-001</code>).
+                    Los envíos activos (<em>Pendiente, En Tránsito, En Sucursal</em>) se identifican con
+                    <code>IENV-</code> (ej: <code>IENV-001</code>).
+                    Ambos contadores son independientes del <code>ENV-</code> del alta individual.
                 </div>
             </section>
 
@@ -65,14 +68,16 @@
                     <li><code>recipientName</code>, <code>recipientDocument</code>, <code>recipientPhone</code>, <code>recipientEmail</code></li>
                     <li><code>street</code>, <code>number</code>, <code>floorApartment</code>, <code>province</code>, <code>postalCode</code></li>
                     <li><code>shipmentTypeId</code>, <code>weightKg</code>, <code>packageQty</code>, <code>status</code></li>
-                    <li><code>legacyTrackingId</code> (opcional)</li>
+                    <li><code>legacyTrackingId</code> (opcional), <code>deliveryUserDocument</code> (opcional)</li>
                 </ul>
                 <p class="import-hint">
                     <code>province</code> acepta el id numérico o el nombre (ej: <em>"Buenos Aires"</em>).
-                    <code>status</code> acepta <em>"Entregado"</em> o <em>"Cancelado"</em> (también sus ids 4 y 5).
-                    Cualquier otro estado se rechaza fila por fila.
+                    <code>status</code> acepta los 5 estados (<em>Pendiente</em>, <em>En Tránsito</em>,
+                    <em>En Sucursal</em>, <em>Entregado</em>, <em>Cancelado</em>) o sus ids 1 a 5.
                     <code>legacyTrackingId</code> es opcional: si lo completás con el id del envío en el sistema viejo,
                     el sistema detecta reimports idempotentes (subir el mismo CSV dos veces no genera duplicados).
+                    <code>deliveryUserDocument</code> es opcional: DNI del repartidor que tenía asignado el envío;
+                    si el usuario no existe o no es repartidor, la fila se rechaza.
                     Las coordenadas se obtienen automáticamente del servicio de geocodificación —
                     no es necesario incluirlas en el CSV.
                 </p>

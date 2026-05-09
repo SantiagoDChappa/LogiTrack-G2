@@ -11,6 +11,16 @@
         <div class="dashboard-wrapper">
             <div class="page-header">
                 <h1>Inicio - Panel General</h1>
+                <div class="header-quick-actions">
+                    <a href="/shipment/new" class="btn-primary quick-btn">
+                        <span class="material-symbols-outlined">add_box</span>
+                        Crear Nuevo Envío
+                    </a>
+                    <a href="/shipment" class="btn-outline quick-btn">
+                        <span class="material-symbols-outlined">search</span>
+                        Buscar Envío por ID/DNI
+                    </a>
+                </div>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
@@ -132,23 +142,6 @@
                 </div>
             </dialog>
             <div class="bottom-grid">
-                <div class="card">
-                    <h2>Entregas Completadas por Día</h2>
-                    <canvas id="chart-entregas" height="120"></canvas>
-                </div>
-                <div class="card acceso-rapido">
-                    <h2>Acceso Rápido</h2>
-                    <div class="quick-actions">
-                        <a href="/shipment/new" class="btn-primary quick-btn">
-                            <span class="material-symbols-outlined">add_box</span>
-                            Crear Nuevo Envío
-                        </a>
-                        <a href="/shipment" class="btn-outline quick-btn">
-                            <span class="material-symbols-outlined">search</span>
-                            Buscar Envío por ID/DNI
-                        </a>
-                    </div>
-                </div>
                 <div class="card estado-envios">
                     <h2>Total de envíos por estado</h2>
                     <% if (statusTotals.length === 0) { %>
@@ -156,10 +149,10 @@
                     <% } else { %>
                         <div class="status-total-list">
                             <% statusTotals.forEach(item => { %>
-                                <div class="status-total-row">
+                                <a href="/shipment/search?statusIds=<%= item.id %>" class="status-total-row">
                                     <span class="status-badge <%= item.key %>"><%= item.label %></span>
                                     <span class="status-total-value"><%= item.total %></span>
-                                </div>
+                                </a>
                             <% }) %>
                         </div>
                     <% } %>
@@ -190,7 +183,7 @@
                                         </td>
                                         <td>
                                             <% const _sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
-                                            <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'}; %>
+                                            <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'}; %>
                                             <span class="status-badge <%= _sk %>">
                                                 <%= _sl[_sk] || s.status.description %>
                                             </span>
@@ -203,6 +196,10 @@
                             <% } %>
                         </tbody>
                     </table>
+                </div>
+                <div class="card entregas-card">
+                    <h2>Entregas Completadas por Día</h2>
+                    <canvas id="chart-entregas" height="80"></canvas>
                 </div>
             </div>
         </div>

@@ -16,8 +16,11 @@ const Shipment = sequelize.define('shipment', {
     shipmentTypeId:   { type: DataTypes.INTEGER },
     weightKg:         { type: DataTypes.DECIMAL(8, 2) },
     packageQty:       { type: DataTypes.INTEGER },
+    volumeM3:         { type: DataTypes.DECIMAL(8, 3) },
     deliveryUserId:   { type: DataTypes.INTEGER },
     legacyTrackingId: { type: DataTypes.STRING },
+    priority:         { type: DataTypes.INTEGER, defaultValue: 1 },
+    basePriority:     { type: DataTypes.INTEGER, defaultValue: 1 },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -62,14 +65,18 @@ const getById = (id) => {
     });
 };
 
-const generateTrackingId = async () => {
-    const last = await Shipment.findOne({ order: [['id', 'DESC']] });
-    const next = last ? last.id + 1 : 1;
-    return `ENV-${String(next).padStart(3, '0')}`;
+const generateTrackingId = async (prefix = 'ENV') => {
+    const last = await Shipment.findOne({
+        where: { trackingId: { [Op.like]: `${prefix}-%` } },
+        order: [['id', 'DESC']],
+    });
+    if (!last) { return `${prefix}-001`; }
+    const lastNum = parseInt(String(last.trackingId).split('-').pop(), 10) || 0;
+    return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
 };
 
 const create = async (data) => {
-    const trackingId = await generateTrackingId();
+    const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
     return Shipment.create({
         trackingId,
         statusId:         data.statusId || 1,
@@ -79,7 +86,11 @@ const create = async (data) => {
         shipmentTypeId:   data.shipmentTypeId || null,
         weightKg:         data.weightKg       || null,
         packageQty:       data.packageQty      || null,
+        deliveryUserId:   data.deliveryUserId  || null,
+        volumeM3:         data.volumeM3 || null,
         legacyTrackingId: data.legacyTrackingId || null,
+        priority:         data.priority     || 1,
+        basePriority:     data.basePriority || 1,
         createdAt:        new Date().toISOString().split('T')[0]
     });
 };
@@ -261,4 +272,33 @@ const findByIdForUpdate = (id, transaction) => Shipment.findOne({
     lock: transaction ? transaction.LOCK.UPDATE : undefined,
 });
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate };
+const getForKanban = (statusIds) => {
+    const { Person }    = require('./person');
+    const { Status }    = require('./status');
+    const { Address }   = require('./address');
+    const { Province }  = require('./province');
+    const { User }      = require('./user');
+
+    return Shipment.findAll({
+        where: { statusId: { [Op.in]: statusIds } },
+        include: [
+            { model: Person,  as: 'recipient' },
+            { model: Status,  as: 'status' },
+            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: User,    as: 'deliveryUser', required: false },
+        ],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+const updatePriority = (id, newPriority) => {
+    return Shipment.update({ priority: newPriority }, { where: { id } });
+};
+
+const getActiveShipments = () => {
+    return Shipment.findAll({
+        where: { statusId: { [Op.notIn]: [4, 5] } }
+    });
+};
+
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId, updatePriority, getActiveShipments };

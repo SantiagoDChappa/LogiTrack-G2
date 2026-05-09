@@ -201,15 +201,18 @@
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 
-                    <div id="prediction-widget"
-                         class="pred-card pred-card--embedded"
-                         data-province-id="<%= shipment.address.provinceId %>"
-                         data-street="<%= shipment.address.street || '' %>"
-                         data-number="<%= shipment.address.number || '' %>"
-                         data-weight-kg="<%= shipment.weightKg || '' %>"
-                         data-package-qty="<%= shipment.packageQty || '' %>"
-                         data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
-                         data-autoload="true">
+                   <div id="prediction-widget"
+                    class="pred-card pred-card--embedded"
+                    data-province-id="<%= shipment.address.provinceId %>"
+                    data-street="<%= shipment.address.street || '' %>"
+                    data-number="<%= shipment.address.number || '' %>"
+                    data-weight-kg="<%= shipment.weightKg || '' %>"
+                    data-package-qty="<%= shipment.packageQty || '' %>"
+                    data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
+                    data-autoload="true"
+                    data-shipment-id="<%= shipment.id %>"
+                    data-delivery-user-id="<%= shipment.deliveryUserId || '' %>">
+                         
                         <h3>
                             <span class="material-symbols-outlined">query_stats</span>
                             Detalles de la entrega
@@ -384,6 +387,10 @@
                     <div class="detail-field">
                         <span class="detail-label">Cantidad de paquetes</span>
                         <span class="detail-value"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Volumen</span>
+                        <span class="detail-value"><%= shipment.volumeM3 != null ? shipment.volumeM3 + ' m³' : '-' %></span>
                     </div>
                 </div>
 

@@ -55,6 +55,7 @@
                 <% const okRows = analysis.rows.filter(r => r.status === 'ok'); %>
                 <% const dupRows = analysis.rows.filter(r => r.status === 'duplicate'); %>
                 <% const invalidRows = analysis.rows.filter(r => r.status === 'invalid'); %>
+                <% const STATUS_LABELS = { 1: 'Pendiente', 2: 'En Tránsito', 3: 'En Sucursal', 4: 'Entregado', 5: 'Cancelado' }; %>
 
                 <% if (okRows.length > 0) { %>
                     <section class="import-section">
@@ -62,7 +63,7 @@
                         <div class="table-wrapper">
                             <table>
                                 <thead>
-                                    <tr><th>Fila</th><th>Remitente</th><th>Destinatario</th><th>Dirección</th><th>Estado</th><th>Legacy ID</th></tr>
+                                    <tr><th>Fila</th><th>Remitente</th><th>Destinatario</th><th>Dirección</th><th>Estado</th><th>Repartidor</th><th>Legacy ID</th></tr>
                                 </thead>
                                 <tbody>
                                     <% okRows.forEach(function(r) { %>
@@ -71,7 +72,8 @@
                                             <td><%= r.data.senderName %> (<%= r.data.senderDocument %>)</td>
                                             <td><%= r.data.recipientName %> (<%= r.data.recipientDocument %>)</td>
                                             <td><%= r.data.street %> <%= r.data.number %></td>
-                                            <td><%= r.data.statusId === 4 ? 'Entregado' : 'Cancelado' %></td>
+                                            <td><%= STATUS_LABELS[r.data.statusId] || r.data.statusId %></td>
+                                            <td><%= r.data.deliveryUserId ? '#' + r.data.deliveryUserId : '-' %></td>
                                             <td><%= r.data.legacyTrackingId || '-' %></td>
                                         </tr>
                                     <% }) %>

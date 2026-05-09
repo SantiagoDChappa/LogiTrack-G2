@@ -1,7 +1,8 @@
-const shipmentModel        = require('../models/shipment');
-const statusModel          = require('../models/status');
-const userModel            = require('../models/user');
-const stateMachine         = require('../services/shipmentStateMachine');
+const shipmentModel          = require('../models/shipment');
+const statusModel            = require('../models/status');
+const userModel              = require('../models/user');
+// const shipmentHistoryModel   = require('../models/shipmentHistory');
+const stateMachine           = require('../services/shipmentStateMachine');
 const { notifyStatusChange } = require('../utils/notifications');
 const { Status }             = require('../constants/enums');
 const { resolveBranchCoords, resolveUserBranchCoords } = require('../utils/eventLocation');

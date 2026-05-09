@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
+const branchModel = require('../models/branch');
 
 const getLogin = (req, res) => {
     if (req.cookies?.token) {
@@ -28,8 +29,12 @@ const login = async (req, res) => {
         return res.render('login', { error: 'Email o contraseña incorrectos'});
     }
 
+    const branch = await branchModel.getById(user.branchId);
+
+
+
     const token = JWT.sign(
-        {id: user.id, email: user.email, roleId: user.roleId, fullName: user.fullName},
+        {id: user.id, email: user.email, roleId: user.roleId, fullName: user.fullName, branch: {id: user.branchId, latitude: branch.latitude, longitude: branch.longitude}},
         process.env.JWT_SECRET,
         {expiresIn: req.body.remember ? '30d' : '8h'}
     );
