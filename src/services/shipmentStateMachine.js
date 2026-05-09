@@ -147,7 +147,7 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
     });
 };
 
-const assignDelivery = ({ shipmentId, deliveryUserId, actor }) => {
+const assignDelivery = ({ shipmentId, deliveryUserId, actor, branchId, latitude, longitude }) => {
     return sequelize.transaction(async (t) => {
         const shipment = await shipmentModel.findByIdForUpdate(shipmentId, t);
         if (!shipment) {
@@ -177,9 +177,12 @@ const assignDelivery = ({ shipmentId, deliveryUserId, actor }) => {
             shipmentId,
             fromStatusId,
             toStatusId: S.ASSIGNED.id,
-            comment: null,
-            userId: actor.id || null,
+            comment:   null,
+            userId:    actor.id || null,
             eventType: rule.eventType,
+            branchId:  branchId  || null,
+            latitude:  latitude  != null ? latitude  : null,
+            longitude: longitude != null ? longitude : null,
             transaction: t,
         });
 

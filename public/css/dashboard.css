@@ -93,6 +93,14 @@
     margin-bottom: 1.25rem;
 }
 
+/* Repartidores cards (5th & 6th) span 2 cols each to fill row cleanly */
+.stat-card:nth-child(5) {
+    grid-column: 1 / span 2;
+}
+.stat-card:nth-child(6) {
+    grid-column: 3 / span 2;
+}
+
 .stat-card {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -204,6 +212,11 @@
 
 .estado-envios {
     min-width: 0;
+}
+
+/* Última actividad spans all 3 columns */
+.ultima-actividad {
+    grid-column: 1 / -1;
 }
 
 .status-total-list {
@@ -398,7 +411,10 @@
 
 @media (max-width: 1200px) {
     .bottom-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+    }
+    .ultima-actividad {
+        grid-column: 1 / -1;
     }
 
     .header-quick-actions {
@@ -409,6 +425,13 @@
 @media (max-width: 900px) {
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+    .stat-card:nth-child(5),
+    .stat-card:nth-child(6) {
+        grid-column: span 1;
+    }
+    .bottom-grid {
+        grid-template-columns: 1fr;
     }
 }
 

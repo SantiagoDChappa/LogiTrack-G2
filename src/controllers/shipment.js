@@ -19,6 +19,7 @@ const csvExport            = require('../services/csvExport');
 const shipmentImportModel  = require('../models/shipmentImport');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
 const stateMachine         = require('../services/shipmentStateMachine');
+const routePlanner         = require('../services/routePlanner');
 
 const renderStateMachineError = (err, res, redirectUrl) => {
     if (err && err.name === 'StateMachineError') {
@@ -90,16 +91,30 @@ const getDetail = async (req, res) => {
             };
         });
     const firstBranchEvent = history.find(h => h.branch);
-    const originBranch     = firstBranchEvent?.branch || null;
+    let originBranch       = firstBranchEvent?.branch || null;
+
+    if (!originBranch) {
+        const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
+        const creatorId    = createdEvent?.user?.id;
+        if (creatorId) {
+            const creator = await userModel.getById(creatorId);
+            if (creator?.branchId) {
+                const branchModel = require('../models/branch');
+                originBranch = await branchModel.getById(creator.branchId);
+            }
+        }
+    }
+
+    const fallbackStreet = [originStreet, originNumber].filter(Boolean).join(' ');
     const mapData = {
         origin: originBranch ? {
             lat:   Number(originBranch.latitude),
             lng:   Number(originBranch.longitude),
-            label: `Sucursal ${originBranch.name}`,
+            label: originBranch.name,
         } : {
             lat:   parseFloat(originLat)  || -34.6037,
             lng:   parseFloat(originLng)  || -58.3816,
-            label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+            label: fallbackStreet || 'Punto de origen central',
         },
         destination: destLat ? {
             lat: destLat,
@@ -108,9 +123,26 @@ const getDetail = async (req, res) => {
                 || (destProv ? destProv.name : ''),
         } : null,
         stops,
+        route: null,
     };
 
-    const returnUrl = req.query.from || '/shipment';
+    if (mapData.destination
+        && Number.isFinite(mapData.origin.lat)
+        && Number.isFinite(mapData.origin.lng)
+        && Number.isFinite(mapData.destination.lat)
+        && Number.isFinite(mapData.destination.lng)) {
+        try {
+            mapData.route = await routePlanner.planShipmentRoute({
+                origin:         { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
+                destination:    { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
+                originBranchId: originBranch?.id || null,
+            });
+        } catch (err) {
+            console.error('ERROR planShipmentRoute:', err.message);
+        }
+    }
+
+    const returnUrl   = req.query.from || '/shipment';
     const returnLabel = req.query.fromLabel || 'Administrador de envíos';
     res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel });
 };
@@ -215,41 +247,77 @@ const createShipment = async (req, res) => {
 };
 
 const getUpdateShipment = async (req, res) => {
-    const { id } = req.params;
-    const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
-        provinceModel.getAll(),
-        statusModel.getAll(),
-        shipmentModel.getById(id),
-        shipmentHistoryModel.getByShipmentId(id),
-        typeShipmentModel.getAll(),
-        settingModel.get('origin_lat'),
-        settingModel.get('origin_lng'),
-        settingModel.get('origin_street'),
-        settingModel.get('origin_number'),
-        userModel.search({ roleId: RoleType.DELIVERY.id })
-    ]);
+  const { id } = req.params;
+  const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
+      provinceModel.getAll(),
+      statusModel.getAll(),
+      shipmentModel.getById(id),
+      shipmentHistoryModel.getByShipmentId(id),
+      typeShipmentModel.getAll(),
+      settingModel.get('origin_lat'),
+      settingModel.get('origin_lng'),
+      settingModel.get('origin_street'),
+      settingModel.get('origin_number'),
+      userModel.search({ roleId: RoleType.DELIVERY.id })
+  ]);
 
-    const destProv = PROVINCES[shipment.address.provinceId];
-    const destLat = shipment.address.lat || (destProv ? destProv.lat : null);
-    const destLng = shipment.address.lng || (destProv ? destProv.lng : null);
-    const mapData = {
-        origin: {
-            lat: parseFloat(originLat) || -34.6037,
-            lng: parseFloat(originLng) || -58.3816,
-            label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
-        },
-        destination: destLat ? {
-            lat: destLat,
-            lng: destLng,
-            label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
-        } : null,
-    };
+  const destProv = PROVINCES[shipment.address.provinceId];
+  const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
+  const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
+  const mapData = {
+      origin: {
+          lat:   parseFloat(originLat)  || -34.6037,
+          lng:   parseFloat(originLng)  || -58.3816,
+          label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+      },
+      destination: destLat ? {
+          lat:   destLat,
+          lng:   destLng,
+          label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
+      } : null,
+  };
 
-    const returnUrl = req.query.from || '/shipment';
-    const currentUser = res.locals.currentUser;
-    const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
-    const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
-    res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
+  // Resolver sucursal origen desde historial (igual que getDetail)
+  const firstBranchEvent = history.find(h => h.branch);
+  let originBranch = firstBranchEvent?.branch || null;
+  if (!originBranch) {
+      const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
+      if (createdEvent?.user?.id) {
+          const creator = await userModel.getById(createdEvent.user.id);
+          if (creator?.branchId) {
+              const branchModel = require('../models/branch');
+              originBranch = await branchModel.getById(creator.branchId);
+          }
+      }
+  }
+  if (originBranch) {
+      mapData.origin = {
+          lat:   Number(originBranch.latitude),
+          lng:   Number(originBranch.longitude),
+          label: originBranch.name,
+      };
+  }
+
+  mapData.route = null;
+  if (mapData.destination
+      && Number.isFinite(mapData.origin.lat) && Number.isFinite(mapData.origin.lng)
+      && Number.isFinite(mapData.destination.lat) && Number.isFinite(mapData.destination.lng)) {
+      try {
+          mapData.route = await routePlanner.planShipmentRoute({
+              origin:         { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
+              destination:    { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
+              originBranchId: originBranch?.id || res.locals.currentUser?.branchId || null,
+          });
+      } catch (err) {
+          console.error('ERROR planShipmentRoute (update):', err.message);
+      }
+  }
+
+  const returnUrl = req.query.from || '/shipment';
+  const currentUser = res.locals.currentUser;
+  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
+  const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
+  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
 };
 
 const updateShipment = async (req, res) => {
@@ -408,10 +476,14 @@ const assignDelivery = async (req, res) => {
         const { deliveryUserId } = req.body;
         const currentUser        = res.locals.currentUser;
 
+        const supervisorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.assignDelivery({
-            shipmentId: Number(id),
+            shipmentId:     Number(id),
             deliveryUserId: deliveryUserId || null,
-            actor: currentUser,
+            actor:          currentUser,
+            branchId:       supervisorCoords.branchId,
+            latitude:       supervisorCoords.latitude,
+            longitude:      supervisorCoords.longitude,
         });
 
         const fresh = await shipmentModel.getById(id);
@@ -432,10 +504,14 @@ const prepareShipment = async (req, res) => {
         const { id }      = req.params;
         const currentUser = res.locals.currentUser;
 
+        const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.IN_PREPARATION.id,
-            actor: currentUser,
+            actor:      currentUser,
+            branchId:   actorCoords.branchId,
+            latitude:   actorCoords.latitude,
+            longitude:  actorCoords.longitude,
         });
 
         const fresh = await shipmentModel.getById(id);
@@ -456,11 +532,15 @@ const cancelShipment = async (req, res) => {
         const { comment } = req.body;
         const currentUser = res.locals.currentUser;
 
+        const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.CANCELLED.id,
-            actor: currentUser,
+            actor:      currentUser,
             comment,
+            branchId:   actorCoords.branchId,
+            latitude:   actorCoords.latitude,
+            longitude:  actorCoords.longitude,
         });
 
         const fresh = await shipmentModel.getById(id);
@@ -481,11 +561,15 @@ const markPackageFailed = async (req, res) => {
         const { comment } = req.body;
         const currentUser = res.locals.currentUser;
 
+        const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.PACKAGE_FAILED.id,
-            actor: currentUser,
+            actor:      currentUser,
             comment,
+            branchId:   actorCoords.branchId,
+            latitude:   actorCoords.latitude,
+            longitude:  actorCoords.longitude,
         });
 
         const fresh = await shipmentModel.getById(id);
