@@ -182,4 +182,13 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     });
 };
 
-module.exports = { validateShipment, validateUpdateShipment, handleUpdateValidationErrors };
+
+const validatePriority = [
+    body('weight').isInt(),
+    body('type').notEmpty(),
+    body('destinationUbication.lat').notEmpty(),
+    body('destinationUbication.lng').notEmpty()
+]
+
+
+module.exports = { validateShipment, validateUpdateShipment, handleUpdateValidationErrors, validatePriority };

@@ -19,6 +19,8 @@ const Shipment = sequelize.define('shipment', {
     volumeM3:         { type: DataTypes.DECIMAL(8, 3) },
     deliveryUserId:   { type: DataTypes.INTEGER },
     legacyTrackingId: { type: DataTypes.STRING },
+    priority:         { type: DataTypes.INTEGER, defaultValue: 1 },
+    basePriority:     { type: DataTypes.INTEGER, defaultValue: 1 },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -87,6 +89,8 @@ const create = async (data) => {
         deliveryUserId:   data.deliveryUserId  || null,
         volumeM3:         data.volumeM3 || null,
         legacyTrackingId: data.legacyTrackingId || null,
+        priority:         data.priority     || 1,
+        basePriority:     data.basePriority || 1,
         createdAt:        new Date().toISOString().split('T')[0]
     });
 };
@@ -287,4 +291,14 @@ const getForKanban = (statusIds) => {
     });
 };
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId };
+const updatePriority = (id, newPriority) => {
+    return Shipment.update({ priority: newPriority }, { where: { id } });
+};
+
+const getActiveShipments = () => {
+    return Shipment.findAll({
+        where: { statusId: { [Op.notIn]: [4, 5] } }
+    });
+};
+
+module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId, updatePriority, getActiveShipments };

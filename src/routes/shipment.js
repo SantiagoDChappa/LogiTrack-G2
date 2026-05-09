@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments } = require('../controllers/shipment.js');
-const { validateShipment, validateUpdateShipment, handleUpdateValidationErrors } = require('../middlewares/shipment.js');
+const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority } = require('../controllers/shipment.js');
+const { validateShipment, validateUpdateShipment, handleUpdateValidationErrors, validatePriority } = require('../middlewares/shipment.js');
 const { requireAuth, requireAdmin, requireSupervisor, requireSupervisorOrAdmin } = require('../middlewares/auth.js');
 const { csvUpload } = require('../middlewares/upload.js');
 
@@ -19,11 +19,14 @@ router.get('/import/report/:id', requireAdmin, downloadImportReport);
 router.get('/detail/:id', getDetail);
 router.get('/update/:id', getUpdateShipment);
 router.post('/update/:id', validateUpdateShipment, handleUpdateValidationErrors, updateShipment);
+router.post('/update/:id/status',      requireSupervisorOrAdmin, updateShipmentStatus);
 router.post('/update/:id/assign',      requireSupervisorOrAdmin, assignDelivery);
 router.post('/update/:id/prepare',     requireSupervisorOrAdmin, prepareShipment);
 router.post('/update/:id/cancel',      requireSupervisorOrAdmin, cancelShipment);
 router.post('/update/:id/mark-failed', requireSupervisorOrAdmin, markPackageFailed);
 router.get('/:id/qr', requireAuth, getQR);
 router.get('/:id/label', requireAuth, getLabel);
+
+router.post('/calculate-initial-priority', calculateInitialPriority);
 
 module.exports = router;
