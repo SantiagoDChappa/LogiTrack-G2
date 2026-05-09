@@ -201,6 +201,11 @@
   color: var(--btn-eliminar-text);
 }
 
+.action-btn.estado {
+  background-color: var(--btn-estado-bg);
+  color: var(--btn-estado-text);
+}
+
 .action-btn.action-btn--disabled {
   opacity: 0.35;
   pointer-events: none;
