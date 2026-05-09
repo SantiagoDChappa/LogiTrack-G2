@@ -111,7 +111,7 @@ const findPotentialDuplicate = ({ senderDocument, recipientDocument, street, num
     });
 };
 
-const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId }) => {
+const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId, currentBranchId }) => {
     const { Person } = require('./person');
     const { Status } = require('./status');
     const { Address } = require('./address');
@@ -121,6 +121,8 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
     const recipientWhere = {};
 
     if (deliveryUserId) { shipmentWhere.deliveryUserId = deliveryUserId; }
+
+    if (currentBranchId) { shipmentWhere.currentBranchId = Number(currentBranchId); }
 
     if (statusIds && statusIds.length > 0) {
         shipmentWhere.statusId = { [Op.in]: statusIds.map(Number) };
@@ -259,6 +261,9 @@ const updateStatus = (id, newStatusId, options = {}) => {
     const updates = { statusId: newStatusId };
     if (options.deliveryUserId !== undefined) {
         updates.deliveryUserId = options.deliveryUserId;
+    }
+    if (options.currentBranchId !== undefined) {
+        updates.currentBranchId = options.currentBranchId;
     }
     return Shipment.update(updates, { where: { id }, transaction: options.transaction });
 };

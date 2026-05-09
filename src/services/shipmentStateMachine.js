@@ -128,6 +128,7 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
         await shipmentModel.updateStatus(shipmentId, toStatusId, {
             transaction: t,
             ...(deliveryUserId !== undefined ? { deliveryUserId } : {}),
+            ...(toStatusId === S.AT_BRANCH.id && branchId ? { currentBranchId: branchId } : {}),
         });
 
         await shipmentHistoryModel.create({

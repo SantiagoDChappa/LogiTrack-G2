@@ -16,7 +16,10 @@ const { validationResult }   = require('express-validator');
 const csvImport            = require('../services/csvImport');
 const csvExport            = require('../services/csvExport');
 const shipmentImportModel  = require('../models/shipmentImport');
+const branchModel          = require('../models/branch');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
+
+const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
 const stateMachine         = require('../services/shipmentStateMachine');
 
 const renderStateMachineError = (err, res, redirectUrl) => {
@@ -35,12 +38,17 @@ const renderStateMachineError = (err, res, redirectUrl) => {
 };
 
 const home = async (req, res) => {
-    const statuses = await statusModel.getAll();
-    res.render('shipment/index', { shipments: [], query: {}, statuses });
+    const isAdmin = isAdminUser(res.locals.currentUser);
+    const [statuses, branches] = await Promise.all([
+        statusModel.getAll(),
+        isAdmin ? branchModel.getAll() : Promise.resolve([]),
+    ]);
+    res.render('shipment/index', { shipments: [], query: {}, statuses, branches, isAdmin });
 };
 
 const searchShipments = async (req, res) => {
-    const { trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds } = req.query;
+    const isAdmin = isAdminUser(res.locals.currentUser);
+    const { trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, currentBranchId } = req.query;
     const query = {
         trackingId,
         role,
@@ -50,13 +58,15 @@ const searchShipments = async (req, res) => {
         senderDocument:    senderDocument?.trim(),
         recipientName:     recipientName?.trim(),
         recipientDocument: recipientDocument?.trim(),
-        statusIds:         statusIds ? [].concat(statusIds) : []
+        statusIds:         statusIds ? [].concat(statusIds) : [],
+        currentBranchId:   isAdmin ? (Number(currentBranchId) || null) : null,
     };
-    const [shipments, statuses] = await Promise.all([
+    const [shipments, statuses, branches] = await Promise.all([
         shipmentModel.search(query),
-        statusModel.getAll()
+        statusModel.getAll(),
+        isAdmin ? branchModel.getAll() : Promise.resolve([]),
     ]);
-    res.render('shipment/index', { shipments, query, statuses });
+    res.render('shipment/index', { shipments, query, statuses, branches, isAdmin });
 };
 
 const getDetail = async (req, res) => {
@@ -152,26 +162,29 @@ const createShipment = async (req, res) => {
         email:        body.recipientEmail
     });
 
-    const address = await addressModel.create({
-        street:         body.street,
-        number:         body.number,
-        provinceId:     body.province,
-        postalCode:     body.postalCode,
-        floorApartment: body.floorApartment,
-        lat:            body.addressLat ? parseFloat(body.addressLat) : null,
-        lng:            body.addressLng ? parseFloat(body.addressLng) : null,
-    });
+    const [address, creatorCoords] = await Promise.all([
+        addressModel.create({
+            street:         body.street,
+            number:         body.number,
+            provinceId:     body.province,
+            postalCode:     body.postalCode,
+            floorApartment: body.floorApartment,
+            lat:            body.addressLat ? parseFloat(body.addressLat) : null,
+            lng:            body.addressLng ? parseFloat(body.addressLng) : null,
+        }),
+        resolveUserBranchCoords(res.locals.currentUser?.id),
+    ]);
 
     const shipment = await shipmentModel.create({
-        senderId:       sender.id,
-        recipientId:    recipient.id,
-        addressId:      address.id,
-        shipmentTypeId: body.shipmentTypeId || null,
-        weightKg:       body.weightKg       || null,
-        packageQty:     body.packageQty      || null,
+        senderId:        sender.id,
+        recipientId:     recipient.id,
+        addressId:       address.id,
+        shipmentTypeId:  body.shipmentTypeId || null,
+        weightKg:        body.weightKg       || null,
+        packageQty:      body.packageQty      || null,
+        currentBranchId: creatorCoords.branchId || null,
     });
 
-    const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
     await shipmentHistoryModel.create({
         shipmentId:   shipment.id,
         fromStatusId: null,

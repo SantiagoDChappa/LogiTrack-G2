@@ -69,16 +69,20 @@
                 <button type="submit" class="btn-primary search-btn">
                     <span class="material-symbols-outlined">search</span>Buscar
                 </button>
-                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= (query.statusIds && query.statusIds.length > 0) ? 'active' : '' %>" onclick="toggleFilterPanel()">
+                <% const _hasBranchFilter = isAdmin && query.currentBranchId; %>
+                <% const _hasStatusFilter = query.statusIds && query.statusIds.length > 0; %>
+                <% const _hasAnyFilter = _hasStatusFilter || _hasBranchFilter; %>
+                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= _hasAnyFilter ? 'active' : '' %>" onclick="toggleFilterPanel()">
                     <span class="material-symbols-outlined">tune</span>Filtros
-                    <% if (query.statusIds && query.statusIds.length > 0) { %>
-                        <span class="filter-count-badge"><%= query.statusIds.length %></span>
+                    <% const _filterCount = (query.statusIds ? query.statusIds.length : 0) + (_hasBranchFilter ? 1 : 0); %>
+                    <% if (_filterCount > 0) { %>
+                        <span class="filter-count-badge"><%= _filterCount %></span>
                     <% } %>
                 </button>
             </div>
 
             <!-- Panel de filtros -->
-            <div id="filter-panel" class="filter-panel" style="<%= (query.statusIds && query.statusIds.length > 0) ? '' : 'display:none;' %>">
+            <div id="filter-panel" class="filter-panel" style="<%= _hasAnyFilter ? '' : 'display:none;' %>">
                 <div class="filter-section">
                     <span class="filter-label">Estado</span>
                     <div class="filter-chips">
@@ -97,6 +101,17 @@
                         <% }); %>
                     </div>
                 </div>
+                <% if (isAdmin && branches && branches.length > 0) { %>
+                    <div class="filter-section">
+                        <span class="filter-label">Sucursal actual</span>
+                        <select name="currentBranchId" class="search-input">
+                            <option value="">-- Todas --</option>
+                            <% branches.forEach(function(b) { %>
+                                <option value="<%= b.id %>" <%= String(query.currentBranchId || '') === String(b.id) ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }); %>
+                        </select>
+                    </div>
+                <% } %>
             </div>
         </form>
 

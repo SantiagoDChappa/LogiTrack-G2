@@ -8,11 +8,16 @@ const transportModel = require('../models/transport');
 const routeModel = require('../models/route');
 const { Route, RouteStatus } = require('../models/route');
 const { RouteStop } = require('../models/routeStop');
-const { Status: StatusEnum } = require('../constants/enums');
+const { Status: StatusEnum, RoleType } = require('../constants/enums');
 const optimizer = require('../services/routeOptimizer.service');
 const sequelize = require('../database/connection');
 
+const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
+
 const resolveBranchId = (user, source) => {
+    if (!isAdminUser(user)) {
+        return user?.branchId || null;
+    }
     const raw = source?.branchId;
     const n = Number(raw);
     if (Number.isInteger(n) && n > 0) { return n; }
@@ -21,13 +26,14 @@ const resolveBranchId = (user, source) => {
 
 const optimizeForm = async (req, res) => {
     const user     = res.locals.currentUser;
+    const isAdmin  = isAdminUser(user);
     const branchId = resolveBranchId(user, req.query);
-    const branches = await branchModel.getAll();
+    const branches = isAdmin ? await branchModel.getAll() : [];
 
     if (!branchId) {
         return res.render('route/optimize', {
             shipments: [], transports: [], branchId: null,
-            branches, isAdmin: true,
+            branches, isAdmin,
         });
     }
 
@@ -49,7 +55,7 @@ const optimizeForm = async (req, res) => {
 
     res.render('route/optimize', {
         shipments, transports, branchId,
-        branches, isAdmin: true,
+        branches, isAdmin,
     });
 };
 
@@ -136,10 +142,14 @@ const confirm = async (req, res) => {
 };
 
 const list = async (req, res) => {
-    const branchId = Number(req.query.branchId) || null;
-    const branches = await branchModel.getAll();
+    const user     = res.locals.currentUser;
+    const isAdmin  = isAdminUser(user);
+    const branchId = isAdmin
+        ? (Number(req.query.branchId) || null)
+        : (user?.branchId || null);
+    const branches = isAdmin ? await branchModel.getAll() : [];
     const routes   = await routeModel.getAllByBranch(branchId);
-    res.render('route/index', { routes, branches, branchId, isAdmin: true });
+    res.render('route/index', { routes, branches, branchId, isAdmin });
 };
 
 const detail = async (req, res) => {
