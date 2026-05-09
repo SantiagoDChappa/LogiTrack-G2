@@ -3,6 +3,7 @@ const { Shipment } = require('../models/shipment');
 const { Address } = require('../models/address');
 const { Zone } = require('../models/zone');
 const { Person } = require('../models/person');
+const branchModel = require('../models/branch');
 const transportModel = require('../models/transport');
 const routeModel = require('../models/route');
 const { Route, RouteStatus } = require('../models/route');
@@ -11,9 +12,24 @@ const { Status: StatusEnum } = require('../constants/enums');
 const optimizer = require('../services/routeOptimizer.service');
 const sequelize = require('../database/connection');
 
+const resolveBranchId = (user, source) => {
+    const raw = source?.branchId;
+    const n = Number(raw);
+    if (Number.isInteger(n) && n > 0) { return n; }
+    return user?.branchId || null;
+};
+
 const optimizeForm = async (req, res) => {
-    const branchId = res.locals.currentUser?.branchId;
-    if (!branchId) { return res.status(400).send('Tu usuario no tiene una sucursal asignada.'); }
+    const user     = res.locals.currentUser;
+    const branchId = resolveBranchId(user, req.query);
+    const branches = await branchModel.getAll();
+
+    if (!branchId) {
+        return res.render('route/optimize', {
+            shipments: [], transports: [], branchId: null,
+            branches, isAdmin: true,
+        });
+    }
 
     const [shipments, transports] = await Promise.all([
         Shipment.findAll({
@@ -31,11 +47,14 @@ const optimizeForm = async (req, res) => {
         transportModel.getEnabledForBranch(branchId),
     ]);
 
-    res.render('route/optimize', { shipments, transports, branchId });
+    res.render('route/optimize', {
+        shipments, transports, branchId,
+        branches, isAdmin: true,
+    });
 };
 
 const previewOptimization = async (req, res) => {
-    const branchId = res.locals.currentUser?.branchId;
+    const branchId = resolveBranchId(res.locals.currentUser, req.body);
     if (!branchId) { return res.status(400).json({ error: 'Sin sucursal asignada' }); }
 
     const shipmentIds = [].concat(req.body.shipmentIds || []).map(Number).filter(Boolean);
@@ -52,7 +71,7 @@ const previewOptimization = async (req, res) => {
 };
 
 const confirm = async (req, res) => {
-    const branchId = res.locals.currentUser?.branchId;
+    const branchId = resolveBranchId(res.locals.currentUser, req.body);
     if (!branchId) { return res.status(400).json({ error: 'Sin sucursal asignada' }); }
 
     const proposals = req.body.proposals || [];
@@ -117,9 +136,10 @@ const confirm = async (req, res) => {
 };
 
 const list = async (req, res) => {
-    const branchId = res.locals.currentUser?.branchId;
-    const routes = await routeModel.getAllByBranch(branchId);
-    res.render('route/index', { routes });
+    const branchId = Number(req.query.branchId) || null;
+    const branches = await branchModel.getAll();
+    const routes   = await routeModel.getAllByBranch(branchId);
+    res.render('route/index', { routes, branches, branchId, isAdmin: true });
 };
 
 const detail = async (req, res) => {

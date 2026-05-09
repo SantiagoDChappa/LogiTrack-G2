@@ -45,7 +45,8 @@ INSERT INTO "logitrack"."user" ("fullName", "email", "password", "document", "ro
     ('Rubi Rose',               'rubirose@gmail.com',                   '$2b$12$zPvoebtpukk2aNU276GJXOLDtgOk2IBeG6eMhlDnRm.eJnO7PQL92', 1111,       2, NULL),
     ('Carlos Repartidor',       'carlos@logitrack.com.ar',              '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30111222,   3, 1),
     ('Maria Repartidora',       'maria@logitrack.com.ar',               '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30333444,   3, 2),
-    ('Pedro Repartidor',        'pedro@logitrack.com.ar',               '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30555666,   3, 3);
+    ('Pedro Repartidor',        'pedro@logitrack.com.ar',               '$2b$12$GiN3kS0fdJMsjJSymc6HAuNYtIOmjMLf/QieEw2Y4dwxKstQWC5Oa', 30555666,   3, 3),
+    ('Admin',                   'admin@logitrack.com.ar',               '$2b$12$SdXTpizzNqadaUlooEyCXu7n9AybN/4kXHFznyAQwHhC04vpk3sUi', 99999999,   4, NULL);
 
 -- shipmentTypes
 INSERT INTO "logitrack"."shipmentType" ("id", "description") VALUES

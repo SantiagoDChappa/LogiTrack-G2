@@ -11,10 +11,28 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Optimizar Ruteo</h1>
-            <p>Sucursal asignada: #<%= branchId %> · Envíos pendientes en tu sucursal: <%= shipments.length %></p>
+            <% if (isAdmin) { %>
+                <form method="GET" action="/route/optimize" style="margin-bottom:1rem">
+                    <label>Sucursal:
+                        <select name="branchId" onchange="this.form.submit()">
+                            <option value="">-- Elegir sucursal --</option>
+                            <% branches.forEach(b => { %>
+                                <option value="<%= b.id %>" <%= branchId === b.id ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }) %>
+                        </select>
+                    </label>
+                </form>
+            <% } %>
+            <% if (branchId) { %>
+                <p>Sucursal: #<%= branchId %> · Envíos pendientes: <%= shipments.length %></p>
+            <% } else { %>
+                <p>Seleccioná una sucursal para ver envíos y transportes.</p>
+            <% } %>
         </div>
 
-        <% if (shipments.length === 0) { %>
+        <% if (!branchId) { %>
+            <p>Esperando selección de sucursal.</p>
+        <% } else if (shipments.length === 0) { %>
             <p>No hay envíos pendientes en tu sucursal.</p>
         <% } else if (transports.length === 0) { %>
             <p>No hay transportes habilitados disponibles.</p>
@@ -96,6 +114,7 @@
         document.querySelectorAll('.tx-cb').forEach(cb => { cb.checked = e.target.checked; });
     });
 
+    const CURRENT_BRANCH_ID = <%= branchId ? branchId : 'null' %>;
     let lastProposals = null;
 
     document.getElementById('optimize-form')?.addEventListener('submit', async (e) => {
@@ -111,7 +130,7 @@
         const res = await fetch('/route/optimize/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ shipmentIds, transportIds }),
+            body: JSON.stringify({ shipmentIds, transportIds, branchId: CURRENT_BRANCH_ID }),
         });
         const data = await res.json();
         if (!res.ok) { alert(data.error || 'Error'); return; }
@@ -168,7 +187,7 @@
         const res = await fetch('/route/confirm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ proposals: lastProposals }),
+            body: JSON.stringify({ proposals: lastProposals, branchId: CURRENT_BRANCH_ID }),
         });
         const data = await res.json();
         if (res.ok) {
