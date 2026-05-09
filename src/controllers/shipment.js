@@ -99,7 +99,9 @@ const getDetail = async (req, res) => {
             };
         });
     const firstBranchEvent = history.find(h => h.branch);
-    const originBranch     = firstBranchEvent?.branch || null;
+    const originBranch     = firstBranchEvent?.branch || shipment.currentBranch || null;
+    const lastBranchEvent  = [...history].reverse().find(h => h.branch);
+    const currentBranch    = lastBranchEvent?.branch || shipment.currentBranch || null;
     const mapData = {
         origin: originBranch ? {
             lat:   Number(originBranch.latitude),
@@ -110,6 +112,11 @@ const getDetail = async (req, res) => {
             lng:   parseFloat(originLng)  || -58.3816,
             label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
         },
+        currentBranch: currentBranch ? {
+            lat:   Number(currentBranch.latitude),
+            lng:   Number(currentBranch.longitude),
+            label: `Sucursal ${currentBranch.name}`,
+        } : null,
         destination: destLat ? {
             lat:   destLat,
             lng:   destLng,

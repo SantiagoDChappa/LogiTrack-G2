@@ -159,6 +159,9 @@
 
                     <div class="summary-addresses">
                         <div><span class="summary-addr-lbl">ORIGEN:</span> <%= mapData.origin.label.toUpperCase() %></div>
+                        <% if (mapData.currentBranch && mapData.currentBranch.label !== mapData.origin.label) { %>
+                            <div><span class="summary-addr-lbl">UBICACIÓN ACTUAL:</span> <%= mapData.currentBranch.label.toUpperCase() %></div>
+                        <% } %>
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 

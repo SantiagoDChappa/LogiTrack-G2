@@ -40,7 +40,7 @@ const optimizeForm = async (req, res) => {
     const [shipments, transports] = await Promise.all([
         Shipment.findAll({
             where: {
-                statusId: StatusEnum.PENDING.id,
+                statusId: { [Op.in]: [StatusEnum.PENDING.id, StatusEnum.AT_BRANCH.id, StatusEnum.IN_PREPARATION.id] },
                 currentBranchId: branchId,
             },
             include: [

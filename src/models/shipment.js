@@ -52,6 +52,7 @@ const getById = (id) => {
     const { Province } = require('./province');
     const { TypeShipment } = require('./typeShipment');
     const { User } = require('./user');
+    const { Branch } = require('./branch');
 
     return Shipment.findOne({
         where: { id },
@@ -61,7 +62,8 @@ const getById = (id) => {
             { model: Status, as: 'status' },
             { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
-            { model: User, as: 'deliveryUser', required: false }
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'currentBranch', required: false }
         ]
     });
 };

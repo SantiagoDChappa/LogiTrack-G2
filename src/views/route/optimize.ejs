@@ -96,12 +96,7 @@
             <button type="submit" class="btn-primary">Calcular ruta óptima</button>
         </form>
 
-        <section id="results" style="margin-top: 2rem; display: none;">
-            <h2>Propuestas</h2>
-            <div id="proposals"></div>
-            <div id="unassigned"></div>
-            <button id="confirm-btn" class="btn-primary" style="display:none">Confirmar y aplicar</button>
-        </section>
+        <%- include('preview') %>
         <% } %>
     </main>
 
@@ -114,8 +109,7 @@
         document.querySelectorAll('.tx-cb').forEach(cb => { cb.checked = e.target.checked; });
     });
 
-    const CURRENT_BRANCH_ID = <%= branchId ? branchId : 'null' %>;
-    let lastProposals = null;
+    window.CURRENT_BRANCH_ID = <%= branchId ? branchId : 'null' %>;
 
     document.getElementById('optimize-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -130,72 +124,11 @@
         const res = await fetch('/route/optimize/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ shipmentIds, transportIds, branchId: CURRENT_BRANCH_ID }),
+            body: JSON.stringify({ shipmentIds, transportIds, branchId: window.CURRENT_BRANCH_ID }),
         });
         const data = await res.json();
         if (!res.ok) { alert(data.error || 'Error'); return; }
-
-        lastProposals = data.proposals;
-        renderProposals(data);
-    });
-
-    function renderProposals(data) {
-        const container = document.getElementById('proposals');
-        container.innerHTML = '';
-        document.getElementById('results').style.display = 'block';
-
-        data.proposals.forEach((p, idx) => {
-            const card = document.createElement('div');
-            card.className = 'proposal-card';
-            card.style.cssText = 'border:1px solid #ccc; padding:1rem; margin:1rem 0; border-radius:8px';
-            card.innerHTML = `
-                <h3>${p.transport.name} ${p.transport.plate ? '(' + p.transport.plate + ')' : ''}</h3>
-                <p>Conductor: ${p.transport.driver ? p.transport.driver.fullName : 'Sin asignar'}</p>
-                <p>Distancia total: ${p.totalDistanceKm} km · Costo total: $${p.totalCost}</p>
-                <p>Utilización peso: ${(p.utilizationWeight*100).toFixed(0)}% (${p.totalWeightKg}/${p.transport.maxWeightKg} kg)</p>
-                <p>Utilización volumen: ${(p.utilizationVolume*100).toFixed(0)}% (${p.totalVolumeM3}/${p.transport.maxVolumeM3} m³)</p>
-                <ol>${p.stops.map(s => `<li><b>${s.stopType === 'pickup' ? '📦 Pickup' : '🏠 Entrega'}</b> · ${s.label || ''} · +${s.distanceFromPrevKm} km</li>`).join('')}</ol>
-                <div id="map-${idx}" style="height:300px; margin-top:1rem"></div>
-            `;
-            container.appendChild(card);
-
-            setTimeout(() => {
-                const map = L.map('map-' + idx).setView([p.stops[0]?.lat || -34.6, p.stops[0]?.lng || -58.4], 12);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
-                const latlngs = [];
-                p.stops.forEach(s => {
-                    L.marker([s.lat, s.lng]).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label || ''}`).addTo(map);
-                    latlngs.push([s.lat, s.lng]);
-                });
-                if (latlngs.length > 1) {
-                    L.polyline(latlngs, { color: 'blue' }).addTo(map);
-                    map.fitBounds(latlngs);
-                }
-            }, 50);
-        });
-
-        const un = document.getElementById('unassigned');
-        un.innerHTML = data.unassigned && data.unassigned.length
-            ? `<p><b>Envíos sin asignar:</b> ${data.unassigned.join(', ')}</p>`
-            : '';
-        document.getElementById('confirm-btn').style.display = data.proposals.length > 0 ? 'inline-block' : 'none';
-    }
-
-    document.getElementById('confirm-btn')?.addEventListener('click', async () => {
-        if (!lastProposals || !lastProposals.length) { return; }
-        if (!confirm('¿Confirmar y aplicar estas asignaciones?')) { return; }
-        const res = await fetch('/route/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ proposals: lastProposals, branchId: CURRENT_BRANCH_ID }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            alert('Rutas creadas: ' + data.routeIds.join(', '));
-            window.location.href = '/route';
-        } else {
-            alert(data.error || 'Error');
-        }
+        window.renderRoutePreview(data);
     });
     </script>
 </body>

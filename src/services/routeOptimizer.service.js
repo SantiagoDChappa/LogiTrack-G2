@@ -6,15 +6,17 @@ const { Address } = require('../models/address');
 const { Branch } = require('../models/branch');
 const { User } = require('../models/user');
 const { Person } = require('../models/person');
-const { haversine } = require('../utils/provinces');
+const { haversine } = require('../utils/geo');
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
+
+const ROUTABLE_STATUS_IDS = [1, 3, 7]; // Pendiente, En Sucursal, En Preparacion
 
 const loadShipments = (shipmentIds, supervisorBranchId) => {
     return Shipment.findAll({
         where: {
             id:              { [Op.in]: shipmentIds },
-            statusId:        1, // PENDING
+            statusId:        { [Op.in]: ROUTABLE_STATUS_IDS },
             currentBranchId: supervisorBranchId,
         },
         include: [
