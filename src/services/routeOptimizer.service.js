@@ -827,9 +827,23 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         }
     }
 
+    const assignedCount = proposals.reduce((a, p) => a + p.shipmentIds.length, 0);
+    const capacityUnassigned = unassigned.filter(u => u.code === 'no_fit' || u.code === 'oversized' || u.code === 'capacity').length;
+
+    let deficitWarning = null;
+    if (capacityShortfall.weightKg > 0 || capacityShortfall.volumeM3 > 0) {
+        const fleetDesc = transports.length === 1
+            ? `${transports[0].name} (capacidad ${totalFleetWeight}kg / ${totalFleetVolume}m³)`
+            : `${transports.length} transportes (capacidad total ${totalFleetWeight}kg / ${totalFleetVolume}m³)`;
+        deficitWarning = assignedCount > 0
+            ? `La flota no alcanza para todos los envíos seleccionados. ${assignedCount} de ${validShipments.length} envíos fueron asignados (ver propuestas abajo). Los ${capacityUnassigned} restantes quedan en "Sin asignar" por falta de espacio en ${fleetDesc}.`
+            : `Ningún envío pudo asignarse. ${fleetDesc} no tiene capacidad suficiente para ninguno de los ${validShipments.length} envíos seleccionados. Revisá los pesos/volúmenes o agregá más transportes a la sucursal.`;
+    }
+
     const summary = {
         totalShipments: shipmentIds.length,
         validShipments: validShipments.length,
+        assignedCount,
         unassignedCount: unassigned.length,
         proposalsCount: proposals.length,
         demandWeightKg: Number(demandWeight.toFixed(2)),
@@ -837,9 +851,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         fleetCapacityKg: totalFleetWeight,
         fleetCapacityM3: totalFleetVolume,
         capacityShortfall,
-        deficitWarning: capacityShortfall.weightKg > 0 || capacityShortfall.volumeM3 > 0
-            ? `Demanda excede flota: faltan ${capacityShortfall.weightKg.toFixed(2)}kg / ${capacityShortfall.volumeM3.toFixed(3)}m³ de capacidad.`
-            : null,
+        deficitWarning,
     };
 
     return { proposals, unassigned, rejected, summary };

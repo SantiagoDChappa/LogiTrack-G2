@@ -29,7 +29,7 @@ const login = async (req, res) => {
     }
 
     const token = JWT.sign(
-        {id: user.id, email: user.email, roleId: user.roleId, fullName: user.fullName},
+        {id: user.id, email: user.email, roleId: user.roleId, fullName: user.fullName, branchId: user.branchId ?? null},
         process.env.JWT_SECRET,
         {expiresIn: req.body.remember ? '30d' : '8h'}
     );
