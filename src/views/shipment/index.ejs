@@ -158,7 +158,7 @@
                                     <span class="status-badge <%= _sk %>">
                                         <%= _sl[_sk] || shipment.status.description %>
                                     </span>
-                                    <% const _p = shipment.latestPrediction; %>
+                                    <!-- <% const _p = shipment.latestPrediction; %>
                                     <% if (_p) { %>
                                         <% const _pp = Number(_p.delayProbability); %>
                                         <% const _pColor = _pp >= 60 ? '#dc2626' : (_pp >= 30 ? '#d97706' : '#16a34a'); %>
@@ -167,7 +167,7 @@
                                             <span class="material-symbols-outlined" style="font-size:.85rem">schedule</span>
                                             Riesgo <%= _pLabel %> · <%= _pp %>%
                                         </div>
-                                    <% } %>
+                                    <% } %> -->
                                 </td>
                                 <td class="col-actions">
                                     <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5 || shipment.statusId === 8; %>
