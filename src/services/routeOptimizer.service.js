@@ -228,11 +228,17 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster })
 
     const allBranches = await Branch.findAll({ where: { closed: false, id: { [Op.ne]: branch.id } } });
     const corridorBranchIds = [];
+    const corridorDetourByBranch = new Map(); // branchId -> { detourKm, dOrigin, dToCentroid }
     for (const b of allBranches) {
         const lat = num(b.latitude), lng = num(b.longitude);
         if (!lat || !lng) { continue; }
-        const detour = haversineKm(origin, { lat, lng }) + haversineKm({ lat, lng }, centroid) - baseDist;
-        if (detour <= OPPORTUNISTIC_DETOUR_MAX_KM) { corridorBranchIds.push(b.id); }
+        const dOrigin = haversineKm(origin, { lat, lng });
+        const dToCentroid = haversineKm({ lat, lng }, centroid);
+        const detour = dOrigin + dToCentroid - baseDist;
+        if (detour <= OPPORTUNISTIC_DETOUR_MAX_KM) {
+            corridorBranchIds.push(b.id);
+            corridorDetourByBranch.set(b.id, { detourKm: detour, dOrigin, dToCentroid });
+        }
     }
     if (corridorBranchIds.length === 0) { return; }
 
@@ -269,10 +275,35 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster })
     let usedW = 0, usedV = 0;
     const added = [];
     const pickupsByBranch = new Map();
+    const branchById = new Map(allBranches.map(b => [b.id, b]));
     for (const s of fits) {
         const w = num(s.weightKg), v = num(s.volumeM3);
         if (usedW + w > capWeightLeft || usedV + v > capVolumeLeft) { continue; }
         usedW += w; usedV += v;
+
+        // Cost-benefit per shipment: comparar ir directo origen->destino vs via sucursal pickup
+        const br = branchById.get(s.currentBranchId);
+        const brPoint = br ? { lat: num(br.latitude), lng: num(br.longitude) } : null;
+        const destPoint = { lat: num(s.address.lat), lng: num(s.address.lng) };
+        const directKm = haversineKm(origin, destPoint);
+        const viaKm = brPoint ? haversineKm(origin, brPoint) + haversineKm(brPoint, destPoint) : directKm;
+        const extraKm = viaKm - directKm;
+        const pctExtra = directKm > 0 ? (extraKm / directKm) * 100 : 0;
+        const corridorInfo = corridorDetourByBranch.get(s.currentBranchId) || {};
+        s._opportunisticInfo = {
+            branchId: s.currentBranchId,
+            branchName: br ? br.name : `Sucursal #${s.currentBranchId}`,
+            directKm: Number(directKm.toFixed(1)),
+            viaBranchKm: Number(viaKm.toFixed(1)),
+            extraKm: Number(extraKm.toFixed(1)),
+            pctExtra: Number(pctExtra.toFixed(1)),
+            corridorDetourKm: Number((corridorInfo.detourKm || 0).toFixed(1)),
+            costPerKm: num(t.costPerKm),
+            extraCost: Number((extraKm * num(t.costPerKm)).toFixed(2)),
+            capWeightBefore: capWeightLeft,
+            capVolumeBefore: capVolumeLeft,
+        };
+
         added.push(s);
         const arr = pickupsByBranch.get(s.currentBranchId) || [];
         arr.push(s);
@@ -285,6 +316,7 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster })
     bucket.usedVolume += usedV;
     bucket.opportunisticPickups = pickupsByBranch;
     bucket.opportunisticBranches = new Map(allBranches.filter(b => pickupsByBranch.has(b.id)).map(b => [b.id, b]));
+    bucket.opportunisticBranchInfo = corridorDetourByBranch; // para reasoning a nivel ruta
 };
 
 const buildProposal = async ({ bucket, branch, cluster }) => {
@@ -468,7 +500,31 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
     const cls = classifyTransport(t);
     const distInfo = cluster.maxDistanceKm !== null && cluster.maxDistanceKm !== undefined ? ` Distancia max al cluster: ${cluster.maxDistanceKm.toFixed(0)}km (rango ${cls.type}: ${cls.maxRangeKm === Infinity ? 'sin limite' : cls.maxRangeKm + 'km'}).` : '';
     const oppCountFinal = bucket.opportunisticPickups ? [...bucket.opportunisticPickups.values()].reduce((a, arr) => a + arr.length, 0) : 0;
-    const oppInfo = oppCountFinal > 0 ? ` Recogida adicional: ${oppCountFinal} envío${oppCountFinal > 1 ? 's' : ''} en ${bucket.opportunisticPickups.size} sucursal${bucket.opportunisticPickups.size > 1 ? 'es' : ''} del corredor (aprovecha capacidad libre).` : '';
+    let opportunisticSummary = null;
+    let oppInfo = '';
+    if (oppCountFinal > 0) {
+        const oppShips = bucket.shipments.filter(s => s._opportunisticInfo);
+        const totalExtraKm = oppShips.reduce((a, s) => a + (s._opportunisticInfo?.extraKm || 0), 0);
+        const avgExtraKm = totalExtraKm / oppShips.length;
+        const avgPctExtra = oppShips.reduce((a, s) => a + (s._opportunisticInfo?.pctExtra || 0), 0) / oppShips.length;
+        const totalExtraCost = totalExtraKm * num(t.costPerKm);
+        const oppWeight = oppShips.reduce((a, s) => a + num(s.weightKg), 0);
+        const oppVolume = oppShips.reduce((a, s) => a + num(s.volumeM3), 0);
+        const branchNames = [...bucket.opportunisticBranches.values()].map(b => b.name).join(', ');
+        oppInfo = ` Recogida adicional: ${oppCountFinal} envío${oppCountFinal > 1 ? 's' : ''} en ${bucket.opportunisticPickups.size} sucursal${bucket.opportunisticPickups.size > 1 ? 'es' : ''} del corredor (${branchNames}). Desvio promedio +${avgExtraKm.toFixed(1)}km (+${avgPctExtra.toFixed(1)}%), costo extra ~$${totalExtraCost.toFixed(0)}. Vs lanzar 1 ruta extra: ahorra costo fijo de transporte ($${num(t.fixedCost)}) + segundo conductor.`;
+        opportunisticSummary = {
+            count: oppCountFinal,
+            branchCount: bucket.opportunisticPickups.size,
+            branchNames: [...bucket.opportunisticBranches.values()].map(b => ({ id: b.id, name: b.name })),
+            totalExtraKm: Number(totalExtraKm.toFixed(1)),
+            avgExtraKm: Number(avgExtraKm.toFixed(1)),
+            avgPctExtra: Number(avgPctExtra.toFixed(1)),
+            totalExtraCost: Number(totalExtraCost.toFixed(2)),
+            savedFixedCost: num(t.fixedCost),
+            opportunisticWeightKg: Number(oppWeight.toFixed(2)),
+            opportunisticVolumeM3: Number(oppVolume.toFixed(3)),
+        };
+    }
     const autonomyInfo = num(t.autonomyKm) > 0 ? ` Autonomia ${num(t.autonomyKm)}km.` : '';
     const transportPickReason = `Cluster destino: ${cluster.provinceName}. Elegido ${t.name} (${cls.type}) por menor costo unitario habilitado dentro del rango (fijo $${num(t.fixedCost)} + $${num(t.costPerKm)}/km). Capacidad ${num(t.maxWeightKg)}kg / ${num(t.maxVolumeM3)}m³. Zonas: ${t.zones?.length ? t.zones.map(z => z.name).join(', ') : 'todas'}.${distInfo}${autonomyInfo}${oppInfo}`;
 
@@ -477,7 +533,16 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         const win = (s.expectedDeliveryFrom && s.expectedDeliveryTo) ? ` Ventana ${s.expectedDeliveryFrom.slice(0,5)}-${s.expectedDeliveryTo.slice(0,5)}.` : '';
         const priText = pri !== 'normal' ? ` Prioridad ${pri.toUpperCase()}.` : '';
         const isOpportunistic = s.currentBranchId !== branch.id;
-        const oppText = isOpportunistic ? ` Recogida oportunista en sucursal ${s.currentBranchId}.` : '';
+        let oppText = '';
+        let oppDetail = null;
+        if (isOpportunistic && s._opportunisticInfo) {
+            const oi = s._opportunisticInfo;
+            const verdict = oi.pctExtra <= 5
+                ? 'desvio despreciable'
+                : (oi.pctExtra <= 15 ? 'desvio moderado, vale la pena' : 'desvio alto pero aceptable');
+            oppText = ` Recogida oportunista en ${oi.branchName}: ir directo desde ${branch.name} al destino son ${oi.directKm}km; pasando por ${oi.branchName} son ${oi.viaBranchKm}km (+${oi.extraKm}km, +${oi.pctExtra}%). ${verdict}. Costo extra estimado: $${oi.extraCost} (${oi.costPerKm} $/km × ${oi.extraKm}km). Aprovecha capacidad libre del transporte (quedaban ${oi.capWeightBefore.toFixed(0)}kg / ${oi.capVolumeBefore.toFixed(2)}m³ disponibles).`;
+            oppDetail = oi;
+        }
         return {
             shipmentId: s.id,
             trackingId: s.trackingId,
@@ -495,6 +560,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
             windowTo: s.expectedDeliveryTo ? String(s.expectedDeliveryTo).slice(0,5) : null,
             expectedDeliveryDate: s.expectedDeliveryDate || null,
             opportunistic: isOpportunistic,
+            opportunisticDetail: oppDetail,
             why: `Destino ${cluster.provinceName} (zona ${s.zone?.name || 's/zona'}). Peso ${num(s.weightKg)}kg, vol ${num(s.volumeM3)}m³. Cabe en ${t.name}.${priText}${win}${oppText}`,
         };
     });
@@ -534,6 +600,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         utilizationWeight: num(t.maxWeightKg) > 0 ? Number((bucket.usedWeight / num(t.maxWeightKg)).toFixed(3)) : 0,
         utilizationVolume: num(t.maxVolumeM3) > 0 ? Number((bucket.usedVolume / num(t.maxVolumeM3)).toFixed(3)) : 0,
         shipmentIds: bucket.shipments.map(s => s.id),
+        opportunisticSummary,
         reasoning: {
             transportPick: transportPickReason,
             ordering: 'Paradas ordenadas por nearest-neighbor con distancia por calles (OSRM) y fallback haversine.',

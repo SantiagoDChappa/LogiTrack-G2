@@ -250,11 +250,41 @@
             const chipsHtml = (p.reasoning?.shipments || []).map(r => {
                 const pri = r.priority === 'urgent' ? 3 : (r.priority === 'express' ? 2 : 1);
                 const meta = encodeURIComponent(JSON.stringify(r));
+                const oppMark = r.opportunistic ? `<span style="background:#0d9488;color:#fff;font-size:.6rem;padding:1px 4px;border-radius:3px;margin-left:2px" title="${escapeHtml(r.why || '')}">+EXTRA</span>` : '';
                 return `<span class="shipment-chip" draggable="${appliedTxIds.has(p.transportId) ? 'false' : 'true'}" data-shipment-id="${r.shipmentId}" data-tracking="${escapeHtml(r.trackingId)}" data-priority="${pri}" data-meta="${meta}">
                     <span class="chip-priority priority-${pri}">${(r.priority || 'normal').toUpperCase().slice(0,3)}</span>
-                    ${escapeHtml(r.trackingId)}
+                    ${escapeHtml(r.trackingId)}${oppMark}
                 </span>`;
             }).join('');
+
+            // Bloque destacado: resumen de oportunismo y detalle por envio
+            let oppBlock = '';
+            if (p.opportunisticSummary) {
+                const os = p.opportunisticSummary;
+                const oppShipDetails = (p.reasoning?.shipments || [])
+                    .filter(r => r.opportunistic && r.opportunisticDetail)
+                    .map(r => {
+                        const oi = r.opportunisticDetail;
+                        const verdict = oi.pctExtra <= 5 ? '✅ desvío despreciable' : (oi.pctExtra <= 15 ? '🟡 desvío moderado' : '🟠 desvío alto');
+                        return `<li style="margin:.3rem 0;font-size:.78rem">
+                            <strong>${escapeHtml(r.trackingId)}</strong> ← ${escapeHtml(oi.branchName)}<br>
+                            <span style="color:var(--color-text-muted)">Directo desde origen: ${oi.directKm}km · Vía sucursal: ${oi.viaBranchKm}km · Extra: <strong>+${oi.extraKm}km (+${oi.pctExtra}%)</strong> · Costo extra: $${oi.extraCost} · ${verdict}</span>
+                        </li>`;
+                    }).join('');
+                oppBlock = `
+                <div style="background:#ecfdf5;border-left:3px solid #0d9488;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#0f766e;margin-bottom:.3rem">🟢 ${os.count} envío${os.count>1?'s':''} extra recogido${os.count>1?'s':''} en ${os.branchCount} sucursal${os.branchCount>1?'es':''} del corredor</div>
+                    <div style="color:#134e4a;margin-bottom:.3rem">
+                        Sucursales: <strong>${escapeHtml(os.branchNames.map(b => b.name).join(', '))}</strong><br>
+                        Suma: ${os.opportunisticWeightKg}kg / ${os.opportunisticVolumeM3}m³ · Desvío total: +${os.totalExtraKm}km (promedio +${os.avgPctExtra}%) · Costo extra: ~$${os.totalExtraCost}<br>
+                        <span style="color:#0f766e">💡 Lanzar 1 ruta dedicada para estos envíos costaría como mínimo el costo fijo del transporte ($${fmtMoney(os.savedFixedCost)}) más combustible y conductor.</span>
+                    </div>
+                    <details>
+                        <summary style="cursor:pointer;color:#0f766e;font-weight:500">Ver detalle por envío</summary>
+                        <ol style="margin:.4rem 0 0;padding-left:1.2rem">${oppShipDetails}</ol>
+                    </details>
+                </div>`;
+            }
 
             const stopsHtml = p.stops.map(st => {
                 const eta = st.etaIso ? `<span style="color:var(--color-text-muted);font-size:.75rem"> · ETA ${fmtEta(st.etaIso)}</span>` : '';
@@ -279,6 +309,7 @@
                     <div class="proposal-stat">Peso<strong>${(p.utilizationWeight*100).toFixed(0)}%</strong></div>
                     <div class="proposal-stat">Volumen<strong>${(p.utilizationVolume*100).toFixed(0)}%</strong></div>
                 </div>
+                ${oppBlock}
                 <div><strong style="font-size:.8rem">Envíos (${p.shipmentIds.length}):</strong></div>
                 <div class="proposal-shipments-zone" data-transport-id="${p.transportId}">
                     ${chipsHtml || '<span style="color:var(--color-text-muted);font-size:.8rem">(vacío - arrastrá un envío aquí)</span>'}
