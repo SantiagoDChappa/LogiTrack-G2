@@ -66,6 +66,9 @@ const searchShipments = async (req, res) => {
         statusModel.getAll(),
         isAdmin ? branchModel.getAll() : Promise.resolve([]),
     ]);
+    const predictionModel = require('../models/shipmentPrediction');
+    const predMap = await predictionModel.getLatestByShipmentIds(shipments.map(s => s.id));
+    for (const s of shipments) { s.latestPrediction = predMap.get(s.id) || null; }
     res.render('shipment/index', { shipments, query, statuses, branches, isAdmin });
 };
 
@@ -106,7 +109,7 @@ const getDetail = async (req, res) => {
         origin: originBranch ? {
             lat:   Number(originBranch.latitude),
             lng:   Number(originBranch.longitude),
-            label: `Sucursal ${originBranch.name}`,
+            label: originBranch.name.startsWith('Sucursal') ? originBranch.name : `Sucursal ${originBranch.name}`,
         } : {
             lat:   parseFloat(originLat)  || -34.6037,
             lng:   parseFloat(originLng)  || -58.3816,
@@ -115,7 +118,7 @@ const getDetail = async (req, res) => {
         currentBranch: currentBranch ? {
             lat:   Number(currentBranch.latitude),
             lng:   Number(currentBranch.longitude),
-            label: `Sucursal ${currentBranch.name}`,
+            label: currentBranch.name.startsWith('Sucursal') ? currentBranch.name : `Sucursal ${currentBranch.name}`,
         } : null,
         destination: destLat ? {
             lat:   destLat,
@@ -128,7 +131,37 @@ const getDetail = async (req, res) => {
 
     const returnUrl   = req.query.from || '/shipment';
     const returnLabel = req.query.fromLabel || 'Administrador de envíos';
-    res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel });
+
+    // SLA penalty + desglose costo cliente
+    const sla = (() => {
+        if (!shipment.expectedDeliveryDate) { return null; }
+        const expected = new Date(shipment.expectedDeliveryDate);
+        const deliveredEvent = (history || []).find(h => h.toStatusId === 4);
+        if (!deliveredEvent) {
+            const today = new Date();
+            const daysOver = Math.max(0, Math.floor((today - expected) / 86400000));
+            return { delivered: false, expected, daysOver, penaltyPct: Math.min(50, daysOver * 5) };
+        }
+        const actual = new Date(deliveredEvent.changedAt);
+        const daysLate = Math.max(0, Math.floor((actual - expected) / 86400000));
+        return { delivered: true, expected, actual, daysLate, penaltyPct: Math.min(50, daysLate * 5), onTime: daysLate === 0 };
+    })();
+
+    // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
+    const costClient = (() => {
+        if (!shipment.zone) { return null; }
+        const zone = shipment.zone;
+        const w = Number(shipment.weightKg || 0);
+        const v = Number(shipment.volumeM3 || 0);
+        const base = Number(zone.baseCost || 0);
+        const wSurcharge = Number(zone.surchargePerKg || 0) * w;
+        const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
+        const subtotal = base + wSurcharge + vSurcharge;
+        const penalty = sla?.penaltyPct ? subtotal * (sla.penaltyPct / 100) : 0;
+        return { base, wSurcharge, vSurcharge, subtotal, penalty: Number(penalty.toFixed(2)), final: Number((subtotal - penalty).toFixed(2)) };
+    })();
+
+    res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel, sla, costClient });
 };
 
 const getNewShipmentForm = async (req, res) => {
@@ -154,6 +187,40 @@ const createShipment = async (req, res) => {
     const body = req.body;
     if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
     if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+
+    // Validar coords vs provincia
+    if (body.addressLat && body.addressLng && body.province) {
+        const { isCoordInProvince, findProvinceByCoord } = require('../utils/provinceBbox');
+        const lat = parseFloat(body.addressLat);
+        const lng = parseFloat(body.addressLng);
+        const check = isCoordInProvince(lat, lng, body.province);
+        if (!check.ok) {
+            const found = findProvinceByCoord(lat, lng);
+            const hint = found ? ` Las coordenadas parecen pertenecer a ${found.name} (id ${found.provinceId}).` : '';
+            throw new Error(`Coordenadas no coinciden con la provincia seleccionada. ${check.reason}.${hint}`);
+        }
+    }
+
+    // Normalizar CP por provincia (regex prefijo)
+    const { normalizePostalCode } = require('../utils/postalCode');
+    if (body.postalCode && body.province) {
+        const norm = normalizePostalCode(body.postalCode, body.province);
+        if (!norm.ok) { throw new Error(norm.reason); }
+        body.postalCode = norm.value;
+    }
+
+    // Detectar duplicados
+    if (body.skipDuplicateCheck !== 'true') {
+        const dup = await shipmentModel.findPotentialDuplicate({
+            senderDocument: body.senderDocument,
+            recipientDocument: body.recipientDocument,
+            street: body.street, number: body.number,
+            provinceId: body.province, statusId: 1,
+        });
+        if (dup) {
+            throw new Error(`Posible duplicado: ya existe envío ${dup.trackingId} con mismo remitente, destinatario y dirección en estado Pendiente. Si querés crearlo igual, marcá "Crear de todos modos".`);
+        }
+    }
 
     const sender = await personModel.createOrUpdate({
         name:         body.senderName,

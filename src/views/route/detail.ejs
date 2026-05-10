@@ -11,49 +11,192 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Ruta #<%= route.id %></h1>
-            <p>Transporte: <%= route.transport ? route.transport.name : '-' %> · Conductor: <%= route.transport && route.transport.driver ? route.transport.driver.fullName : '-' %></p>
-            <p>Distancia: <%= route.totalDistanceKm %> km · Costo: $<%= route.totalCost %></p>
+            <div style="display:flex;gap:.5rem">
+                <button id="btn-print-labels" class="btn-secondary">🖨️ Imprimir todas las etiquetas</button>
+                <a href="/route" class="btn-secondary">Volver</a>
+            </div>
+            <script>
+            document.getElementById('btn-print-labels')?.addEventListener('click', () => {
+                const ids = <%- JSON.stringify((route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId).map(s => s.shipmentId)) %>;
+                ids.forEach((id, i) => setTimeout(() => window.open('/shipment/' + id + '/label', '_blank'), i * 200));
+            });
+            </script>
         </div>
 
-        <h2>Paradas</h2>
-        <ol>
-            <% (route.stops || []).forEach(s => { %>
-                <li>
-                    <b><%= s.stopType === 'pickup' ? 'Pickup' : 'Entrega' %></b> ·
-                    <% if (s.stopType === 'pickup') { %>
-                        Sucursal: <%= s.branch ? s.branch.name : '#' + s.branchId %>
-                    <% } else { %>
-                        Envío: <%= s.shipment ? s.shipment.trackingId : '#' + s.shipmentId %>
-                        <% if (s.shipment && s.shipment.address) { %>
-                            (<%= s.shipment.address.street %> <%= s.shipment.address.number %>)
-                        <% } %>
-                    <% } %>
-                    · +<%= s.distanceFromPrevKm %> km
-                    <%= s.completed ? '✓' : '' %>
-                </li>
-            <% }) %>
-        </ol>
+        <div class="page-update-wrapper">
 
-        <div id="map" style="height: 500px; margin-top: 1rem"></div>
+            <%
+                const _routeStatusMap = {
+                    1: { label: 'Pendiente',  cls: 'pendiente'   },
+                    2: { label: 'En curso',   cls: 'en_transito' },
+                    3: { label: 'Completada', cls: 'entregado'   },
+                    4: { label: 'Cancelada',  cls: 'cancelado'   },
+                };
+                const _rs = _routeStatusMap[route.statusId] || { label: 'Estado ' + route.statusId, cls: 'inicial' };
+            %>
+
+            <!-- Header card -->
+            <div class="detail-top" style="margin-bottom:1.5rem">
+                <div class="detail-tracking">
+                    <span class="detail-tracking-label">Ruta</span>
+                    <span class="detail-tracking-id">#<%= route.id %></span>
+                </div>
+                <span class="status-badge <%= _rs.cls %>"><%= _rs.label %></span>
+            </div>
+
+            <!-- Top grid: info + mapa -->
+            <div class="update-top-grid" style="margin-bottom:1.5rem">
+
+                <!-- Info de la ruta -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">local_shipping</span> Información</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Transporte</span>
+                        <span class="detail-value"><%= route.transport ? route.transport.name : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Conductor</span>
+                        <span class="detail-value"><%= route.transport && route.transport.driver ? route.transport.driver.fullName : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Sucursal origen</span>
+                        <span class="detail-value"><%= route.originBranch ? route.originBranch.name : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Distancia total</span>
+                        <span class="detail-value"><%= route.totalDistanceKm %> km</span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Costo total</span>
+                        <span class="detail-value"><%= fmtMoney(route.totalCost) %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Creada</span>
+                        <span class="detail-value"><%= route.createdAt ? new Date(route.createdAt).toLocaleString('es-AR') : '-' %></span>
+                    </div>
+                </div>
+
+                <!-- Mapa -->
+                <div class="update-card update-map-card" style="grid-column: span 2">
+                    <h3><span class="material-symbols-outlined">map</span> Recorrido</h3>
+                    <div id="map" style="height:340px;border-radius:var(--radius-sm);border:1px solid var(--color-border)"></div>
+                </div>
+            </div>
+
+            <!-- Paradas -->
+            <div class="update-card">
+                <h3><span class="material-symbols-outlined">pin_drop</span> Paradas (<%= (route.stops || []).length %>)</h3>
+                <% if (!route.stops || route.stops.length === 0) { %>
+                    <p class="historial-empty">Sin paradas registradas.</p>
+                <% } else { %>
+                <ol class="shipment-timeline" style="margin-top:var(--space-4)">
+                    <% route.stops.forEach(function(s) { %>
+                        <li class="shipment-timeline-item">
+                            <%
+                                const _stopIcon  = s.stopType === 'pickup' ? 'warehouse' : (s.stopType === 'service' ? 'local_gas_station' : 'home');
+                                const _stopLabel = s.stopType === 'pickup' ? 'Pickup' : (s.stopType === 'service' ? 'Servicio (combustible/descanso)' : 'Entrega');
+                                const _stopCls   = s.completed ? 'entregado' : (s.stopType === 'pickup' ? 'en_sucursal' : (s.stopType === 'service' ? 'retrasado' : 'pendiente'));
+                                const _detailIco = s.stopType === 'pickup' ? 'store' : (s.stopType === 'service' ? 'local_gas_station' : 'package_2');
+                            %>
+                            <span class="shipment-timeline-dot <%= _stopCls %>">
+                                <span class="material-symbols-outlined"><%= _stopIcon %></span>
+                            </span>
+                            <div class="shipment-timeline-content">
+                                <div class="shipment-timeline-header">
+                                    <strong style="font-size:var(--font-size-sm)">
+                                        #<%= s.sequence %> — <%= _stopLabel %>
+                                    </strong>
+                                    <% if (s.completed) { %>
+                                        <span class="status-badge status-badge--sm entregado">Completada</span>
+                                    <% } else { %>
+                                        <span class="status-badge status-badge--sm pendiente">Pendiente</span>
+                                    <% } %>
+                                </div>
+                                <div class="shipment-timeline-meta">
+                                    <span class="material-symbols-outlined shipment-timeline-meta-ico"><%= _detailIco %></span>
+                                    <% if (s.stopType === 'pickup' || s.stopType === 'service') { %>
+                                        <%= s.branch ? s.branch.name : 'Sucursal #' + s.branchId %>
+                                    <% } else { %>
+                                        Envío: <strong><%= s.shipment ? s.shipment.trackingId : '#' + s.shipmentId %></strong>
+                                        <% if (s.shipment && s.shipment.address) { %>
+                                            — <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                                        <% } %>
+                                    <% } %>
+                                </div>
+                                <div class="shipment-timeline-meta">
+                                    <span class="material-symbols-outlined shipment-timeline-meta-ico">straighten</span>
+                                    +<%= s.distanceFromPrevKm %> km desde parada anterior
+                                </div>
+                            </div>
+                        </li>
+                    <% }) %>
+                </ol>
+                <% } %>
+            </div>
+
+        </div>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
     <script>
+    (function() {
         const stops = <%- JSON.stringify((route.stops || []).map(s => ({
-            sequence: s.sequence, stopType: s.stopType, lat: Number(s.lat), lng: Number(s.lng),
-            label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
+            sequence: s.sequence,
+            stopType: s.stopType,
+            lat: Number(s.lat),
+            lng: Number(s.lng),
+            label: s.stopType === 'pickup'
+                ? (s.branch ? s.branch.name : 'Pickup')
+                : (s.stopType === 'service'
+                    ? (s.branch ? s.branch.name + ' (combustible/descanso)' : 'Servicio')
+                    : (s.shipment ? s.shipment.trackingId : 'Entrega')),
+            completed: s.completed,
         }))) %>;
-        const map = L.map('map').setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
+
+        const validStops = stops.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+        const center = validStops.length > 0
+            ? [validStops[0].lat, validStops[0].lng]
+            : [-34.6, -58.4];
+
+        const map = L.map('map').setView(center, 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+
+        const mkIcon = (color) => L.divIcon({
+            className: '',
+            html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [14, 14], iconAnchor: [7, 7],
+        });
+
         const latlngs = [];
-        stops.forEach(s => {
-            L.marker([s.lat, s.lng]).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label}`).addTo(map);
+        validStops.forEach(s => {
+            const color = s.stopType === 'pickup' ? '#2563eb' : (s.stopType === 'service' ? '#d97706' : (s.completed ? '#16a34a' : '#dc2626'));
+            const typeLabel = s.stopType === 'pickup' ? 'Pickup' : (s.stopType === 'service' ? 'Servicio' : 'Entrega');
+            L.marker([s.lat, s.lng], { icon: mkIcon(color) })
+                .bindPopup('<strong>#' + s.sequence + ' ' + typeLabel + '</strong><br>' + s.label)
+                .addTo(map);
             latlngs.push([s.lat, s.lng]);
         });
+
         if (latlngs.length > 1) {
-            L.polyline(latlngs, { color: 'blue' }).addTo(map);
-            map.fitBounds(latlngs);
+            let fallback = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.6 }).addTo(map);
+            map.fitBounds(latlngs, { padding: [24, 24] });
+
+            const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+            fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !d.routes || !d.routes[0]) return;
+                    const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                    map.removeLayer(fallback);
+                    L.polyline(poly, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(poly, { padding: [24, 24] });
+                }).catch(() => {});
+        } else if (latlngs.length === 1) {
+            map.setView(latlngs[0], 13);
         }
+    })();
     </script>
 </body>
 </html>

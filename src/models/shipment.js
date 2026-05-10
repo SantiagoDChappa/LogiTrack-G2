@@ -22,6 +22,9 @@ const Shipment = sequelize.define('shipment', {
     zoneId:           { type: DataTypes.INTEGER },
     currentBranchId:  { type: DataTypes.INTEGER },
     expectedDeliveryDate: { type: DataTypes.DATEONLY },
+    expectedDeliveryFrom: { type: DataTypes.TIME, allowNull: true },
+    expectedDeliveryTo:   { type: DataTypes.TIME, allowNull: true },
+    priority:             { type: DataTypes.INTEGER, defaultValue: 1 },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -53,6 +56,7 @@ const getById = (id) => {
     const { TypeShipment } = require('./typeShipment');
     const { User } = require('./user');
     const { Branch } = require('./branch');
+    const { Zone } = require('./zone');
 
     return Shipment.findOne({
         where: { id },
@@ -63,7 +67,8 @@ const getById = (id) => {
             { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
             { model: User, as: 'deliveryUser', required: false },
-            { model: Branch, as: 'currentBranch', required: false }
+            { model: Branch, as: 'currentBranch', required: false },
+            { model: Zone, as: 'zone', required: false }
         ]
     });
 };

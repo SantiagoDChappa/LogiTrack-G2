@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Stats <%= transport.name %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <style>
+    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 1rem; margin: 1rem 0; }
+    .stat-card { background: var(--color-surface); border: 1px solid var(--color-border); padding: 1rem; border-radius: 10px; }
+    .stat-card .label { font-size: .8rem; color: var(--color-text-secondary); }
+    .stat-card .value { font-size: 1.6rem; font-weight: 700; color: var(--color-text); margin-top: .25rem; }
+    .recent-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    .recent-table th, .recent-table td { padding: .5rem; border-bottom: 1px solid var(--color-border); text-align: left; font-size: .85rem; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <a href="/transport" style="color:var(--color-primary);text-decoration:none">← Volver</a>
+            <h1>📊 Histórico de <%= transport.name %></h1>
+            <p style="color:var(--color-text-secondary)">Patente: <%= transport.plate || '-' %> · Capacidad <%= transport.maxWeightKg %>kg / <%= transport.maxVolumeM3 %>m³ · <%= fmtMoney(transport.fixedCost) %> + <%= fmtMoney(transport.costPerKm) %>/km</p>
+        </div>
+
+        <div class="stat-cards">
+            <div class="stat-card"><div class="label">Rutas totales</div><div class="value"><%= stats.routes || 0 %></div></div>
+            <div class="stat-card"><div class="label">Km recorridos</div><div class="value"><%= (stats.total_km || 0).toFixed(1) %></div></div>
+            <div class="stat-card"><div class="label">Costo acumulado</div><div class="value"><%= fmtMoney(stats.total_cost || 0) %></div></div>
+            <div class="stat-card"><div class="label">Entregas</div><div class="value"><%= stats.deliveries || 0 %></div></div>
+            <div class="stat-card"><div class="label">Intentos fallidos</div><div class="value" style="color:#dc2626"><%= stats.failed_attempts || 0 %></div></div>
+            <div class="stat-card"><div class="label">% On-time</div><div class="value" style="color:<%= stats.on_time_pct >= 80 ? '#16a34a' : '#d97706' %>"><%= stats.on_time_pct !== null ? stats.on_time_pct + '%' : '-' %></div></div>
+        </div>
+
+        <h2>Últimas rutas</h2>
+        <% if (recent.length === 0) { %>
+            <p style="color:var(--color-text-muted)">Sin rutas registradas.</p>
+        <% } else { %>
+            <table class="recent-table">
+                <thead><tr><th>#Ruta</th><th>Distancia</th><th>Costo</th><th>Peso</th><th>Estado</th><th>Fecha</th></tr></thead>
+                <tbody>
+                <% recent.forEach(r => { %>
+                    <tr>
+                        <td><a href="/route/<%= r.id %>">#<%= r.id %></a></td>
+                        <td><%= Number(r.totalDistanceKm).toFixed(1) %> km</td>
+                        <td><%= fmtMoney(r.totalCost) %></td>
+                        <td><%= Number(r.totalWeightKg).toFixed(1) %> kg</td>
+                        <td><%= r.status %></td>
+                        <td><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></td>
+                    </tr>
+                <% }) %>
+                </tbody>
+            </table>
+        <% } %>
+    </main>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

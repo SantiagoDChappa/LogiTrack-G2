@@ -18,47 +18,70 @@
         </div>
 
         <div class="shipments-wrapper">
-            <table class="shipments-table">
-                <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Patente</th>
-                        <th>Peso máx (kg)</th>
-                        <th>Volumen máx (m³)</th>
-                        <th>Costo fijo</th>
-                        <th>Costo/km</th>
-                        <th>Conductor</th>
-                        <th>Sucursal</th>
-                        <th>Habilitado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% transports.forEach(t => { %>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
                         <tr>
-                            <td><%= t.name %></td>
-                            <td><%= t.plate || '-' %></td>
-                            <td><%= t.maxWeightKg %></td>
-                            <td><%= t.maxVolumeM3 %></td>
-                            <td>$<%= t.fixedCost %></td>
-                            <td>$<%= t.costPerKm %></td>
-                            <td><%= t.driver ? t.driver.fullName : '-' %></td>
-                            <td><%= t.branch ? t.branch.name : '-' %></td>
-                            <td><%= t.enabled ? 'Sí' : 'No' %></td>
-                            <td>
-                                <a href="/transport/update/<%= t.id %>" class="btn-secondary">Editar</a>
-                                <form method="POST" action="/transport/toggle/<%= t.id %>" style="display:inline">
-                                    <button class="btn-secondary" type="submit"><%= t.enabled ? 'Deshabilitar' : 'Habilitar' %></button>
-                                </form>
-                            </td>
+                            <th>Nombre</th>
+                            <th>Patente</th>
+                            <th>Peso máx.</th>
+                            <th>Vol. máx.</th>
+                            <th>Costo fijo</th>
+                            <th>Costo/km</th>
+                            <th>Conductor</th>
+                            <th>Sucursal</th>
+                            <th>Estado</th>
+                            <th class="col-actions">Acciones</th>
                         </tr>
-                    <% }) %>
-                    <% if (transports.length === 0) { %>
-                        <tr><td colspan="10">No hay transportes cargados.</td></tr>
-                    <% } %>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <% if (transports.length === 0) { %>
+                            <tr>
+                                <td colspan="10" class="empty-row">
+                                    <span class="material-symbols-outlined">local_shipping</span>
+                                    No hay transportes cargados.
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% transports.forEach(t => { %>
+                                <tr>
+                                    <td><strong><%= t.name %></strong></td>
+                                    <td class="tracking-id"><%= t.plate || '-' %></td>
+                                    <td><%= t.maxWeightKg %> kg</td>
+                                    <td><%= t.maxVolumeM3 %> m³</td>
+                                    <td><%= fmtMoney(t.fixedCost) %></td>
+                                    <td><%= fmtMoney(t.costPerKm) %></td>
+                                    <td><%= t.driver ? t.driver.fullName : '-' %></td>
+                                    <td><%= t.branch ? t.branch.name : '-' %></td>
+                                    <td>
+                                        <% if (t.enabled) { %>
+                                            <span class="status-badge entregado">Habilitado</span>
+                                        <% } else { %>
+                                            <span class="status-badge cancelado">Deshabilitado</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/transport/update/<%= t.id %>" class="action-btn modificar" data-tooltip="Editar">
+                                            <span class="material-symbols-outlined">edit</span>
+                                        </a>
+                                        <form method="POST" action="/transport/toggle/<%= t.id %>" style="display:inline">
+                                            <button type="submit"
+                                                    class="action-btn <%= t.enabled ? 'eliminar' : 'detalle' %>"
+                                                    data-tooltip="<%= t.enabled ? 'Deshabilitar' : 'Habilitar' %>">
+                                                <span class="material-symbols-outlined"><%= t.enabled ? 'block' : 'check_circle' %></span>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
 </body>
 </html>

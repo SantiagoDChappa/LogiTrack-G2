@@ -8,5 +8,6 @@ router.post('/new',       ctrl.create);
 router.get('/update/:id', ctrl.updateForm);
 router.post('/update/:id', ctrl.update);
 router.post('/toggle/:id', ctrl.toggleEnabled);
+router.get('/stats/:id',   ctrl.stats);
 
 module.exports = router;

@@ -9,6 +9,7 @@ const Transport = sequelize.define('transport', {
     maxVolumeM3:   { type: DataTypes.DECIMAL(10, 3), allowNull: false, field: 'max_volume_m3' },
     fixedCost:     { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0, field: 'fixed_cost' },
     costPerKm:     { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0, field: 'cost_per_km' },
+    autonomyKm:    { type: DataTypes.INTEGER, allowNull: true, field: 'autonomy_km' },
     driverUserId:  { type: DataTypes.INTEGER, allowNull: true, field: 'driver_user_id' },
     branchId:      { type: DataTypes.INTEGER, allowNull: true, field: 'branch_id' },
     enabled:       { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },

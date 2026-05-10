@@ -1,74 +1,471 @@
-<%# Partial: preview de propuestas de ruteo. Incluido por optimize.ejs.
-     Renderiza el resultado de POST /route/optimize/preview vía JS y dispara confirm a /route/confirm. %>
-<section id="results" style="margin-top: 2rem; display: none;">
-    <h2>Propuestas</h2>
-    <div id="proposals"></div>
-    <div id="unassigned"></div>
-    <button id="confirm-btn" class="btn-primary" style="display:none">Confirmar y aplicar</button>
+<%# Partial: preview con drag&drop + apply individual %>
+<style>
+:root {
+    --pp-radius: 12px;
+    --pp-shadow: 0 1px 3px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.03);
+    --pp-shadow-hover: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+}
+.proposals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1rem; }
+.proposal-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 1.25rem;
+    border-radius: var(--pp-radius);
+    box-shadow: var(--pp-shadow);
+    transition: box-shadow .2s ease, transform .15s ease, border-color .2s ease;
+    position: relative;
+}
+.proposal-card:hover { box-shadow: var(--pp-shadow-hover); }
+.proposal-card.applied { opacity: .85; border-color: var(--color-success, #16a34a); }
+.proposal-card.drop-target { border-color: var(--color-primary); border-style: dashed; transform: scale(1.005); }
+.proposal-card.recalculating { opacity: .55; pointer-events: none; }
+.proposal-card.recalculating::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(59,130,246,.15), transparent);
+    background-size: 200% 100%; animation: shimmer 1.2s linear infinite;
+    border-radius: var(--pp-radius); pointer-events: none;
+}
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.proposal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .5rem; }
+.proposal-card h3 { margin: 0; color: var(--color-text); font-size: 1.05rem; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.proposal-cluster-badge {
+    display: inline-block; padding: .15rem .55rem; border-radius: 999px;
+    font-size: .7rem; font-weight: 600;
+    background: var(--color-primary-light); color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+.proposal-meta { color: var(--color-text-secondary); margin: .25rem 0; font-size: .85rem; }
+.proposal-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .5rem; margin: .65rem 0; padding: .6rem; background: var(--color-bg); border-radius: 8px; }
+.proposal-stat { font-size: .75rem; color: var(--color-text-muted); }
+.proposal-stat strong { display: block; color: var(--color-text); font-size: .95rem; margin-top: .15rem; }
+
+.proposal-shipments-zone {
+    margin: .75rem 0;
+    padding: .55rem;
+    border: 1px dashed var(--color-border);
+    border-radius: 8px;
+    min-height: 56px;
+    background: var(--color-bg);
+    transition: background .2s, border-color .2s;
+}
+.proposal-shipments-zone.drag-over { background: var(--color-primary-light); border-color: var(--color-primary); }
+.shipment-chip {
+    display: inline-flex; align-items: center; gap: .35rem;
+    background: var(--color-surface); color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: .3rem .6rem; border-radius: 999px;
+    font-size: .75rem; margin: .15rem;
+    cursor: grab; user-select: none;
+    transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.shipment-chip:hover { border-color: var(--color-primary); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,.06); }
+.shipment-chip:active { cursor: grabbing; }
+.shipment-chip.dragging { opacity: .4; }
+.shipment-chip .chip-priority { font-size: .6rem; padding: 0 .3rem; border-radius: 4px; color: #fff; font-weight: 700; }
+.priority-1 { background: #94a3b8; } .priority-2 { background: #0284c7; } .priority-3 { background: #dc2626; }
+
+.proposal-reasoning { margin: .65rem 0; }
+.proposal-reasoning summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--color-primary); padding: .3rem 0; }
+.proposal-reasoning-body { padding: .6rem; background: var(--color-bg); border-radius: 6px; color: var(--color-text); font-size: .8rem; border: 1px solid var(--color-border); }
+.proposal-reasoning-body p { margin: .25rem 0; }
+
+.proposal-actions { display: flex; gap: .5rem; margin-top: .85rem; flex-wrap: wrap; }
+.btn-apply { background: var(--color-success, #16a34a); color: #fff; border: none; padding: .5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background .2s, transform .12s; }
+.btn-apply:hover { background: #15803d; transform: translateY(-1px); }
+.btn-apply.applied { background: var(--color-text-muted); cursor: default; }
+.btn-apply.applied:hover { transform: none; }
+.btn-exclude { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); padding: .4rem .7rem; border-radius: 6px; font-size: .8rem; cursor: pointer; transition: border-color .2s; }
+.btn-exclude:hover { border-color: var(--color-warning); }
+
+.proposal-map { height: 280px; margin-top: .75rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--color-border); }
+
+.unassigned-pool {
+    margin-top: 1rem; padding: 1rem;
+    border: 2px dashed var(--color-warning); border-radius: var(--pp-radius);
+    background: var(--color-warning-bg); color: var(--color-text);
+}
+.unassigned-pool h3 { margin: 0 0 .5rem 0; font-size: 1rem; display: flex; align-items: center; gap: .35rem; }
+.unassigned-pool.drag-over { background: var(--color-primary-light); border-color: var(--color-primary); }
+
+.warn-banner { border-left: 4px solid var(--color-warning); background: var(--color-warning-bg); color: var(--color-text); padding: .5rem .75rem; border-radius: 4px; margin: .5rem 0; font-size: .82rem; }
+.deficit-banner { border: 1px solid var(--color-danger); background: var(--color-danger-bg); color: var(--color-text); padding: .75rem 1rem; border-radius: 8px; margin: .75rem 0; font-weight: 500; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .75rem; margin: .75rem 0; padding: .75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; }
+.summary-grid .item { font-size: .8rem; color: var(--color-text-secondary); }
+.summary-grid .item strong { color: var(--color-text); display: block; font-size: 1.05rem; margin-top: .15rem; }
+
+.help-banner { background: var(--color-info-bg); border-left: 4px solid var(--color-info); padding: .65rem .85rem; border-radius: 6px; margin: .5rem 0; font-size: .85rem; color: var(--color-text); }
+.help-banner strong { color: var(--color-info); }
+
+#chip-popover {
+    position: fixed;
+    pointer-events: none;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
+    border-radius: 10px;
+    padding: .75rem .85rem;
+    font-size: .78rem;
+    min-width: 240px;
+    max-width: 320px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity .12s ease, transform .12s ease;
+}
+#chip-popover.visible { opacity: 1; transform: translateY(0); }
+#chip-popover .pop-title { font-weight: 700; font-size: .9rem; color: var(--color-primary); margin-bottom: .25rem; display: flex; align-items: center; gap: .35rem; }
+#chip-popover .pop-row { display: flex; justify-content: space-between; gap: .75rem; margin: .15rem 0; }
+#chip-popover .pop-row .lbl { color: var(--color-text-secondary); font-size: .72rem; }
+#chip-popover .pop-row .val { color: var(--color-text); font-weight: 500; text-align: right; }
+#chip-popover .pop-pri { display: inline-block; padding: .05rem .4rem; border-radius: 999px; font-size: .65rem; font-weight: 700; color: #fff; }
+#chip-popover hr { border: none; border-top: 1px solid var(--color-border); margin: .4rem 0; }
+</style>
+
+<div id="chip-popover" role="tooltip"></div>
+<section id="results" style="margin-top: 1.5rem; display: none;">
+    <h2 style="margin-bottom:.5rem">Propuestas</h2>
+    <div class="help-banner">💡 <strong>Tip:</strong> Arrastrá los <em>chips</em> de envíos entre propuestas para reasignar. Soltá en "Sin asignar" para sacar de la ruta. El cálculo se actualiza automáticamente.</div>
+    <div id="proposals-summary" class="proposal-meta"></div>
+    <div id="proposals" class="proposals-grid"></div>
+    <div id="unassigned-pool"></div>
 </section>
 
 <script>
 (function() {
-    let lastProposals = null;
+    let lastShipmentIds = [];
+    let excludedTxIds = new Set();
+    let appliedTxIds = new Set();
+    let currentState = null; // { proposals: [...], unassigned: [...], summary }
 
-    window.renderRoutePreview = function(data) {
-        const container = document.getElementById('proposals');
-        container.innerHTML = '';
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtEta = (iso) => { if (!iso) return ''; return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    const fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const buildAssignmentsFromState = () => {
+        return currentState.proposals.map(p => ({
+            transportId: p.transportId,
+            shipmentIds: p.shipmentIds,
+        }));
+    };
+
+    const recalc = async () => {
+        document.querySelectorAll('.proposal-card').forEach(c => c.classList.add('recalculating'));
+        const res = await fetch('/route/optimize/recalc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, assignments: buildAssignmentsFromState() }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Error al recalcular'); document.querySelectorAll('.proposal-card').forEach(c => c.classList.remove('recalculating')); return; }
+        // Mantener unassigned previos (envíos sacados manualmente) + los nuevos del recalc
+        const previousUnassigned = currentState.unassigned || [];
+        // Merge: si un envío reaparece en proposals, sacarlo de unassigned
+        const inProposals = new Set(data.proposals.flatMap(p => p.shipmentIds));
+        const mergedUn = [...previousUnassigned, ...data.unassigned].filter(u => !inProposals.has(u.id || u.shipmentId));
+        // Dedupe
+        const seenIds = new Set();
+        const dedupUn = mergedUn.filter(u => {
+            const id = u.id || u.shipmentId;
+            if (seenIds.has(id)) return false;
+            seenIds.add(id);
+            return true;
+        });
+        currentState = { proposals: data.proposals, unassigned: dedupUn, summary: data.summary };
+        render();
+    };
+
+    const recalcExcluding = async (txId) => {
+        excludedTxIds.add(txId);
+        appliedTxIds.delete(txId);
+        const res = await fetch('/route/optimize/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipmentIds: lastShipmentIds, branchId: window.CURRENT_BRANCH_ID, excludeTransportIds: [...excludedTxIds] }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Error'); return; }
+        currentState = data;
+        render();
+    };
+
+    const applyOne = async (proposal, btn) => {
+        if (!confirm(`¿Aplicar ruta para ${proposal.transport.name}? Se asignarán ${proposal.shipmentIds.length} envíos.`)) return;
+        btn.disabled = true; btn.textContent = 'Aplicando...';
+        const res = await fetch('/route/confirm-one', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, proposal }),
+        });
+        const data = await res.json();
+        if (!res.ok) { btn.disabled = false; btn.textContent = '✓ Aplicar ruta'; alert(data.error || 'Error'); return; }
+        appliedTxIds.add(proposal.transportId);
+        btn.classList.add('applied');
+        btn.textContent = `✅ APLICADO · Ruta #${data.routeId}`;
+        const card = btn.closest('.proposal-card');
+        card.classList.add('applied');
+        // Bloquear chips de esta propuesta para que no se arrastren mas
+        card.querySelectorAll('.shipment-chip').forEach(ch => { ch.draggable = false; ch.style.cursor = 'default'; });
+    };
+
+    window.renderRoutePreview = function(data, opts = {}) {
+        if (opts.shipmentIds) { lastShipmentIds = opts.shipmentIds; excludedTxIds = new Set(); appliedTxIds = new Set(); }
+        currentState = data;
         document.getElementById('results').style.display = 'block';
-        lastProposals = data.proposals;
+        render();
+    };
+
+    const render = () => {
+        const data = currentState;
+        const summaryEl = document.getElementById('proposals-summary');
+        const container = document.getElementById('proposals');
+        const poolEl = document.getElementById('unassigned-pool');
+        container.innerHTML = '';
+
+        const s = data.summary || {};
+        const totalCost = data.proposals.reduce((a,p) => a + p.totalCost, 0);
+        let summaryHtml = `
+            <div class="summary-grid">
+                <div class="item">Propuestas<strong>${data.proposals.length}</strong></div>
+                <div class="item">Asignados<strong>${data.proposals.reduce((a,p) => a + p.shipmentIds.length, 0)}/${s.totalShipments ?? '-'}</strong></div>
+                <div class="item">Sin asignar<strong>${(data.unassigned || []).length}</strong></div>
+                <div class="item">Costo total<strong>${fmtMoney(totalCost)}</strong></div>
+                <div class="item">Demanda<strong>${s.demandWeightKg ?? '-'}kg / ${s.demandVolumeM3 ?? '-'}m³</strong></div>
+                <div class="item">Aplicadas<strong>${appliedTxIds.size}</strong></div>
+            </div>`;
+        if (s.deficitWarning) summaryHtml += `<div class="deficit-banner">⚠ ${escapeHtml(s.deficitWarning)}</div>`;
+        summaryEl.innerHTML = summaryHtml;
 
         data.proposals.forEach((p, idx) => {
             const card = document.createElement('div');
-            card.className = 'proposal-card';
-            card.style.cssText = 'border:1px solid #ccc; padding:1rem; margin:1rem 0; border-radius:8px';
+            card.className = 'proposal-card' + (appliedTxIds.has(p.transportId) ? ' applied' : '');
+            card.dataset.transportId = p.transportId;
+            const cb = p.costBreakdown || {};
+            const cluster = p.clusterProvinceName ? `<span class="proposal-cluster-badge">📍 ${escapeHtml(p.clusterProvinceName)}</span>` : '';
+            const warns = (p.warnings || []).map(w => `<div class="warn-banner">⚠ ${escapeHtml(w)}</div>`).join('');
+
+            const chipsHtml = (p.reasoning?.shipments || []).map(r => {
+                const pri = r.priority === 'urgent' ? 3 : (r.priority === 'express' ? 2 : 1);
+                const meta = encodeURIComponent(JSON.stringify(r));
+                return `<span class="shipment-chip" draggable="${appliedTxIds.has(p.transportId) ? 'false' : 'true'}" data-shipment-id="${r.shipmentId}" data-tracking="${escapeHtml(r.trackingId)}" data-priority="${pri}" data-meta="${meta}">
+                    <span class="chip-priority priority-${pri}">${(r.priority || 'normal').toUpperCase().slice(0,3)}</span>
+                    ${escapeHtml(r.trackingId)}
+                </span>`;
+            }).join('');
+
+            const stopsHtml = p.stops.map(st => {
+                const eta = st.etaIso ? `<span style="color:var(--color-text-muted);font-size:.75rem"> · ETA ${fmtEta(st.etaIso)}</span>` : '';
+                const icon = st.stopType === 'pickup' ? (st.opportunistic ? '🟢' : '📦') : (st.stopType === 'service' ? '⛽' : '🏠');
+                const detour = st.stopType === 'service' && st.detourKm ? ` <span style="color:#d97706;font-size:.7rem">(desvío +${st.detourKm}km)</span>` : '';
+                const oppTag = st.opportunistic ? ` <span style="color:#16a34a;font-size:.7rem;font-weight:600">PICKUP EXTRA</span>` : '';
+                return `<li style="font-size:.85rem;margin:.2rem 0">${icon} ${escapeHtml(st.label || '')}${oppTag} <span style="color:var(--color-text-muted)">+${st.distanceFromPrevKm}km</span>${detour}${eta}</li>`;
+            }).join('');
+
+            const isApplied = appliedTxIds.has(p.transportId);
+
             card.innerHTML = `
-                <h3>${p.transport.name} ${p.transport.plate ? '(' + p.transport.plate + ')' : ''}</h3>
-                <p>Conductor: ${p.transport.driver ? p.transport.driver.fullName : 'Sin asignar'}</p>
-                <p>Distancia total: ${p.totalDistanceKm} km · Costo total: $${p.totalCost}</p>
-                <p>Utilización peso: ${(p.utilizationWeight*100).toFixed(0)}% (${p.totalWeightKg}/${p.transport.maxWeightKg} kg)</p>
-                <p>Utilización volumen: ${(p.utilizationVolume*100).toFixed(0)}% (${p.totalVolumeM3}/${p.transport.maxVolumeM3} m³)</p>
-                <ol>${p.stops.map(s => `<li><b>${s.stopType === 'pickup' ? '📦 Pickup' : '🏠 Entrega'}</b> · ${s.label || ''} · +${s.distanceFromPrevKm} km</li>`).join('')}</ol>
-                <div id="map-${idx}" style="height:300px; margin-top:1rem"></div>
+                <div class="proposal-header">
+                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster}</h3>
+                </div>
+                <div class="proposal-meta">Conductor: ${p.transport.driver ? escapeHtml(p.transport.driver.fullName) : 'Sin asignar'}</div>
+                ${warns}
+                <div class="proposal-stats">
+                    <div class="proposal-stat">Distancia<strong>${p.totalDistanceKm} km</strong></div>
+                    <div class="proposal-stat">Tiempo<strong>${p.totalDurationMin ?? '-'} min</strong></div>
+                    <div class="proposal-stat">Costo<strong>${fmtMoney(p.totalCost)}</strong></div>
+                    <div class="proposal-stat">Peso<strong>${(p.utilizationWeight*100).toFixed(0)}%</strong></div>
+                    <div class="proposal-stat">Volumen<strong>${(p.utilizationVolume*100).toFixed(0)}%</strong></div>
+                </div>
+                <div><strong style="font-size:.8rem">Envíos (${p.shipmentIds.length}):</strong></div>
+                <div class="proposal-shipments-zone" data-transport-id="${p.transportId}">
+                    ${chipsHtml || '<span style="color:var(--color-text-muted);font-size:.8rem">(vacío - arrastrá un envío aquí)</span>'}
+                </div>
+                <details class="proposal-reasoning">
+                    <summary>Detalles del cálculo</summary>
+                    <div class="proposal-reasoning-body">
+                        <p><b>Transporte:</b> ${escapeHtml(p.reasoning?.transportPick || '')}</p>
+                        <p><b>Costo:</b> ${fmtMoney(p.totalCost)} = fijo ${fmtMoney(cb.fixed)} + km ${fmtMoney(cb.perKm)} + zona ${fmtMoney(cb.zoneBase ?? cb.zoneSurcharges ?? 0)} + recargo peso ${fmtMoney(cb.weightSurcharge ?? 0)} + recargo vol ${fmtMoney(cb.volumeSurcharge ?? 0)}.</p>
+                        <p><b>Distancia:</b> ${p.distanceSource}</p>
+                        <ol style="font-size:.75rem;padding-left:1.25rem">${stopsHtml}</ol>
+                    </div>
+                </details>
+                <div id="map-${idx}" class="proposal-map"></div>
+                <div class="proposal-actions">
+                    <button class="btn-apply ${isApplied ? 'applied' : ''}" data-action="apply" ${isApplied ? 'disabled' : ''}>
+                        ${isApplied ? '✅ APLICADO' : '✓ Aplicar ruta'}
+                    </button>
+                    <button class="btn-exclude" data-action="exclude" ${isApplied ? 'disabled' : ''}>Recalcular sin este transporte</button>
+                </div>
             `;
             container.appendChild(card);
 
+            // Map
             setTimeout(() => {
                 const map = L.map('map-' + idx).setView([p.stops[0]?.lat || -34.6, p.stops[0]?.lng || -58.4], 12);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
-                const latlngs = [];
-                p.stops.forEach(s => {
-                    L.marker([s.lat, s.lng]).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label || ''}`).addTo(map);
-                    latlngs.push([s.lat, s.lng]);
+                const lls = [];
+                p.stops.forEach(st => {
+                    const isPickup = st.stopType === 'pickup';
+                    const isService = st.stopType === 'service';
+                    const isOpp = st.opportunistic;
+                    const fillColor = isOpp ? '#0d9488' : (isPickup ? '#16a34a' : (isService ? '#d97706' : '#dc2626'));
+                    const typeLabel = isOpp ? 'Pickup oportunista' : (isPickup ? 'Pickup' : (isService ? 'Servicio (combustible/descanso)' : 'Entrega'));
+                    L.circleMarker([st.lat, st.lng], { radius: 7, color: '#fff', weight: 2, fillColor, fillOpacity: 1 })
+                        .bindPopup(`<b>#${st.sequence} ${typeLabel}</b><br>${escapeHtml(st.label || '')}`).addTo(map);
+                    lls.push([st.lat, st.lng]);
                 });
-                if (latlngs.length > 1) {
-                    L.polyline(latlngs, { color: 'blue' }).addTo(map);
-                    map.fitBounds(latlngs);
+                if (p.geometry?.type === 'LineString' && p.geometry.coordinates?.length > 1) {
+                    const poly = p.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                    L.polyline(poly, { color: '#1e88e5', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(poly, { padding: [20,20] });
+                } else if (lls.length > 1) {
+                    L.polyline(lls, { color: '#888', weight: 3, dashArray: '6 6' }).addTo(map);
+                    map.fitBounds(lls, { padding: [20,20] });
                 }
             }, 50);
         });
 
-        const un = document.getElementById('unassigned');
-        un.innerHTML = data.unassigned && data.unassigned.length
-            ? `<p><b>Envíos sin asignar:</b> ${data.unassigned.join(', ')}</p>`
-            : '';
-        document.getElementById('confirm-btn').style.display = data.proposals.length > 0 ? 'inline-block' : 'none';
-    };
+        // Pool sin asignar
+        const un = data.unassigned || [];
+        const unChips = un.map(u => {
+            const sid = u.id || u.shipmentId;
+            const tracking = u.trackingId || `#${sid}`;
+            return `<span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" title="${escapeHtml(u.reason || '')}">
+                <span class="chip-priority priority-1">UN</span>
+                ${escapeHtml(tracking)}
+            </span>`;
+        }).join('');
+        poolEl.innerHTML = `<div class="unassigned-pool" data-transport-id="unassigned">
+            <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- arrastrá aquí para descartar de la ruta</span></h3>
+            <div>${unChips || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío)</span>'}</div>
+        </div>`;
 
-    document.getElementById('confirm-btn')?.addEventListener('click', async () => {
-        if (!lastProposals || !lastProposals.length) { return; }
-        if (!confirm('¿Confirmar y aplicar estas asignaciones?')) { return; }
-        const res = await fetch('/route/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ proposals: lastProposals, branchId: window.CURRENT_BRANCH_ID }),
+        // Wire actions
+        container.querySelectorAll('[data-action="apply"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const card = btn.closest('.proposal-card');
+                const txId = Number(card.dataset.transportId);
+                const proposal = currentState.proposals.find(pp => pp.transportId === txId);
+                if (proposal) applyOne(proposal, btn);
+            });
         });
-        const data = await res.json();
-        if (res.ok) {
-            alert('Rutas creadas: ' + data.routeIds.join(', '));
-            window.location.href = '/route';
-        } else {
-            alert(data.error || 'Error');
-        }
-    });
+        container.querySelectorAll('[data-action="exclude"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const txId = Number(btn.closest('.proposal-card').dataset.transportId);
+                recalcExcluding(txId);
+            });
+        });
+
+        // Popover hover/focus
+        const pop = document.getElementById('chip-popover');
+        const priColors = { 1: '#94a3b8', 2: '#0284c7', 3: '#dc2626' };
+        const priLabels = { 1: 'NORMAL', 2: 'EXPRESS', 3: 'URGENT' };
+        const showPop = (chip, evt) => {
+            const meta = chip.dataset.meta;
+            if (!meta) return;
+            let r;
+            try { r = JSON.parse(decodeURIComponent(meta)); } catch { return; }
+            const pri = r.priority === 'urgent' ? 3 : (r.priority === 'express' ? 2 : 1);
+            const addr = [r.addressStreet, r.addressNumber].filter(Boolean).join(' ') || '—';
+            const win = (r.windowFrom && r.windowTo) ? `${r.windowFrom}–${r.windowTo}` : '—';
+            const dest = r.provinceName || '—';
+            const expDate = r.expectedDeliveryDate ? new Date(r.expectedDeliveryDate).toLocaleDateString('es-AR') : '—';
+            pop.innerHTML = `
+                <div class="pop-title">📦 ${escapeHtml(r.trackingId)}</div>
+                <div class="pop-row"><span class="lbl">Prioridad</span><span class="val"><span class="pop-pri" style="background:${priColors[pri]}">${priLabels[pri]}</span></span></div>
+                <hr>
+                <div class="pop-row"><span class="lbl">📍 Provincia</span><span class="val">${escapeHtml(dest)}</span></div>
+                <div class="pop-row"><span class="lbl">Zona</span><span class="val">${escapeHtml(r.zoneName || '—')}</span></div>
+                <div class="pop-row"><span class="lbl">Domicilio</span><span class="val">${escapeHtml(addr)}</span></div>
+                <div class="pop-row"><span class="lbl">CP</span><span class="val">${escapeHtml(r.postalCode || '—')}</span></div>
+                <div class="pop-row"><span class="lbl">Destinatario</span><span class="val">${escapeHtml(r.recipientName || '—')}</span></div>
+                <hr>
+                <div class="pop-row"><span class="lbl">Peso</span><span class="val">${r.weightKg ?? '—'} kg</span></div>
+                <div class="pop-row"><span class="lbl">Volumen</span><span class="val">${r.volumeM3 ?? '—'} m³</span></div>
+                <div class="pop-row"><span class="lbl">Bultos</span><span class="val">${r.packageQty ?? '—'}</span></div>
+                <hr>
+                <div class="pop-row"><span class="lbl">⏰ Ventana</span><span class="val">${win}</span></div>
+                <div class="pop-row"><span class="lbl">📅 Fecha estimada</span><span class="val">${expDate}</span></div>
+            `;
+            pop.classList.add('visible');
+            const rect = chip.getBoundingClientRect();
+            const w = pop.offsetWidth || 280;
+            const h = pop.offsetHeight || 200;
+            let x = rect.left + rect.width / 2 - w / 2;
+            let y = rect.bottom + 8;
+            if (x < 8) x = 8;
+            if (x + w > window.innerWidth - 8) x = window.innerWidth - w - 8;
+            if (y + h > window.innerHeight - 8) y = rect.top - h - 8;
+            pop.style.left = x + 'px';
+            pop.style.top = y + 'px';
+            void evt;
+        };
+        const hidePop = () => pop.classList.remove('visible');
+        document.querySelectorAll('.shipment-chip[data-meta]').forEach(chip => {
+            chip.addEventListener('mouseenter', e => showPop(chip, e));
+            chip.addEventListener('mouseleave', hidePop);
+            chip.addEventListener('focus', e => showPop(chip, e));
+            chip.addEventListener('blur', hidePop);
+            chip.tabIndex = 0;
+        });
+
+        // Wire DnD
+        const allChips = document.querySelectorAll('.shipment-chip[draggable="true"]');
+        allChips.forEach(chip => {
+            chip.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', chip.dataset.shipmentId);
+                e.dataTransfer.setData('text/from', chip.closest('[data-transport-id]').dataset.transportId);
+                chip.classList.add('dragging');
+            });
+            chip.addEventListener('dragend', () => chip.classList.remove('dragging'));
+        });
+
+        const dropZones = document.querySelectorAll('[data-transport-id]');
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const sid = Number(e.dataTransfer.getData('text/plain'));
+                const fromTx = e.dataTransfer.getData('text/from');
+                const toTx = zone.dataset.transportId;
+                if (fromTx === toTx) return;
+
+                // Bloquear si la propuesta destino está aplicada
+                if (toTx !== 'unassigned' && appliedTxIds.has(Number(toTx))) {
+                    alert('No se puede modificar una ruta ya aplicada.');
+                    return;
+                }
+                if (fromTx !== 'unassigned' && appliedTxIds.has(Number(fromTx))) {
+                    alert('No se puede sacar de una ruta ya aplicada.');
+                    return;
+                }
+
+                // Actualizar estado local
+                if (fromTx !== 'unassigned') {
+                    const fromP = currentState.proposals.find(p => p.transportId === Number(fromTx));
+                    if (fromP) fromP.shipmentIds = fromP.shipmentIds.filter(x => x !== sid);
+                } else {
+                    currentState.unassigned = currentState.unassigned.filter(u => (u.id || u.shipmentId) !== sid);
+                }
+                if (toTx !== 'unassigned') {
+                    const toP = currentState.proposals.find(p => p.transportId === Number(toTx));
+                    if (toP && !toP.shipmentIds.includes(sid)) toP.shipmentIds.push(sid);
+                } else {
+                    currentState.unassigned = currentState.unassigned || [];
+                    currentState.unassigned.push({ id: sid, code: 'manual', reason: 'Removido manualmente de la ruta' });
+                }
+                // Recalcular si hubo cambio en una propuesta no aplicada
+                recalc();
+            });
+        });
+    };
 })();
 </script>

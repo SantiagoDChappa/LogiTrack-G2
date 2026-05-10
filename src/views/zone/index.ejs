@@ -11,30 +11,62 @@
         <div class="page-header">
             <h1>Zonas</h1>
             <div class="page-header__actions">
-                <a href="/zone/new" class="btn-primary"><span class="material-symbols-outlined">add</span>Nueva</a>
+                <a href="/zone/new" class="btn-primary">
+                    <span class="material-symbols-outlined">add</span>Nueva
+                </a>
             </div>
         </div>
+
         <div class="shipments-wrapper">
-            <table class="shipments-table">
-                <thead>
-                    <tr>
-                        <th>Nombre</th><th>Provincia</th><th>Costo base</th><th>Prefijos CP</th><th>Habilitada</th><th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% zones.forEach(z => { %>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
                         <tr>
-                            <td><%= z.name %></td>
-                            <td><%= z.provinceId || '-' %></td>
-                            <td>$<%= z.baseCost %></td>
-                            <td><%= z.postalCodePrefixes ? z.postalCodePrefixes.join(', ') : '-' %></td>
-                            <td><%= z.enabled ? 'Sí' : 'No' %></td>
-                            <td><a class="btn-secondary" href="/zone/update/<%= z.id %>">Editar</a></td>
+                            <th>Nombre</th>
+                            <th>Provincia</th>
+                            <th>Costo base</th>
+                            <th>Prefijos CP</th>
+                            <th>Estado</th>
+                            <th class="col-actions">Acciones</th>
                         </tr>
-                    <% }) %>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <% if (!zones || zones.length === 0) { %>
+                            <tr>
+                                <td colspan="6" class="empty-row">
+                                    <span class="material-symbols-outlined">map</span>
+                                    No hay zonas cargadas.
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% zones.forEach(z => { %>
+                                <tr>
+                                    <td><strong><%= z.name %></strong></td>
+                                    <td><%= z.provinceId || '-' %></td>
+                                    <td><%= fmtMoney(z.baseCost) %></td>
+                                    <td class="tracking-id"><%= z.postalCodePrefixes ? z.postalCodePrefixes.join(', ') : '-' %></td>
+                                    <td>
+                                        <% if (z.enabled) { %>
+                                            <span class="status-badge entregado">Habilitada</span>
+                                        <% } else { %>
+                                            <span class="status-badge cancelado">Deshabilitada</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/zone/update/<%= z.id %>" class="action-btn modificar" data-tooltip="Editar">
+                                            <span class="material-symbols-outlined">edit</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
 </body>
 </html>
