@@ -171,6 +171,24 @@ const confirmOne = async (req, res) => {
     const proposal = req.body.proposal;
     if (!proposal || !proposal.transportId) { return res.status(400).json({ error: 'Propuesta inválida' }); }
     try {
+        const { Transport } = require('../models/transport');
+        const transport = await Transport.findOne({ where: { id: proposal.transportId, branchId, enabled: true } });
+        if (!transport) { return res.status(400).json({ error: 'Transporte no disponible' }); }
+
+        const shipmentIds = (proposal.shipmentIds || []).map(Number).filter(Boolean);
+        if (shipmentIds.length > 0) {
+            const ships = await Shipment.findAll({ where: { id: { [Op.in]: shipmentIds }, currentBranchId: branchId } });
+            const num = (v) => (v === null || v === undefined ? 0 : Number(v));
+            const totalW = ships.reduce((s, sh) => s + num(sh.weightKg), 0);
+            const totalV = ships.reduce((s, sh) => s + num(sh.volumeM3), 0);
+            if (totalW > num(transport.maxWeightKg)) {
+                return res.status(400).json({ error: `Peso total ${totalW.toFixed(2)}kg supera la capacidad del transporte (${num(transport.maxWeightKg)}kg)` });
+            }
+            if (totalV > num(transport.maxVolumeM3)) {
+                return res.status(400).json({ error: `Volumen total ${totalV.toFixed(3)}m³ supera la capacidad del transporte (${num(transport.maxVolumeM3)}m³)` });
+            }
+        }
+
         const actor = res.locals.currentUser || {};
         const routeId = await sequelize.transaction(t => persistProposal({ p: proposal, branchId, actor, t }));
         res.json({ ok: true, routeId });
