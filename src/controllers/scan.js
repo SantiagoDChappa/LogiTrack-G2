@@ -6,9 +6,11 @@ const stateMachine           = require('../services/shipmentStateMachine');
 const { notifyStatusChange } = require('../utils/notifications');
 const { Status }             = require('../constants/enums');
 const { resolveBranchCoords, resolveUserBranchCoords } = require('../utils/eventLocation');
+const failedAttemptModel   = require('../models/failedAttempt');
+const { getSuggestedDate } = require('../utils/failedAttempt');
 
 const renderError = (res, message, status = 200) => {
-    return res.status(status).render('scan/index', { shipment: null, actions: [], error: message, success: null });
+    return res.status(status).render('scan/index', { shipment: null, actions: [], error: message, success: null, suggestedDate: null });
 };
 
 const loadShipmentForActor = async (trackingId, currentUser) => {
@@ -30,7 +32,8 @@ const getScanPage = async (req, res) => {
         const actions = stateMachine.getAvailableActions({ shipment, actor: currentUser })
             .map(a => ({ ...a, endpoint: a.endpoint.replace(':trackingId', trackingId) }));
         const success = req.query.success === '1';
-        res.render('scan/index', { shipment, actions, error: null, success });
+        const suggestedDate = req.query.suggestedDate || null;
+        res.render('scan/index', { shipment, actions, error: null, success, suggestedDate });
     } catch (err) {
         console.error('ERROR getScanPage:', err.message);
         renderError(res, 'Error interno. Intentá de nuevo.', 500);
@@ -83,7 +86,53 @@ const buildHandler = (toStatusId, options = {}) => async (req, res) => {
 
 const postPickup        = buildHandler(Status.IN_TRANSIT.id);
 const postAtBranch      = buildHandler(Status.AT_BRANCH.id, { fillBranch: true });
-const postFailedAttempt = buildHandler(Status.FAILED_ATTEMPT.id);
+const postFailedAttempt = async (req, res) => {
+    const { trackingId } = req.params;
+    const currentUser    = res.locals.currentUser;
+    try {
+        const { shipment, error, status } = await loadShipmentForActor(trackingId, currentUser);
+        if (error) { return renderError(res, error, status); }
+
+        const reason      = req.body?.reason      || req.body?.comment || '';
+        const observation = req.body?.observation || null;
+
+        const coords = await resolveUserBranchCoords(currentUser.id);
+        const suggestedDate = getSuggestedDate(reason);
+
+        await stateMachine.transition({
+            shipmentId: shipment.id,
+            toStatusId: Status.FAILED_ATTEMPT.id,
+            actor:      currentUser,
+            comment:    reason,
+            branchId:   coords.branchId,
+            latitude:   coords.latitude,
+            longitude:  coords.longitude,
+        });
+
+        await failedAttemptModel.create({
+            shipmentId:    shipment.id,
+            reason,
+            observation,
+            suggestedDate,
+            status:        'pendiente',
+            operatorId:    currentUser.id,
+        });
+
+        const newStatus = await statusModel.getById(Status.FAILED_ATTEMPT.id);
+        if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+
+        res.redirect(`/scan/${trackingId}?success=1&suggestedDate=${suggestedDate}`);
+    } catch (err) {
+        if (err && err.name === 'StateMachineError') {
+            const map = { INVALID_TRANSITION: 422, FORBIDDEN_ROLE: 403, COMMENT_REQUIRED: 400, SHIPMENT_NOT_FOUND: 404 };
+            return res.status(map[err.code] || 400).render('scan/index', {
+                shipment: null, actions: [], error: err.message, success: null, suggestedDate: null,
+            });
+        }
+        console.error('ERROR postFailedAttempt:', err.message);
+        renderError(res, 'Error interno. Intentá de nuevo.', 500);
+    }
+};
 const postRetry         = buildHandler(Status.IN_TRANSIT.id);
 const postPackageFailed = buildHandler(Status.PACKAGE_FAILED.id);
 
