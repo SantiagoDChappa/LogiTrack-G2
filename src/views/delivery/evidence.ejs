@@ -248,7 +248,7 @@
                     <div>
                         <% if (errors.receiverName) { %>
                             <sub style="color:red" id="receiverName-error">
-                                <%= errors.receiverName %>
+                                <%= errors.receiverName.msg.message %>
                             </sub>
                         <% } %>
                     </div>
@@ -257,7 +257,7 @@
                         <div>
                             <% if (errors.receiverLastname) { %>
                                 <sub style="color:red" id="receiverLastname-error">
-                                    <%= errors.receiverLastname %>
+                                    <%= errors.receiverLastname.msg.message %>
                                 </sub>
                             <% } %>
                         </div>
@@ -269,7 +269,7 @@
                         <div>
                             <% if (errors.receiverDni) { %>
                                 <sub style="color:red" id="receiverDni-error">
-                                    <%= errors.receiverDni %>
+                                    <%= errors.receiverDni.msg.message %>
                                 </sub>
                             <% } %>
                         </div>
@@ -288,7 +288,8 @@
                     <div>
                         <% if (errors.latitude || errors.longitude) { %>
                             <sub style="color:red" id="ubication-error">
-                                <%= errors.ubication %>
+                                <%= errors.latitude.msg.message %> <br>
+                                <%= errors.longitude.msg.message %>
                             </sub>
                             <% } %>
                     </div>
@@ -307,7 +308,7 @@
                     <div>
                         <% if (errors.photoBase64) { %>
                             <sub style="color:red" id="photo-error">
-                                <%= errors.photoBase64 %>
+                                <%= errors.photoBase64.msg.message %>
                             </sub>
                         <% } %>
                     </div>
@@ -331,7 +332,7 @@
                     <div>
                         <% if (errors.signatureBase64) { %>
                             <sub style="color:red" id="signature-error">
-                                <%= errors.signatureBase64 %>
+                                <%= errors.signatureBase64.msg.message %>
                             </sub>
                         <% } %>
                     </div>
