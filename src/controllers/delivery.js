@@ -124,7 +124,7 @@ const saveEvidence = async (req, res) => {
             });
         }
 
-        if (signatureBase64.isEmpty()) {
+        if (signatureBase64 === '') {
             return res.render('delivery/evidence', {
                 shipmentId: trackingCode,
                 errors: {
