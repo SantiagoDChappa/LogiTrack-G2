@@ -422,6 +422,8 @@
 
         function stopDrawing() {
             drawing = false;
+            ctx.beginPath();
+
         }
 
         // Mouse
@@ -438,6 +440,7 @@
         // Limpiar firma
         clearBtn.addEventListener('click', () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
 
             hiddenInput.value = '';
         });
