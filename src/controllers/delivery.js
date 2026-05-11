@@ -81,7 +81,8 @@ const showEvidenceForm = async (req, res) => {
         }
 
         res.render('delivery/evidence', {
-            shipmentId: shipment.trackingId
+            shipmentId: shipment.trackingId,
+            errors: {}
         });
 
     } catch (error) {
@@ -114,7 +115,13 @@ const saveEvidence = async (req, res) => {
         } = req.body;
 
         if (!latitude || !longitude) {
-            return res.status(400).send('La latitud y longitud son requeridas para confirmar la entrega.');
+
+            return res.render('delivery/evidence', {
+                shipmentId: trackingCode,
+                errors: {
+                    ubication: 'La ubicación es requerida para confirmar la entrega.'
+                }
+            });
         }
 
         if (!stateMachine.canTransition({

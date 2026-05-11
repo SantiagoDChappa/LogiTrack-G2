@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <script>(function () { var t = localStorage.getItem('theme') || 'light'; document.documentElement.setAttribute('data-theme', t); })();</script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
     <title>Prueba de Entrega</title>
@@ -46,7 +47,7 @@
         }
 
         .pod-header-text p {
-            color: rgba(255,255,255,0.75);
+            color: rgba(255, 255, 255, 0.75);
             font-size: var(--font-size-sm);
             margin-top: var(--space-1);
         }
@@ -217,179 +218,194 @@
         }
     </style>
 </head>
+
 <body>
 
-<div class="pod-card">
+    <div class="pod-card">
 
-    <div class="pod-header">
-        <span class="material-symbols-outlined">local_shipping</span>
-        <div class="pod-header-text">
-            <h1>Prueba de Entrega</h1>
-            <p>Completá los datos para confirmar la entrega</p>
+        <div class="pod-header">
+            <span class="material-symbols-outlined">local_shipping</span>
+            <div class="pod-header-text">
+                <h1>Prueba de Entrega</h1>
+                <p>Completá los datos para confirmar la entrega</p>
+            </div>
+        </div>
+
+        <div class="pod-body">
+            <form method="POST" action="/delivery/evidence/<%= shipmentId %>/pod">
+
+                <!-- Identidad -->
+                <div class="pod-section">
+                    <div class="pod-section-title">
+                        <span class="material-symbols-outlined">badge</span>
+                        Datos del receptor
+                    </div>
+
+                    <div class="form-field">
+                        <label>Nombre</label>
+                        <input type="text" name="receiverName" placeholder="Nombre del receptor" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Apellido</label>
+                        <input type="text" name="receiverLastname" placeholder="Apellido del receptor" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label>DNI</label>
+                        <input type="text" name="receiverDni" placeholder="Número de documento" required>
+                    </div>
+                </div>
+
+                <!-- GPS -->
+                <div class="pod-section">
+                    <div class="pod-section-title">
+                        <span class="material-symbols-outlined">location_on</span>
+                        Ubicación
+                    </div>
+                    <input type="hidden" name="latitude" id="latitude">
+                    <input type="hidden" name="longitude" id="longitude">
+                    <div>
+                        <% if (errors.ubication) { %>
+                            <sub style="color:red" id="ubication-error">
+                                <%= errors.ubication %>
+                            </sub>
+                            <% } %>
+                    </div>
+                    <div class="gps-status" id="gps-status">
+                        <span class="material-symbols-outlined">my_location</span>
+                        <span>Obteniendo ubicación...</span>
+                    </div>
+                </div>
+
+                <!-- Foto -->
+                <div class="pod-section">
+                    <div class="pod-section-title">
+                        <span class="material-symbols-outlined">photo_camera</span>
+                        Foto del paquete
+                    </div>
+                    <input type="file" name="photoFile" id="photoFile" accept="image/*" capture="environment"
+                        style="display:none;">
+                    <input type="hidden" name="photoBase64" id="photoBase64">
+                    <button type="button" class="photo-btn" onclick="document.getElementById('photoFile').click()">
+                        <span class="material-symbols-outlined">add_a_photo</span>
+                        Sacar foto del paquete
+                    </button>
+                    <img id="photoPreview" alt="Preview foto">
+                </div>
+
+                <!-- Firma -->
+                <div class="pod-section">
+                    <div class="pod-section-title">
+                        <span class="material-symbols-outlined">draw</span>
+                        Firma del receptor
+                    </div>
+                    <canvas id="signatureCanvas" width="440" height="160"></canvas>
+                    <button type="button" class="clear-btn" id="clearSignature">
+                        <span class="material-symbols-outlined">delete</span>
+                        Limpiar firma
+                    </button>
+                    <input type="hidden" name="signatureBase64" id="signatureBase64">
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    Confirmar entrega
+                </button>
+
+            </form>
         </div>
     </div>
 
-    <div class="pod-body">
-        <form method="POST" action="/delivery/evidence/<%= shipmentId %>/pod">
+    <script>
+        const errorMessage = document.getElementById('ubication-error');
+        // GPS
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    document.getElementById('latitude').value = position.coords.latitude;
+                    document.getElementById('longitude').value = position.coords.longitude;
+                    const el = document.getElementById('gps-status');
+                    el.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span>Ubicación obtenida</span>';
+                    el.classList.add('success');
 
-            <!-- Identidad -->
-            <div class="pod-section">
-                <div class="pod-section-title">
-                    <span class="material-symbols-outlined">badge</span>
-                    Datos del receptor
-                </div>
+                    if (errorMessage) {
+                        errorMessage.style.display = 'none';
+                    }
+                },
+                () => {
+                    const el = document.getElementById('gps-status');
+                    el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>No se pudo obtener ubicación</span>';
+                    el.classList.add('warning');
+                }
+            );
+        } else {
+            const el = document.getElementById('gps-status');
+            el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>GPS no disponible</span>';
+            el.classList.add('warning');
+        }
 
-                <div class="form-field">
-                    <label>Nombre</label>
-                    <input type="text" name="receiverName" placeholder="Nombre del receptor" required>
-                </div>
+        // Foto
+        document.getElementById('photoFile').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const img = document.getElementById('photoPreview');
+                img.src = event.target.result;
+                img.style.display = 'block';
+                document.getElementById('photoBase64').value = event.target.result;
+                document.querySelector('.photo-btn').innerHTML = '<span class="material-symbols-outlined">check_circle</span> Foto cargada';
+            };
+            reader.readAsDataURL(file);
+        });
 
-                <div class="form-field">
-                    <label>Apellido</label>
-                    <input type="text" name="receiverLastname" placeholder="Apellido del receptor" required>
-                </div>
+        // Firma
+        const canvas = document.getElementById('signatureCanvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
 
-                <div class="form-field">
-                    <label>DNI</label>
-                    <input type="text" name="receiverDni" placeholder="Número de documento" required>
-                </div>
-            </div>
+        function getPos(e) {
+            const r = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / r.width;
+            const scaleY = canvas.height / r.height;
+            const t = e.touches[0];
+            return {
+                x: (t.clientX - r.left) * scaleX,
+                y: (t.clientY - r.top) * scaleY
+            };
+        }
 
-            <!-- GPS -->
-            <div class="pod-section">
-                <div class="pod-section-title">
-                    <span class="material-symbols-outlined">location_on</span>
-                    Ubicación
-                </div>
-                <input type="hidden" name="latitude" id="latitude">
-                <input type="hidden" name="longitude" id="longitude">
-                <div class="gps-status" id="gps-status">
-                    <span class="material-symbols-outlined">my_location</span>
-                    <span>Obteniendo ubicación...</span>
-                </div>
-            </div>
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            drawing = true;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        });
 
-            <!-- Foto -->
-            <div class="pod-section">
-                <div class="pod-section-title">
-                    <span class="material-symbols-outlined">photo_camera</span>
-                    Foto del paquete
-                </div>
-                <input type="file" name="photoFile" id="photoFile" accept="image/*" capture="environment" style="display:none;">
-                <input type="hidden" name="photoBase64" id="photoBase64">
-                <button type="button" class="photo-btn" onclick="document.getElementById('photoFile').click()">
-                    <span class="material-symbols-outlined">add_a_photo</span>
-                    Sacar foto del paquete
-                </button>
-                <img id="photoPreview" alt="Preview foto">
-            </div>
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!drawing) return;
+            const pos = getPos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim();
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        });
 
-            <!-- Firma -->
-            <div class="pod-section">
-                <div class="pod-section-title">
-                    <span class="material-symbols-outlined">draw</span>
-                    Firma del receptor
-                </div>
-                <canvas id="signatureCanvas" width="440" height="160"></canvas>
-                <button type="button" class="clear-btn" id="clearSignature">
-                    <span class="material-symbols-outlined">delete</span>
-                    Limpiar firma
-                </button>
-                <input type="hidden" name="signatureBase64" id="signatureBase64">
-            </div>
+        canvas.addEventListener('touchend', () => {
+            drawing = false;
+            document.getElementById('signatureBase64').value = canvas.toDataURL('image/png');
+        });
 
-            <button type="submit" class="submit-btn">
-                <span class="material-symbols-outlined">check_circle</span>
-                Confirmar entrega
-            </button>
-
-        </form>
-    </div>
-</div>
-
-<script>
-    // GPS
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                document.getElementById('latitude').value = position.coords.latitude;
-                document.getElementById('longitude').value = position.coords.longitude;
-                const el = document.getElementById('gps-status');
-                el.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span>Ubicación obtenida</span>';
-                el.classList.add('success');
-            },
-            () => {
-                const el = document.getElementById('gps-status');
-                el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>No se pudo obtener ubicación</span>';
-                el.classList.add('warning');
-            }
-        );
-    } else {
-        const el = document.getElementById('gps-status');
-        el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>GPS no disponible</span>';
-        el.classList.add('warning');
-    }
-
-    // Foto
-    document.getElementById('photoFile').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = document.getElementById('photoPreview');
-            img.src = event.target.result;
-            img.style.display = 'block';
-            document.getElementById('photoBase64').value = event.target.result;
-            document.querySelector('.photo-btn').innerHTML = '<span class="material-symbols-outlined">check_circle</span> Foto cargada';
-        };
-        reader.readAsDataURL(file);
-    });
-
-    // Firma
-    const canvas = document.getElementById('signatureCanvas');
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
-
-    function getPos(e) {
-        const r = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / r.width;
-        const scaleY = canvas.height / r.height;
-        const t = e.touches[0];
-        return {
-            x: (t.clientX - r.left) * scaleX,
-            y: (t.clientY - r.top) * scaleY
-        };
-    }
-
-    canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        drawing = true;
-        const pos = getPos(e);
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-    });
-
-    canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (!drawing) return;
-        const pos = getPos(e);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim();
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-    });
-
-    canvas.addEventListener('touchend', () => {
-        drawing = false;
-        document.getElementById('signatureBase64').value = canvas.toDataURL('image/png');
-    });
-
-    document.getElementById('clearSignature').addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        document.getElementById('signatureBase64').value = '';
-    });
-</script>
+        document.getElementById('clearSignature').addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('signatureBase64').value = '';
+        });
+    </script>
 
 </body>
+
 </html>
