@@ -4,6 +4,7 @@ const { Status } = require('../constants/enums');
 
 const { getSuggestedDate } = require('../utils/failedAttempt');
 const failedAttemptModel = require('../models/failedAttempt');
+const shipmentHistoryModel = require('../models/shipmentHistory');
 
 const showFailedForm = async (req, res) => {
     try {

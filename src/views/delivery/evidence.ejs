@@ -215,9 +215,102 @@
         .submit-btn .material-symbols-outlined {
             font-size: 1.3rem;
         }
+
+        /* Validation modal */
+        .validation-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-4);
+        }
+
+        .validation-overlay.active {
+            display: flex;
+        }
+
+        .validation-modal {
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 340px;
+            width: 100%;
+            overflow: hidden;
+            animation: modal-in 0.18s ease-out;
+        }
+
+        @keyframes modal-in {
+            from { transform: scale(0.9); opacity: 0; }
+            to   { transform: scale(1);   opacity: 1; }
+        }
+
+        .validation-modal-header {
+            background: var(--color-warning, #f59e0b);
+            padding: var(--space-4) var(--space-5);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            color: white;
+        }
+
+        .validation-modal-header .material-symbols-outlined {
+            font-size: 1.5rem;
+        }
+
+        .validation-modal-header h2 {
+            font-size: var(--font-size-base);
+            margin: 0;
+            color: white;
+        }
+
+        .validation-modal-body {
+            padding: var(--space-5);
+        }
+
+        .validation-modal-body p {
+            margin: 0 0 var(--space-4);
+            color: var(--color-text);
+            font-size: var(--font-size-sm);
+        }
+
+        .validation-modal-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            width: 100%;
+            padding: var(--space-3);
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
+
+<!-- Validation popup -->
+<div class="validation-overlay" id="validationOverlay">
+    <div class="validation-modal">
+        <div class="validation-modal-header">
+            <span class="material-symbols-outlined">warning</span>
+            <h2>Campos requeridos</h2>
+        </div>
+        <div class="validation-modal-body">
+            <p id="validationMessage"></p>
+            <button class="validation-modal-close" onclick="document.getElementById('validationOverlay').classList.remove('active')">
+                <span class="material-symbols-outlined">check</span>
+                Entendido
+            </button>
+        </div>
+    </div>
+</div>
 
 <div class="pod-card">
 
@@ -349,27 +442,28 @@
     const canvas = document.getElementById('signatureCanvas');
     const ctx = canvas.getContext('2d');
     let drawing = false;
+    let signatureDrawn = false;
 
     function getPos(e) {
         const r = canvas.getBoundingClientRect();
         const scaleX = canvas.width / r.width;
         const scaleY = canvas.height / r.height;
-        const t = e.touches[0];
+        const src = e.touches ? e.touches[0] : e;
         return {
-            x: (t.clientX - r.left) * scaleX,
-            y: (t.clientY - r.top) * scaleY
+            x: (src.clientX - r.left) * scaleX,
+            y: (src.clientY - r.top) * scaleY
         };
     }
 
-    canvas.addEventListener('touchstart', (e) => {
+    function startDraw(e) {
         e.preventDefault();
         drawing = true;
         const pos = getPos(e);
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
-    });
+    }
 
-    canvas.addEventListener('touchmove', (e) => {
+    function moveDraw(e) {
         e.preventDefault();
         if (!drawing) return;
         const pos = getPos(e);
@@ -378,17 +472,55 @@
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.stroke();
-    });
+        signatureDrawn = true;
+    }
 
-    canvas.addEventListener('touchend', () => {
+    function endDraw() {
         drawing = false;
-        document.getElementById('signatureBase64').value = canvas.toDataURL('image/png');
-    });
+        if (signatureDrawn) {
+            document.getElementById('signatureBase64').value = canvas.toDataURL('image/png');
+        }
+    }
+
+    canvas.addEventListener('touchstart', startDraw);
+    canvas.addEventListener('touchmove', moveDraw);
+    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', moveDraw);
+    canvas.addEventListener('mouseup', endDraw);
 
     document.getElementById('clearSignature').addEventListener('click', () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         document.getElementById('signatureBase64').value = '';
+        signatureDrawn = false;
     });
+
+    // Validación al submit
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const photo = document.getElementById('photoBase64').value;
+        const signature = document.getElementById('signatureBase64').value;
+
+        if (!photo && !signatureDrawn) {
+            e.preventDefault();
+            showValidation('Por favor, sacá una foto del paquete y agregá la firma del receptor antes de confirmar la entrega.');
+            return;
+        }
+        if (!photo) {
+            e.preventDefault();
+            showValidation('Por favor, sacá una foto del paquete antes de confirmar la entrega.');
+            return;
+        }
+        if (!signatureDrawn) {
+            e.preventDefault();
+            showValidation('Por favor, agregá la firma del receptor antes de confirmar la entrega.');
+            return;
+        }
+    });
+
+    function showValidation(msg) {
+        document.getElementById('validationMessage').textContent = msg;
+        document.getElementById('validationOverlay').classList.add('active');
+    }
 </script>
 
 </body>

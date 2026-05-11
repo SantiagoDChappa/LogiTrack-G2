@@ -19,6 +19,7 @@ const csvExport            = require('../services/csvExport');
 const shipmentImportModel  = require('../models/shipmentImport');
 const branchModel          = require('../models/branch');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
+const { resolveZone } = require('../services/zoneResolver.service');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
 const stateMachine         = require('../services/shipmentStateMachine');
@@ -293,6 +294,18 @@ const createShipment = async (req, res) => {
             },
         });
 
+        const resolvedZone = await resolveZone({
+            postalCode: body.postalCode,
+            provinceId: body.province,
+        });
+
+        const normalizeTime = (t) => {
+            if (!t) { return null; }
+            const v = String(t).trim();
+            if (!v) { return null; }
+            return v.length === 5 ? `${v}:00` : v;
+        };
+
         const shipment = await shipmentModel.create({
             senderId:        sender.id,
             recipientId:     recipient.id,
@@ -304,6 +317,10 @@ const createShipment = async (req, res) => {
             basePriority:    initialPriority,
             priority:        initialPriority,
             currentBranchId: creatorCoordsForCreate.branchId || null,
+            zoneId:          resolvedZone?.id || null,
+            expectedDeliveryDate: body.expectedDeliveryDate || null,
+            expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
+            expectedDeliveryTo:   normalizeTime(body.expectedDeliveryTo),
         });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
@@ -678,22 +695,86 @@ const getKanban = async (req, res) => {
         Status.IN_TRANSIT.id,
         Status.AT_BRANCH.id,
         Status.FAILED_ATTEMPT.id,
+        Status.PACKAGE_FAILED.id,
     ];
 
-    const [shipments, deliveryUsers] = await Promise.all([
-        shipmentModel.getForKanban(KANBAN_STATUS_IDS),
+    const user      = res.locals.currentUser;
+    const isAdmin   = isAdminUser(user);
+    const branchIdQ = Number(req.query.branchId) || null;
+    const branchId  = isAdmin ? branchIdQ : (user?.branchId || null);
+
+    const [shipments, deliveryUsers, branches] = await Promise.all([
+        shipmentModel.getForKanban(KANBAN_STATUS_IDS, { branchId }),
         userModel.search({ roleId: RoleType.DELIVERY.id, active: 'true' }),
+        isAdmin ? branchModel.getAll() : Promise.resolve([]),
     ]);
 
     const columns = {};
     KANBAN_STATUS_IDS.forEach(sid => { columns[sid] = []; });
     shipments.forEach(s => { if (columns[s.statusId]) columns[s.statusId].push(s); });
 
+    // Agrupar EN TRANSITO por transporte usando rutas activas
+    const inTransitIds = columns[Status.IN_TRANSIT.id].map(s => s.id);
+    let inTransitGroups = [];
+    if (inTransitIds.length > 0) {
+        const { RouteStop } = require('../models/routeStop');
+        const { Route, RouteStatus } = require('../models/route');
+        const { Transport } = require('../models/transport');
+        const stops = await RouteStop.findAll({
+            where: { shipmentId: inTransitIds, stopType: 'delivery' },
+            include: [{
+                model: Route,
+                as: 'route',
+                required: true,
+                include: [{ model: Transport, as: 'transport', include: [{ model: userModel.User, as: 'driver', required: false }] }],
+            }],
+            order: [[{ model: Route, as: 'route' }, 'createdAt', 'DESC']],
+        });
+        // Preferir ruta activa (PLANNED/IN_ROUTE); fallback a la más reciente.
+        const transportByShipment = new Map();
+        const ACTIVE = new Set([RouteStatus.PLANNED, RouteStatus.IN_ROUTE]);
+        for (const st of stops) {
+            const t = st.route?.transport;
+            if (!t) { continue; }
+            const existing = transportByShipment.get(st.shipmentId);
+            if (!existing) {
+                transportByShipment.set(st.shipmentId, t);
+            } else if (!ACTIVE.has(existing._routeStatus) && ACTIVE.has(st.route.statusId)) {
+                t._routeStatus = st.route.statusId;
+                transportByShipment.set(st.shipmentId, t);
+            }
+            if (transportByShipment.get(st.shipmentId) === t) {
+                t._routeStatus = st.route.statusId;
+            }
+        }
+        const groupMap = new Map();
+        const transitShipments = [];
+        for (const s of columns[Status.IN_TRANSIT.id]) {
+            const t = transportByShipment.get(s.id);
+            if (!t) { continue; } // ocultar envíos sin transporte
+            const key = `t-${t.id}`;
+            if (!groupMap.has(key)) {
+                groupMap.set(key, {
+                    key,
+                    transportName: t.name,
+                    plate:         t.plate || '',
+                    driverName:    t.driver?.fullName || s.deliveryUser?.fullName || '',
+                    shipments:     [],
+                });
+            }
+            groupMap.get(key).shipments.push(s);
+            transitShipments.push(s);
+        }
+        // Reemplazar la columna IN_TRANSIT con solo los envíos que tienen transporte
+        columns[Status.IN_TRANSIT.id] = transitShipments;
+        inTransitGroups = Array.from(groupMap.values());
+    }
+
     const driversJson = JSON.stringify(
         deliveryUsers.map(u => ({ id: u.id, fullName: u.fullName }))
     );
 
-    res.render('shipment/kanban', { columns, driversJson });
+    res.render('shipment/kanban', { columns, driversJson, inTransitGroups, branches, branchId, isAdmin });
 };
 
 const getQR = async (req, res) => {

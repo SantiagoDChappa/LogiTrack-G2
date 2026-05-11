@@ -74,12 +74,20 @@
             %>
 
             <!-- Tracking ID + estado -->
+            <%
+                const _priLabels = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Urgente' };
+                const _priCls    = { 1: 'priority-badge--low', 2: 'priority-badge--mid', 3: 'priority-badge--high', 4: 'priority-badge--urgent' };
+                const _pr        = shipment.priority || 1;
+            %>
             <div class="detail-top" style="margin-bottom: 1.5rem;">
                 <div class="detail-tracking">
                     <span class="detail-tracking-label">ID Tracking</span>
                     <span class="detail-tracking-id"><%= shipment.trackingId %></span>
                 </div>
-                <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
+                <div style="display:flex;gap:var(--space-3);align-items:center;">
+                    <span class="priority-badge <%= _priCls[_pr] %>"><%= _priLabels[_pr] || '—' %></span>
+                    <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
+                </div>
             </div>
 
             <!-- ── Línea de tiempo (card independiente) ── -->
