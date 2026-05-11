@@ -1,6 +1,8 @@
 const { DeliveryEvidence, Shipment } = require('../models');
 const stateMachine = require('../services/shipmentStateMachine');
 const { Status } = require('../constants/enums');
+const shipmentHistoryModel = require('../models/shipmentHistory');
+const ShipmentModel = require('../models/shipment');
 
 const { getSuggestedDate } = require('../utils/failedAttempt');
 const failedAttemptModel = require('../models/failedAttempt');
@@ -79,7 +81,8 @@ const showEvidenceForm = async (req, res) => {
         }
 
         res.render('delivery/evidence', {
-            shipmentId: shipment.trackingId
+            shipmentId: shipment.trackingId,
+            errors: {}
         });
 
     } catch (error) {
@@ -111,6 +114,25 @@ const saveEvidence = async (req, res) => {
             signatureBase64
         } = req.body;
 
+        if (!latitude || !longitude) {
+
+            return res.render('delivery/evidence', {
+                shipmentId: trackingCode,
+                errors: {
+                    ubication: 'La ubicación es requerida para confirmar la entrega.'
+                }
+            });
+        }
+
+        if (signatureBase64.isEmpty()) {
+            return res.render('delivery/evidence', {
+                shipmentId: trackingCode,
+                errors: {
+                    signature: 'La firma es requerida para confirmar la entrega.'
+                }
+            });
+        }
+
         if (!stateMachine.canTransition({
             fromStatusId: shipment.statusId,
             toStatusId:   Status.DELIVERED.id,
@@ -129,6 +151,9 @@ const saveEvidence = async (req, res) => {
             photoBase64: photoBase64 || null,
             signatureBase64: signatureBase64 || null
         });
+
+
+        await ShipmentModel.updateStatus(shipment.id, Status.DELIVERED.id);
 
         const podLat = latitude  !== null && latitude  !== undefined && latitude  !== '' ? Number(latitude)  : null;
         const podLng = longitude !== null && longitude !== undefined && longitude !== '' ? Number(longitude) : null;
