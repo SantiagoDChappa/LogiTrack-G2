@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const QRCode = require('qrcode');
 const { Shipment } = require('../models/shipment');
 const { Address } = require('../models/address');
 const { Zone } = require('../models/zone');
@@ -12,7 +13,9 @@ const { Status: StatusEnum, RoleType } = require('../constants/enums');
 const optimizer = require('../services/routeOptimizer.service');
 const sequelize = require('../database/connection');
 const shipmentHistoryModel = require('../models/shipmentHistory');
+const stateMachine = require('../services/shipmentStateMachine');
 const { buildAutoComment } = require('../services/shipmentStateMachine');
+const { resolveUserBranchCoords } = require('../utils/eventLocation');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
 
@@ -214,4 +217,81 @@ const detail = async (req, res) => {
     res.render('route/detail', { route });
 };
 
-module.exports = { optimizeForm, previewOptimization, recalcManual, confirm, confirmOne, list, detail };
+const getQR = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const route = await routeModel.getById(id);
+        if (!route) { return res.status(404).send('Ruta no encontrada'); }
+        const url = `${req.protocol}://${req.get('host')}/route/scan/${route.id}`;
+        const buffer = await QRCode.toBuffer(url, { width: 320, margin: 2 });
+        res.setHeader('Content-Type', 'image/png');
+        res.send(buffer);
+    } catch (err) {
+        console.error('ERROR route getQR:', err.message);
+        res.status(500).send('Error generando QR');
+    }
+};
+
+const getScanPage = async (req, res) => {
+    const route = await routeModel.getById(req.params.id);
+    if (!route) { return res.status(404).render('route/scan', { route: null, error: 'Ruta no encontrada', success: null, summary: null }); }
+    const success = req.query.success === '1';
+    const summary = req.query.summary || null;
+    res.render('route/scan', { route, error: null, success, summary });
+};
+
+const dispatchRoute = async (req, res) => {
+    const routeId = Number(req.params.id);
+    const currentUser = res.locals.currentUser;
+    try {
+        const route = await routeModel.getById(routeId);
+        if (!route) { return res.status(404).redirect(`/route/scan/${routeId}`); }
+
+        if (currentUser.roleId === RoleType.DELIVERY.id
+            && route.transport?.driverUserId
+            && route.transport.driverUserId !== currentUser.id) {
+            return res.status(403).render('route/scan', { route, error: 'Esta ruta no está asignada a vos.', success: null, summary: null });
+        }
+
+        const coords = await resolveUserBranchCoords(currentUser.id);
+        const deliveryIds = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && s.shipmentId)
+            .map(s => s.shipmentId);
+
+        let transitioned = 0;
+        let skipped = 0;
+        for (const sid of deliveryIds) {
+            try {
+                await stateMachine.transition({
+                    shipmentId: sid,
+                    toStatusId: StatusEnum.IN_TRANSIT.id,
+                    actor:      currentUser,
+                    branchId:   coords.branchId,
+                    latitude:   coords.latitude,
+                    longitude:  coords.longitude,
+                });
+                transitioned++;
+            } catch (err) {
+                if (err && err.name === 'StateMachineError'
+                    && ['INVALID_TRANSITION', 'FORBIDDEN_ROLE'].includes(err.code)) {
+                    skipped++;
+                    continue;
+                }
+                throw err;
+            }
+        }
+
+        if (route.statusId === RouteStatus.PLANNED) {
+            await Route.update({ statusId: RouteStatus.IN_ROUTE }, { where: { id: routeId } });
+        }
+
+        const summary = encodeURIComponent(`${transitioned} envío(s) en tránsito · ${skipped} omitido(s)`);
+        res.redirect(`/route/scan/${routeId}?success=1&summary=${summary}`);
+    } catch (err) {
+        console.error('ERROR dispatchRoute:', err.message);
+        const route = await routeModel.getById(routeId).catch(() => null);
+        res.status(500).render('route/scan', { route, error: 'Error interno al despachar ruta.', success: null, summary: null });
+    }
+};
+
+module.exports = { optimizeForm, previewOptimization, recalcManual, confirm, confirmOne, list, detail, getQR, getScanPage, dispatchRoute };

@@ -99,6 +99,8 @@ const create = async (data) => {
         zoneId:               data.zoneId          || null,
         currentBranchId:      data.currentBranchId || null,
         expectedDeliveryDate: data.expectedDeliveryDate || null,
+        expectedDeliveryFrom: data.expectedDeliveryFrom || null,
+        expectedDeliveryTo:   data.expectedDeliveryTo   || null,
         deliveryUserId:       data.deliveryUserId  || null,
         legacyTrackingId: data.legacyTrackingId || null,
         priority:         data.priority     || 1,
@@ -289,15 +291,18 @@ const findByIdForUpdate = (id, transaction) => Shipment.findOne({
     lock: transaction ? transaction.LOCK.UPDATE : undefined,
 });
 
-const getForKanban = (statusIds) => {
+const getForKanban = (statusIds, { branchId } = {}) => {
     const { Person }    = require('./person');
     const { Status }    = require('./status');
     const { Address }   = require('./address');
     const { Province }  = require('./province');
     const { User }      = require('./user');
 
+    const where = { statusId: { [Op.in]: statusIds } };
+    if (branchId) { where.currentBranchId = Number(branchId); }
+
     return Shipment.findAll({
-        where: { statusId: { [Op.in]: statusIds } },
+        where,
         include: [
             { model: Person,  as: 'recipient' },
             { model: Status,  as: 'status' },

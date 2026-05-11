@@ -4,8 +4,10 @@ const { Status } = require('../constants/enums');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const ShipmentModel = require('../models/shipment');
 
+
 const { getSuggestedDate } = require('../utils/failedAttempt');
 const failedAttemptModel = require('../models/failedAttempt');
+const shipmentHistoryModel = require('../models/shipmentHistory');
 
 const showFailedForm = async (req, res) => {
     try {
@@ -114,24 +116,6 @@ const saveEvidence = async (req, res) => {
             signatureBase64
         } = req.body;
 
-        if (!latitude || !longitude) {
-
-            return res.render('delivery/evidence', {
-                shipmentId: trackingCode,
-                errors: {
-                    ubication: 'La ubicación es requerida para confirmar la entrega.'
-                }
-            });
-        }
-
-        if (signatureBase64.isEmpty()) {
-            return res.render('delivery/evidence', {
-                shipmentId: trackingCode,
-                errors: {
-                    signature: 'La firma es requerida para confirmar la entrega.'
-                }
-            });
-        }
 
         if (!stateMachine.canTransition({
             fromStatusId: shipment.statusId,

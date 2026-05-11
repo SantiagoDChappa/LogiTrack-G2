@@ -44,6 +44,20 @@
                 <span class="status-badge <%= _rs.cls %>"><%= _rs.label %></span>
             </div>
 
+            <!-- QR salida de ruta -->
+            <% if (route.statusId === 1) { %>
+            <div class="update-card" style="margin-bottom:1.5rem;display:flex;gap:var(--space-5);align-items:center;flex-wrap:wrap;">
+                <div>
+                    <h3 style="margin-top:0"><span class="material-symbols-outlined">qr_code_2</span> QR de salida</h3>
+                    <p style="color:var(--color-text-secondary);max-width:340px;margin:0 0 var(--space-3);">
+                        El repartidor escanea este QR al salir. Todos los envíos asignados a esta ruta pasan automáticamente a <strong>En Tránsito</strong>.
+                    </p>
+                    <a href="/route/scan/<%= route.id %>" class="btn-secondary"><span class="material-symbols-outlined">open_in_new</span> Abrir pantalla de salida</a>
+                </div>
+                <img src="/route/<%= route.id %>/qr" alt="QR ruta <%= route.id %>" style="width:200px;height:200px;background:#fff;border-radius:8px;padding:8px;">
+            </div>
+            <% } %>
+
             <!-- Top grid: info + mapa -->
             <div class="update-top-grid" style="margin-bottom:1.5rem">
 
