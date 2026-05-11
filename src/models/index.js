@@ -11,6 +11,11 @@ const { ShipmentHistory } = require('./shipmentHistory');
 const { DeliveryEvidence } = require('./deliveryEvidence');
 const { FailedAttempt }    = require('./failedAttempt');
 const { ShipmentImport }  = require('./shipmentImport');
+const { Zone }            = require('./zone');
+const { Transport }       = require('./transport');
+const { TransportZone }   = require('./transportZone');
+const { Route }           = require('./route');
+const { RouteStop }       = require('./routeStop');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -59,6 +64,45 @@ const safeAssociate = () => {
     if (ShipmentImport.belongsTo && User) {
         ShipmentImport.belongsTo(User, { as: 'user', foreignKey: 'userId' });
     }
+
+    // Routing optimization associations
+    if (Zone.belongsTo && Province) {
+        Zone.belongsTo(Province, { as: 'province', foreignKey: 'provinceId' });
+    }
+
+    if (Shipment.belongsTo) {
+        if (Zone)   { Shipment.belongsTo(Zone,   { as: 'zone',          foreignKey: 'zoneId' }); }
+        if (Branch) { Shipment.belongsTo(Branch, { as: 'currentBranch', foreignKey: 'currentBranchId' }); }
+    }
+
+    if (Transport.belongsTo) {
+        if (User)   { Transport.belongsTo(User,   { as: 'driver', foreignKey: 'driverUserId' }); }
+        if (Branch) { Transport.belongsTo(Branch, { as: 'branch', foreignKey: 'branchId' }); }
+    }
+    if (Transport.belongsToMany && Zone) {
+        Transport.belongsToMany(Zone, {
+            through: TransportZone, as: 'zones',
+            foreignKey: 'transportId', otherKey: 'zoneId',
+        });
+        Zone.belongsToMany(Transport, {
+            through: TransportZone, as: 'transports',
+            foreignKey: 'zoneId', otherKey: 'transportId',
+        });
+    }
+
+    if (Route.belongsTo) {
+        Route.belongsTo(Transport, { as: 'transport',    foreignKey: 'transportId' });
+        Route.belongsTo(Branch,    { as: 'originBranch', foreignKey: 'originBranchId' });
+        Route.belongsTo(Status,    { as: 'status',       foreignKey: 'statusId' });
+    }
+    if (Route.hasMany) {
+        Route.hasMany(RouteStop, { as: 'stops', foreignKey: 'routeId' });
+    }
+    if (RouteStop.belongsTo) {
+        RouteStop.belongsTo(Route,    { as: 'route',    foreignKey: 'routeId' });
+        RouteStop.belongsTo(Branch,   { as: 'branch',   foreignKey: 'branchId' });
+        RouteStop.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' });
+    }
 };
 
 safeAssociate();
@@ -75,5 +119,10 @@ module.exports = {
     ShipmentHistory,
     DeliveryEvidence,
     FailedAttempt,
-    ShipmentImport
+    ShipmentImport,
+    Zone,
+    Transport,
+    TransportZone,
+    Route,
+    RouteStop
 };

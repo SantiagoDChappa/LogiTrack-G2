@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Mi Ruta - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+    .stop-row {
+        background: var(--color-surface, #fff);
+        border: 1px solid var(--color-border, #e2e8f0);
+        border-radius: 10px;
+        padding: 1rem;
+        margin: .65rem 0;
+        list-style: none;
+    }
+    .stop-row.completed { opacity: .55; }
+    .stop-row .stop-title { font-weight: 600; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .stop-row .stop-meta { color: var(--color-text-secondary, #64748b); font-size: .9rem; margin-top: .25rem; }
+    .stop-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .65rem; }
+    .stop-actions button, .stop-actions a {
+        font-size: .85rem; padding: .4rem .8rem; border-radius: 6px;
+        border: 1px solid var(--color-border, #ccc); cursor: pointer;
+        text-decoration: none; display: inline-flex; align-items: center; gap: .25rem;
+    }
+    .btn-arrive { background: #0284c7; color: #fff; border-color: #0284c7; }
+    .btn-pickup { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .btn-delivered { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .btn-failed { background: #dc2626; color: #fff; border-color: #dc2626; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Mi Ruta #<%= route.id %></h1>
+            <p>Transporte: <%= route.transport.name %> · Distancia: <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</p>
+        </div>
+
+        <div id="map" style="height: 380px; margin-bottom: 1rem; border-radius: 8px; overflow: hidden;"></div>
+
+        <h2>Recorrido</h2>
+        <ol id="stops-list" style="padding:0">
+            <% (route.stops || []).forEach(s => { %>
+                <li class="stop-row <%= s.completed ? 'completed' : '' %>" data-stop-id="<%= s.id %>">
+                    <div class="stop-title">
+                        <% if (s.stopType === 'pickup') { %>
+                            📦 Pickup en <%= s.branch ? (s.branch.name.startsWith('Sucursal') ? s.branch.name : 'Sucursal ' + s.branch.name) : 'sucursal' %>
+                        <% } else { %>
+                            🏠 Entrega <%= s.shipment ? s.shipment.trackingId : '' %>
+                        <% } %>
+                        <% if (s.completed) { %><span style="color:#16a34a">✅</span><% } %>
+                    </div>
+                    <div class="stop-meta">
+                        <% if (s.stopType === 'delivery' && s.shipment && s.shipment.address) { %>
+                            <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                            <% if (s.shipment.recipient) { %> · <%= s.shipment.recipient.fullName %><% } %>
+                        <% } else if (s.branch) { %>
+                            <%= s.branch.address || '' %>
+                        <% } %>
+                        <br>+<%= s.distanceFromPrevKm %> km
+                    </div>
+                    <% if (!s.completed) { %>
+                        <div class="stop-actions">
+                            <% if (s.stopType === 'pickup') { %>
+                                <button class="btn-pickup" data-action="pickup-confirmed" data-stop-id="<%= s.id %>">📦 Confirmar pickup</button>
+                            <% } else { %>
+                                <button class="btn-arrive" data-action="arrive" data-stop-id="<%= s.id %>">🏁 Llegué</button>
+                                <button class="btn-delivered" data-action="delivered" data-stop-id="<%= s.id %>">✅ Entregado</button>
+                                <button class="btn-failed" data-action="failed" data-stop-id="<%= s.id %>">❌ No pude entregar</button>
+                                <% if (s.shipment) { %>
+                                    <a class="btn-secondary" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod">📷 Foto + firma</a>
+                                <% } %>
+                            <% } %>
+                        </div>
+                    <% } %>
+                </li>
+            <% }) %>
+        </ol>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    const routeId = <%= route.id %>;
+    const stops = <%- JSON.stringify((route.stops || []).map(s => ({
+        id: s.id, sequence: s.sequence, stopType: s.stopType,
+        lat: Number(s.lat), lng: Number(s.lng), completed: s.completed,
+        label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
+    }))) %>;
+
+    const map = L.map('map').setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+    const latlngs = [];
+    stops.forEach(s => {
+        const color = s.completed ? '#94a3b8' : (s.stopType === 'pickup' ? '#f59e0b' : '#1976d2');
+        const icon = L.divIcon({
+            html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${s.sequence}</div>`,
+            className: '', iconSize: [30,30], iconAnchor: [15,15],
+        });
+        L.marker([s.lat, s.lng], { icon }).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label}`).addTo(map);
+        latlngs.push([s.lat, s.lng]);
+    });
+    let routeLayer = null;
+    if (latlngs.length > 1) {
+        routeLayer = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.5 }).addTo(map);
+        map.fitBounds(latlngs, { padding: [25,25] });
+        const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+        fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (!d || !d.routes || !d.routes[0]) return;
+                const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                if (routeLayer) map.removeLayer(routeLayer);
+                L.polyline(poly, { color: '#1976d2', weight: 4, opacity: 0.85 }).addTo(map);
+                map.fitBounds(poly, { padding: [25,25] });
+            }).catch(() => {});
+    }
+
+    const getGeo = () => new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve({});
+        navigator.geolocation.getCurrentPosition(
+            p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+            () => resolve({}),
+            { timeout: 4000 }
+        );
+    });
+
+    const post = async (url, body) => {
+        const res = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(data.error || 'Error'); return null; }
+        return data;
+    };
+
+    // GPS live heartbeat cada 30s
+    if (navigator.geolocation) {
+        const sendHb = (pos) => {
+            fetch('/delivery/heartbeat', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    speedKmh: pos.coords.speed ? pos.coords.speed * 3.6 : null,
+                    routeId,
+                }),
+            }).catch(() => {});
+        };
+        navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 });
+        setInterval(() => {
+            navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 });
+        }, 30000);
+    }
+
+    document.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const action = btn.dataset.action;
+            const stopId = btn.dataset.stopId;
+            const geo = await getGeo();
+            const url = `/delivery/route/${routeId}/stop/${stopId}/${action}`;
+
+            if (action === 'failed') {
+                const reason = prompt('Motivo del intento fallido:');
+                if (!reason) return;
+                const r = await post(url, { ...geo, comment: reason });
+                if (r) location.reload();
+                return;
+            }
+            if (action === 'delivered') {
+                if (!confirm('¿Confirmar entrega? (sin foto/firma)')) return;
+            }
+            const r = await post(url, geo);
+            if (r) location.reload();
+        });
+    });
+    </script>
+</body>
+</html>

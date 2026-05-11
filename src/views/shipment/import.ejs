@@ -10,7 +10,7 @@
     <%- include('../partials/header') %>
     <main class="main-content">
         <div class="page-header">
-            <h1>Importación masiva de envíos históricos</h1>
+            <h1>Importación masiva de envíos</h1>
             <div class="page-header__actions">
                 <a href="/shipment/import/history" class="btn-secondary">
                     <span class="material-symbols-outlined">history</span>Historial
@@ -19,74 +19,187 @@
             </div>
         </div>
 
-        <div class="form-new">
+        <div class="import-wrapper">
+
             <% if (error) { %>
-                <div class="import-alert import-alert--error"><%= error %></div>
+                <div class="import-alert import-alert--error">
+                    <span class="material-symbols-outlined">error</span>
+                    <div class="alert-body"><%= error %></div>
+                </div>
             <% } %>
 
-            <section class="import-section">
-                <div class="import-alert import-alert--warn">
-                    <strong>Importante:</strong> esta funcionalidad permite importar envíos
-                    desde un sistema anterior o cargar envíos activos en lote.
-                    Los envíos terminados (<em>Entregado, Cancelado</em>) se identifican con
-                    <code>HIST-</code> (ej: <code>HIST-001</code>).
-                    Los envíos activos (<em>Pendiente, En Tránsito, En Sucursal</em>) se identifican con
-                    <code>IENV-</code> (ej: <code>IENV-001</code>).
+            <!-- Aviso importante -->
+            <div class="import-alert import-alert--warn">
+                <span class="material-symbols-outlined">info</span>
+                <div class="alert-body">
+                    <strong>Importante:</strong> esta funcionalidad permite importar envíos desde un sistema anterior o cargar envíos activos en lote.
+                    Los envíos terminados (<em>Entregado, Cancelado</em>) se identifican con <code>HIST-</code> (ej: <code>HIST-001</code>).
+                    Los envíos activos (<em>Pendiente, En Tránsito, En Sucursal</em>) se identifican con <code>IENV-</code> (ej: <code>IENV-001</code>).
                     Ambos contadores son independientes del <code>ENV-</code> del alta individual.
                 </div>
-            </section>
+            </div>
 
-            <section class="import-section">
-                <h3>1. Descargá el template</h3>
-                <p>Usá este archivo como base. Mantené los nombres de las columnas; el orden no importa.</p>
+            <!-- Paso 1: Descargar template -->
+            <div class="import-card">
+                <h2 class="import-card-title">
+                    <span class="import-step-num">1</span>
+                    <span class="material-symbols-outlined">download</span>
+                    Descargá el template
+                </h2>
+                <p class="import-hint" style="margin-bottom:var(--space-4)">
+                    Usá este archivo como base. Mantené los nombres de las columnas exactos; el orden de columnas no importa.
+                </p>
                 <a href="/templates/shipments-import-template.csv" class="btn-secondary" download>
                     <span class="material-symbols-outlined">download</span>Descargar template CSV
                 </a>
-            </section>
+            </div>
 
-            <section class="import-section">
-                <h3>2. Subí tu archivo</h3>
-                <p>Tamaño máximo: <strong>10 MB</strong>. Cantidad máxima: <strong>1.000 filas</strong>.</p>
+            <!-- Paso 2: Subir archivo -->
+            <div class="import-card">
+                <h2 class="import-card-title">
+                    <span class="import-step-num">2</span>
+                    <span class="material-symbols-outlined">upload_file</span>
+                    Subí tu archivo
+                </h2>
+                <p class="import-hint" style="margin-bottom:var(--space-5)">
+                    Tamaño máximo: <strong>10 MB</strong> · Cantidad máxima: <strong>1.000 filas</strong>
+                </p>
+
                 <form action="/shipment/import" method="post" enctype="multipart/form-data" id="import-form">
-                    <div class="field">
-                        <label for="csvFile">Archivo CSV <span class="req">*</span></label>
+                    <div class="import-dropzone" id="dropzone">
                         <input id="csvFile" name="csvFile" type="file" accept=".csv,text/csv" required>
+                        <span class="material-symbols-outlined import-dropzone-icon">cloud_upload</span>
+                        <span class="import-dropzone-text">Arrastrá tu archivo aquí o hacé clic para seleccionar</span>
+                        <span class="import-dropzone-hint">.csv · máx. 10 MB</span>
                     </div>
-                    <div class="form-actions">
+
+                    <div class="import-file-selected" id="file-selected">
+                        <span class="material-symbols-outlined">description</span>
+                        <span class="import-file-name" id="file-name">—</span>
+                        <span class="import-file-size" id="file-size"></span>
+                    </div>
+
+                    <div class="import-actions" style="border-top:none;padding-top:var(--space-4)">
                         <a href="/shipment" class="btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn-primary">
-                            <span class="material-symbols-outlined">upload</span>Importar
+                        <button type="submit" class="btn-primary" id="btn-submit" disabled>
+                            <span class="material-symbols-outlined">upload</span>Subir e importar
                         </button>
                     </div>
                 </form>
-            </section>
+            </div>
 
-            <section class="import-section">
-                <h3>Columnas esperadas</h3>
-                <ul class="import-cols">
-                    <li><code>senderName</code>, <code>senderDocument</code>, <code>senderPhone</code>, <code>senderEmail</code></li>
-                    <li><code>recipientName</code>, <code>recipientDocument</code>, <code>recipientPhone</code>, <code>recipientEmail</code></li>
-                    <li><code>street</code>, <code>number</code>, <code>floorApartment</code>, <code>province</code>, <code>postalCode</code></li>
-                    <li><code>shipmentTypeId</code>, <code>weightKg</code>, <code>packageQty</code>, <code>status</code></li>
-                    <li><code>legacyTrackingId</code> (opcional), <code>deliveryUserDocument</code> (opcional)</li>
-                </ul>
+            <!-- Paso 3: Referencia de columnas -->
+            <div class="import-card">
+                <h2 class="import-card-title">
+                    <span class="import-step-num">3</span>
+                    <span class="material-symbols-outlined">table_chart</span>
+                    Columnas del CSV
+                </h2>
+
+                <div class="import-cols-grid">
+                    <div class="import-col-group">
+                        <div class="import-col-group-label">
+                            <span class="material-symbols-outlined">person</span>Remitente
+                        </div>
+                        <div class="import-col-list">
+                            <code>senderName</code>
+                            <code>senderDocument</code>
+                            <code>senderPhone</code>
+                            <code>senderEmail</code>
+                        </div>
+                    </div>
+                    <div class="import-col-group">
+                        <div class="import-col-group-label">
+                            <span class="material-symbols-outlined">person_pin</span>Destinatario
+                        </div>
+                        <div class="import-col-list">
+                            <code>recipientName</code>
+                            <code>recipientDocument</code>
+                            <code>recipientPhone</code>
+                            <code>recipientEmail</code>
+                        </div>
+                    </div>
+                    <div class="import-col-group">
+                        <div class="import-col-group-label">
+                            <span class="material-symbols-outlined">location_on</span>Dirección
+                        </div>
+                        <div class="import-col-list">
+                            <code>street</code>
+                            <code>number</code>
+                            <code>floorApartment</code>
+                            <code>province</code>
+                            <code>postalCode</code>
+                        </div>
+                    </div>
+                    <div class="import-col-group">
+                        <div class="import-col-group-label">
+                            <span class="material-symbols-outlined">inventory_2</span>Paquete
+                        </div>
+                        <div class="import-col-list">
+                            <code>shipmentTypeId</code>
+                            <code>weightKg</code>
+                            <code>packageQty</code>
+                            <code>status</code>
+                            <code>legacyTrackingId</code>
+                            <code>deliveryUserDocument</code>
+                        </div>
+                    </div>
+                </div>
+
                 <p class="import-hint">
                     <code>province</code> acepta el id numérico o el nombre (ej: <em>"Buenos Aires"</em>).
-                    <code>status</code> acepta los 5 estados (<em>Pendiente</em>, <em>En Tránsito</em>,
-                    <em>En Sucursal</em>, <em>Entregado</em>, <em>Cancelado</em>) o sus ids 1 a 5.
-                    <code>legacyTrackingId</code> es opcional: si lo completás con el id del envío en el sistema viejo,
-                    el sistema detecta reimports idempotentes (subir el mismo CSV dos veces no genera duplicados).
-                    <code>deliveryUserDocument</code> es opcional: DNI del repartidor que tenía asignado el envío;
-                    si el usuario no existe o no es repartidor, la fila se rechaza.
-                    Las coordenadas se obtienen automáticamente del servicio de geocodificación —
-                    no es necesario incluirlas en el CSV.
+                    <code>status</code> acepta los 5 estados (<em>Pendiente</em>, <em>En Tránsito</em>, <em>En Sucursal</em>, <em>Entregado</em>, <em>Cancelado</em>) o sus ids 1 a 5.
+                    <code>legacyTrackingId</code> es opcional: si lo completás con el id del envío en el sistema viejo, el sistema detecta reimports idempotentes (subir el mismo CSV dos veces no genera duplicados).
+                    <code>deliveryUserDocument</code> es opcional: DNI del repartidor que tenía asignado el envío; si el usuario no existe o no es repartidor, la fila se rechaza.
+                    Las coordenadas se obtienen automáticamente por geocodificación — no es necesario incluirlas en el CSV.
                 </p>
-            </section>
+            </div>
+
         </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+    (function () {
+        const input     = document.getElementById('csvFile');
+        const dropzone  = document.getElementById('dropzone');
+        const selected  = document.getElementById('file-selected');
+        const nameEl    = document.getElementById('file-name');
+        const sizeEl    = document.getElementById('file-size');
+        const btnSubmit = document.getElementById('btn-submit');
+
+        function fmtSize(bytes) {
+            if (bytes < 1024)        return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function onFile(file) {
+            if (!file) return;
+            nameEl.textContent    = file.name;
+            sizeEl.textContent    = fmtSize(file.size);
+            selected.classList.add('visible');
+            btnSubmit.disabled    = false;
+        }
+
+        input.addEventListener('change', () => onFile(input.files[0]));
+
+        dropzone.addEventListener('dragover',  (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+        dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('drag-over'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                onFile(file);
+            }
+        });
+    })();
+    </script>
 </body>
 </html>
