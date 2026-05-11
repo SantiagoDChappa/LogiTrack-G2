@@ -340,17 +340,37 @@
 
                     <div class="form-field">
                         <label>Nombre</label>
-                        <input type="text" name="receiverName" placeholder="Nombre del receptor" required>
+                        <input type="text" id="receiverName" name="receiverName" placeholder="Nombre del receptor" required>
                     </div>
-
+                    <div>
+                        <% if (errors.receiverName) { %>
+                            <sub style="color:red" id="receiverName-error">
+                                <%= errors.receiverName.msg.message %>
+                            </sub>
+                        <% } %>
+                    </div>
                     <div class="form-field">
                         <label>Apellido</label>
-                        <input type="text" name="receiverLastname" placeholder="Apellido del receptor" required>
+                        <div>
+                            <% if (errors.receiverLastname) { %>
+                                <sub style="color:red" id="receiverLastname-error">
+                                    <%= errors.receiverLastname.msg.message %>
+                                </sub>
+                            <% } %>
+                        </div>
+                        <input type="text" id="receiverLastname" name="receiverLastname" placeholder="Apellido del receptor" required>
                     </div>
 
                     <div class="form-field">
                         <label>DNI</label>
-                        <input type="text" name="receiverDni" placeholder="Número de documento" required>
+                        <div>
+                            <% if (errors.receiverDni) { %>
+                                <sub style="color:red" id="receiverDni-error">
+                                    <%= errors.receiverDni.msg.message %>
+                                </sub>
+                            <% } %>
+                        </div>
+                        <input type="text" id="receiverDni" name="receiverDni" placeholder="Número de documento" required>
                     </div>
                 </div>
 
@@ -363,9 +383,10 @@
                     <input type="hidden" name="latitude" id="latitude">
                     <input type="hidden" name="longitude" id="longitude">
                     <div>
-                        <% if (errors.ubication) { %>
+                        <% if (errors.latitude || errors.longitude) { %>
                             <sub style="color:red" id="ubication-error">
-                                <%= errors.ubication %>
+                                <%= errors.latitude.msg.message %> <br>
+                                <%= errors.longitude.msg.message %>
                             </sub>
                             <% } %>
                     </div>
@@ -381,6 +402,14 @@
                         <span class="material-symbols-outlined">photo_camera</span>
                         Foto del paquete
                     </div>
+                    <div>
+                        <% if (errors.photoBase64) { %>
+                            <sub style="color:red" id="photo-error">
+                                <%= errors.photoBase64.msg.message %>
+                            </sub>
+                        <% } %>
+                    </div>
+
                     <input type="file" name="photoFile" id="photoFile" accept="image/*" capture="environment"
                         style="display:none;">
                     <input type="hidden" name="photoBase64" id="photoBase64">
@@ -398,9 +427,9 @@
                         Firma del receptor
                     </div>
                     <div>
-                        <% if (errors.signature) { %>
+                        <% if (errors.signatureBase64) { %>
                             <sub style="color:red" id="signature-error">
-                                <%= errors.signature %>
+                                <%= errors.signatureBase64.msg.message %>
                             </sub>
                         <% } %>
                     </div>
@@ -422,6 +451,26 @@
     </div>
 
     <script>
+        // Campos
+        const recNameErrorMessage = document.getElementById('receiverName-error');
+        document.getElementById('receiverName').addEventListener('focus', function () {
+            if (recNameErrorMessage.style.display !== 'none') {
+                recNameErrorMessage.style.display = 'none';
+            }
+        });
+        const recLastnameErrorMessage = document.getElementById('receiverLastname-error');
+        document.getElementById('receiverLastname').addEventListener('focus', function () {
+            if (recLastnameErrorMessage.style.display !== 'none') {
+                recLastnameErrorMessage.style.display = 'none';
+            }
+        });
+        const recDniErrorMessage = document.getElementById('receiverDni-error');
+        document.getElementById('receiverDni').addEventListener('focus', function () {
+            if (recDniErrorMessage.style.display !== 'none') {
+                recDniErrorMessage.style.display = 'none';
+            }
+        });
+
         // GPS
         const ubiErrorMessage = document.getElementById('ubication-error');
         if (navigator.geolocation) {
@@ -448,13 +497,14 @@
             el.innerHTML = '<span class="material-symbols-outlined">warning</span><span>GPS no disponible</span>';
             el.classList.add('warning');
         }
-
+        const photoErrorMessage = document.getElementById('photo-error');
         // Foto
         document.getElementById('photoFile').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function (event) {
+                photoErrorMessage.style.display = 'none';
                 const img = document.getElementById('photoPreview');
                 img.src = event.target.result;
                 img.style.display = 'block';

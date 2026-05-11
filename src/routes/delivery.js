@@ -7,6 +7,7 @@ const routeModel = require('../models/route');
 const { RouteStop } = require('../models/routeStop');
 const stateMachine = require('../services/shipmentStateMachine');
 const { Status } = require('../constants/enums');
+const { deliveryValidation, handleCreateValidationErrors } = require('../middlewares/delivery');
 
 router.get('/', requireDelivery, async (req, res) => {
     try {
@@ -37,6 +38,8 @@ router.get('/evidence/:id/pod',
 router.post('/evidence/:id/pod',
     requireAuth,
     requireDelivery,
+    deliveryValidation,
+    handleCreateValidationErrors,
     deliveryController.saveEvidence
 );
 
