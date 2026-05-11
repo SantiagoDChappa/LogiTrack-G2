@@ -369,9 +369,23 @@
                 ${escapeHtml(tracking)}
             </span>`;
         }).join('');
+        // Agrupar por motivo para mostrar diagnóstico claro
+        const reasonGroups = new Map();
+        for (const u of un) {
+            const r = u.reason || 'Sin motivo';
+            if (!reasonGroups.has(r)) reasonGroups.set(r, []);
+            reasonGroups.get(r).push(u.trackingId || `#${u.id || u.shipmentId}`);
+        }
+        const reasonsHtml = un.length === 0 ? '' : [...reasonGroups.entries()].map(([reason, tracks]) =>
+            `<div style="margin-top:.5rem;padding:.5rem .7rem;background:var(--color-surface);border-left:3px solid var(--color-warning);border-radius:4px;font-size:.8rem">
+                <div style="color:var(--color-text);margin-bottom:.2rem"><strong>${tracks.length} envío${tracks.length>1?'s':''}:</strong> ${escapeHtml(reason)}</div>
+                <div style="color:var(--color-text-muted);font-size:.72rem">${tracks.map(escapeHtml).join(', ')}</div>
+            </div>`
+        ).join('');
         poolEl.innerHTML = `<div class="unassigned-pool" data-transport-id="unassigned">
             <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- arrastrá aquí para descartar de la ruta</span></h3>
             <div>${unChips || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío)</span>'}</div>
+            ${reasonsHtml}
         </div>`;
 
         // Wire actions
