@@ -114,7 +114,7 @@
                                                        : a.toStatusId === 9 ? 'cancel'
                                                        : 'swap_horiz';
                                     %>
-                                    <form method="POST" action="<%= a.endpoint %>" onsubmit="return confirmAction(this, <%= a.requireComment ? 'true' : 'false' %>)">
+                                    <form method="<%= a.toStatusId === 4 ? 'GET' : 'POST' %>" action="<%= a.toStatusId === 4 ? '/delivery/evidence/'+ shipment.trackingId + '/pod' : a.endpoint %>" onsubmit="return confirmAction(this, <%= a.requireComment ? 'true' : 'false' %>)">
                                         <% if (a.requireComment) { %>
                                             <input type="hidden" name="comment" value="">
                                         <% } %>
