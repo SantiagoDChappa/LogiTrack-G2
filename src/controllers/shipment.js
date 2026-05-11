@@ -86,6 +86,8 @@ const getDetail = async (req, res) => {
         settingModel.get('origin_number'),
     ]);
 
+    if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+
     const destProv = PROVINCES[shipment.address.provinceId];
     const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
     const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
