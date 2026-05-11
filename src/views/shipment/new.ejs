@@ -119,11 +119,20 @@
                         <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
                         <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= body.packageQty || '' %>" placeholder="Ej: 3" required>
                     </div>
+                    <div class="field">
+                        <label for="volume-m3">Volumen (m³) <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
+                        <input id="volume-m3" type="number" name="volumeM3" min="0.001" max="999" step="0.001" value="<%= body.volumeM3 || '' %>" placeholder="Ej: 0.05">
+                        <span class="field-hint" id="volume-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;"></span>
+                    </div>
                 </div>
 
                 <div id="prediction-widget" class="pred-card">
                     <h3><span class="material-symbols-outlined">psychology</span> Predicción de entrega</h3>
                     <div id="prediction-result"></div>
+                </div>
+
+                <div id="priority-conteiner">
+                    <p>Prioridad: <span id="initial-priority">-</span></p>
                 </div>
 
                 <div class="form-actions">
@@ -144,5 +153,21 @@
     <script src="/js/address-autocomplete.js" defer></script>
     <script src="/js/document-format.js" defer></script>
     <script src="/js/personaSugerencia.js" defer></script>
+    <script src="/js/priorityInitial.js" defer></script>
+    <script>
+        function calcularVolumen() {
+            const peso = parseFloat(document.getElementById('weight-kg')?.value) || 0;
+            const cantidad = parseInt(document.getElementById('package-qty')?.value) || 0;
+            const volInput = document.getElementById('volume-m3');
+            const hint = document.getElementById('volume-hint');
+            if (peso > 0 && cantidad > 0) {
+                const estimado = (cantidad * peso * 0.004).toFixed(3);
+                hint.textContent = `Sugerido: ${estimado} m³ (basado en peso × cantidad)`;
+                if (!volInput.value) volInput.value = estimado;
+            }
+        }
+        document.getElementById('weight-kg')?.addEventListener('input', calcularVolumen);
+        document.getElementById('package-qty')?.addEventListener('input', calcularVolumen);
+    </script>
 </body>
 </html>

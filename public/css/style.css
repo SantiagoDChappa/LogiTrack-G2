@@ -41,6 +41,14 @@
   --badge-delayed-text:    #9a3412;
   --badge-initial-bg:      #f1f5f9;
   --badge-initial-text:    #475569;
+  --badge-assigned-bg:        #cffafe;
+  --badge-assigned-text:      #155e75;
+  --badge-preparing-bg:       #fed7aa;
+  --badge-preparing-text:     #9a3412;
+  --badge-package-failed-bg:  #ffe4e6;
+  --badge-package-failed-text:#9f1239;
+  --badge-failed-attempt-bg:  #fef08a;
+  --badge-failed-attempt-text:#854d0e;
 
   --btn-modificar-bg:      #fef3c7;
   --btn-modificar-text:    #b45309;
@@ -48,6 +56,8 @@
   --btn-detalle-text:      #15803d;
   --btn-eliminar-bg:       #fee2e2;
   --btn-eliminar-text:     #b91c1c;
+  --btn-estado-bg:         #dbeafe;
+  --btn-estado-text:       #1d4ed8;
 
   --font-family:     'Inter', system-ui, -apple-system, sans-serif;
   --font-size-xs:    0.75rem;
@@ -126,6 +136,14 @@
   --badge-delayed-text:    #fdba74;
   --badge-initial-bg:      #1e293b;
   --badge-initial-text:    #94a3b8;
+  --badge-assigned-bg:        #164e63;
+  --badge-assigned-text:      #67e8f9;
+  --badge-preparing-bg:       #7c2d12;
+  --badge-preparing-text:     #fdba74;
+  --badge-package-failed-bg:  #881337;
+  --badge-package-failed-text:#fda4af;
+  --badge-failed-attempt-bg:  #713f12;
+  --badge-failed-attempt-text:#fde047;
 
   --btn-modificar-bg:      #451a03;
   --btn-modificar-text:    #fcd34d;
@@ -133,6 +151,8 @@
   --btn-detalle-text:      #86efac;
   --btn-eliminar-bg:       #450a0a;
   --btn-eliminar-text:     #fca5a5;
+  --btn-estado-bg:         #1e3a5f;
+  --btn-estado-text:       #93c5fd;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -428,7 +448,6 @@ button {
 
 .page-wrapper {
   max-width: 1100px;
-  margin-top: -410px; /* 🔥 clave */
 }
 
 .search-form {

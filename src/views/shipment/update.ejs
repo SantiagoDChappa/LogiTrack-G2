@@ -3,9 +3,45 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <% if (mapData && mapData.destination) { %>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-    <% } %>
+    <style>
+        .route-stop-badge {
+            position: relative;
+            cursor: default;
+            border-bottom: 1px dashed var(--color-text-secondary);
+            padding-bottom: 1px;
+        }
+        .route-seg-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-md);
+            padding: .5rem .75rem;
+            font-size: .8rem;
+            line-height: 1.6;
+            z-index: 50;
+            min-width: 220px;
+            pointer-events: none;
+        }
+        .route-seg-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: var(--color-border);
+        }
+        .route-stop-badge:hover .route-seg-tooltip,
+        .route-stop-badge:focus .route-seg-tooltip {
+            display: block;
+        }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
     <script src="/js/new_shipment_popup.js" defer></script>
@@ -50,7 +86,7 @@
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
-                const _slU = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _slU = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                 const _slLabel = _slU[_sk] || shipment.status.description;
             %>
 
@@ -165,12 +201,12 @@
                 </div>
 
                 <!-- ── Mapa ── -->
-                <% if (mapData && mapData.destination) { %>
                 <div class="update-card update-map-card" style="margin-bottom: 0;">
                     <h3><span class="material-symbols-outlined">map</span> Trayecto</h3>
-                    <div id="shipment-map" style="height: 180px; border-radius: 8px;"></div>
+                    <div id="shipment-map" style="height: 200px; border-radius: 8px;"></div>
+                    <div id="route-summary" style="margin-top:.5rem;font-size:.85rem;color:var(--color-text-secondary);display:flex;gap:1rem;flex-wrap:wrap;min-height:1.2em;"></div>
+                    <div id="route-legend" class="map-legend" style="margin-top:.4rem;"></div>
                 </div>
-                <% } %>
 
             </div>
             <!-- ══════════ FIN TOP GRID ══════════ -->
@@ -180,8 +216,6 @@
             <div class="update-bottom-grid">
 
                 <form id="main-update-form" style="display:contents" action="/shipment/update/<%= shipment.id %>" method="post">
-                    <input type="hidden" name="newStatusId" id="hidden-new-status-id">
-                    <input type="hidden" name="statusComment" id="hidden-status-comment">
 
                     <div class="update-card" style="grid-area:destinatario">
                         <h3>Destinatario</h3>
@@ -284,29 +318,37 @@
                         </div>
                     </div>
 
-                    <div class="update-card" style="grid-area:repartidor">
-                        <h3>Asignar Repartidor</h3>
-                        <% if (shipment.deliveryUser) { %>
-                            <p style="margin-bottom:var(--space-3);color:var(--color-text-secondary);font-size:var(--font-size-sm);">Repartidor actual: <strong style="color:var(--color-text)"><%= shipment.deliveryUser.fullName %></strong></p>
-                        <% } else { %>
-                            <p style="margin-bottom:var(--space-3);color:var(--color-text-secondary);font-size:var(--font-size-sm);">Sin repartidor asignado</p>
-                        <% } %>
-                        <div class="field">
-                            <label for="deliveryUserId">Seleccionar Repartidor</label>
-                            <select name="deliveryUserId" id="deliveryUserId" <%= !canEditDelivery ? 'disabled' : '' %>>
-                                <option value="">-- Sin asignar --</option>
-                                <% deliveryUsers.forEach(user => { %>
-                                    <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
-                                        <%= user.fullName %>
-                                    </option>
-                                <% }) %>
-                            </select>
-                        </div>
-                    </div>
 
                 </form>
 
-                <!-- Gestión de estado -->
+                <!-- Modal asignar repartidor (LGT-109) -->
+                <div id="assign-modal" class="app-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="assign-modal-title">
+                    <div class="app-modal">
+                        <h3 id="assign-modal-title">
+                            <span class="material-symbols-outlined">person_add</span>
+                            Asignar repartidor
+                        </h3>
+                        <form action="/shipment/update/<%= shipment.id %>/assign" method="post" id="assign-modal-form">
+                            <div class="field">
+                                <label for="modal-deliveryUserId">Seleccionar repartidor</label>
+                                <select name="deliveryUserId" id="modal-deliveryUserId" required>
+                                    <option value="">-- Elegir repartidor --</option>
+                                    <% deliveryUsers.forEach(user => { %>
+                                        <option value="<%= user.id %>" <%= shipment.deliveryUserId == user.id ? 'selected' : '' %>>
+                                            <%= user.fullName %>
+                                        </option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="app-modal-actions">
+                                <button type="button" class="btn-secondary" id="btn-close-assign-modal">Cancelar</button>
+                                <button type="submit" class="btn-primary">Confirmar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Gestión de estado: flujo dinámico (LGT-109) -->
                 <div class="gestion-estado" style="grid-area:gestion">
                     <h3>Gestión de Estado</h3>
 
@@ -314,59 +356,70 @@
                         ESTADO ACTUAL: <%= shipment.status.description.toUpperCase() %>
                     </div>
 
-                    <div class="timeline-track">
-                        <% const currentId = shipment.statusId; %>
-                        <% statuses.forEach(function(s, idx) { %>
-                            <%
-                                var isDone      = s.id < currentId && currentId !== 5;
-                                var isCurrent   = s.id === currentId;
-                                var isCancel    = s.id === 5;
-                                var isFilled    = (currentId !== 5 && s.id <= currentId) || (currentId === 5 && s.id === 5);
-                                var isClickable = isSupervisor && (
-                                    (!isCancel && s.id === currentId + 1 && currentId < 4 && currentId !== 5) ||
-                                    (isCancel && currentId >= 1 && currentId <= 3)
-                                );
-                                var stateClass  = isDone ? 'done' : (isCurrent ? 'active' : 'pending');
-                            %>
-                            <% if (idx > 0) { %>
-                                <div class="timeline-connector <%= isFilled ? 'filled' : '' %>"></div>
-                            <% } %>
-                            <div class="timeline-step">
-                                <button
-                                    type="button"
-                                    class="timeline-dot status-dot-<%= s.id %> <%= stateClass %>"
-                                    <% if (isClickable) { %>data-clickable data-status-id="<%= s.id %>" data-status-name="<%= s.description %>"<% } %>
-                                    <% if (!isClickable) { %>disabled<% } %>
-                                >
-                                    <% if (isDone) { %><span class="material-symbols-outlined">check</span><% } %>
-                                    <% if (isCurrent && isCancel) { %><span class="material-symbols-outlined">close</span><% } %>
-                                </button>
-                                <span class="timeline-label"><%= s.description %></span>
-                            </div>
-                        <% }) %>
-                    </div>
-
-                    <div id="status-confirm-panel" class="status-confirm-panel" style="display:none;">
-                        <p class="confirm-title">Confirmar nuevo estado: <strong id="confirm-status-name"></strong></p>
-                        <input type="hidden" id="confirm-status-id">
-                        <textarea id="status-comment-input" placeholder="Describa el motivo del cambio de estado..." rows="3"></textarea>
-                        <div class="confirm-actions">
-                            <button type="button" id="btn-cancel-confirm" class="btn-secondary btn-sm">Cancelar</button>
-                            <button type="button" id="btn-confirm-status" class="btn-primary btn-sm">Confirmar cambio</button>
+                    <% const isTerminal = [4, 5, 8].includes(shipment.statusId); %>
+                    <% if (isTerminal) { %>
+                        <div class="status-info-message" style="background-color:#e5e7eb;border:1px solid #9ca3af;border-radius:4px;padding:12px;margin-top:16px;color:#374151;font-size:0.9rem;">
+                            <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">flag</span>
+                            Este envío está en estado final. No se admiten más cambios.
                         </div>
-                    </div>
+                    <% } else if (!availableActions || availableActions.length === 0) { %>
+                        <div class="status-info-message" style="background-color:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:12px;margin-top:16px;color:#92400e;font-size:0.9rem;">
+                            <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">info</span>
+                            No hay acciones disponibles para tu rol en este estado.
+                        </div>
+                    <% } else { %>
+                        <%
+                            const _actionIcons = {
+                                6: 'person_add', 7: 'play_arrow', 2: 'local_shipping',
+                                3: 'store', 4: 'check_circle', 5: 'cancel',
+                                8: 'report', 9: 'warning'
+                            };
+                        %>
+                        <div class="dynamic-actions">
+                            <% availableActions.forEach(function(action) { %>
+                                <% const url = action.endpoint.replace(':id', shipment.id); %>
+                                <% const icon = _actionIcons[action.toStatusId] || 'arrow_forward'; %>
+                                <% const isAssign = url.includes('/assign'); %>
+                                <% if (isAssign) { %>
+                                    <button type="button" class="action-btn-dyn action-btn-status-<%= action.toStatusId %>" id="btn-open-assign-modal">
+                                        <span class="material-symbols-outlined"><%= icon %></span>
+                                        <%= action.label %>
+                                    </button>
+                                <% } else if (action.requireComment) { %>
+                                    <button type="button" class="action-btn-dyn action-btn-status-<%= action.toStatusId %> action-with-comment"
+                                            data-endpoint="<%= url %>"
+                                            data-label="<%= action.label %>">
+                                        <span class="material-symbols-outlined"><%= icon %></span>
+                                        <%= action.label %>
+                                    </button>
+                                <% } else { %>
+                                    <form action="<%= url %>" method="post" style="margin:0;">
+                                        <button type="submit" class="action-btn-dyn action-btn-status-<%= action.toStatusId %>">
+                                            <span class="material-symbols-outlined"><%= icon %></span>
+                                            <%= action.label %>
+                                        </button>
+                                    </form>
+                                <% } %>
+                            <% }) %>
+                        </div>
 
-                    <% if (!isSupervisor) { %>
-                    <div class="status-info-message" style="background-color:var(--color-warning-bg,#fef3c7);border:1px solid var(--color-warning,#f59e0b);border-radius:4px;padding:12px;margin-top:16px;color:var(--color-warning-text,#92400e);font-size:0.9rem;">
-                        <span class="material-symbols-outlined" style="vertical-align:text-bottom;margin-right:8px;">info</span>
-                        Solo los supervisores pueden cambiar el estado del envío.
-                    </div>
+                        <div id="comment-modal" class="app-modal-backdrop" role="dialog" aria-modal="true">
+                            <div class="app-modal">
+                                <h3 id="comment-modal-title"></h3>
+                                <form id="comment-modal-form" method="post" action="">
+                                    <div class="field" style="margin-bottom:12px;">
+                                        <label for="comment-modal-input">Motivo</label>
+                                        <textarea name="comment" id="comment-modal-input" rows="4" required minlength="3"
+                                                  placeholder="Motivo obligatorio..."></textarea>
+                                    </div>
+                                    <div class="app-modal-actions">
+                                        <button type="button" class="btn-secondary" id="comment-modal-cancel">Cancelar</button>
+                                        <button type="submit" class="btn-primary">Confirmar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     <% } %>
-
-                    <div id="pending-status-badge" style="display:none;" class="pending-status-badge">
-                        Cambio de estado pendiente: <strong id="pending-status-name"></strong>
-                        <button type="button" id="btn-undo-status" class="btn-secondary btn-sm">Deshacer</button>
-                    </div>
                 </div>
 
             </div>
@@ -380,79 +433,190 @@
     </main>
 
     <script>
-        document.querySelectorAll('.timeline-dot[data-clickable]').forEach(function(dot) {
-            dot.addEventListener('click', function() {
-                var panel = document.getElementById('status-confirm-panel');
-                document.getElementById('confirm-status-id').value = this.dataset.statusId;
-                document.getElementById('confirm-status-name').textContent = this.dataset.statusName;
-                document.getElementById('status-comment-input').value = '';
-                panel.style.display = 'flex';
+        (function() {
+            // ── Modal motivo (cancelar, paquete fallido, etc.) ──
+            var cModal  = document.getElementById('comment-modal');
+            var cForm   = document.getElementById('comment-modal-form');
+            var cTitle  = document.getElementById('comment-modal-title');
+            var cInput  = document.getElementById('comment-modal-input');
+            var cCancel = document.getElementById('comment-modal-cancel');
+
+            document.querySelectorAll('.action-with-comment').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    if (!cModal) return;
+                    cForm.action = this.dataset.endpoint;
+                    cTitle.textContent = this.dataset.label;
+                    cInput.value = '';
+                    cModal.classList.add('is-open');
+                });
             });
-        });
+            if (cCancel) cCancel.addEventListener('click', function() { cModal.classList.remove('is-open'); });
+            if (cModal)  cModal.addEventListener('click', function(e) { if (e.target === cModal) cModal.classList.remove('is-open'); });
 
-        document.getElementById('btn-cancel-confirm').addEventListener('click', function() {
-            document.getElementById('status-confirm-panel').style.display = 'none';
-        });
+            // ── Modal asignar repartidor ──
+            var aModal  = document.getElementById('assign-modal');
+            var aOpen   = document.getElementById('btn-open-assign-modal');
+            var aClose  = document.getElementById('btn-close-assign-modal');
 
-        document.getElementById('btn-confirm-status').addEventListener('click', function() {
-            var statusId   = document.getElementById('confirm-status-id').value;
-            var statusName = document.getElementById('confirm-status-name').textContent;
-            var comment    = document.getElementById('status-comment-input').value;
-            document.getElementById('hidden-new-status-id').value  = statusId;
-            document.getElementById('hidden-status-comment').value = comment;
-            document.getElementById('pending-status-name').textContent = statusName;
-            document.getElementById('pending-status-badge').style.display = 'flex';
-            document.getElementById('status-confirm-panel').style.display = 'none';
-        });
+            if (aOpen && aModal)  aOpen.addEventListener('click',  function() { aModal.classList.add('is-open'); });
+            if (aClose)           aClose.addEventListener('click',  function() { aModal.classList.remove('is-open'); });
+            if (aModal)           aModal.addEventListener('click',  function(e) { if (e.target === aModal) aModal.classList.remove('is-open'); });
+        })();
 
-        document.getElementById('btn-undo-status').addEventListener('click', function() {
-            document.getElementById('hidden-new-status-id').value  = '';
-            document.getElementById('hidden-status-comment').value = '';
-            document.getElementById('pending-status-badge').style.display = 'none';
-        });
-
-        // Prevenir doble submit
-        document.getElementById('main-update-form').addEventListener('submit', function() {
-            var btn = document.getElementById('btn-save-changes');
-            if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
-        });
+        // Prevenir doble submit del form de datos.
+        var mainForm = document.getElementById('main-update-form');
+        if (mainForm) {
+            mainForm.addEventListener('submit', function() {
+                var btn = document.getElementById('btn-save-changes');
+                if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+            });
+        }
     </script>
 
-    <% if (mapData && mapData.destination) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
     (function () {
-        const origin = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %> };
-        const dest   = { lat: <%- mapData.destination.lat %>, lng: <%- mapData.destination.lng %> };
+        var ORIGIN       = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %>, label: '<%- mapData.origin.label.replace(/'/g, "\\'") %>' };
+        var DEST         = <%- mapData.destination ? JSON.stringify({ lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label }) : 'null' %>;
+        var INIT_ROUTE   = <%- mapData.route ? JSON.stringify(mapData.route) : 'null' %>;
+        var BRANCH_ID    = <%= (currentUser && currentUser.branchId) ? currentUser.branchId : 'null' %>;
 
-        const map = L.map('shipment-map');
+        var map = L.map('shipment-map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
             maxZoom: 18,
         }).addTo(map);
 
-        const blueIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
-        });
-        const redIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
-        });
+        var routeLayer   = null;
+        var markersLayer = L.layerGroup().addTo(map);
 
-        L.marker([origin.lat, origin.lng], { icon: blueIcon }).addTo(map)
-            .bindPopup('<strong>Origen</strong><br><%- mapData.origin.label %>');
-        L.marker([dest.lat, dest.lng], { icon: redIcon }).addTo(map)
-            .bindPopup('<strong>Destino</strong><br><%- mapData.destination.label %>');
-        L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
-            color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
-        }).addTo(map);
-        map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+        function makeIcon(color) {
+            return L.divIcon({
+                className: '',
+                html: '<div style="width:12px;height:12px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+                iconSize: [12, 12], iconAnchor: [6, 6],
+            });
+        }
+
+        function renderRoute(route, origin, dest) {
+            markersLayer.clearLayers();
+            if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+
+            if (!dest) {
+                L.marker([origin.lat, origin.lng], { icon: makeIcon('#2563eb') })
+                    .addTo(markersLayer).bindPopup('<strong>Origen</strong><br>' + origin.label);
+                map.setView([origin.lat, origin.lng], 10);
+                updateSummary(null);
+                updateLegend(null);
+                return;
+            }
+
+            if (route && route.polyline && route.polyline.length > 1) {
+                routeLayer = L.polyline(route.polyline, { color: '#2563eb', weight: 3, opacity: 0.8 }).addTo(map);
+
+                route.stops.forEach(function (s) {
+                    var color = s.kind === 'origin' ? '#2563eb' : s.kind === 'destination' ? '#dc2626' : '#f59e0b';
+                    L.marker([s.lat, s.lng], { icon: makeIcon(color) })
+                        .addTo(markersLayer)
+                        .bindPopup('<strong>' + s.label + '</strong>');
+                });
+
+                map.fitBounds(routeLayer.getBounds(), { padding: [25, 25] });
+            } else {
+                L.marker([origin.lat, origin.lng], { icon: makeIcon('#2563eb') })
+                    .addTo(markersLayer).bindPopup('<strong>Origen</strong><br>' + origin.label);
+                L.marker([dest.lat, dest.lng], { icon: makeIcon('#dc2626') })
+                    .addTo(markersLayer).bindPopup('<strong>Destino</strong><br>' + dest.label);
+                L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
+                    color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
+                }).addTo(map);
+                map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+            }
+
+            updateSummary(route);
+            updateLegend(route);
+        }
+
+        function haversineKm(a, b) {
+            var R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+            var x = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+            return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+        }
+
+        function updateSummary(route) {
+            var el = document.getElementById('route-summary');
+            if (!el) return;
+            if (!route) { el.innerHTML = ''; return; }
+            var intermediates = route.stops.filter(function(s){ return s.kind === 'branch'; }).length;
+            var providerLabel = route.provider === 'osrm' ? 'Red vial real (OSRM)' : 'Estimado en línea recta';
+
+            var stopSpan = '';
+            if (intermediates > 0) {
+                var segLines = [];
+                for (var i = 0; i < route.stops.length - 1; i++) {
+                    var from = route.stops[i], to = route.stops[i + 1];
+                    var km = haversineKm(from, to).toFixed(1);
+                    segLines.push('<div style="white-space:nowrap"><span style="color:#6b7280">' + from.label + ' → ' + to.label + '</span> <strong>' + km + ' km</strong></div>');
+                }
+                var tooltip = '<div class="route-seg-tooltip">' + segLines.join('') + '</div>';
+                stopSpan = '<span class="route-stop-badge" tabindex="0">'
+                    + '<strong>' + intermediates + '</strong> sucursal' + (intermediates > 1 ? 'es intermedias' : ' intermedia')
+                    + tooltip
+                    + '</span>';
+            } else {
+                stopSpan = '<span>Ruta directa</span>';
+            }
+
+            el.innerHTML = '<span><strong>' + route.totalKm.toFixed(1) + '</strong> km</span>'
+                + stopSpan
+                + '<span style="color:#9ca3af;font-size:.8rem;">' + providerLabel + '</span>';
+        }
+
+        function updateLegend(route) {
+            var el = document.getElementById('route-legend');
+            if (!el) return;
+            if (!route) { el.innerHTML = ''; return; }
+            var intermediates = route.stops.filter(function(s){ return s.kind === 'branch'; }).length;
+            var html = '<div class="map-legend-item"><div class="map-dot" style="background:#2563eb"></div><span>Origen</span></div>';
+            if (intermediates > 0) {
+                html += '<div class="map-legend-item"><div class="map-dot" style="background:#f59e0b"></div><span>Sucursal intermedia</span></div>';
+            }
+            html += '<div class="map-legend-item"><div class="map-dot" style="background:#dc2626"></div><span>Destino</span></div>';
+            el.innerHTML = html;
+        }
+
+        // Render inicial
+        renderRoute(INIT_ROUTE, ORIGIN, DEST);
+
+        // Recalcular al seleccionar nueva dirección
+        var streetInput = document.getElementById('street');
+        if (streetInput) {
+            streetInput.addEventListener('change', function () {
+                var lat = parseFloat(document.getElementById('address-lat').value);
+                var lng = parseFloat(document.getElementById('address-lng').value);
+                if (!isFinite(lat) || !isFinite(lng)) return;
+
+                var destLabel = (document.getElementById('street').value || '') + ' ' + (document.getElementById('number').value || '');
+                var url = '/api/route?originLat=' + ORIGIN.lat + '&originLng=' + ORIGIN.lng
+                    + '&originLabel=' + encodeURIComponent(ORIGIN.label)
+                    + '&destLat=' + lat + '&destLng=' + lng
+                    + '&destLabel=' + encodeURIComponent(destLabel.trim())
+                    + (BRANCH_ID ? '&originBranchId=' + BRANCH_ID : '');
+
+                var summaryEl = document.getElementById('route-summary');
+                if (summaryEl) summaryEl.innerHTML = '<span style="color:#6b7280">Calculando ruta...</span>';
+
+                fetch(url)
+                    .then(function(r){ return r.json(); })
+                    .then(function(data){
+                        var newDest = { lat: lat, lng: lng, label: destLabel.trim() };
+                        renderRoute(data.route, ORIGIN, newDest);
+                    })
+                    .catch(function(){ if (summaryEl) summaryEl.innerHTML = ''; });
+            });
+        }
     })();
     </script>
-    <% } %>
 
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>

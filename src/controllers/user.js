@@ -1,4 +1,5 @@
-const userModel = require('../models/user');
+const userModel   = require('../models/user');
+const branchModel = require('../models/branch');
 const { RoleType } = require('../constants/enums');
 
 const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
@@ -51,16 +52,17 @@ const searchUsers = async (req, res) => {
     }
 };
 
-const getCreateUserForm = (req, res) => {
-    res.render('user/new', { body: {}, errors: [], roleTypes: Object.values(RoleType) });
+const getCreateUserForm = async (req, res) => {
+    const branches = await branchModel.getAll();
+    res.render('user/new', { body: {}, errors: [], roleTypes: Object.values(RoleType), branches });
 };
 
-const getUpdateUser  = async (req, res) => {
-  const { id }    = req.params;
-  const user = await userModel.getById(id);
+const getUpdateUser = async (req, res) => {
+  const { id } = req.params;
+  const [user, branches] = await Promise.all([userModel.getById(id), branchModel.getAll()]);
 
   const returnUrl = req.query.from || '/user';
-  res.render('user/update', { errors: [], user, roleTypes: Object.values(RoleType), returnUrl });
+  res.render('user/update', { errors: [], user, roleTypes: Object.values(RoleType), branches, returnUrl });
 };
 
 

@@ -1,6 +1,7 @@
 const express      = require('express');
 const router       = express.Router();
-const { PROVINCES, haversine } = require('../../utils/provinces');
+const { PROVINCES }  = require('../../utils/provinces');
+const { haversine }  = require('../../utils/geo');
 const settingModel = require('../../models/setting');
 
 const GEOREF    = 'https://apis.datos.gob.ar/georef/api';

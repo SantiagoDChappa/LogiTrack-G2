@@ -11,6 +11,7 @@ const Branch = sequelize.define('branch', {
     postalCode: { type: DataTypes.STRING(10),  allowNull: false, field: 'postal_code' },
     phone:      { type: DataTypes.STRING(20),  allowNull: true  },
     statusId:   { type: DataTypes.INTEGER,     allowNull: false, defaultValue: 1, field: 'status_id' },
+    closed:     { type: DataTypes.BOOLEAN,     allowNull: false, defaultValue: false },
 }, { tableName: 'branch', timestamps: false });
 
 const getAll  = ()   => Branch.findAll({ order: [['name', 'ASC']] });

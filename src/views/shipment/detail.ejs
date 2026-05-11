@@ -3,9 +3,49 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <% if (mapData && mapData.destination) { %>
+    <% const _hasRoute = mapData && mapData.route && mapData.route.stops && mapData.route.stops.length > 0; %>
+    <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0) || _hasRoute); %>
+    <% if (_hasMap) { %>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <% } %>
+    <style>
+        .route-stop-badge {
+            position: relative;
+            cursor: default;
+            border-bottom: 1px dashed var(--color-text-secondary);
+            padding-bottom: 1px;
+        }
+        .route-seg-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-md);
+            padding: .5rem .75rem;
+            font-size: .8rem;
+            line-height: 1.6;
+            z-index: 50;
+            min-width: 220px;
+            pointer-events: none;
+        }
+        .route-seg-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: var(--color-border);
+        }
+        .route-stop-badge:hover .route-seg-tooltip,
+        .route-stop-badge:focus .route-seg-tooltip {
+            display: block;
+        }
+    </style>
     <title>Detalle de Envío - LogiTrack</title>
 </head>
 
@@ -17,7 +57,7 @@
             <h1>Detalle de Envío</h1>
             <div style="display:flex;gap:var(--space-3)">
                 <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
-                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && shipment.statusId !== 3 && shipment.statusId !== 4 && shipment.statusId !== 5) { %>
+                <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
                 <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="btn-primary">
                     <span class="material-symbols-outlined">edit</span>Modificar
                 </a>
@@ -29,7 +69,7 @@
 
             <%
                 const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
-                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                 const _slLabel = _sl[_sk] || shipment.status.description;
             %>
 
@@ -49,7 +89,7 @@
                     <p class="historial-empty">Sin eventos registrados.</p>
                 <% } else { %>
                     <%
-                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                         function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         const _refLocation = [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || null;
                     %>
@@ -90,20 +130,29 @@
                                             <%= _author %>
                                         </div>
                                     <% } %>
-                                    <% if (_isCreated) { %>
+                                    <% if (h.branch) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
+                                            <%= h.branch.name.toUpperCase().startsWith('SUCURSAL') ? h.branch.name.toUpperCase() : 'SUCURSAL ' + h.branch.name.toUpperCase() %>
+                                        </div>
+                                    <% } else if (_isCreated) { %>
                                         <div class="shipment-timeline-meta">
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
                                             <%= mapData.origin.label.toUpperCase() %>
-                                        </div>
-                                    <% } else if (h.branch) { %>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
-                                            <%= h.branch.name.toUpperCase() %>
                                         </div>
                                     <% } else if (_refLocation) { %>
                                         <div class="shipment-timeline-meta">
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
                                             <%= _refLocation.toUpperCase() %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.latitude != null && h.longitude != null) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">my_location</span>
+                                            <%= Number(h.latitude).toFixed(5) %>, <%= Number(h.longitude).toFixed(5) %>
+                                            <% if (_hasMap) { %>
+                                                <a href="#shipment-map" class="timeline-map-link" data-lat="<%= h.latitude %>" data-lng="<%= h.longitude %>" style="margin-left:.5rem;">Ver en mapa</a>
+                                            <% } %>
                                         </div>
                                     <% } %>
                                     <% if (h.comment) { %>
@@ -149,40 +198,140 @@
 
                     <div class="summary-addresses">
                         <div><span class="summary-addr-lbl">ORIGEN:</span> <%= mapData.origin.label.toUpperCase() %></div>
+                        <% if (mapData.currentBranch && mapData.currentBranch.label !== mapData.origin.label) { %>
+                            <div><span class="summary-addr-lbl">UBICACIÓN ACTUAL:</span> <%= mapData.currentBranch.label.toUpperCase() %></div>
+                        <% } %>
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 
-                    <div id="prediction-widget"
-                         class="pred-card pred-card--embedded"
-                         data-province-id="<%= shipment.address.provinceId %>"
-                         data-street="<%= shipment.address.street || '' %>"
-                         data-number="<%= shipment.address.number || '' %>"
-                         data-weight-kg="<%= shipment.weightKg || '' %>"
-                         data-package-qty="<%= shipment.packageQty || '' %>"
-                         data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
-                         data-autoload="true">
+                   <div id="prediction-widget"
+                    class="pred-card pred-card--embedded"
+                    data-province-id="<%= shipment.address.provinceId %>"
+                    data-street="<%= shipment.address.street || '' %>"
+                    data-number="<%= shipment.address.number || '' %>"
+                    data-weight-kg="<%= shipment.weightKg || '' %>"
+                    data-package-qty="<%= shipment.packageQty || '' %>"
+                    data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
+                    data-autoload="true"
+                    data-shipment-id="<%= shipment.id %>"
+                    data-delivery-user-id="<%= shipment.deliveryUserId || '' %>">
+                         
                         <h3>
                             <span class="material-symbols-outlined">query_stats</span>
                             Detalles de la entrega
                         </h3>
                         <div id="prediction-result"></div>
                     </div>
+
+                    <% if (typeof sla !== 'undefined' && sla) { %>
+                        <div style="margin-top:1rem;padding:.75rem;border-radius:8px;background:<%= sla.delivered && sla.onTime ? 'var(--color-success-bg)' : (sla.delivered ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)') %>;border:1px solid <%= sla.delivered && sla.onTime ? 'var(--color-success)' : (sla.delivered ? 'var(--color-danger)' : 'var(--color-warning)') %>;">
+                            <strong style="display:block;margin-bottom:.25rem">SLA</strong>
+                            <% if (sla.delivered && sla.onTime) { %>
+                                <span style="color:var(--color-success);font-weight:600">✓ Entregado a tiempo</span>
+                            <% } else if (sla.delivered) { %>
+                                <span style="color:var(--color-danger)">⚠ Entregado <%= sla.daysLate %> día(s) tarde · Penalización <%= sla.penaltyPct %>%</span>
+                            <% } else if (sla.daysOver > 0) { %>
+                                <span style="color:var(--color-warning)">⏰ <%= sla.daysOver %> día(s) atrasado · Penalización proyectada <%= sla.penaltyPct %>%</span>
+                            <% } else { %>
+                                <span style="color:var(--color-text-secondary)">Dentro de plazo</span>
+                            <% } %>
+                        </div>
+                    <% } %>
+
+                    <% if (typeof costClient !== 'undefined' && costClient) { %>
+                        <div style="margin-top:.75rem;padding:.75rem;border-radius:8px;background:var(--color-bg);border:1px solid var(--color-border);font-size:.85rem">
+                            <strong style="display:block;margin-bottom:.35rem">Desglose de costo (cliente)</strong>
+                            <div style="display:flex;justify-content:space-between"><span>Tarifa zona</span><span><%= fmtMoney(costClient.base) %></span></div>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo peso</span><span><%= fmtMoney(costClient.wSurcharge) %></span></div>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo volumen</span><span><%= fmtMoney(costClient.vSurcharge) %></span></div>
+                            <hr style="margin:.35rem 0;border-color:var(--color-border)">
+                            <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span><%= fmtMoney(costClient.subtotal) %></span></div>
+                            <% if (costClient.penalty > 0) { %>
+                                <div style="display:flex;justify-content:space-between;color:var(--color-danger)"><span>Penalización SLA</span><span>-<%= fmtMoney(costClient.penalty) %></span></div>
+                            <% } %>
+                            <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Total a cobrar</span><span><%= fmtMoney(costClient.final) %></span></div>
+                        </div>
+                    <% } %>
                 </div>
 
                 <!-- ── Trayecto del envío (mapa) ── -->
-                <% if (mapData && mapData.destination) { %>
+                <% if (_hasMap) { %>
                 <div class="update-card update-map-card">
-                    <h3><span class="material-symbols-outlined">map</span> Trayecto del envío</h3>
+                    <h3>
+                        <span class="material-symbols-outlined">map</span>
+                        <% if (_hasRoute) { %>Ruta del repartidor<% } else { %>Trayecto del envío<% } %>
+                    </h3>
                     <div id="shipment-map"></div>
+                    <% if (_hasRoute) { %>
+                        <%
+                            var _intermediateCount = mapData.route.stops.filter(s => s.kind === 'branch').length;
+                        %>
+                        <div class="route-summary" style="margin-top:.6rem;font-size:.9rem;display:flex;gap:1rem;flex-wrap:wrap;">
+                            <span><strong><%= mapData.route.totalKm.toFixed(1) %></strong> km de ruta</span>
+                            <% if (_intermediateCount > 0) { %>
+                                <%
+                                    const _hvSeg = (a, b) => {
+                                        const R = 6371, dLat = (b.lat-a.lat)*Math.PI/180, dLng = (b.lng-a.lng)*Math.PI/180;
+                                        const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+                                        return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+                                    };
+                                    const _segs = mapData.route.stops.map((s, i, arr) =>
+                                        i < arr.length - 1
+                                            ? { from: s.label, to: arr[i+1].label, km: _hvSeg(s, arr[i+1]).toFixed(1) }
+                                            : null
+                                    ).filter(Boolean);
+                                %>
+                                <span class="route-stop-badge" tabindex="0">
+                                    <strong><%= _intermediateCount %></strong> sucursal<%= _intermediateCount > 1 ? 'es' : '' %> intermedia<%= _intermediateCount > 1 ? 's' : '' %>
+                                    <div class="route-seg-tooltip">
+                                        <% _segs.forEach(seg => { %>
+                                            <div style="white-space:nowrap">
+                                                <span style="color:#6b7280"><%= seg.from %> → <%= seg.to %></span>
+                                                <strong><%= seg.km %> km</strong>
+                                            </div>
+                                        <% }) %>
+                                    </div>
+                                </span>
+                            <% } else { %>
+                                <span>Ruta directa</span>
+                            <% } %>
+                            <span style="color:#6b7280;font-size:.8rem;">
+                                <%= mapData.route.provider === 'osrm' ? 'Calculado por OSRM (red vial real)' : 'Estimado en línea recta' %>
+                            </span>
+                        </div>
+                    <% } %>
                     <div class="map-legend">
+                        <% if (_hasRoute) { %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#2563eb"></div>
+                            <span>Sucursal de origen</span>
+                        </div>
+                        <% if (_intermediateCount > 0) { %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#f59e0b"></div>
+                            <span>Sucursal intermedia (escala)</span>
+                        </div>
+                        <% } %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#dc2626"></div>
+                            <span>Destino del envío</span>
+                        </div>
+                        <% } else { %>
                         <div class="map-legend-item">
                             <div class="map-dot map-dot--origin"></div>
-                            <span>Origen: <%= mapData.origin.label %></span>
+                            <span>Sucursal / evento</span>
                         </div>
                         <div class="map-legend-item">
                             <div class="map-dot map-dot--dest"></div>
+                            <span>Entrega final (GPS)</span>
+                        </div>
+                        <% if (mapData.destination) { %>
+                        <div class="map-legend-item">
+                            <div class="map-dot" style="background:#9ca3af"></div>
                             <span>Destino: <%= mapData.destination.label %></span>
                         </div>
+                        <% } %>
+                        <% } %>
                     </div>
                 </div>
                 <% } %>
@@ -272,6 +421,10 @@
                         <span class="detail-label">Cantidad de paquetes</span>
                         <span class="detail-value"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
                     </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Volumen</span>
+                        <span class="detail-value"><%= shipment.volumeM3 != null ? shipment.volumeM3 + ' m³' : '-' %></span>
+                    </div>
                 </div>
 
                 <div class="update-card" style="text-align:center;">
@@ -294,12 +447,14 @@
     <script src="/js/ui.js" defer></script>
     <script src="/js/prediction.js" defer></script>
 
-    <% if (mapData && mapData.destination) { %>
+    <% if (_hasMap) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
     (function () {
-        const origin = { lat: <%- mapData.origin.lat %>, lng: <%- mapData.origin.lng %> };
-        const dest   = { lat: <%- mapData.destination.lat %>, lng: <%- mapData.destination.lng %> };
+        const stops = <%- JSON.stringify(mapData.stops || []) %>;
+        const destination = <%- mapData.destination ? JSON.stringify(mapData.destination) : 'null' %>;
+        const route = <%- mapData.route ? JSON.stringify(mapData.route) : 'null' %>;
+        const origin = <%- JSON.stringify(mapData.origin) %>;
 
         const map = L.map('shipment-map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -307,25 +462,115 @@
             maxZoom: 18,
         }).addTo(map);
 
-        const blueIcon = L.divIcon({
+        if (route && route.stops && route.stops.length) {
+            const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+            const colorByKind = { origin: '#2563eb', branch: '#f59e0b', destination: '#dc2626' };
+            const labelByKind = { origin: 'Origen', branch: 'Escala intermedia', destination: 'Destino del envío' };
+            const dotIcon = (color, size) => L.divIcon({
+                className: '',
+                html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+                iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+            });
+            const numberedIcon = (n, color) => L.divIcon({
+                className: '',
+                html: '<div style="width:30px;height:30px;border-radius:50%;background:' + color + ';color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">' + n + '</div>',
+                iconSize: [30, 30], iconAnchor: [15, 15],
+            });
+
+            const bounds = [];
+            route.stops.forEach((s, idx) => {
+                const color = colorByKind[s.kind] || '#10b981';
+                const icon = s.kind === 'branch' ? numberedIcon(idx, color) : dotIcon(color, 20);
+                const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+                m.bindPopup(
+                    '<strong>' + escHtml(labelByKind[s.kind] || 'Parada') + '</strong>'
+                    + '<br>' + escHtml(s.label)
+                );
+                if (s.kind === 'destination') { m.openPopup(); }
+                bounds.push([s.lat, s.lng]);
+            });
+
+            if (route.polyline && route.polyline.length >= 2) {
+                L.polyline(route.polyline, { color: '#2563eb', weight: 4, opacity: 0.75 }).addTo(map);
+            }
+            map.fitBounds(bounds, { padding: [40, 40] });
+            return;
+        }
+
+        const mkIcon = (color) => L.divIcon({
             className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
+            html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [14, 14], iconAnchor: [7, 7],
         });
-        const redIcon = L.divIcon({
-            className: '',
-            html: '<div style="width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-            iconSize: [12, 12], iconAnchor: [6, 6],
+        const podIcon    = mkIcon('#dc2626');
+        const branchIcon = mkIcon('#2563eb');
+        const destIcon   = mkIcon('#9ca3af');
+
+        const fmtTs = (iso) => {
+            const d = new Date(iso);
+            return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        const escapeHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+        const markers = [];
+        const latlngs = [];
+        stops.forEach((s, idx) => {
+            const icon = s.isPOD ? podIcon : branchIcon;
+            const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+            const popup = '<strong>' + escapeHtml(s.label) + '</strong>'
+                + (s.status ? '<br>Estado: ' + escapeHtml(s.status) : '')
+                + '<br>' + escapeHtml(fmtTs(s.timestamp))
+                + '<br><small>' + s.lat.toFixed(5) + ', ' + s.lng.toFixed(5) + '</small>';
+            m.bindPopup(popup);
+            m.__idx = idx;
+            markers.push(m);
+            latlngs.push([s.lat, s.lng]);
         });
 
-        L.marker([origin.lat, origin.lng], { icon: blueIcon })
-            .addTo(map).bindPopup('<strong>Origen</strong><br><%- mapData.origin.label %>');
-        L.marker([dest.lat, dest.lng], { icon: redIcon })
-            .addTo(map).bindPopup('<strong>Destino</strong><br><%- mapData.destination.label %>');
-        L.polyline([[origin.lat, origin.lng], [dest.lat, dest.lng]], {
-            color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.6,
-        }).addTo(map);
-        map.fitBounds([[origin.lat, origin.lng], [dest.lat, dest.lng]], { padding: [30, 30] });
+        if (destination && (!stops.length || !stops[stops.length - 1].isPOD)) {
+            L.marker([destination.lat, destination.lng], { icon: destIcon })
+                .addTo(map)
+                .bindPopup('<strong>Destino</strong><br>' + escapeHtml(destination.label));
+            latlngs.push([destination.lat, destination.lng]);
+        }
+
+        let routeLayer = null;
+        if (latlngs.length >= 2) {
+            routeLayer = L.polyline(latlngs, { color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.5 }).addTo(map);
+            map.fitBounds(latlngs, { padding: [30, 30] });
+            const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+            fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !d.routes || !d.routes[0] || !d.routes[0].geometry) return;
+                    const polyLatLngs = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                    if (routeLayer) map.removeLayer(routeLayer);
+                    L.polyline(polyLatLngs, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(polyLatLngs, { padding: [30, 30] });
+                })
+                .catch(() => {});
+        } else if (latlngs.length === 1) {
+            map.setView(latlngs[0], 13);
+        } else {
+            map.setView([-34.6037, -58.3816], 11);
+        }
+
+        document.querySelectorAll('.timeline-map-link').forEach(link => {
+            link.addEventListener('click', (ev) => {
+                const lat = parseFloat(link.dataset.lat);
+                const lng = parseFloat(link.dataset.lng);
+                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                    map.setView([lat, lng], 15);
+                    const hit = markers.find(m => {
+                        const ll = m.getLatLng();
+                        return Math.abs(ll.lat - lat) < 1e-6 && Math.abs(ll.lng - lng) < 1e-6;
+                    });
+                    if (hit) hit.openPopup();
+                }
+            });
+        });
     })();
     </script>
     <% } %>

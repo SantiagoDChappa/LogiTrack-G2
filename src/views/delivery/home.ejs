@@ -12,6 +12,36 @@
             <h1>Mis Envíos Asignados</h1>
         </div>
 
+        <% if (typeof activeRoute !== 'undefined' && activeRoute) { %>
+            <div style="margin:0 clamp(1.25rem,2.5vw,2rem) 1rem;background:var(--color-info-bg);border:1px solid var(--color-info);border-radius:var(--radius-md);padding:var(--space-4) var(--space-5);display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:var(--space-3)">
+                    <span class="material-symbols-outlined" style="color:var(--color-info);font-size:1.5rem">map</span>
+                    <div>
+                        <strong style="font-size:var(--font-size-sm);color:var(--color-text)">Tenés una ruta activa</strong>
+                        <p style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:0">Ruta #<%= activeRoute.id %> · <%= activeRoute.totalDistanceKm %> km</p>
+                    </div>
+                </div>
+                <a href="/delivery/route/<%= activeRoute.id %>" class="btn-primary">
+                    <span class="material-symbols-outlined">directions</span>Ver mi recorrido
+                </a>
+            </div>
+        <% } %>
+
+        <div style="padding:0 clamp(1.25rem,2.5vw,2rem);margin-bottom:var(--space-4)">
+            <button id="btn-reschedule-failed" class="btn-secondary">
+                <span class="material-symbols-outlined">replay</span>Reprogramar intentos fallidos
+            </button>
+        </div>
+        <script>
+        document.getElementById('btn-reschedule-failed')?.addEventListener('click', async () => {
+            if (!confirm('¿Devolver tus envíos con intento fallido a sucursal para reprogramar?')) return;
+            const r = await fetch('/delivery/reschedule-failed', { method: 'POST' });
+            const d = await r.json();
+            if (r.ok) { alert('Reprogramados: ' + d.rescheduled); location.reload(); }
+            else { alert(d.error || 'Error'); }
+        });
+        </script>
+
         <div class="shipments-wrapper">
             <div class="table-wrapper">
                 <table id="shipments-table">
@@ -59,6 +89,9 @@
                                                 onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
                                             <span class="material-symbols-outlined">qr_code</span>
                                         </button>
+                                        <a href="/scan/<%= shipment.trackingId %>" class="action-btn estado" data-tooltip="Cambiar Estado">
+                                            <span class="material-symbols-outlined">swap_horiz</span>
+                                        </a>
                                     </td>
                                 </tr>
                             <% }) %>
@@ -74,6 +107,7 @@
     <script src="/js/ui.js" defer></script>
     <script>
         function showQR(id, trackingId) {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             Swal.fire({
                 title: trackingId,
                 html: '<img src="/shipment/' + id + '/qr" style="width:200px;height:200px;display:block;margin:0 auto;" alt="QR">',
@@ -114,13 +148,29 @@
         });
     </script>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     if (new URLSearchParams(window.location.search).get('delivered') === 'true') {
+        const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
         Swal.fire({
             icon: 'success',
             title: '¡Entrega confirmada!',
             text: 'La evidencia fue registrada correctamente.',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+            background: isDark ? '#1e293b' : '#ffffff',
+            color: isDark ? '#f1f5f9' : '#1e293b',
+        }).then(() => {
+            history.replaceState(null, '', '/delivery');
+        });
+    }
+</script>
+
+<script>
+    if (new URLSearchParams(window.location.search).get('failed') === 'true') {
+        Swal.fire({
+            icon: 'warning',
+            title: '¡Intento fallido registrado!',
+            text: 'El operador recibirá la notificación para reprogramar la entrega.',
             confirmButtonText: 'Aceptar',
             confirmButtonColor: '#2563eb',
         }).then(() => {

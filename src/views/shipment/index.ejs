@@ -69,21 +69,25 @@
                 <button type="submit" class="btn-primary search-btn">
                     <span class="material-symbols-outlined">search</span>Buscar
                 </button>
-                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= (query.statusIds && query.statusIds.length > 0) ? 'active' : '' %>" onclick="toggleFilterPanel()">
+                <% const _hasBranchFilter = isAdmin && query.currentBranchId; %>
+                <% const _hasStatusFilter = query.statusIds && query.statusIds.length > 0; %>
+                <% const _hasAnyFilter = _hasStatusFilter || _hasBranchFilter; %>
+                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= _hasAnyFilter ? 'active' : '' %>" onclick="toggleFilterPanel()">
                     <span class="material-symbols-outlined">tune</span>Filtros
-                    <% if (query.statusIds && query.statusIds.length > 0) { %>
-                        <span class="filter-count-badge"><%= query.statusIds.length %></span>
+                    <% const _filterCount = (query.statusIds ? query.statusIds.length : 0) + (_hasBranchFilter ? 1 : 0); %>
+                    <% if (_filterCount > 0) { %>
+                        <span class="filter-count-badge"><%= _filterCount %></span>
                     <% } %>
                 </button>
             </div>
 
             <!-- Panel de filtros -->
-            <div id="filter-panel" class="filter-panel" style="<%= (query.statusIds && query.statusIds.length > 0) ? '' : 'display:none;' %>">
+            <div id="filter-panel" class="filter-panel" style="<%= _hasAnyFilter ? '' : 'display:none;' %>">
                 <div class="filter-section">
                     <span class="filter-label">Estado</span>
                     <div class="filter-chips">
                         <%
-                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                             function _fsk(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         %>
                         <% statuses.forEach(function(s) { %>
@@ -97,6 +101,17 @@
                         <% }); %>
                     </div>
                 </div>
+                <% if (isAdmin && branches && branches.length > 0) { %>
+                    <div class="filter-section">
+                        <span class="filter-label">Sucursal actual</span>
+                        <select name="currentBranchId" class="search-input">
+                            <option value="">-- Todas --</option>
+                            <% branches.forEach(function(b) { %>
+                                <option value="<%= b.id %>" <%= String(query.currentBranchId || '') === String(b.id) ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }); %>
+                        </select>
+                    </div>
+                <% } %>
             </div>
         </form>
 
@@ -139,13 +154,23 @@
                                 <td><%= shipment.recipient.document %></td>
                                 <td>
                                     <% const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
-                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'}; %>
+                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'}; %>
                                     <span class="status-badge <%= _sk %>">
                                         <%= _sl[_sk] || shipment.status.description %>
                                     </span>
+                                    <!-- <% const _p = shipment.latestPrediction; %>
+                                    <% if (_p) { %>
+                                        <% const _pp = Number(_p.delayProbability); %>
+                                        <% const _pColor = _pp >= 60 ? '#dc2626' : (_pp >= 30 ? '#d97706' : '#16a34a'); %>
+                                        <% const _pLabel = _pp >= 60 ? 'Alto' : (_pp >= 30 ? 'Medio' : 'Bajo'); %>
+                                        <div title="Predicción ML: <%= _pp %>% prob. demora · estimado <%= _p.predictedDays %> días" style="margin-top:.25rem;display:inline-flex;align-items:center;gap:.3rem;padding:.1rem .5rem;border-radius:999px;font-size:.7rem;font-weight:600;background:<%= _pColor %>;color:#fff;">
+                                            <span class="material-symbols-outlined" style="font-size:.85rem">schedule</span>
+                                            Riesgo <%= _pLabel %> · <%= _pp %>%
+                                        </div>
+                                    <% } %> -->
                                 </td>
                                 <td class="col-actions">
-                                    <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5; %>
+                                    <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5 || shipment.statusId === 8; %>
                                     <a href="<%= _isFinalS ? '#' : '/shipment/update/' + shipment.id %>"
                                        class="action-btn modificar<%= _isFinalS ? ' action-btn--disabled' : '' %>"
                                        data-tooltip="<%= _isFinalS ? 'No modificable' : 'Modificar' %>"

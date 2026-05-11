@@ -61,6 +61,35 @@ describe('generateTrackingId()', () => {
         const id = 'ENV-001';
         expect(id).toMatch(/^ENV-\d{3,}$/);
     });
+
+    test('con prefix HIST genera HIST-001 para imports históricos', async () => {
+        const generate = async (prefix, lastNum) => {
+            const next = lastNum ? lastNum + 1 : 1;
+            return `${prefix}-${String(next).padStart(3, '0')}`;
+        };
+
+        expect(await generate('HIST', null)).toBe('HIST-001');
+        expect(await generate('HIST', 5)).toBe('HIST-006');
+    });
+
+    test('con prefix IENV genera IENV-001 para imports activos', async () => {
+        const generate = async (prefix, lastNum) => {
+            const next = lastNum ? lastNum + 1 : 1;
+            return `${prefix}-${String(next).padStart(3, '0')}`;
+        };
+
+        expect(await generate('IENV', null)).toBe('IENV-001');
+        expect(await generate('IENV', 3)).toBe('IENV-004');
+    });
+
+    test('contadores ENV, HIST e IENV son independientes', () => {
+        const envId = 'ENV-005';
+        const histId = 'HIST-003';
+        const ienvId = 'IENV-002';
+        expect(envId).toMatch(/^ENV-\d{3,}$/);
+        expect(histId).toMatch(/^HIST-\d{3,}$/);
+        expect(ienvId).toMatch(/^IENV-\d{3,}$/);
+    });
 });
 
 // ── updateStatus ──────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
 </head>
 <body>
@@ -244,6 +245,14 @@
                         </div>
                     </div>
 
+                    <!-- Mapa de seguimiento -->
+                    <% if (s.mapStops && s.mapStops.length >= 1) { %>
+                    <div class="portal-map-section">
+                        <span class="portal-history-title">Recorrido</span>
+                        <div id="portal-map-<%= s.id %>" class="portal-map" style="height:300px;border-radius:10px;overflow:hidden;border:1px solid var(--color-border, #e2e8f0);margin-top:.5rem;"></div>
+                    </div>
+                    <% } %>
+
                     <!-- Historial de estados -->
                     <% if (s.history && s.history.length > 0) { %>
                     <div class="portal-history">
@@ -348,5 +357,64 @@
 
 
     <script src="/js/theme.js" defer></script>
+    <% if (typeof shipments !== 'undefined' && shipments && shipments.length) { %>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    (function(){
+        const data = <%- JSON.stringify(shipments.map(s => ({ id: s.id, stops: s.mapStops || [], activeRouteId: s.activeRouteId || null }))) %>;
+        data.forEach(item => {
+            if (!item.stops.length) return;
+            const el = document.getElementById('portal-map-' + item.id);
+            if (!el) return;
+            const map = L.map(el).setView([item.stops[0].lat, item.stops[0].lng], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+            const colors = { origin: '#16a34a', transit: '#2563eb', pod: '#dc2626', destination: '#94a3b8' };
+            const labels = { origin: 'Origen', transit: 'En tránsito', pod: 'Entregado', destination: 'Destino' };
+            const latlngs = [];
+            item.stops.forEach(s => {
+                L.circleMarker([s.lat, s.lng], { radius: 8, color: '#fff', weight: 2, fillColor: colors[s.type] || '#666', fillOpacity: 1 })
+                    .bindPopup('<b>' + (labels[s.type] || s.type) + '</b><br>' + (s.label || ''))
+                    .addTo(map);
+                latlngs.push([s.lat, s.lng]);
+            });
+            if (latlngs.length === 1) {
+                map.setView(latlngs[0], 13);
+                return;
+            }
+            const fallback = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.5 }).addTo(map);
+            map.fitBounds(latlngs, { padding: [25,25] });
+            const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+            fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !d.routes || !d.routes[0]) return;
+                    const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                    map.removeLayer(fallback);
+                    L.polyline(poly, { color: '#1e88e5', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(poly, { padding: [25,25] });
+                }).catch(() => {});
+
+            if (item.activeRouteId) {
+                let liveMarker = null;
+                const truckIcon = L.divIcon({
+                    html: '<div style="background:#f59e0b;border:3px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.4)">🚚</div>',
+                    className: '', iconSize: [28,28], iconAnchor: [14,14],
+                });
+                const updateLive = () => {
+                    fetch('/delivery/position/route/' + item.activeRouteId)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(p => {
+                            if (!p || !p.lat) return;
+                            if (liveMarker) liveMarker.setLatLng([p.lat, p.lng]);
+                            else liveMarker = L.marker([p.lat, p.lng], { icon: truckIcon }).addTo(map).bindPopup('Repartidor en camino');
+                        }).catch(() => {});
+                };
+                updateLive();
+                setInterval(updateLive, 20000);
+            }
+        });
+    })();
+    </script>
+    <% } %>
 </body>
 </html>
