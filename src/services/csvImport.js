@@ -8,6 +8,7 @@ const userModel            = require('../models/user');
 const { RoleType }         = require('../constants/enums');
 const { validate }         = require('./shipmentRowValidator');
 const { geocodeAddress, GeocodeError } = require('./geocode');
+const zoneResolver         = require('./zoneResolver.service');
 
 const MAX_ROWS = 1000;
 const GEOCODE_THROTTLE_MS = 250;
@@ -264,6 +265,12 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
             const isTerminal = data.statusId === 4 || data.statusId === 5;
             const trackingPrefix = isTerminal ? 'HIST' : 'IENV';
 
+            // Resolución automática de zona por CP/provincia. Si no matchea, queda en null.
+            const resolvedZone = await zoneResolver.resolveZone({
+                postalCode: data.postalCode,
+                provinceId: data.provinceId,
+            });
+
             const shipment = await shipmentModel.create({
                 senderId:         sender.id,
                 recipientId:      recipient.id,
@@ -274,6 +281,7 @@ const commitAnalysis = async (analysis, { userId, includeDuplicates = false } = 
                 statusId:         data.statusId,
                 legacyTrackingId: data.legacyTrackingId,
                 deliveryUserId:   data.deliveryUserId || null,
+                zoneId:           resolvedZone?.id || null,
                 trackingPrefix,
             });
 
