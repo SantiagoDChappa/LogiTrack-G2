@@ -47,12 +47,18 @@
                     </div>
 
                 <% } else { %>
-                    <% if (success) { %>
-                        <div class="scan-alert scan-alert--success">
-                            <span class="material-symbols-outlined">check_circle</span>
-                            <span>Estado actualizado correctamente.</span>
-                        </div>
+                <% if (success) { %>
+                    <div class="scan-alert scan-alert--success">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        <span>Estado actualizado correctamente.</span>
+                    </div>
+                    <% if (suggestedDate) { %>
+                    <div class="scan-alert" style="background:var(--color-warning-bg);border:1px solid var(--color-warning);color:var(--color-warning);margin-top:var(--space-3)">
+                        <span class="material-symbols-outlined">event</span>
+                        <span>Fecha sugerida para el próximo intento: <strong><%= new Date(suggestedDate + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></strong></span>
+                    </div>
                     <% } %>
+                <% } %>
 
                     <%
                         const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
@@ -114,7 +120,7 @@
                                                        : a.toStatusId === 9 ? 'cancel'
                                                        : 'swap_horiz';
                                     %>
-                                    <form method="<%= a.toStatusId === 4 ? 'GET' : 'POST' %>" action="<%= a.toStatusId === 4 ? '/delivery/evidence/'+ shipment.trackingId + '/pod' : a.endpoint %>" onsubmit="return confirmAction(this, <%= a.requireComment ? 'true' : 'false' %>)">
+                                    <form method="POST" action="<%= a.endpoint %>" onsubmit="return confirmAction(this, <%= a.requireComment ? 'true' : 'false' %>, <%= a.toStatusId %>)">
                                         <% if (a.requireComment) { %>
                                             <input type="hidden" name="comment" value="">
                                         <% } %>
@@ -137,36 +143,82 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script>
-        function confirmAction(form, requireComment) {
+        function confirmAction(form, requireComment, toStatusId) {
             var btn    = form.querySelector('button');
             var label  = btn.querySelector('.material-symbols-outlined').nextSibling.textContent.trim();
             var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
 
-            if (requireComment) {
-                Swal.fire({
-                    title: label,
-                    input: 'textarea',
-                    inputLabel: 'Motivo (obligatorio)',
-                    inputPlaceholder: 'Describí el motivo...',
-                    inputAttributes: { 'aria-label': 'Motivo' },
-                    showCancelButton: true,
-                    confirmButtonText: 'Confirmar',
-                    cancelButtonText: 'Cancelar',
-                    confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
-                    background: isDark ? '#1e293b' : '#ffffff',
-                    color: isDark ? '#f1f5f9' : '#1e293b',
-                    reverseButtons: true,
-                    inputValidator: function(value) {
-                        if (!value || value.trim().length < 3) { return 'Debés escribir un motivo (mín. 3 caracteres).'; }
-                    },
-                }).then(function(result) {
-                    if (result.isConfirmed) {
-                        form.querySelector('input[name="comment"]').value = result.value.trim();
-                        form.submit();
-                    }
-                });
-                return false;
+        
+if (requireComment) {
+    if (toStatusId === 9) {
+        // Reportar intento fallido: select de motivos estructurados
+        Swal.fire({
+            title: label,
+            html:
+                '<label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:6px;text-align:left">Motivo <span style="color:#ef4444">*</span></label>' +
+                '<select id="swal-reason" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.95rem;background:' + (isDark ? '#1e293b' : '#fff') + ';color:' + (isDark ? '#f1f5f9' : '#1e293b') + '">' +
+                  '<option value="" disabled selected>Seleccioná un motivo</option>' +
+                  '<option value="ausente">Ausente</option>' +
+                  '<option value="domicilio incorrecto">Domicilio incorrecto</option>' +
+                  '<option value="rechazo">Rechazo</option>' +
+                  '<option value="zona inaccesible">Zona inaccesible</option>' +
+                  '<option value="otro">Otro</option>' +
+                '</select>' +
+                '<label style="font-size:0.85rem;font-weight:600;display:block;margin:12px 0 6px;text-align:left">Observación <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>' +
+                '<textarea id="swal-obs" rows="2" placeholder="Detallá lo que ocurrió…" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.9rem;resize:vertical;background:' + (isDark ? '#1e293b' : '#fff') + ';color:' + (isDark ? '#f1f5f9' : '#1e293b') + '"></textarea>',
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+            background: isDark ? '#1e293b' : '#ffffff',
+            color: isDark ? '#f1f5f9' : '#1e293b',
+            reverseButtons: true,
+            preConfirm: function() {
+                var reason = document.getElementById('swal-reason').value;
+                if (!reason) { Swal.showValidationMessage('Seleccioná un motivo'); return false; }
+                return { reason: reason, observation: document.getElementById('swal-obs').value.trim() };
+            },
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                form.querySelector('input[name="comment"]').value = result.value.reason;
+                var obsInput = form.querySelector('input[name="observation"]');
+                if (!obsInput) {
+                    obsInput = document.createElement('input');
+                    obsInput.type = 'hidden';
+                    obsInput.name = 'observation';
+                    form.appendChild(obsInput);
+                }
+                obsInput.value = result.value.observation;
+                form.submit();
             }
+        });
+    } else {
+        // Marcar paquete fallido y otros: textarea libre original
+        Swal.fire({
+            title: label,
+            input: 'textarea',
+            inputLabel: 'Motivo (obligatorio)',
+            inputPlaceholder: 'Describí el motivo...',
+            inputAttributes: { 'aria-label': 'Motivo' },
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+            background: isDark ? '#1e293b' : '#ffffff',
+            color: isDark ? '#f1f5f9' : '#1e293b',
+            reverseButtons: true,
+            inputValidator: function(value) {
+                if (!value || value.trim().length < 3) { return 'Debés escribir un motivo (mín. 3 caracteres).'; }
+            },
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                form.querySelector('input[name="comment"]').value = result.value.trim();
+                form.submit();
+            }
+        });
+    }
+    return false;
+}
 
             Swal.fire({
                 title: '¿Confirmás?',
