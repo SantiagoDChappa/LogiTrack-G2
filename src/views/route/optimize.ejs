@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Optimización de Ruteo - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Optimizar Ruteo</h1>
+            <a href="/route" class="btn-secondary">Volver</a>
+        </div>
+
+        <div class="shipments-wrapper">
+
+            <% if (isAdmin) { %>
+            <form method="GET" action="/route/optimize" class="search-form">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="branchId">Sucursal</label>
+                        <select id="branchId" name="branchId" class="search-input" onchange="this.form.submit()">
+                            <option value="">— Elegir sucursal —</option>
+                            <% branches.forEach(b => { %>
+                                <option value="<%= b.id %>" <%= branchId === b.id ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+            </form>
+            <% } %>
+
+            <% if (!branchId) { %>
+                <div style="text-align:center;padding:var(--space-12) var(--space-6);color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:var(--space-4);opacity:.4">warehouse</span>
+                    Seleccioná una sucursal para ver envíos y transportes disponibles.
+                </div>
+            <% } else if (shipments.length === 0) { %>
+                <div class="empty-row" style="padding:var(--space-8);text-align:center;color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:var(--space-2);opacity:.4">inventory_2</span>
+                    No hay envíos pendientes en esta sucursal.
+                </div>
+            <% } else if (transports.length === 0) { %>
+                <div class="empty-row" style="padding:var(--space-8);text-align:center;color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:var(--space-2);opacity:.4">local_shipping</span>
+                    No hay transportes habilitados disponibles en esta sucursal.
+                </div>
+            <% } else { %>
+            <form id="optimize-form">
+
+                <!-- Envíos -->
+                <div class="update-card" style="margin-bottom:var(--space-5)">
+                    <h3><span class="material-symbols-outlined">inventory_2</span> Envíos pendientes (<%= shipments.length %>)</h3>
+                    <div class="table-wrapper" style="margin-top:var(--space-4)">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:2rem"><input type="checkbox" id="select-all-shipments"></th>
+                                    <th>Tracking</th>
+                                    <th>Prioridad</th>
+                                    <th>Destinatario</th>
+                                    <th>Zona</th>
+                                    <th>Peso (kg)</th>
+                                    <th>Volumen (m³)</th>
+                                    <th>CP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <%
+                                    const priLabels = { 1: 'Normal', 2: 'Express', 3: 'Urgente' };
+                                    const priCls    = { 1: 'inicial', 2: 'en_transito', 3: 'cancelado' };
+                                %>
+                                <% shipments.forEach(s => { %>
+                                    <% const pr = s.priority || 1; %>
+                                    <tr>
+                                        <td><input type="checkbox" name="shipmentIds" value="<%= s.id %>" class="ship-cb"></td>
+                                        <td class="tracking-id"><%= s.trackingId %></td>
+                                        <td><span class="status-badge status-badge--sm <%= priCls[pr] %>"><%= priLabels[pr] %></span></td>
+                                        <td><%= s.recipient ? s.recipient.fullName : '-' %></td>
+                                        <td><%= s.zone ? s.zone.name : '—' %></td>
+                                        <td><%= s.weightKg || '-' %></td>
+                                        <td><%= s.volumeM3 || '-' %></td>
+                                        <td class="tracking-id"><%= s.address ? s.address.postalCode : '-' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Transportes -->
+                <div class="update-card" style="margin-bottom:var(--space-5)">
+                    <h3><span class="material-symbols-outlined">local_shipping</span> Transportes habilitados</h3>
+                    <p style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
+                        El sistema elegirá los transportes según costo, capacidad y zonas habilitadas.
+                    </p>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Patente</th>
+                                    <th>Peso máx.</th>
+                                    <th>Vol. máx.</th>
+                                    <th>Costo fijo</th>
+                                    <th>$/km</th>
+                                    <th>Autonomía</th>
+                                    <th>Conductor</th>
+                                    <th>Zonas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% transports.forEach(t => { %>
+                                    <tr>
+                                        <td><strong><%= t.name %></strong></td>
+                                        <td class="tracking-id"><%= t.plate || '-' %></td>
+                                        <td><%= t.maxWeightKg %> kg</td>
+                                        <td><%= t.maxVolumeM3 %> m³</td>
+                                        <td><%= fmtMoney(t.fixedCost) %></td>
+                                        <td><%= fmtMoney(t.costPerKm) %></td>
+                                        <td><%= t.autonomyKm ? t.autonomyKm + ' km' : '—' %></td>
+                                        <td><%= t.driver ? t.driver.fullName : '-' %></td>
+                                        <td><%= (t.zones && t.zones.length) ? t.zones.map(z => z.name).join(', ') : 'Todas' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;padding-bottom:var(--space-6)">
+                    <button type="submit" class="btn-primary">
+                        <span class="material-symbols-outlined">alt_route</span>
+                        Calcular ruta óptima
+                    </button>
+                </div>
+            </form>
+
+            <%- include('preview') %>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+    document.getElementById('select-all-shipments')?.addEventListener('change', e => {
+        document.querySelectorAll('.ship-cb').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    window.CURRENT_BRANCH_ID = <%= branchId ? branchId : 'null' %>;
+
+    document.getElementById('optimize-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const shipmentIds = fd.getAll('shipmentIds');
+        if (shipmentIds.length === 0) {
+            alert('Seleccioná al menos un envío.');
+            return;
+        }
+        const res = await fetch('/route/optimize/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipmentIds, branchId: window.CURRENT_BRANCH_ID }),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Error'); return; }
+        window.renderRoutePreview(data, { shipmentIds: shipmentIds.map(Number) });
+        setTimeout(() => {
+            document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    });
+    </script>
+</body>
+</html>

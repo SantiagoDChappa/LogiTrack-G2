@@ -4,6 +4,7 @@
     <%- include('partials/head') %>
     <title>Dashboard - LogiTrack</title>
     <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
     <%- include('partials/header') %>
@@ -157,6 +158,18 @@
                         </div>
                     <% } %>
                 </div>
+                <div class="card" style="grid-column: span 2;">
+                    <h2>Densidad de envíos (heatmap)</h2>
+                    <div id="dashboard-heatmap" style="height:340px;border-radius:8px;overflow:hidden;border:1px solid var(--color-border);"></div>
+                </div>
+                <div class="card">
+                    <h2>Saturación por sucursal</h2>
+                    <% if (!branchSaturation || branchSaturation.length === 0) { %>
+                        <p class="empty-state">Sin envíos pendientes.</p>
+                    <% } else { %>
+                        <canvas id="chart-saturacion" height="180"></canvas>
+                    <% } %>
+                </div>
                 <div class="card ultima-actividad">
                     <h2>Última Actividad</h2>
                     <table class="activity-table">
@@ -204,8 +217,53 @@
             </div>
         </div>
     </main>
-    <!-- Gráfico entregas por día -->
+    <!-- Gráfico entregas por día + heatmap + saturación -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script>
+    (function(){
+        const heatmapPoints = <%- JSON.stringify(heatmapPoints || []) %>;
+        const branchSaturation = <%- JSON.stringify(branchSaturation || []) %>;
+
+        const heatEl = document.getElementById('dashboard-heatmap');
+        if (heatEl && heatmapPoints.length > 0) {
+            const map = L.map('dashboard-heatmap').setView([-34.6, -58.4], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+            const data = heatmapPoints.map(p => [p.lat, p.lng, 0.5]);
+            L.heatLayer(data, { radius: 22, blur: 18, maxZoom: 11 }).addTo(map);
+            try { map.fitBounds(data.map(d => [d[0], d[1]]), { padding: [20,20] }); } catch(_) {}
+        } else if (heatEl) {
+            heatEl.innerHTML = '<p style="padding:1rem;color:var(--color-text-muted)">Sin envíos activos para mapear.</p>';
+        }
+
+        const satEl = document.getElementById('chart-saturacion');
+        if (satEl && branchSaturation.length > 0) {
+            new Chart(satEl.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: branchSaturation.map(b => b.name.replace(/^Sucursal /,'')),
+                    datasets: [{
+                        label: 'Pendientes',
+                        data: branchSaturation.map(b => b.pending),
+                        backgroundColor: 'rgba(59,130,246,0.7)',
+                        borderColor: 'rgba(59,130,246,1)',
+                        borderWidth: 1, borderRadius: 6,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+    })();
+    </script>
     <script>
         const deliveriesByDay = <%- JSON.stringify(deliveriesByDay) %>;
         const labels = deliveriesByDay.map(d => {
@@ -244,7 +302,7 @@
                         grid: { display: false }
                     }
                 }
-            }
+             }
         });
     </script>
     <script src="/js/theme.js" defer></script>

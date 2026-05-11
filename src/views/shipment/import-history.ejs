@@ -16,10 +16,14 @@
             </a>
         </div>
 
-        <div class="shipments-wrapper">
+        <div class="import-wrapper" style="max-width:100%">
             <% if (imports.length === 0) { %>
-                <div class="import-section">
-                    <p>No hay importaciones registradas todavía.</p>
+                <div style="text-align:center;padding:var(--space-12) var(--space-6);color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:var(--space-4);opacity:.4">history</span>
+                    <p style="font-size:var(--font-size-sm)">No hay importaciones registradas todavía.</p>
+                    <a href="/shipment/import" class="btn-primary" style="margin-top:var(--space-4);display:inline-flex;align-items:center;gap:var(--space-2)">
+                        <span class="material-symbols-outlined">upload_file</span>Hacer primera importación
+                    </a>
                 </div>
             <% } else { %>
                 <div class="table-wrapper">
@@ -54,13 +58,13 @@
                                     <td><%= imp.forced ? 'Sí' : 'No' %></td>
                                     <td>
                                         <% if (imp.aborted) { %>
-                                            <span class="status-badge cancelado">Abortado</span>
+                                            <span class="status-badge status-badge--sm cancelado">Abortado</span>
                                         <% } else if (imp.errorCount === 0) { %>
-                                            <span class="status-badge entregado">OK</span>
+                                            <span class="status-badge status-badge--sm entregado">OK</span>
                                         <% } else if (imp.importedCount === 0) { %>
-                                            <span class="status-badge cancelado">Sin importar</span>
+                                            <span class="status-badge status-badge--sm cancelado">Sin importar</span>
                                         <% } else { %>
-                                            <span class="status-badge en_transito">Parcial</span>
+                                            <span class="status-badge status-badge--sm en_transito">Parcial</span>
                                         <% } %>
                                     </td>
                                 </tr>
@@ -69,7 +73,7 @@
                     </table>
                 </div>
             <% } %>
-        </div>
+        </div><!-- /.import-wrapper -->
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

@@ -15,12 +15,17 @@ const Shipment = sequelize.define('shipment', {
     addressId:        { type: DataTypes.INTEGER },
     shipmentTypeId:   { type: DataTypes.INTEGER },
     weightKg:         { type: DataTypes.DECIMAL(8, 2) },
-    packageQty:       { type: DataTypes.INTEGER },
     volumeM3:         { type: DataTypes.DECIMAL(8, 3) },
+    packageQty:       { type: DataTypes.INTEGER },
     deliveryUserId:   { type: DataTypes.INTEGER },
     legacyTrackingId: { type: DataTypes.STRING },
-    priority:         { type: DataTypes.INTEGER, defaultValue: 1 },
-    basePriority:     { type: DataTypes.INTEGER, defaultValue: 1 },
+    zoneId:               { type: DataTypes.INTEGER },
+    currentBranchId:      { type: DataTypes.INTEGER },
+    expectedDeliveryDate: { type: DataTypes.DATEONLY },
+    expectedDeliveryFrom: { type: DataTypes.TIME, allowNull: true },
+    expectedDeliveryTo:   { type: DataTypes.TIME, allowNull: true },
+    priority:             { type: DataTypes.INTEGER, defaultValue: 1 },
+    basePriority:         { type: DataTypes.INTEGER, defaultValue: 1 },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -51,6 +56,8 @@ const getById = (id) => {
     const { Province } = require('./province');
     const { TypeShipment } = require('./typeShipment');
     const { User } = require('./user');
+    const { Branch } = require('./branch');
+    const { Zone } = require('./zone');
 
     return Shipment.findOne({
         where: { id },
@@ -60,7 +67,9 @@ const getById = (id) => {
             { model: Status, as: 'status' },
             { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
-            { model: User, as: 'deliveryUser', required: false }
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'currentBranch', required: false },
+            { model: Zone, as: 'zone', required: false }
         ]
     });
 };
@@ -85,9 +94,14 @@ const create = async (data) => {
         addressId:        data.addressId,
         shipmentTypeId:   data.shipmentTypeId || null,
         weightKg:         data.weightKg       || null,
+        volumeM3:         data.volumeM3        || null,
         packageQty:       data.packageQty      || null,
-        deliveryUserId:   data.deliveryUserId  || null,
-        volumeM3:         data.volumeM3 || null,
+        zoneId:               data.zoneId          || null,
+        currentBranchId:      data.currentBranchId || null,
+        expectedDeliveryDate: data.expectedDeliveryDate || null,
+        expectedDeliveryFrom: data.expectedDeliveryFrom || null,
+        expectedDeliveryTo:   data.expectedDeliveryTo   || null,
+        deliveryUserId:       data.deliveryUserId  || null,
         legacyTrackingId: data.legacyTrackingId || null,
         priority:         data.priority     || 1,
         basePriority:     data.basePriority || 1,
@@ -114,7 +128,7 @@ const findPotentialDuplicate = ({ senderDocument, recipientDocument, street, num
     });
 };
 
-const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId }) => {
+const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId, currentBranchId }) => {
     const { Person } = require('./person');
     const { Status } = require('./status');
     const { Address } = require('./address');
@@ -124,6 +138,8 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
     const recipientWhere = {};
 
     if (deliveryUserId) { shipmentWhere.deliveryUserId = deliveryUserId; }
+
+    if (currentBranchId) { shipmentWhere.currentBranchId = Number(currentBranchId); }
 
     if (statusIds && statusIds.length > 0) {
         shipmentWhere.statusId = { [Op.in]: statusIds.map(Number) };
@@ -263,6 +279,9 @@ const updateStatus = (id, newStatusId, options = {}) => {
     if (options.deliveryUserId !== undefined) {
         updates.deliveryUserId = options.deliveryUserId;
     }
+    if (options.currentBranchId !== undefined) {
+        updates.currentBranchId = options.currentBranchId;
+    }
     return Shipment.update(updates, { where: { id }, transaction: options.transaction });
 };
 
@@ -272,15 +291,18 @@ const findByIdForUpdate = (id, transaction) => Shipment.findOne({
     lock: transaction ? transaction.LOCK.UPDATE : undefined,
 });
 
-const getForKanban = (statusIds) => {
+const getForKanban = (statusIds, { branchId } = {}) => {
     const { Person }    = require('./person');
     const { Status }    = require('./status');
     const { Address }   = require('./address');
     const { Province }  = require('./province');
     const { User }      = require('./user');
 
+    const where = { statusId: { [Op.in]: statusIds } };
+    if (branchId) { where.currentBranchId = Number(branchId); }
+
     return Shipment.findAll({
-        where: { statusId: { [Op.in]: statusIds } },
+        where,
         include: [
             { model: Person,  as: 'recipient' },
             { model: Status,  as: 'status' },

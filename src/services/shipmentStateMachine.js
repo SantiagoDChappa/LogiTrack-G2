@@ -6,9 +6,54 @@ const { Status, RoleType } = require('../constants/enums');
 const S = Status;
 const R = RoleType;
 
+const STATUS_LABELS = {
+    [S.PENDING.id]: 'Pendiente',
+    [S.IN_TRANSIT.id]: 'En tránsito',
+    [S.AT_BRANCH.id]: 'En sucursal',
+    [S.DELIVERED.id]: 'Entregado',
+    [S.CANCELLED.id]: 'Cancelado',
+    [S.ASSIGNED.id]: 'Asignado',
+    [S.IN_PREPARATION.id]: 'En preparación',
+    [S.PACKAGE_FAILED.id]: 'Paquete fallido',
+    [S.FAILED_ATTEMPT.id]: 'Intento fallido',
+};
+
+// Mensajes orientados al cliente (portal publico). Sin info interna: ni actor, ni hora, ni ruta interna.
+const buildAutoComment = ({ fromStatusId, toStatusId }) => {
+    if (toStatusId === S.ASSIGNED.id) {
+        return 'Tu envío fue asignado a un repartidor.';
+    }
+    if (toStatusId === S.IN_PREPARATION.id) {
+        return 'Tu envío está siendo preparado en sucursal.';
+    }
+    if (toStatusId === S.IN_TRANSIT.id) {
+        if (fromStatusId === S.FAILED_ATTEMPT.id) {
+            return 'El repartidor está en camino nuevamente con tu envío.';
+        }
+        return 'Tu envío está en camino.';
+    }
+    if (toStatusId === S.AT_BRANCH.id) {
+        return 'Tu envío llegó a una sucursal.';
+    }
+    if (toStatusId === S.DELIVERED.id) {
+        return 'Tu envío fue entregado.';
+    }
+    if (toStatusId === S.FAILED_ATTEMPT.id) {
+        return 'No fue posible entregar tu envío. Se reintentará.';
+    }
+    if (toStatusId === S.PACKAGE_FAILED.id) {
+        return 'Tu envío tuvo un problema. Comunicate con atención al cliente.';
+    }
+    if (toStatusId === S.CANCELLED.id) {
+        return 'Tu envío fue cancelado.';
+    }
+    const to = STATUS_LABELS[toStatusId] || `Estado ${toStatusId}`;
+    return `Estado actualizado: ${to}.`;
+};
+
 const TRANSITIONS = {
     [S.PENDING.id]:        [S.ASSIGNED.id, S.CANCELLED.id],
-    [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.CANCELLED.id],
+    [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.IN_TRANSIT.id, S.CANCELLED.id],
     [S.IN_PREPARATION.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.IN_TRANSIT.id]:     [S.AT_BRANCH.id, S.DELIVERED.id, S.FAILED_ATTEMPT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.AT_BRANCH.id]:      [S.ASSIGNED.id, S.PACKAGE_FAILED.id],
@@ -23,6 +68,7 @@ const RULES_TARGETED = {
     [`${S.AT_BRANCH.id}->${S.ASSIGNED.id}`]:             { roles: [R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'REASSIGNED',        label: 'Reasignar repartidor',   endpoint: '/shipment/update/:id/assign' },
     [`${S.ASSIGNED.id}->${S.IN_PREPARATION.id}`]:        { roles: [R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Iniciar preparacion',    endpoint: '/shipment/update/:id/prepare' },
     [`${S.IN_PREPARATION.id}->${S.IN_TRANSIT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'PICKUP_CONFIRMED',  label: 'Confirmar retiro',       endpoint: '/scan/:trackingId/pickup' },
+    [`${S.ASSIGNED.id}->${S.IN_TRANSIT.id}`]:            { roles: [R.DELIVERY.id, R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'ROUTE_DISPATCHED', label: 'Salida de ruta',         endpoint: '/route/scan/:id/dispatch' },
     [`${S.IN_TRANSIT.id}->${S.DELIVERED.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'DELIVERED',         label: 'Confirmar entrega',      endpoint: '/delivery/evidence/:id/pod' },
     [`${S.IN_TRANSIT.id}->${S.AT_BRANCH.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Marcar en sucursal',     endpoint: '/scan/:trackingId/at-branch' },
     [`${S.IN_TRANSIT.id}->${S.FAILED_ATTEMPT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: true,  eventType: 'FAILED_ATTEMPT',    label: 'Reportar intento fallido', endpoint: '/scan/:trackingId/failed-attempt' },
@@ -128,20 +174,36 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
         await shipmentModel.updateStatus(shipmentId, toStatusId, {
             transaction: t,
             ...(deliveryUserId !== undefined ? { deliveryUserId } : {}),
+            ...(toStatusId === S.AT_BRANCH.id && branchId ? { currentBranchId: branchId } : {}),
         });
+
+        const finalComment = comment && String(comment).trim()
+            ? String(comment).trim()
+            : buildAutoComment({ fromStatusId, toStatusId, actor, extras: { branchName: undefined } });
 
         await shipmentHistoryModel.create({
             shipmentId,
             fromStatusId,
             toStatusId,
-            comment: comment ? String(comment).trim() : null,
+            comment: finalComment,
             userId: actor.id || null,
             eventType: eventTypeOverride || rule.eventType,
             branchId: branchId || null,
-            latitude:  latitude  != null ? latitude  : null,
-            longitude: longitude != null ? longitude : null,
+            latitude:  latitude  !== null && latitude  !== undefined ? latitude  : null,
+            longitude: longitude !== null && longitude !== undefined ? longitude : null,
             transaction: t,
         });
+
+        // Webhook dispatch (fire and forget)
+        try {
+            const { fire } = require('./webhookDispatcher');
+            fire('shipment.status_changed', {
+                shipmentId, fromStatusId, toStatusId,
+                trackingId: shipment.trackingId,
+                comment: finalComment,
+                eventType: eventTypeOverride || rule.eventType,
+            });
+        } catch { /* ignore */ }
 
         return { ok: true, fromStatusId, toStatusId, eventType: eventTypeOverride || rule.eventType };
     });
@@ -177,7 +239,7 @@ const assignDelivery = ({ shipmentId, deliveryUserId, actor, branchId, latitude,
             shipmentId,
             fromStatusId,
             toStatusId: S.ASSIGNED.id,
-            comment:   null,
+            comment:   buildAutoComment({ fromStatusId, toStatusId: S.ASSIGNED.id, actor }),
             userId:    actor.id || null,
             eventType: rule.eventType,
             branchId:  branchId  || null,
@@ -195,6 +257,7 @@ module.exports = {
     assignDelivery,
     canTransition,
     getAvailableActions,
+    buildAutoComment,
     StateMachineError,
     TRANSITIONS,
 };

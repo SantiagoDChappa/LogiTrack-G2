@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Editar Transporte - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Editar Transporte</h1>
+            <a href="/transport" class="btn-secondary">Volver</a>
+        </div>
+
+        <div class="form-new">
+            <form method="POST" action="/transport/update/<%= transport.id %>">
+                <div class="usuario">
+                    <h3>Datos del vehículo</h3>
+                    <div class="field">
+                        <label for="name">Nombre <span class="req">*</span></label>
+                        <input id="name" class="search-input" name="name" type="text" value="<%= transport.name %>" maxlength="100" required>
+                    </div>
+                    <div class="field">
+                        <label for="plate">Patente</label>
+                        <input id="plate" class="search-input" name="plate" type="text" value="<%= transport.plate || '' %>" maxlength="20">
+                    </div>
+                    <div class="field">
+                        <label for="maxWeightKg">Peso máximo (kg) <span class="req">*</span></label>
+                        <input id="maxWeightKg" class="search-input" name="maxWeightKg" type="number" step="0.01" min="0" value="<%= transport.maxWeightKg %>" required>
+                    </div>
+                    <div class="field">
+                        <label for="maxVolumeM3">Volumen máximo (m³) <span class="req">*</span></label>
+                        <input id="maxVolumeM3" class="search-input" name="maxVolumeM3" type="number" step="0.001" min="0" value="<%= transport.maxVolumeM3 %>" required>
+                    </div>
+                    <div class="field">
+                        <label for="fixedCost">Costo fijo ($)</label>
+                        <input id="fixedCost" class="search-input" name="fixedCost" type="number" step="0.01" value="<%= transport.fixedCost %>">
+                    </div>
+                    <div class="field">
+                        <label for="costPerKm">Costo por km ($)</label>
+                        <input id="costPerKm" class="search-input" name="costPerKm" type="number" step="0.01" value="<%= transport.costPerKm %>">
+                    </div>
+                    <div class="field">
+                        <label for="autonomyKm">Autonomía (km) <span style="font-weight:400;color:var(--color-text-secondary)">(km con tanque lleno; vacío = sin chequeo)</span></label>
+                        <input id="autonomyKm" class="search-input" name="autonomyKm" type="number" step="1" min="0" value="<%= transport.autonomyKm || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="driverUserId">Conductor</label>
+                        <select id="driverUserId" class="search-input" name="driverUserId">
+                            <option value="">— Sin asignar —</option>
+                            <% drivers.forEach(d => { %>
+                                <option value="<%= d.id %>" <%= transport.driverUserId === d.id ? 'selected' : '' %>><%= d.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="branchId">Sucursal</label>
+                        <select id="branchId" class="search-input" name="branchId">
+                            <option value="">— Sin asignar —</option>
+                            <% branches.forEach(b => { %>
+                                <option value="<%= b.id %>" <%= transport.branchId === b.id ? 'selected' : '' %>><%= b.name %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="zoneIds">Zonas asignadas <span style="font-weight:400;color:var(--color-text-secondary)">(opcional, Ctrl+clic para múltiple)</span></label>
+                        <select id="zoneIds" class="search-input" name="zoneIds" multiple size="5">
+                            <% zones.forEach(z => { %>
+                                <option value="<%= z.id %>" <%= selectedZoneIds.includes(z.id) ? 'selected' : '' %>><%= z.name %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field" style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem">
+                        <input type="checkbox" id="enabled" name="enabled" <%= transport.enabled ? 'checked' : '' %> style="width:auto">
+                        <label for="enabled" style="margin:0;text-transform:none;font-size:var(--font-size-sm)">Habilitado</label>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <a href="/transport" class="btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn-primary">
+                        <span class="material-symbols-outlined">save</span>Actualizar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+const { haversine } = require('./geo');
+
 // Coordenadas aproximadas del centroide de cada provincia argentina.
 // id     → id en la tabla province de la DB
 // ml     → nombre que espera el modelo Python (sin tildes)
@@ -33,16 +35,6 @@ const PROVINCES = {
 const BY_INDEC = Object.fromEntries(
     Object.entries(PROVINCES).map(([id, p]) => [p.indec, { id: parseInt(id), ...p }])
 );
-
-function haversine(lat1, lon1, lat2, lon2) {
-    const R    = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a    = Math.sin(dLat / 2) ** 2
-               + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
-               * Math.sin(dLon / 2) ** 2;
-    return Math.max(1, Math.round(R * 2 * Math.asin(Math.sqrt(a))));
-}
 
 function normalizeStr(s) {
     return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();

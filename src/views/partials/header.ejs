@@ -15,6 +15,9 @@
     <a href="/shipment"><ul><span class="material-symbols-outlined">local_shipping</span>Envios</ul></a>
 <% } %>
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/route"><ul><span class="material-symbols-outlined">route</span>Ruteo</ul></a>
+                    <a href="/transport"><ul><span class="material-symbols-outlined">local_shipping</span>Transportes</ul></a>
+                    <a href="/zone"><ul><span class="material-symbols-outlined">map</span>Zonas</ul></a>
                     <a href="/shipment/kanban"><ul><span class="material-symbols-outlined">view_kanban</span>Kanban</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>

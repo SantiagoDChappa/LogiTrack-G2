@@ -30,6 +30,9 @@ const deliveryRoutes = require('./src/routes/delivery');
 const scanRoutes     = require('./src/routes/scan');
 const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
+const routeRoutes      = require('./src/routes/route');
+const transportRoutes  = require('./src/routes/transport');
+const zoneRoutes       = require('./src/routes/zone');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -52,6 +55,13 @@ app.use(express.static('public'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
+
+// Helpers globales para EJS
+app.use((req, res, next) => {
+    res.locals.fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    res.locals.fmtNumber = (n, dec = 2) => Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    next();
+});
 
 // Rutas Publicas
 app.use('/', portalRoutes);
@@ -76,6 +86,12 @@ app.use('/api/route',             requireAuth, apiRouteRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/delivery', requireAuth, deliveryRoutes);
 app.use('/scan',     requireAuth, scanRoutes);
+const routeCtrl = require('./src/controllers/route');
+app.get('/route/scan/:id',           requireAuth, routeCtrl.getScanPage);
+app.post('/route/scan/:id/dispatch', requireAuth, routeCtrl.dispatchRoute);
+app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
+app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
+app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 
 ;
 app.use('/api/persons',personRoutes);

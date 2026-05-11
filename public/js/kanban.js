@@ -543,6 +543,12 @@
 
     /* ── Public API ─────────────────────────────────────────── */
 
-    window.kanban = { applyFilters, closeModal, confirmModal, _checkTa, refresh };
+    function toggleFailedCols(show) {
+        document.querySelectorAll('.k-col[data-failure="1"]').forEach(col => {
+            col.style.display = show ? '' : 'none';
+        });
+    }
+
+    window.kanban = { applyFilters, closeModal, confirmModal, _checkTa, refresh, toggleFailedCols };
 
 })();

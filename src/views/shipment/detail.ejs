@@ -74,12 +74,20 @@
             %>
 
             <!-- Tracking ID + estado -->
+            <%
+                const _priLabels = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Urgente' };
+                const _priCls    = { 1: 'priority-badge--low', 2: 'priority-badge--mid', 3: 'priority-badge--high', 4: 'priority-badge--urgent' };
+                const _pr        = shipment.priority || 1;
+            %>
             <div class="detail-top" style="margin-bottom: 1.5rem;">
                 <div class="detail-tracking">
                     <span class="detail-tracking-label">ID Tracking</span>
                     <span class="detail-tracking-id"><%= shipment.trackingId %></span>
                 </div>
-                <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
+                <div style="display:flex;gap:var(--space-3);align-items:center;">
+                    <span class="priority-badge <%= _priCls[_pr] %>"><%= _priLabels[_pr] || '—' %></span>
+                    <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
+                </div>
             </div>
 
             <!-- ── Línea de tiempo (card independiente) ── -->
@@ -133,7 +141,7 @@
                                     <% if (h.branch) { %>
                                         <div class="shipment-timeline-meta">
                                             <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
-                                            SUCURSAL <%= h.branch.name.toUpperCase() %>
+                                            <%= h.branch.name.toUpperCase().startsWith('SUCURSAL') ? h.branch.name.toUpperCase() : 'SUCURSAL ' + h.branch.name.toUpperCase() %>
                                         </div>
                                     <% } else if (_isCreated) { %>
                                         <div class="shipment-timeline-meta">
@@ -198,6 +206,9 @@
 
                     <div class="summary-addresses">
                         <div><span class="summary-addr-lbl">ORIGEN:</span> <%= mapData.origin.label.toUpperCase() %></div>
+                        <% if (mapData.currentBranch && mapData.currentBranch.label !== mapData.origin.label) { %>
+                            <div><span class="summary-addr-lbl">UBICACIÓN ACTUAL:</span> <%= mapData.currentBranch.label.toUpperCase() %></div>
+                        <% } %>
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 
@@ -219,6 +230,36 @@
                         </h3>
                         <div id="prediction-result"></div>
                     </div>
+
+                    <% if (typeof sla !== 'undefined' && sla) { %>
+                        <div style="margin-top:1rem;padding:.75rem;border-radius:8px;background:<%= sla.delivered && sla.onTime ? 'var(--color-success-bg)' : (sla.delivered ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)') %>;border:1px solid <%= sla.delivered && sla.onTime ? 'var(--color-success)' : (sla.delivered ? 'var(--color-danger)' : 'var(--color-warning)') %>;">
+                            <strong style="display:block;margin-bottom:.25rem">SLA</strong>
+                            <% if (sla.delivered && sla.onTime) { %>
+                                <span style="color:var(--color-success);font-weight:600">✓ Entregado a tiempo</span>
+                            <% } else if (sla.delivered) { %>
+                                <span style="color:var(--color-danger)">⚠ Entregado <%= sla.daysLate %> día(s) tarde · Penalización <%= sla.penaltyPct %>%</span>
+                            <% } else if (sla.daysOver > 0) { %>
+                                <span style="color:var(--color-warning)">⏰ <%= sla.daysOver %> día(s) atrasado · Penalización proyectada <%= sla.penaltyPct %>%</span>
+                            <% } else { %>
+                                <span style="color:var(--color-text-secondary)">Dentro de plazo</span>
+                            <% } %>
+                        </div>
+                    <% } %>
+
+                    <% if (typeof costClient !== 'undefined' && costClient) { %>
+                        <div style="margin-top:.75rem;padding:.75rem;border-radius:8px;background:var(--color-bg);border:1px solid var(--color-border);font-size:.85rem">
+                            <strong style="display:block;margin-bottom:.35rem">Desglose de costo (cliente)</strong>
+                            <div style="display:flex;justify-content:space-between"><span>Tarifa zona</span><span><%= fmtMoney(costClient.base) %></span></div>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo peso</span><span><%= fmtMoney(costClient.wSurcharge) %></span></div>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo volumen</span><span><%= fmtMoney(costClient.vSurcharge) %></span></div>
+                            <hr style="margin:.35rem 0;border-color:var(--color-border)">
+                            <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span><%= fmtMoney(costClient.subtotal) %></span></div>
+                            <% if (costClient.penalty > 0) { %>
+                                <div style="display:flex;justify-content:space-between;color:var(--color-danger)"><span>Penalización SLA</span><span>-<%= fmtMoney(costClient.penalty) %></span></div>
+                            <% } %>
+                            <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Total a cobrar</span><span><%= fmtMoney(costClient.final) %></span></div>
+                        </div>
+                    <% } %>
                 </div>
 
                 <!-- ── Trayecto del envío (mapa) ── -->
@@ -503,9 +544,21 @@
             latlngs.push([destination.lat, destination.lng]);
         }
 
+        let routeLayer = null;
         if (latlngs.length >= 2) {
-            L.polyline(latlngs, { color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.7 }).addTo(map);
+            routeLayer = L.polyline(latlngs, { color: '#2563eb', weight: 2, dashArray: '5 5', opacity: 0.5 }).addTo(map);
             map.fitBounds(latlngs, { padding: [30, 30] });
+            const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+            fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !d.routes || !d.routes[0] || !d.routes[0].geometry) return;
+                    const polyLatLngs = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                    if (routeLayer) map.removeLayer(routeLayer);
+                    L.polyline(polyLatLngs, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(polyLatLngs, { padding: [30, 30] });
+                })
+                .catch(() => {});
         } else if (latlngs.length === 1) {
             map.setView(latlngs[0], 13);
         } else {
