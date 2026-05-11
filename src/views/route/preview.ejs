@@ -306,8 +306,8 @@
                     <div class="proposal-stat">Distancia<strong>${p.totalDistanceKm} km</strong></div>
                     <div class="proposal-stat">Tiempo<strong>${p.totalDurationMin ?? '-'} min</strong></div>
                     <div class="proposal-stat">Costo<strong>${fmtMoney(p.totalCost)}</strong></div>
-                    <div class="proposal-stat">Peso<strong>${(p.utilizationWeight*100).toFixed(0)}%</strong></div>
-                    <div class="proposal-stat">Volumen<strong>${(p.utilizationVolume*100).toFixed(0)}%</strong></div>
+                    <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
+                    <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
                 </div>
                 ${oppBlock}
                 <div><strong style="font-size:.8rem">Envíos (${p.shipmentIds.length}):</strong></div>
@@ -369,9 +369,23 @@
                 ${escapeHtml(tracking)}
             </span>`;
         }).join('');
+        // Agrupar por motivo para mostrar diagnóstico claro
+        const reasonGroups = new Map();
+        for (const u of un) {
+            const r = u.reason || 'Sin motivo';
+            if (!reasonGroups.has(r)) reasonGroups.set(r, []);
+            reasonGroups.get(r).push(u.trackingId || `#${u.id || u.shipmentId}`);
+        }
+        const reasonsHtml = un.length === 0 ? '' : [...reasonGroups.entries()].map(([reason, tracks]) =>
+            `<div style="margin-top:.5rem;padding:.5rem .7rem;background:var(--color-surface);border-left:3px solid var(--color-warning);border-radius:4px;font-size:.8rem">
+                <div style="color:var(--color-text);margin-bottom:.2rem"><strong>${tracks.length} envío${tracks.length>1?'s':''}:</strong> ${escapeHtml(reason)}</div>
+                <div style="color:var(--color-text-muted);font-size:.72rem">${tracks.map(escapeHtml).join(', ')}</div>
+            </div>`
+        ).join('');
         poolEl.innerHTML = `<div class="unassigned-pool" data-transport-id="unassigned">
             <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- arrastrá aquí para descartar de la ruta</span></h3>
             <div>${unChips || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío)</span>'}</div>
+            ${reasonsHtml}
         </div>`;
 
         // Wire actions

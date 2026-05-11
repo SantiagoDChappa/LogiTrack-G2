@@ -126,13 +126,30 @@
                     </div>
                 </div>
 
+                <div class="info-shipment">
+                    <h3>Ventana de entrega <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></h3>
+                    <div class="field">
+                        <label for="expected-date">Fecha estimada</label>
+                        <input id="expected-date" type="date" name="expectedDeliveryDate" value="<%= body.expectedDeliveryDate || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="expected-from">Desde</label>
+                        <input id="expected-from" type="time" name="expectedDeliveryFrom" value="<%= body.expectedDeliveryFrom || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="expected-to">Hasta</label>
+                        <input id="expected-to" type="time" name="expectedDeliveryTo" value="<%= body.expectedDeliveryTo || '' %>">
+                    </div>
+                </div>
+
                 <div id="prediction-widget" class="pred-card">
                     <h3><span class="material-symbols-outlined">psychology</span> Predicción de entrega</h3>
                     <div id="prediction-result"></div>
                 </div>
 
-                <div id="priority-conteiner">
-                    <p>Prioridad: <span id="initial-priority">-</span></p>
+                <div id="priority-conteiner" class="priority-box">
+                    <span class="priority-box-label">Prioridad inicial</span>
+                    <span id="initial-priority" class="priority-badge priority-badge--none">—</span>
                 </div>
 
                 <div class="form-actions">

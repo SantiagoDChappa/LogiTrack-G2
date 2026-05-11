@@ -12,12 +12,13 @@
 
         <%
             const KANBAN_COLS = [
-                { id: 1, name: 'Pendiente',       icon: 'schedule'       },
-                { id: 6, name: 'Asignado',        icon: 'assignment_ind' },
-                { id: 7, name: 'En Preparación',  icon: 'inventory_2'    },
-                { id: 2, name: 'En Tránsito',     icon: 'local_shipping' },
-                { id: 3, name: 'En Sucursal',     icon: 'warehouse'      },
-                { id: 9, name: 'Intento Fallido', icon: 'report'         },
+                { id: 1, name: 'Pendiente',       icon: 'schedule',       active: true,  failure: false },
+                { id: 6, name: 'Asignado',        icon: 'assignment_ind', active: true,  failure: false },
+                { id: 7, name: 'En Preparación',  icon: 'inventory_2',    active: true,  failure: false },
+                { id: 2, name: 'En Tránsito',     icon: 'local_shipping', active: true,  failure: false },
+                { id: 3, name: 'En Sucursal',     icon: 'warehouse',      active: true,  failure: false },
+                { id: 9, name: 'Intento Fallido', icon: 'report',         active: false, failure: true  },
+                { id: 8, name: 'Paquete Fallido', icon: 'broken_image',   active: false, failure: true  },
             ];
             const CARD_BTNS = {
                 1: ['cancel'],
@@ -26,6 +27,7 @@
                 2: ['cancel', 'failed'],
                 3: ['failed'],
                 9: [],
+                8: [],
             };
         %>
 
@@ -35,9 +37,21 @@
                 <h1>Tablero Kanban</h1>
                 <p class="kanban-subtitle">Vista operativa de envíos activos</p>
             </div>
-            <button class="btn-secondary btn-sm" id="k-refresh-btn" onclick="kanban.refresh()" title="Actualizar tablero">
-                <span class="material-symbols-outlined">refresh</span>
-            </button>
+            <div style="display:flex;gap:var(--space-3);align-items:center;">
+                <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+                <form method="GET" action="/shipment/kanban" style="margin:0;">
+                    <select name="branchId" class="search-input" onchange="this.form.submit()">
+                        <option value="">— Todas las sucursales —</option>
+                        <% (branches || []).forEach(b => { %>
+                            <option value="<%= b.id %>" <%= (branchId === b.id) ? 'selected' : '' %>><%= b.name %></option>
+                        <% }) %>
+                    </select>
+                </form>
+                <% } %>
+                <button class="btn-secondary btn-sm" id="k-refresh-btn" onclick="kanban.refresh()" title="Actualizar tablero">
+                    <span class="material-symbols-outlined">refresh</span>
+                </button>
+            </div>
         </div>
 
         <!-- ── Métricas ──────────────────────────────────────────── -->
@@ -84,6 +98,13 @@
                     %>
                 </select>
             </div>
+            <div class="search-field">
+                <label for="k-show-failed">Estados fallidos</label>
+                <label style="display:flex;gap:.4rem;align-items:center;cursor:pointer;padding-top:.4rem;">
+                    <input type="checkbox" id="k-show-failed" onchange="kanban.toggleFailedCols(this.checked)">
+                    <span>Mostrar Intento / Paquete Fallido</span>
+                </label>
+            </div>
             <span class="k-filter-hint">
                 <span class="material-symbols-outlined">drag_indicator</span>
                 Arrastrá las tarjetas para cambiar el estado
@@ -98,7 +119,7 @@
                 <% KANBAN_COLS.forEach(col => { %>
                     <% const colShips = columns[col.id] || []; %>
 
-                    <div class="k-col col-sid-<%= col.id %>" data-col-sid="<%= col.id %>">
+                    <div class="k-col col-sid-<%= col.id %><%= col.failure ? ' k-col-failure' : '' %>" data-col-sid="<%= col.id %>" data-failure="<%= col.failure ? '1' : '0' %>" <%- col.failure ? 'style="display:none"' : '' %>>
 
                         <div class="col-head">
                             <div class="col-icon">
@@ -110,6 +131,71 @@
 
                         <div class="col-body" id="k-body-<%= col.id %>">
 
+                            <%
+                                // Render IN_TRANSIT (id=2) grouped by transport
+                                const _isInTransit = col.id === 2 && typeof inTransitGroups !== 'undefined';
+                                const _groups = _isInTransit ? (inTransitGroups || []) : [];
+                            %>
+                            <% if (_isInTransit) { %>
+                                <% _groups.forEach(g => { %>
+                                    <div class="k-transport-group">
+                                        <div class="k-transport-head">
+                                            <span class="material-symbols-outlined">local_shipping</span>
+                                            <div class="k-transport-info">
+                                                <span class="k-transport-name"><%= g.transportName %></span>
+                                                <% if (g.plate) { %><span class="k-transport-plate"><%= g.plate %></span><% } %>
+                                                <% if (g.driverName) { %><span class="k-transport-driver"><%= g.driverName %></span><% } %>
+                                            </div>
+                                            <span class="k-transport-count"><%= g.shipments.length %></span>
+                                        </div>
+                                        <div class="k-transport-cards">
+                                            <% g.shipments.forEach(s => { %>
+                                                <%
+                                                    const btns     = CARD_BTNS[s.statusId] || [];
+                                                    const drvName  = s.deliveryUser ? s.deliveryUser.fullName : '';
+                                                    const drvId    = s.deliveryUserId ? String(s.deliveryUserId) : '';
+                                                    const provName = (s.address && s.address.province) ? s.address.province.name : '';
+                                                %>
+                                                <div class="k-card"
+                                                     draggable="true"
+                                                     data-id="<%= s.id %>"
+                                                     data-sid="<%= s.statusId %>"
+                                                     data-trk="<%= s.trackingId %>"
+                                                     data-rec="<%= s.recipient.fullName.toLowerCase() %>"
+                                                     data-rec-full="<%= s.recipient.fullName %>"
+                                                     data-prov="<%= provName %>"
+                                                     data-drv-id="<%= drvId %>"
+                                                     data-drv-name="<%= drvName.toLowerCase() %>"
+                                                     data-drv-full="<%= drvName %>">
+                                                    <div class="card-track"><%= s.trackingId %></div>
+                                                    <div class="card-recip"><%= s.recipient.fullName %></div>
+                                                    <% if (provName) { %>
+                                                    <div class="card-meta">
+                                                        <span class="material-symbols-outlined">location_on</span><%= provName %>
+                                                    </div>
+                                                    <% } %>
+                                                    <div class="card-sep"></div>
+                                                    <div class="card-actions">
+                                                        <a href="/shipment/detail/<%= s.id %>?from=/shipment/kanban&fromLabel=Kanban" class="c-btn c-btn-detail">
+                                                            <span class="material-symbols-outlined">info</span>Ver detalle
+                                                        </a>
+                                                        <% if (btns.includes('cancel')) { %>
+                                                        <button class="c-btn c-btn-cancel" data-action="cancel" data-sid="<%= s.id %>">
+                                                            <span class="material-symbols-outlined">cancel</span>Cancelar
+                                                        </button>
+                                                        <% } %>
+                                                        <% if (btns.includes('failed')) { %>
+                                                        <button class="c-btn c-btn-failed" data-action="failed" data-sid="<%= s.id %>">
+                                                            <span class="material-symbols-outlined">broken_image</span>Fallido
+                                                        </button>
+                                                        <% } %>
+                                                    </div>
+                                                </div>
+                                            <% }); %>
+                                        </div>
+                                    </div>
+                                <% }); %>
+                            <% } else { %>
                             <% colShips.slice(0, 50).forEach(s => { %>
                                 <%
                                     const btns     = CARD_BTNS[s.statusId] || [];
@@ -172,6 +258,7 @@
                                     </div>
                                 </div>
                             <% }); %>
+                            <% } %>
 
                             <% if (colShips.length === 0) { %>
                             <div class="col-empty" id="k-empty-<%= col.id %>">

@@ -36,7 +36,9 @@ async function callBackend(data) {
 
     const result = await res.json();
 
-    document.getElementById('initial-priority').textContent = castPriorityToString(result.priority);
+    const el = document.getElementById('initial-priority');
+    el.textContent = castPriorityToString(result.priority);
+    el.className = 'priority-badge ' + priorityClass(result.priority);
 
   } catch (error) {
     console.error(error);
@@ -49,7 +51,17 @@ function castPriorityToString(number) {
     case 2: return 'Media';
     case 3: return 'Alta';
     case 4: return 'Urgente';
-    default: return '-';
+    default: return '—';
+  }
+}
+
+function priorityClass(number) {
+  switch (number) {
+    case 1: return 'priority-badge--low';
+    case 2: return 'priority-badge--mid';
+    case 3: return 'priority-badge--high';
+    case 4: return 'priority-badge--urgent';
+    default: return 'priority-badge--none';
   }
 }
 
