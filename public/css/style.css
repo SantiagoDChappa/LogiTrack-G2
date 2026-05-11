@@ -56,6 +56,8 @@
   --btn-detalle-text:      #15803d;
   --btn-eliminar-bg:       #fee2e2;
   --btn-eliminar-text:     #b91c1c;
+  --btn-estado-bg:         #dbeafe;
+  --btn-estado-text:       #1d4ed8;
 
   --font-family:     'Inter', system-ui, -apple-system, sans-serif;
   --font-size-xs:    0.75rem;
@@ -149,6 +151,8 @@
   --btn-detalle-text:      #86efac;
   --btn-eliminar-bg:       #450a0a;
   --btn-eliminar-text:     #fca5a5;
+  --btn-estado-bg:         #1e3a5f;
+  --btn-estado-text:       #93c5fd;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);

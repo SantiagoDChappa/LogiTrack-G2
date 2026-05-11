@@ -16,14 +16,14 @@ const getIndex = async (req, res) => {
     const deliveriesToday = shipments.filter(s => normalizeStatus(s) === 'entregado').length;
     const delayAlerts     = shipments.filter(s => normalizeStatus(s) === 'retrasado').length;
     const newRecords      = shipments.length;
-    const lastActivity    = shipments.slice(-5).reverse();
+    const lastActivity    = [...shipments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
 
     // Total por estado
     const statusMap = {};
     shipments.forEach(s => {
         const key   = normalizeStatus(s);
         const label = s.status.description;
-        if (!statusMap[key]) { statusMap[key] = { key, label, total: 0 }; }
+        if (!statusMap[key]) { statusMap[key] = { key, label, total: 0, id: s.statusId }; }
         statusMap[key].total++;
     });
     const statusTotals = Object.values(statusMap);

@@ -1,14 +1,23 @@
 const { findProvinceByState } = require('../utils/provinces');
 const { Status } = require('../constants/enums');
 
-// Solo se permiten estados terminales en la importación (envíos históricos).
-// Aliases por id para tolerar variantes en español/inglés y mayúsculas.
+// Estados aceptados en la importación: los 5 estados del sistema con aliases
+// en español/inglés (con y sin tildes) y por id numérico.
 const STATUS_ALIASES = {
-    [Status.DELIVERED.id]: ['delivered', 'entregado', 'entregada', String(Status.DELIVERED.id)],
-    [Status.CANCELLED.id]: ['cancelled', 'canceled', 'cancelado', 'cancelada', String(Status.CANCELLED.id)],
+    [Status.PENDING.id]:    ['pending', 'pendiente', String(Status.PENDING.id)],
+    [Status.IN_TRANSIT.id]: ['in transit', 'in_transit', 'en transito', 'en_transito', String(Status.IN_TRANSIT.id)],
+    [Status.AT_BRANCH.id]:  ['at branch', 'at_branch', 'en sucursal', 'en_sucursal', String(Status.AT_BRANCH.id)],
+    [Status.DELIVERED.id]:  ['delivered', 'entregado', 'entregada', String(Status.DELIVERED.id)],
+    [Status.CANCELLED.id]:  ['cancelled', 'canceled', 'cancelado', 'cancelada', String(Status.CANCELLED.id)],
 };
 
-const ALLOWED_STATUS_LABEL = `${Status.DELIVERED.description} o ${Status.CANCELLED.description}`;
+const ALLOWED_STATUS_LABEL = [
+    Status.PENDING.description,
+    Status.IN_TRANSIT.description,
+    Status.AT_BRANCH.description,
+    Status.DELIVERED.description,
+    Status.CANCELLED.description,
+].join(', ');
 
 const isInt = (v) => /^-?\d+$/.test(String(v).trim());
 const isFloat = (v) => /^-?\d+(\.\d+)?$/.test(String(v).trim());
@@ -167,8 +176,19 @@ const validate = (row) => {
         if (statusId === null) {
             errors.push({
                 field:   'status',
-                message: `Estado inválido: "${row.status}". Solo se aceptan envíos cerrados (${ALLOWED_STATUS_LABEL}).`,
+                message: `Estado inválido: "${row.status}". Estados permitidos: ${ALLOWED_STATUS_LABEL}.`,
             });
+        }
+    }
+
+    let deliveryUserDocument = null;
+    if (row.deliveryUserDocument !== undefined && row.deliveryUserDocument !== null && String(row.deliveryUserDocument).trim() !== '') {
+        const raw = String(row.deliveryUserDocument).trim();
+        const docNum = parseInt(raw, 10);
+        if (!isInt(raw) || docNum < 1000000 || docNum > 99999999) {
+            errors.push({ field: 'deliveryUserDocument', message: 'deliveryUserDocument inválido (DNI entre 1.000.000 y 99.999.999)' });
+        } else {
+            deliveryUserDocument = docNum;
         }
     }
 
@@ -194,6 +214,7 @@ const validate = (row) => {
             packageQty:        parseInt(row.packageQty, 10),
             statusId,
             legacyTrackingId:  row.legacyTrackingId ? String(row.legacyTrackingId).trim() : null,
+            deliveryUserDocument,
         } : null,
     };
 };

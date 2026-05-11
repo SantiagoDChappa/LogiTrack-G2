@@ -40,6 +40,18 @@ router.post('/evidence/:id/pod',
     deliveryController.saveEvidence
 );
 
+router.get('/failed/:id',
+    requireAuth,
+    requireDelivery,
+    deliveryController.showFailedForm
+);
+
+router.post('/failed/:id',
+    requireAuth,
+    requireDelivery,
+    deliveryController.saveFailedAttempt
+);
+
 // Vista del repartidor con su ruta optimizada
 router.get('/route/:id', requireDelivery, async (req, res) => {
     try {

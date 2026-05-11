@@ -89,6 +89,9 @@
                                                 onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
                                             <span class="material-symbols-outlined">qr_code</span>
                                         </button>
+                                        <a href="/scan/<%= shipment.trackingId %>" class="action-btn estado" data-tooltip="Cambiar Estado">
+                                            <span class="material-symbols-outlined">swap_horiz</span>
+                                        </a>
                                     </td>
                                 </tr>
                             <% }) %>
@@ -156,6 +159,20 @@
             confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
             background: isDark ? '#1e293b' : '#ffffff',
             color: isDark ? '#f1f5f9' : '#1e293b',
+        }).then(() => {
+            history.replaceState(null, '', '/delivery');
+        });
+    }
+</script>
+
+<script>
+    if (new URLSearchParams(window.location.search).get('failed') === 'true') {
+        Swal.fire({
+            icon: 'warning',
+            title: '¡Intento fallido registrado!',
+            text: 'El operador recibirá la notificación para reprogramar la entrega.',
+            confirmButtonText: 'Aceptar',
+            confirmButtonColor: '#2563eb',
         }).then(() => {
             history.replaceState(null, '', '/delivery');
         });

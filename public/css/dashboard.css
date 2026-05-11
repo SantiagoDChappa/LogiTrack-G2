@@ -75,13 +75,30 @@
     font-size: 1.1rem;
 }
 
+/* ===== ACCESO RÁPIDO EN HEADER ===== */
+
+.header-quick-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
 /* ===== TARJETAS DE ESTADÍSTICAS ===== */
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
     margin-bottom: 1.25rem;
+}
+
+/* Repartidores cards (5th & 6th) span 2 cols each to fill row cleanly */
+.stat-card:nth-child(5) {
+    grid-column: 1 / span 2;
+}
+.stat-card:nth-child(6) {
+    grid-column: 3 / span 2;
 }
 
 .stat-card {
@@ -152,9 +169,13 @@
 
 .bottom-grid {
     display: grid;
-    grid-template-columns: minmax(220px, 0.85fr) minmax(240px, 0.9fr) minmax(420px, 1.4fr);
+    grid-template-columns: minmax(200px, 0.7fr) minmax(400px, 1.3fr);
     gap: 1rem;
     align-items: start;
+}
+
+.entregas-card {
+    grid-column: 1 / -1;
 }
 
 .card {
@@ -193,6 +214,11 @@
     min-width: 0;
 }
 
+/* Última actividad spans all 3 columns */
+.ultima-actividad {
+    grid-column: 1 / -1;
+}
+
 .status-total-list {
     display: flex;
     flex-direction: column;
@@ -204,12 +230,21 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 0.65rem 0;
+    padding: 0.65rem 0.5rem;
     border-bottom: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--transition);
 }
 
 .status-total-row:last-child {
     border-bottom: none;
+}
+
+.status-total-row:hover {
+    background-color: var(--color-surface-hover, rgba(99,102,241,0.07));
+    text-decoration: none;
 }
 
 .status-total-value {
@@ -330,6 +365,26 @@
     color: var(--badge-initial-text);
 }
 
+.status-badge.asignado {
+    background-color: var(--badge-assigned-bg);
+    color: var(--badge-assigned-text);
+}
+
+.status-badge.en_preparacion {
+    background-color: var(--badge-preparing-bg);
+    color: var(--badge-preparing-text);
+}
+
+.status-badge.paquete_fallido {
+    background-color: var(--badge-package-failed-bg);
+    color: var(--badge-package-failed-text);
+}
+
+.status-badge.intento_fallido {
+    background-color: var(--badge-failed-attempt-bg);
+    color: var(--badge-failed-attempt-text);
+}
+
 /* ===== BOTÓN VER DETALLE ===== */
 
 .btn-ver-detalle {
@@ -356,13 +411,27 @@
 
 @media (max-width: 1200px) {
     .bottom-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+    }
+    .ultima-actividad {
+        grid-column: 1 / -1;
+    }
+
+    .header-quick-actions {
+        flex-wrap: wrap;
     }
 }
 
 @media (max-width: 900px) {
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+    .stat-card:nth-child(5),
+    .stat-card:nth-child(6) {
+        grid-column: span 1;
+    }
+    .bottom-grid {
+        grid-template-columns: 1fr;
     }
 }
 

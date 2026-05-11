@@ -72,6 +72,8 @@
                     const okRows      = analysis.rows.filter(r => r.status === 'ok');
                     const dupRows     = analysis.rows.filter(r => r.status === 'duplicate');
                     const invalidRows = analysis.rows.filter(r => r.status === 'invalid');
+                    const STATUS_LABELS = { 1: 'Pendiente', 2: 'En Tránsito', 3: 'En Sucursal', 4: 'Entregado', 5: 'Cancelado' };
+                    const STATUS_CLASS  = { 1: 'pendiente', 2: 'en-transito', 3: 'en-sucursal', 4: 'entregado', 5: 'cancelado' };
                 %>
 
                 <!-- Filas OK -->
@@ -92,6 +94,7 @@
                                         <th>Destinatario</th>
                                         <th>Dirección</th>
                                         <th>Estado</th>
+                                        <th>Repartidor</th>
                                         <th>Legacy ID</th>
                                     </tr>
                                 </thead>
@@ -103,10 +106,11 @@
                                             <td><%= r.data.recipientName %> <small>(<%= r.data.recipientDocument %>)</small></td>
                                             <td><%= r.data.street %> <%= r.data.number %></td>
                                             <td>
-                                                <span class="status-badge status-badge--sm <%= r.data.statusId === 4 ? 'entregado' : 'cancelado' %>">
-                                                    <%= r.data.statusId === 4 ? 'Entregado' : 'Cancelado' %>
+                                                <span class="status-badge status-badge--sm <%= STATUS_CLASS[r.data.statusId] || '' %>">
+                                                    <%= STATUS_LABELS[r.data.statusId] || r.data.statusId %>
                                                 </span>
                                             </td>
+                                            <td><%= r.data.deliveryUserId ? '#' + r.data.deliveryUserId : '—' %></td>
                                             <td class="tracking-id"><%= r.data.legacyTrackingId || '—' %></td>
                                         </tr>
                                     <% }) %>
