@@ -124,6 +124,15 @@ const saveEvidence = async (req, res) => {
             });
         }
 
+        if (signatureBase64.isEmpty()) {
+            return res.render('delivery/evidence', {
+                shipmentId: trackingCode,
+                errors: {
+                    signature: 'La firma es requerida para confirmar la entrega.'
+                }
+            });
+        }
+
         if (!stateMachine.canTransition({
             fromStatusId: shipment.statusId,
             toStatusId:   Status.DELIVERED.id,

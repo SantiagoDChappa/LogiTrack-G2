@@ -300,6 +300,13 @@
                         <span class="material-symbols-outlined">draw</span>
                         Firma del receptor
                     </div>
+                    <div>
+                        <% if (errors.signature) { %>
+                            <sub style="color:red" id="signature-error">
+                                <%= errors.signature %>
+                            </sub>
+                        <% } %>
+                    </div>
                     <canvas id="signatureCanvas" width="440" height="160"></canvas>
                     <button type="button" class="clear-btn" id="clearSignature">
                         <span class="material-symbols-outlined">delete</span>
@@ -318,8 +325,8 @@
     </div>
 
     <script>
-        const errorMessage = document.getElementById('ubication-error');
         // GPS
+        const ubiErrorMessage = document.getElementById('ubication-error');
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -329,8 +336,8 @@
                     el.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span>Ubicación obtenida</span>';
                     el.classList.add('success');
 
-                    if (errorMessage) {
-                        errorMessage.style.display = 'none';
+                    if (ubiErrorMessage) {
+                        ubiErrorMessage.style.display = 'none';
                     }
                 },
                 () => {
@@ -361,48 +368,78 @@
         });
 
         // Firma
+        const sigErrorMessage = document.getElementById('signature-error');
         const canvas = document.getElementById('signatureCanvas');
         const ctx = canvas.getContext('2d');
+
+        const hiddenInput = document.getElementById('signatureBase64');
+        const clearBtn = document.getElementById('clearSignature');
+
         let drawing = false;
 
-        function getPos(e) {
-            const r = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / r.width;
-            const scaleY = canvas.height / r.height;
-            const t = e.touches[0];
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#000';
+
+        function getPosition(event) {
+            const rect = canvas.getBoundingClientRect();
+
+            if (event.touches) {
+                return {
+                    x: event.touches[0].clientX - rect.left,
+                    y: event.touches[0].clientY - rect.top
+                };
+            }
+
             return {
-                x: (t.clientX - r.left) * scaleX,
-                y: (t.clientY - r.top) * scaleY
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
             };
         }
 
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
+        function startDrawing(event) {
             drawing = true;
-            const pos = getPos(e);
+            sigErrorMessage.style.display = 'none';
+            const pos = getPosition(event);
+
             ctx.beginPath();
             ctx.moveTo(pos.x, pos.y);
-        });
+        }
 
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
+        function draw(event) {
             if (!drawing) return;
-            const pos = getPos(e);
+
+            event.preventDefault();
+
+            const pos = getPosition(event);
+
             ctx.lineTo(pos.x, pos.y);
-            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim();
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
             ctx.stroke();
-        });
 
-        canvas.addEventListener('touchend', () => {
+            // Guarda automáticamente la firma en el hidden input
+            hiddenInput.value = canvas.toDataURL('image/png');
+        }
+
+        function stopDrawing() {
             drawing = false;
-            document.getElementById('signatureBase64').value = canvas.toDataURL('image/png');
-        });
+        }
 
-        document.getElementById('clearSignature').addEventListener('click', () => {
+        // Mouse
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        // Touch
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // Limpiar firma
+        clearBtn.addEventListener('click', () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            document.getElementById('signatureBase64').value = '';
+
+            hiddenInput.value = '';
         });
     </script>
 
