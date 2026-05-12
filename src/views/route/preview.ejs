@@ -144,6 +144,7 @@
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const fmtEta = (iso) => { if (!iso) return ''; return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
     const fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDuration = (min) => { if (min == null) return '-'; const h = Math.floor(min / 60); const m = min % 60; return h > 0 ? `${h}h${m > 0 ? ' ' + m + 'min' : ''}` : `${m}min`; };
 
     const buildAssignmentsFromState = () => {
         return currentState.proposals.map(p => ({
@@ -176,6 +177,23 @@
         });
         currentState = { proposals: data.proposals, unassigned: dedupUn, summary: data.summary };
         render();
+    };
+
+    const rejectExtras = (txId) => {
+        const proposal = currentState.proposals.find(p => p.transportId === txId);
+        if (!proposal || !proposal.opportunisticSummary) { return; }
+        const oppIds = new Set(
+            (proposal.reasoning?.shipments || []).filter(r => r.opportunistic).map(r => r.shipmentId)
+        );
+        if (oppIds.size === 0) { return; }
+        proposal.shipmentIds = proposal.shipmentIds.filter(id => !oppIds.has(id));
+        currentState.unassigned = currentState.unassigned || [];
+        for (const r of (proposal.reasoning?.shipments || [])) {
+            if (r.opportunistic && r.shipmentId) {
+                currentState.unassigned.push({ id: r.shipmentId, trackingId: r.trackingId, code: 'opp_rejected', reason: 'Extra rechazado. Puede arrastrarse a otra propuesta o dejarse para la siguiente ruta.' });
+            }
+        }
+        recalc();
     };
 
     const recalcExcluding = async (txId) => {
@@ -237,6 +255,8 @@
                 <div class="item">Aplicadas<strong>${appliedTxIds.size}</strong></div>
             </div>`;
         if (s.deficitWarning) summaryHtml += `<div class="deficit-banner">⚠ ${escapeHtml(s.deficitWarning)}</div>`;
+        if (s.unavailableTransports?.busy?.length) summaryHtml += `<div class="deficit-banner">🔒 ${s.unavailableTransports.busy.length} transporte(s) excluido(s) por tener ruta activa: <strong>${escapeHtml(s.unavailableTransports.busy.map(t => t.name).join(', '))}</strong>. Completar o cancelar esas rutas para liberarlos.</div>`;
+        if (s.unavailableTransports?.zeroCap?.length) summaryHtml += `<div class="deficit-banner">⚠ ${s.unavailableTransports.zeroCap.length} transporte(s) excluido(s) por no tener capacidad de carga configurada: <strong>${escapeHtml(s.unavailableTransports.zeroCap.map(t => t.name).join(', '))}</strong>. Actualizar el peso máximo en Transportes.</div>`;
         summaryEl.innerHTML = summaryHtml;
 
         data.proposals.forEach((p, idx) => {
@@ -283,6 +303,10 @@
                         <summary style="cursor:pointer;color:#0f766e;font-weight:500">Ver detalle por envío</summary>
                         <ol style="margin:.4rem 0 0;padding-left:1.2rem">${oppShipDetails}</ol>
                     </details>
+                    <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
+                        <button disabled style="background:#dcfce7;color:#166534;border:1px solid #86efac;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:default;opacity:.75">✓ Extras aceptados</button>
+                        <button class="btn-opp-reject" data-tx="${p.transportId}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer" title="Quita estos envíos de la propuesta y los mueve al pool sin asignar">✗ Rechazar extras</button>
+                    </div>
                 </div>`;
             }
 
@@ -304,7 +328,7 @@
                 ${warns}
                 <div class="proposal-stats">
                     <div class="proposal-stat">Distancia<strong>${p.totalDistanceKm} km</strong></div>
-                    <div class="proposal-stat">Tiempo<strong>${p.totalDurationMin ?? '-'} min</strong></div>
+                    <div class="proposal-stat">Tiempo<strong>${fmtDuration(p.totalDurationMin)}</strong></div>
                     <div class="proposal-stat">Costo<strong>${fmtMoney(p.totalCost)}</strong></div>
                     <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
                     <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
@@ -388,6 +412,9 @@
                 const txId = Number(btn.closest('.proposal-card').dataset.transportId);
                 recalcExcluding(txId);
             });
+        });
+        container.querySelectorAll('.btn-opp-reject').forEach(btn => {
+            btn.addEventListener('click', () => rejectExtras(Number(btn.dataset.tx)));
         });
 
         // Popover hover/focus

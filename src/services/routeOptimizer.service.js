@@ -153,7 +153,7 @@ const assignClusterToTransports = (cluster, availableTx, distKm) => {
         .sort((a, b) => (num(a.fixedCost) + num(a.costPerKm)) - (num(b.fixedCost) + num(b.costPerKm)));
 
     if (candidates.length === 0) {
-        return { buckets: [], unassigned: sortedShipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `Sin transporte adecuado para ${distKm.toFixed(0)}km hacia ${cluster.provinceName} (motos limitadas a 50km, vans 300km, camion chico 600km)` })) };
+        return { buckets: [], unassigned: sortedShipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `No hay transporte habilitado para cubrir ${distKm.toFixed(0)}km hacia ${cluster.provinceName}. Rangos máx: moto 50km, van 300km, camión chico 600km, camión grande ilimitado. Agregar un vehículo con mayor rango a la sucursal o verificar zonas habilitadas.` })) };
     }
 
     const buckets = [];
@@ -197,7 +197,7 @@ const assignClusterToTransports = (cluster, availableTx, distKm) => {
                 dedicated: isUrgent,
             });
         } else {
-            unassigned.push({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `Sin transporte con capacidad para peso=${w}kg vol=${v}m³ en provincia ${cluster.provinceName}` });
+            unassigned.push({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `Ningún transporte puede cargar este envío (${w}kg / ${v}m³) hacia ${cluster.provinceName}. Todos los vehículos disponibles están llenos o son incompatibles. Agregar otro transporte a la sucursal o reducir la carga.` });
         }
     }
 
@@ -620,7 +620,7 @@ const optimizeManual = async ({ assignments, supervisorBranchId }) => {
     const allTxIds = assignments.map(a => a.transportId);
     const [shipments, transports] = await Promise.all([
         Shipment.findAll({
-            where: { id: { [Op.in]: allShipmentIds }, currentBranchId: supervisorBranchId },
+            where: { id: { [Op.in]: allShipmentIds } }, // sin filtro de branch: permite envíos oportunistas de otras sucursales
             include: [
                 { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province', required: false }] },
                 { model: Zone, as: 'zone', required: false },
@@ -694,6 +694,46 @@ const optimizeManual = async ({ assignments, supervisorBranchId }) => {
             maxDistanceKm: clusterMaxDistanceKm(branch, { shipments: ok }),
         };
         const bucket = { transport: t, shipments: ok, usedWeight: usedW, usedVolume: usedV, dedicated: false };
+
+        // Reconstruir datos oportunistas para envíos que vienen de otras sucursales
+        const oppShips = ok.filter(s => s.currentBranchId && s.currentBranchId !== supervisorBranchId);
+        if (oppShips.length > 0) {
+            const oppBranchIds = [...new Set(oppShips.map(s => s.currentBranchId))];
+            const oppBranches = await Branch.findAll({ where: { id: { [Op.in]: oppBranchIds } } });
+            const branchMap = new Map(oppBranches.map(b => [b.id, b]));
+            const bPt = { lat: num(branch.latitude), lng: num(branch.longitude) };
+            const pickupsByBranch = new Map();
+            for (const s of oppShips) {
+                if (s.address?.lat && s.address?.lng) {
+                    const br = branchMap.get(s.currentBranchId);
+                    const destPt = { lat: num(s.address.lat), lng: num(s.address.lng) };
+                    const directKm = haversineKm(bPt, destPt);
+                    const brPt = br ? { lat: num(br.latitude), lng: num(br.longitude) } : null;
+                    const viaKm = brPt ? haversineKm(bPt, brPt) + haversineKm(brPt, destPt) : directKm;
+                    const extraKm = viaKm - directKm;
+                    const pctExtra = directKm > 0 ? (extraKm / directKm) * 100 : 0;
+                    s._opportunisticInfo = {
+                        branchId: s.currentBranchId,
+                        branchName: br ? br.name : `Sucursal #${s.currentBranchId}`,
+                        directKm: Number(directKm.toFixed(1)),
+                        viaBranchKm: Number(viaKm.toFixed(1)),
+                        extraKm: Number(extraKm.toFixed(1)),
+                        pctExtra: Number(pctExtra.toFixed(1)),
+                        corridorDetourKm: 0,
+                        costPerKm: num(t.costPerKm),
+                        extraCost: Number((extraKm * num(t.costPerKm)).toFixed(2)),
+                        capWeightBefore: num(t.maxWeightKg),
+                        capVolumeBefore: num(t.maxVolumeM3),
+                    };
+                }
+                const arr = pickupsByBranch.get(s.currentBranchId) || [];
+                arr.push(s);
+                pickupsByBranch.set(s.currentBranchId, arr);
+            }
+            bucket.opportunisticPickups = pickupsByBranch;
+            bucket.opportunisticBranches = branchMap;
+        }
+
         proposals.push(await buildProposal({ bucket, branch, cluster }));
     }
 
@@ -738,6 +778,26 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     ]);
     transports = transports.filter(t => !excludeSet.has(t.id));
 
+    // Transportes sin capacidad de peso declarada (maxWeightKg=0) no pueden cargar nada
+    const zeroCapTransports = transports
+        .filter(t => num(t.maxWeightKg) <= 0)
+        .map(t => ({ id: t.id, name: t.name, plate: t.plate }));
+    transports = transports.filter(t => num(t.maxWeightKg) > 0);
+
+    // Transportes ya asignados a una ruta activa (planificada o en curso) no están disponibles
+    const { Route: _RouteCheck, RouteStatus: _RSCheck } = require('../models/route');
+    const activeTxRoutes = await _RouteCheck.findAll({
+        where: {
+            transportId: { [Op.in]: transports.map(t => t.id) },
+            statusId: { [Op.in]: [_RSCheck.PLANNED, _RSCheck.IN_ROUTE] },
+        },
+        attributes: ['transportId', 'id'],
+    }).catch(() => []);
+    const busyTxMap = new Map(activeTxRoutes.map(r => [r.transportId, r.id]));
+    const busyTransports = transports.filter(t => busyTxMap.has(t.id))
+        .map(t => ({ id: t.id, name: t.name, plate: t.plate, activeRouteId: busyTxMap.get(t.id) }));
+    transports = transports.filter(t => !busyTxMap.has(t.id));
+
     // Doble asignación: descartar envíos que ya tienen RouteStop en una ruta activa
     const RouteStop = require('../models/routeStop').RouteStop;
     const routeModel = require('../models/route');
@@ -754,7 +814,12 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     const rejected = shipmentIds.filter(id => !loadedIds.has(Number(id)));
 
     if (transports.length === 0) {
-        return { proposals: [], unassigned: shipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_transports', reason: 'Sin transportes habilitados en la sucursal' })), rejected, summary: {} };
+        const whyParts = [];
+        if (busyTransports.length > 0) whyParts.push(`${busyTransports.length} en ruta activa (${busyTransports.map(t => t.name).join(', ')}) — completar o cancelar esas rutas para liberarlos`);
+        if (zeroCapTransports.length > 0) whyParts.push(`${zeroCapTransports.length} sin capacidad configurada (${zeroCapTransports.map(t => t.name).join(', ')}) — actualizar peso máximo en Transportes`);
+        const whyMsg = whyParts.length > 0 ? ` Causas: ${whyParts.join('; ')}.` : ' Verificar que existan vehículos habilitados y asignados a esta sucursal.';
+        const noTxSummary = { unavailableTransports: { busy: busyTransports, zeroCap: zeroCapTransports } };
+        return { proposals: [], unassigned: shipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_transports', reason: `Sin transportes disponibles para operar.${whyMsg}` })), rejected, summary: noTxSummary };
     }
 
     // ===== Pre-flight: casos borde =====
@@ -782,15 +847,11 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         const lng = num(s.address?.lng);
 
         if (!lat || !lng) {
-            unassigned.push({ id: s.id, trackingId: s.trackingId, code: 'no_geo', reason: 'Domicilio sin coordenadas (lat/lng faltantes). Requiere georreferenciar.' });
+            unassigned.push({ id: s.id, trackingId: s.trackingId, code: 'no_geo', reason: 'Domicilio sin geolocalización. Editar el envío, corregir la dirección y guardar para que el sistema calcule las coordenadas automáticamente.' });
             continue;
         }
-        if (s.address?.provinceId && lat && lng) {
-            // chequeo barato: provincia inconsistente con coords (bbox aproximado).
-            // Lo dejamos como warning sin filtrar.
-        }
         if (w > maxFleetWeight || v > maxFleetVolume) {
-            unassigned.push({ id: s.id, trackingId: s.trackingId, code: 'oversized', reason: `Bulto sobredimensionado: peso=${w}kg vol=${v}m³ excede el transporte mas grande (${maxFleetWeight}kg / ${maxFleetVolume}m³). Requiere subcontratacion.` });
+            unassigned.push({ id: s.id, trackingId: s.trackingId, code: 'oversized', reason: `Envío sobredimensionado: ${w}kg / ${v}m³ supera el vehículo más grande de la flota (${maxFleetWeight}kg / ${maxFleetVolume}m³). Opciones: subdividir en múltiples envíos o contratar transporte especial.` });
             continue;
         }
         validShipments.push(s);
@@ -852,6 +913,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         fleetCapacityM3: totalFleetVolume,
         capacityShortfall,
         deficitWarning,
+        unavailableTransports: { busy: busyTransports, zeroCap: zeroCapTransports },
     };
 
     return { proposals, unassigned, rejected, summary };

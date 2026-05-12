@@ -20,6 +20,10 @@ jest.mock('../src/services/geocode', () => ({
     GeocodeError:   jest.requireActual('../src/services/geocode').GeocodeError,
 }));
 
+jest.mock('../src/services/zoneResolver.service', () => ({
+    resolveZone: jest.fn().mockResolvedValue(null),
+}));
+
 const personModel          = require('../src/models/person');
 const addressModel         = require('../src/models/address');
 const shipmentModel        = require('../src/models/shipment');

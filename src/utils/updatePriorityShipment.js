@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { Shipment } = require('../models/shipment');
+const { Shipment, getActiveShipments } = require('../models/shipment');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const { Status, ShipmentPriority } = require('../constants/enums');
 
@@ -32,7 +32,7 @@ async function calcutaleUpdatePriority(shipmentId, priorityBase) {
 }
 
 cron.schedule('0 0 * * *', async () => {
-    const shipments = await Shipment.getActiveShipments();
+    const shipments = await getActiveShipments();
 
     for (const shipment of shipments) {
         const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);

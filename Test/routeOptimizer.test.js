@@ -42,7 +42,7 @@ describe('Route Optimization E2E', () => {
         // Transportes
         await Transport.bulkCreate([
             { id: 100, name: 'Camion CABA',  plate: 'AB123CD', maxWeightKg: 100, maxVolumeM3: 5,  fixedCost: 1000, costPerKm: 50,  driverUserId: 10, branchId: 1, enabled: true },
-            { id: 101, name: 'Camion Largo', plate: 'XY789ZW', maxWeightKg: 500, maxVolumeM3: 20, fixedCost: 5000, costPerKm: 200, driverUserId: 11, branchId: 1, enabled: true },
+            { id: 101, name: 'Camion Largo', plate: 'XY789ZW', maxWeightKg: 3000, maxVolumeM3: 20, fixedCost: 5000, costPerKm: 200, driverUserId: 11, branchId: 1, enabled: true },
             { id: 102, name: 'Deshabilitado', plate: 'ZZ000', maxWeightKg: 1000, maxVolumeM3: 50, fixedCost: 0, costPerKm: 1, driverUserId: null, branchId: 1, enabled: false },
         ]);
 
@@ -241,7 +241,7 @@ describe('Route Optimization E2E', () => {
             ]);
         });
 
-        const allOtherTx = (keep) => [100, 101, 102, 200, 201, 202, 203, 204].filter(id => !keep.includes(id));
+        const allOtherTx = (keep) => [100, 101, 102, 200, 201, 202, 203, 204, 205, 206, 207].filter(id => !keep.includes(id));
 
         test('CP-R02: envío 60kg supera cap 50kg → unassigned (oversized/no_fit)', async () => {
             const result = await optimizer.optimizeRoutes({
@@ -335,7 +335,7 @@ describe('Route Optimization E2E', () => {
             const result = await optimizer.optimizeRoutes({
                 shipmentIds: [1001, 1002],
                 supervisorBranchId: 1,
-                excludeTransportIds: [100, 101, 102, 200, 201, 202, 203, 204], // todos
+                excludeTransportIds: [100, 101, 102, 200, 201, 202, 203, 204, 205, 206, 207], // todos
             });
             expect(result.proposals).toEqual([]);
             const ids = result.unassigned.map(u => (typeof u === 'object' ? u.id : u));
