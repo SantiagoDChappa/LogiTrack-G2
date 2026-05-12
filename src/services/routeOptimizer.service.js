@@ -143,7 +143,8 @@ const clusterByProvince = (shipments) => {
 
 // Asigna 1 cluster -> 1+ transportes. Greedy: transporte mas barato que entre el cluster entero;
 // si no entra, parte el cluster y usa multiples.
-const assignClusterToTransports = (cluster, availableTx, distKm) => {
+const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) => {
+    const urgentCombine = options.urgentCombine || { enabled: false, maxKm: 0 };
     const sortedShipments = [...cluster.shipments].sort((a, b) => num(b.weightKg) - num(a.weightKg));
     // Filtra transportes elegibles para alguna zona del cluster (al menos uno)
     const zoneIds = [...new Set(cluster.shipments.map(s => s.zoneId).filter(Boolean))];
@@ -169,7 +170,7 @@ const assignClusterToTransports = (cluster, availableTx, distKm) => {
         const isUrgent = (s.priority || 1) === 3;
         let placed = false;
 
-        // urgent NUNCA se mezcla en bucket existente -> vehiculo dedicado
+        // No-urgent: intentar compartir bucket NO dedicado
         if (!isUrgent) {
             for (const b of buckets) {
                 if (b.dedicated) { continue; }
@@ -183,6 +184,23 @@ const assignClusterToTransports = (cluster, availableTx, distKm) => {
                 break;
             }
             if (placed) { continue; }
+        }
+
+        // Urgent: intentar combinar con bucket urgente existente si la distancia entre destinos es chica
+        if (isUrgent && urgentCombine.enabled) {
+            let bestBucket = null, bestDist = Infinity;
+            for (const b of buckets) {
+                if (!b.dedicated) { continue; }
+                const check = isUrgentBucketCompatible(b, s, urgentCombine.maxKm);
+                if (check.ok && check.distKm < bestDist) { bestBucket = b; bestDist = check.distKm; }
+            }
+            if (bestBucket) {
+                bestBucket.shipments.push(s);
+                bestBucket.usedWeight += w;
+                bestBucket.usedVolume += v;
+                bestBucket.urgentCombined = (bestBucket.urgentCombined || []).concat([{ shipmentId: s.id, trackingId: s.trackingId, pairedDistKm: Number(bestDist.toFixed(2)) }]);
+                continue;
+            }
         }
 
         // abrir bucket nuevo con transporte mas barato no usado
@@ -526,7 +544,11 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         };
     }
     const autonomyInfo = num(t.autonomyKm) > 0 ? ` Autonomia ${num(t.autonomyKm)}km.` : '';
-    const transportPickReason = `Cluster destino: ${cluster.provinceName}. Elegido ${t.name} (${cls.type}) por menor costo unitario habilitado dentro del rango (fijo $${num(t.fixedCost)} + $${num(t.costPerKm)}/km). Capacidad ${num(t.maxWeightKg)}kg / ${num(t.maxVolumeM3)}m³. Zonas: ${t.zones?.length ? t.zones.map(z => z.name).join(', ') : 'todas'}.${distInfo}${autonomyInfo}${oppInfo}`;
+    const urgentShips = bucket.shipments.filter(s => (s.priority || 1) === 3);
+    const urgentCombinedInfo = (bucket.dedicated && urgentShips.length > 1)
+        ? ` 🚨 ${urgentShips.length} envíos URGENTES combinados en este vehículo dedicado por destinos cercanos (max ${(bucket.urgentCombined || []).reduce((m, c) => Math.max(m, c.pairedDistKm || 0), 0).toFixed(1)}km entre destinos).`
+        : '';
+    const transportPickReason = `Cluster destino: ${cluster.provinceName}. Elegido ${t.name} (${cls.type}) por menor costo unitario habilitado dentro del rango (fijo $${num(t.fixedCost)} + $${num(t.costPerKm)}/km). Capacidad ${num(t.maxWeightKg)}kg / ${num(t.maxVolumeM3)}m³. Zonas: ${t.zones?.length ? t.zones.map(z => z.name).join(', ') : 'todas'}.${distInfo}${autonomyInfo}${oppInfo}${urgentCombinedInfo}`;
 
     const reasons = bucket.shipments.map(s => {
         const pri = PRIORITY_LABEL[Number(s.priority) || 1] ?? 'normal';
@@ -600,6 +622,11 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         utilizationWeight: num(t.maxWeightKg) > 0 ? Number((bucket.usedWeight / num(t.maxWeightKg)).toFixed(3)) : 0,
         utilizationVolume: num(t.maxVolumeM3) > 0 ? Number((bucket.usedVolume / num(t.maxVolumeM3)).toFixed(3)) : 0,
         shipmentIds: bucket.shipments.map(s => s.id),
+        urgentCombinedSummary: (bucket.dedicated && urgentShips.length > 1) ? {
+            count: urgentShips.length,
+            shipments: urgentShips.map(s => ({ id: s.id, trackingId: s.trackingId })),
+            maxPairDistKm: (bucket.urgentCombined || []).reduce((m, c) => Math.max(m, c.pairedDistKm || 0), 0),
+        } : null,
         opportunisticSummary,
         reasoning: {
             transportPick: transportPickReason,
@@ -768,6 +795,57 @@ const loadPiggybackSettings = async () => {
             maxExtraCostPct: Number(costPct) || 0,
         };
     } catch { return { enabled: false, maxExtraPct: 15, maxExtraKm: 30, maxExtraCostPct: 20 }; }
+};
+
+const loadUrgentCombineSettings = async () => {
+    try {
+        const settingModel = require('../models/setting');
+        const get = async (k, def) => (await settingModel.get(k)) ?? def;
+        const [en, kmMax] = await Promise.all([
+            get('urgent_combine_enabled', 'true'),
+            get('urgent_combine_max_km', '15'),
+        ]);
+        return {
+            enabled: en === 'true' || en === 'on' || en === '1',
+            maxKm: Number(kmMax) || 0,
+        };
+    } catch { return { enabled: true, maxKm: 15 }; }
+};
+
+// Devuelve true si el envio s "cabe" en un bucket urgente existente:
+// - capacidad libre suficiente
+// - zona compatible
+// - distancia haversine al destino mas cercano del bucket <= maxKm
+// - ventanas horarias compatibles (si ambos tienen ventana, los rangos deben solaparse)
+const isUrgentBucketCompatible = (bucket, s, maxKm) => {
+    const t = bucket.transport;
+    const w = num(s.weightKg), v = num(s.volumeM3);
+    if (bucket.usedWeight + w > num(t.maxWeightKg)) { return { ok: false, reason: 'capacidad peso' }; }
+    if (bucket.usedVolume + v > num(t.maxVolumeM3)) { return { ok: false, reason: 'capacidad volumen' }; }
+    if (!isTransportEligibleForZone(t, s.zoneId)) { return { ok: false, reason: 'zona incompatible' }; }
+    const sLat = num(s.address?.lat), sLng = num(s.address?.lng);
+    if (!sLat || !sLng) { return { ok: false, reason: 'sin geo' }; }
+    let minDist = Infinity;
+    for (const bs of bucket.shipments) {
+        const bLat = num(bs.address?.lat), bLng = num(bs.address?.lng);
+        if (!bLat || !bLng) { continue; }
+        const d = haversineKm({ lat: sLat, lng: sLng }, { lat: bLat, lng: bLng });
+        if (d < minDist) { minDist = d; }
+    }
+    if (minDist > maxKm) { return { ok: false, reason: `distancia ${minDist.toFixed(1)}km > ${maxKm}km`, distKm: minDist }; }
+    // Ventanas: si ambos tienen, deben solaparse
+    const sFrom = parseTimeToSec(s.expectedDeliveryFrom);
+    const sTo   = parseTimeToSec(s.expectedDeliveryTo);
+    if (sFrom != null && sTo != null) {
+        for (const bs of bucket.shipments) {
+            const bFrom = parseTimeToSec(bs.expectedDeliveryFrom);
+            const bTo   = parseTimeToSec(bs.expectedDeliveryTo);
+            if (bFrom != null && bTo != null) {
+                if (sTo < bFrom || sFrom > bTo) { return { ok: false, reason: 'ventanas no solapan' }; }
+            }
+        }
+    }
+    return { ok: true, distKm: minDist };
 };
 
 const evaluatePiggyback = async ({ plannedRoutes, transportsById, shipments, branch, thresholds }) => {
@@ -980,6 +1058,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     // Transportes con rutas activas. Si piggyback está habilitado, PLANNED no bloquea (se reusa la ruta);
     // IN_ROUTE siempre bloquea (el repartidor salió, no se puede modificar).
     const piggySettings = await loadPiggybackSettings();
+    const urgentCombine = await loadUrgentCombineSettings();
     const { Route: _RouteCheck, RouteStatus: _RSCheck } = require('../models/route');
     const activeTxRoutes = await _RouteCheck.findAll({
         where: {
@@ -1110,7 +1189,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         }
         const distKm = clusterMaxDistanceKm(branch, cluster);
         cluster.maxDistanceKm = distKm;
-        const { buckets, unassigned: clUn } = assignClusterToTransports(cluster, available, distKm);
+        const { buckets, unassigned: clUn } = assignClusterToTransports(cluster, available, distKm, { urgentCombine });
         unassigned.push(...clUn);
         for (const bucket of buckets) {
             usedTxIds.add(bucket.transport.id);

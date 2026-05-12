@@ -289,6 +289,21 @@
             const cb = p.costBreakdown || {};
             const cluster = p.clusterProvinceName ? `<span class="proposal-cluster-badge">📍 ${escapeHtml(p.clusterProvinceName)}</span>` : '';
             const piggyBadge = p.piggyback ? `<span class="proposal-cluster-badge" style="background:#fef3c7;color:#92400e;border-color:#f59e0b">🔗 SUMAR A RUTA #${p.existingRouteId}</span>` : '';
+            const urgentBadge = p.urgentCombinedSummary ? `<span class="proposal-cluster-badge" style="background:#fee2e2;color:#991b1b;border-color:#dc2626">🚨 ${p.urgentCombinedSummary.count} URGENTES COMBINADOS</span>` : '';
+            let urgentBlock = '';
+            if (p.urgentCombinedSummary) {
+                const us = p.urgentCombinedSummary;
+                const ships = us.shipments.map(s => escapeHtml(s.trackingId)).join(', ');
+                urgentBlock = `
+                <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#991b1b;margin-bottom:.3rem">🚨 ${us.count} envíos urgentes combinados en este vehículo dedicado</div>
+                    <div style="color:#7f1d1d">
+                        Tracking: <strong>${ships}</strong><br>
+                        Distancia máxima entre destinos: <strong>${us.maxPairDistKm.toFixed(1)}km</strong> (dentro del umbral configurado).<br>
+                        <em>Ahorra ${us.count - 1} vehículo(s) dedicado(s) adicional(es) — costo fijo evitado.</em>
+                    </div>
+                </div>`;
+            }
             let piggyBlock = '';
             if (p.piggyback && p.piggybackSummary) {
                 const ps = p.piggybackSummary;
@@ -361,9 +376,10 @@
 
             card.innerHTML = `
                 <div class="proposal-header">
-                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster} ${piggyBadge}</h3>
+                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster} ${piggyBadge} ${urgentBadge}</h3>
                 </div>
                 ${piggyBlock}
+                ${urgentBlock}
                 <div class="proposal-meta">Conductor: ${p.transport.driver ? escapeHtml(p.transport.driver.fullName) : 'Sin asignar'}</div>
                 ${warns}
                 <div class="proposal-stats">

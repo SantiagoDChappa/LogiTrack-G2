@@ -71,6 +71,8 @@ const ROUTE_SETTINGS = {
     piggyback_max_extra_pct:     { default: '15',    parse: v => Math.max(0, Number(v) || 0) },
     piggyback_max_extra_km:      { default: '30',    parse: v => Math.max(0, Number(v) || 0) },
     piggyback_max_extra_cost_pct:{ default: '20',    parse: v => Math.max(0, Number(v) || 0) },
+    urgent_combine_enabled:      { default: 'true',  parse: v => v === 'true' || v === 'on' || v === '1' },
+    urgent_combine_max_km:       { default: '15',    parse: v => Math.max(0, Number(v) || 0) },
 };
 
 const getRouteOptimizerSettings = async () => {
@@ -84,12 +86,15 @@ const getRouteOptimizerSettings = async () => {
 
 const saveRouteOptimizerSettings = async (req, res) => {
     const body = req.body || {};
-    const piggyEnabled = body.piggyback_enabled === 'on' || body.piggyback_enabled === 'true' || body.piggyback_enabled === '1';
+    const piggyEnabled  = body.piggyback_enabled === 'on'      || body.piggyback_enabled === 'true'      || body.piggyback_enabled === '1';
+    const urgentEnabled = body.urgent_combine_enabled === 'on' || body.urgent_combine_enabled === 'true' || body.urgent_combine_enabled === '1';
     await Promise.all([
         settingModel.set('piggyback_enabled',            piggyEnabled ? 'true' : 'false'),
         settingModel.set('piggyback_max_extra_pct',      String(Math.max(0, Number(body.piggyback_max_extra_pct) || 0))),
         settingModel.set('piggyback_max_extra_km',       String(Math.max(0, Number(body.piggyback_max_extra_km) || 0))),
         settingModel.set('piggyback_max_extra_cost_pct', String(Math.max(0, Number(body.piggyback_max_extra_cost_pct) || 0))),
+        settingModel.set('urgent_combine_enabled',       urgentEnabled ? 'true' : 'false'),
+        settingModel.set('urgent_combine_max_km',        String(Math.max(0, Number(body.urgent_combine_max_km) || 0))),
     ]);
     res.redirect('/setting?success=3');
 };
