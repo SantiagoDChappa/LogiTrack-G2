@@ -36,6 +36,25 @@
   font-size: 1rem;
 }
 
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.45rem 1rem;
+  background-color: #dc2626;
+  color: #ffffff !important;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
 .table-wrapper {
   background: transparent;
 }
@@ -2100,6 +2119,7 @@
 /* ── Board wrapper ───────────────────────────────────────────── */
 .kanban-board-wrap {
   flex: 1;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
   padding: var(--space-4) var(--space-6);

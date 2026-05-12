@@ -44,11 +44,11 @@ const requireSupervisor = (req, res, next) => {
 const requireSupervisorOrOperator = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
     const roleId = res.locals.currentUser?.roleId;
-    if (roleId !== RoleType.ADMIN.id && roleId !== RoleType.OPERATOR.id) {
+    if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.OPERATOR.id && roleId !== RoleType.ADMIN.id) {
         if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de administrador u operador' });
+            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de supervisor u operador' });
         }
-        return res.status(403).send('Acceso denegado: se requieren permisos de administrador u operador');
+        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor u operador');
     }
     next();
 };

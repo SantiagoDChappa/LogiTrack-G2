@@ -60,8 +60,13 @@
 
                 <div class="form-actions">
                     <button type="submit" class="btn-primary">Guardar cambios</button>
+                    <% if (user.active) { %>
+                    <button type="button" class="btn-danger" id="btn-baja">Dar de baja</button>
+                    <% } %>
                 </div>
             </form>
+
+            <form id="form-baja" action="/user/delete/<%= user.id %>" method="POST" style="display:none;"></form>
         </div>
     </main>
 
@@ -72,5 +77,28 @@
     <script src="/js/ui.js" defer></script>
     <script src="/js/document-format.js" defer></script>
     <script>function toggleBranchField(v){document.getElementById('branch-field').style.display=v==3?'block':'none';}</script>
+    <% if (user.active) { %>
+    <script>
+        document.getElementById('btn-baja').addEventListener('click', function() {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'warning',
+                title: '¿Dar de baja al usuario?',
+                text: '"<%= user.fullName %>" quedará inactivo en el sistema.',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, dar de baja',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: isDark ? '#475569' : '#6b7280',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('form-baja').submit();
+                }
+            });
+        });
+    </script>
+    <% } %>
 </body>
 </html>

@@ -198,7 +198,8 @@ const update = async (data) => {
 
     const statusId = shipment.statusId;
 
-    if (statusId === 4 || statusId === 5 || statusId === 3) {
+    // Entregado, Cancelado, En Sucursal, Paquete Fallido, Intento Fallido — solo deliveryUserId si corresponde
+    if (statusId === 4 || statusId === 5 || statusId === 3 || statusId === 8 || statusId === 9) {
         if (data.deliveryUserId !== undefined) {
              await Shipment.update(
                 { deliveryUserId: data.deliveryUserId || null },
@@ -208,12 +209,13 @@ const update = async (data) => {
         return shipment;
     }
 
-    if (statusId === 2) { // En Tránsito
+    // En Tránsito, Asignado, En Preparación — solo contacto destinatario + deliveryUserId
+    if (statusId === 2 || statusId === 6 || statusId === 7) {
         await Person.update(
             { phone: data.recipientPhone, email: data.recipientEmail },
             { where: { id: shipment.recipientId } }
         );
-        
+
         if (data.deliveryUserId !== undefined) {
             await Shipment.update(
                { deliveryUserId: data.deliveryUserId || null },
@@ -223,28 +225,31 @@ const update = async (data) => {
         return shipment;
     }
 
-    if (statusId === 1) { // Pendiente
+    if (statusId === 1) { // Pendiente — modificación completa
         await Person.update(
             { fullName: data.recipientName, document: data.recipientDocument, phone: data.recipientPhone, email: data.recipientEmail },
             { where: { id: shipment.recipientId } }
         );
 
         await Address.update(
-            { 
-                street: data.street, 
-                number: data.number, 
-                provinceId: data.province, 
-                postalCode: data.postalCode, 
-                floorApartment: data.floorApartment, 
-                lat: data.addressLat || null, 
-                lng: data.addressLng || null 
+            {
+                street: data.street,
+                number: data.number,
+                provinceId: data.province,
+                postalCode: data.postalCode,
+                floorApartment: data.floorApartment,
+                lat: data.addressLat || null,
+                lng: data.addressLng || null
             },
             { where: { id: shipment.addressId } }
         );
 
         await Shipment.update(
             {
-                deliveryUserId: data.deliveryUserId  || null,
+                deliveryUserId:  data.deliveryUserId  || null,
+                weightKg:        data.weightKg        || shipment.weightKg,
+                packageQty:      data.packageQty      || shipment.packageQty,
+                shipmentTypeId:  data.shipmentTypeId  || shipment.shipmentTypeId,
             },
             { where: { id: data.id } }
         );
