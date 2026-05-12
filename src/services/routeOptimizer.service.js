@@ -750,6 +750,199 @@ const optimizeManual = async ({ assignments, supervisorBranchId }) => {
     return { proposals, unassigned, rejected: [], summary };
 };
 
+// ===== Piggyback: sumar envios a rutas PLANIFICADAS existentes =====
+const loadPiggybackSettings = async () => {
+    try {
+        const settingModel = require('../models/setting');
+        const get = async (k, def) => (await settingModel.get(k)) ?? def;
+        const [en, pct, kmAbs, costPct] = await Promise.all([
+            get('piggyback_enabled', 'false'),
+            get('piggyback_max_extra_pct', '15'),
+            get('piggyback_max_extra_km', '30'),
+            get('piggyback_max_extra_cost_pct', '20'),
+        ]);
+        return {
+            enabled: en === 'true' || en === 'on' || en === '1',
+            maxExtraPct: Number(pct) || 0,
+            maxExtraKm:  Number(kmAbs) || 0,
+            maxExtraCostPct: Number(costPct) || 0,
+        };
+    } catch { return { enabled: false, maxExtraPct: 15, maxExtraKm: 30, maxExtraCostPct: 20 }; }
+};
+
+const evaluatePiggyback = async ({ plannedRoutes, transportsById, shipments, branch, thresholds }) => {
+    const RouteStop = require('../models/routeStop').RouteStop;
+    if (!plannedRoutes.length || !shipments.length) {
+        return { piggybackProposals: [], piggybackedShipmentIds: new Set() };
+    }
+    const ctxByRouteId = new Map();
+    for (const r of plannedRoutes) {
+        const transport = transportsById.get(r.transportId);
+        if (!transport) { continue; }
+        const stops = await RouteStop.findAll({ where: { routeId: r.id }, order: [['sequence', 'ASC']] });
+        if (stops.length === 0) { continue; }
+        const deliveryStopShipmentIds = stops.filter(s => s.stopType === 'delivery' && s.shipmentId).map(s => s.shipmentId);
+        const existingShipments = await Shipment.findAll({
+            where: { id: { [Op.in]: deliveryStopShipmentIds } },
+            include: [
+                { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province', required: false }] },
+                { model: Zone,    as: 'zone',      required: false },
+            ],
+        });
+        const usedW = existingShipments.reduce((a, s) => a + num(s.weightKg), 0);
+        const usedV = existingShipments.reduce((a, s) => a + num(s.volumeM3), 0);
+        const provCount = new Map();
+        for (const s of existingShipments) {
+            const k = s.address?.provinceId || 0;
+            provCount.set(k, (provCount.get(k) || 0) + 1);
+        }
+        const [topProv] = [...provCount.entries()].sort((x, y) => y[1] - x[1]) || [[0, 0]];
+        const routeProvinceId = topProv ? topProv[0] : 0;
+        const routeProvinceName = existingShipments.find(s => s.address?.provinceId === routeProvinceId)?.address?.province?.description || 'Mixto';
+
+        ctxByRouteId.set(r.id, {
+            route: r,
+            transport,
+            stops: stops.map(s => ({ lat: num(s.lat), lng: num(s.lng), stopType: s.stopType, shipmentId: s.shipmentId, branchId: s.branchId, sequence: s.sequence })),
+            existingShipments,
+            usedWeight: usedW,
+            usedVolume: usedV,
+            capWeightLeft: num(transport.maxWeightKg) - usedW,
+            capVolumeLeft: num(transport.maxVolumeM3) - usedV,
+            provinceId: routeProvinceId,
+            provinceName: routeProvinceName,
+            totalKm:  num(r.totalDistanceKm),
+            totalCost: num(r.totalCost),
+        });
+    }
+
+    // Calcular mejor insercion por envio
+    const candidates = []; // { shipment, routeId, extraKm, extraCost, insertPos }
+    for (const s of shipments) {
+        const lat = num(s.address?.lat);
+        const lng = num(s.address?.lng);
+        if (!lat || !lng) { continue; }
+        const w = num(s.weightKg), v = num(s.volumeM3);
+        for (const ctx of ctxByRouteId.values()) {
+            if (!isTransportEligibleForZone(ctx.transport, s.zoneId)) { continue; }
+            if (s.address?.provinceId && ctx.provinceId && s.address.provinceId !== ctx.provinceId) { continue; }
+            if (w > ctx.capWeightLeft || v > ctx.capVolumeLeft) { continue; }
+
+            // Mejor posicion de insercion: minimiza haversine(a,new) + haversine(new,b) - haversine(a,b)
+            let bestExtra = Infinity, bestPos = -1;
+            for (let i = 1; i < ctx.stops.length; i++) {
+                const a = ctx.stops[i - 1], b = ctx.stops[i];
+                const detour = haversineKm(a, { lat, lng }) + haversineKm({ lat, lng }, b) - haversineKm(a, b);
+                if (detour < bestExtra) { bestExtra = detour; bestPos = i; }
+            }
+            // Insertar al final tambien es opcion
+            const last = ctx.stops[ctx.stops.length - 1];
+            const tailDetour = haversineKm(last, { lat, lng });
+            if (tailDetour < bestExtra) { bestExtra = tailDetour; bestPos = ctx.stops.length; }
+            if (bestPos < 1) { continue; }
+
+            const extraKm = bestExtra;
+            const costPerKm = num(ctx.transport.costPerKm);
+            const extraCost = extraKm * costPerKm;
+            const pctExtraKm   = ctx.totalKm  > 0 ? (extraKm / ctx.totalKm)  * 100 : Infinity;
+            const pctExtraCost = ctx.totalCost > 0 ? (extraCost / ctx.totalCost) * 100 : Infinity;
+
+            const reasons = [];
+            if (extraKm > thresholds.maxExtraKm)               reasons.push(`detour absoluto ${extraKm.toFixed(1)}km > ${thresholds.maxExtraKm}km`);
+            if (pctExtraKm > thresholds.maxExtraPct)           reasons.push(`detour ${pctExtraKm.toFixed(1)}% > ${thresholds.maxExtraPct}%`);
+            if (pctExtraCost > thresholds.maxExtraCostPct)     reasons.push(`costo extra ${pctExtraCost.toFixed(1)}% > ${thresholds.maxExtraCostPct}%`);
+            if (reasons.length > 0) { continue; }
+
+            candidates.push({
+                shipment: s, routeId: ctx.route.id, ctx,
+                extraKm, extraCost, pctExtraKm, pctExtraCost, insertPos: bestPos,
+            });
+        }
+    }
+    // Greedy: ordenar por menor extraKm; asignar 1 envio a 1 ruta sin pisar capacidad
+    candidates.sort((a, b) => a.extraKm - b.extraKm);
+    const assignedShipments = new Set();
+    const additionsByRoute = new Map(); // routeId -> [{shipment, extraKm, extraCost, insertPos}]
+    for (const c of candidates) {
+        if (assignedShipments.has(c.shipment.id)) { continue; }
+        const ctx = c.ctx;
+        const w = num(c.shipment.weightKg), v = num(c.shipment.volumeM3);
+        if (w > ctx.capWeightLeft || v > ctx.capVolumeLeft) { continue; }
+        ctx.capWeightLeft -= w; ctx.capVolumeLeft -= v;
+        ctx.usedWeight += w; ctx.usedVolume += v;
+        ctx.totalKm   += c.extraKm;
+        ctx.totalCost += c.extraCost;
+        assignedShipments.add(c.shipment.id);
+        const arr = additionsByRoute.get(c.routeId) || [];
+        arr.push(c);
+        additionsByRoute.set(c.routeId, arr);
+    }
+
+    // Construir propuestas piggyback (no necesitan stops/geometria nueva; el UI mostrara resumen + lista)
+    const piggybackProposals = [];
+    for (const [routeId, adds] of additionsByRoute.entries()) {
+        const ctx = ctxByRouteId.get(routeId);
+        const t = ctx.transport;
+        const totalExtraKm = adds.reduce((a, c) => a + c.extraKm, 0);
+        const totalExtraCost = adds.reduce((a, c) => a + c.extraCost, 0);
+        const reasoningShipments = adds.map(c => ({
+            shipmentId: c.shipment.id,
+            trackingId: c.shipment.trackingId,
+            priority: PRIORITY_LABEL[Number(c.shipment.priority) || 1] ?? 'normal',
+            provinceName: c.shipment.address?.province?.description || ctx.provinceName,
+            zoneName: c.shipment.zone?.name || null,
+            recipientName: c.shipment.recipient?.fullName || null,
+            addressStreet: c.shipment.address?.street || null,
+            addressNumber: c.shipment.address?.number || null,
+            postalCode: c.shipment.address?.postalCode || null,
+            weightKg: num(c.shipment.weightKg),
+            volumeM3: num(c.shipment.volumeM3),
+            extraKm:  Number(c.extraKm.toFixed(2)),
+            extraCost: Number(c.extraCost.toFixed(2)),
+            pctExtraKm: Number(c.pctExtraKm.toFixed(1)),
+            pctExtraCost: Number(c.pctExtraCost.toFixed(1)),
+            insertPos: c.insertPos,
+            why: `Cabe en ruta planificada #${routeId} con detour +${c.extraKm.toFixed(1)}km (${c.pctExtraKm.toFixed(1)}%) y costo extra $${c.extraCost.toFixed(2)} (${c.pctExtraCost.toFixed(1)}%). Capacidad libre antes: ${(ctx.capWeightLeft + num(c.shipment.weightKg)).toFixed(0)}kg / ${(ctx.capVolumeLeft + num(c.shipment.volumeM3)).toFixed(2)}m³.`,
+        }));
+        piggybackProposals.push({
+            piggyback: true,
+            existingRouteId: routeId,
+            transportId: t.id,
+            transport: { id: t.id, name: t.name, plate: t.plate, maxWeightKg: num(t.maxWeightKg), maxVolumeM3: num(t.maxVolumeM3), fixedCost: num(t.fixedCost), costPerKm: num(t.costPerKm), driver: t.driver ? { id: t.driver.id, fullName: t.driver.fullName } : null },
+            clusterProvinceName: ctx.provinceName,
+            stops: [],
+            totalDistanceKm: Number(ctx.totalKm.toFixed(2)),
+            totalDurationMin: null,
+            totalCost: Number(ctx.totalCost.toFixed(2)),
+            totalWeightKg: Number(ctx.usedWeight.toFixed(2)),
+            totalVolumeM3: Number(ctx.usedVolume.toFixed(3)),
+            utilizationWeight: num(t.maxWeightKg) > 0 ? Number((ctx.usedWeight / num(t.maxWeightKg)).toFixed(3)) : 0,
+            utilizationVolume: num(t.maxVolumeM3) > 0 ? Number((ctx.usedVolume / num(t.maxVolumeM3)).toFixed(3)) : 0,
+            addedShipmentIds: adds.map(c => c.shipment.id),
+            shipmentIds: adds.map(c => c.shipment.id),
+            piggybackSummary: {
+                routeId,
+                addedCount: adds.length,
+                totalExtraKm: Number(totalExtraKm.toFixed(2)),
+                totalExtraCost: Number(totalExtraCost.toFixed(2)),
+                previousTotalKm: num(ctx.route.totalDistanceKm),
+                previousTotalCost: num(ctx.route.totalCost),
+                newTotalKm: Number(ctx.totalKm.toFixed(2)),
+                newTotalCost: Number(ctx.totalCost.toFixed(2)),
+                capWeightLeftAfter: Number(ctx.capWeightLeft.toFixed(2)),
+                capVolumeLeftAfter: Number(ctx.capVolumeLeft.toFixed(3)),
+            },
+            warnings: [],
+            reasoning: {
+                transportPick: `Ruta #${routeId} ya planificada en ${t.name}. Sumar ${adds.length} envío(s) cuesta solo ${totalExtraKm.toFixed(1)}km extra y $${totalExtraCost.toFixed(0)} adicionales — más barato que lanzar una ruta nueva.`,
+                ordering: 'Inserción por mínimo desvío haversine en la secuencia existente.',
+                shipments: reasoningShipments,
+            },
+        });
+    }
+    return { piggybackProposals, piggybackedShipmentIds: assignedShipments };
+};
+
 const loadFuelMultiplier = async () => {
     try {
         const settingModel = require('../models/setting');
@@ -784,18 +977,30 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         .map(t => ({ id: t.id, name: t.name, plate: t.plate }));
     transports = transports.filter(t => num(t.maxWeightKg) > 0);
 
-    // Transportes ya asignados a una ruta activa (planificada o en curso) no están disponibles
+    // Transportes con rutas activas. Si piggyback está habilitado, PLANNED no bloquea (se reusa la ruta);
+    // IN_ROUTE siempre bloquea (el repartidor salió, no se puede modificar).
+    const piggySettings = await loadPiggybackSettings();
     const { Route: _RouteCheck, RouteStatus: _RSCheck } = require('../models/route');
     const activeTxRoutes = await _RouteCheck.findAll({
         where: {
             transportId: { [Op.in]: transports.map(t => t.id) },
             statusId: { [Op.in]: [_RSCheck.PLANNED, _RSCheck.IN_ROUTE] },
         },
-        attributes: ['transportId', 'id'],
+        attributes: ['id', 'transportId', 'statusId', 'totalDistanceKm', 'totalCost', 'totalWeightKg', 'totalVolumeM3'],
     }).catch(() => []);
-    const busyTxMap = new Map(activeTxRoutes.map(r => [r.transportId, r.id]));
+    const transportsById = new Map(transports.map(t => [t.id, t]));
+    const plannedRoutes = activeTxRoutes.filter(r => r.statusId === _RSCheck.PLANNED);
+    const inRouteRoutes = activeTxRoutes.filter(r => r.statusId === _RSCheck.IN_ROUTE);
+
+    const inRouteTxIds = new Set(inRouteRoutes.map(r => r.transportId));
+    const plannedTxIds = new Set(plannedRoutes.map(r => r.transportId));
+    const busyTxMap = new Map();
+    inRouteRoutes.forEach(r => busyTxMap.set(r.transportId, r.id));
+    if (!piggySettings.enabled) {
+        plannedRoutes.forEach(r => busyTxMap.set(r.transportId, r.id));
+    }
     const busyTransports = transports.filter(t => busyTxMap.has(t.id))
-        .map(t => ({ id: t.id, name: t.name, plate: t.plate, activeRouteId: busyTxMap.get(t.id) }));
+        .map(t => ({ id: t.id, name: t.name, plate: t.plate, activeRouteId: busyTxMap.get(t.id), reason: inRouteTxIds.has(t.id) ? 'in_route' : 'planned' }));
     transports = transports.filter(t => !busyTxMap.has(t.id));
 
     // Doble asignación: descartar envíos que ya tienen RouteStop en una ruta activa
@@ -830,7 +1035,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     for (const sid of rejected) {
         unassigned.push({ id: sid, code: 'rejected', reason: 'Envío no cumple filtros (estado no ruteable o sucursal distinta).' });
     }
-    const validShipments = [];
+    let validShipments = [];
 
     const maxFleetWeight = transports.reduce((m, t) => Math.max(m, num(t.maxWeightKg)), 0);
     const maxFleetVolume = transports.reduce((m, t) => Math.max(m, num(t.maxVolumeM3)), 0);
@@ -863,6 +1068,33 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         weightKg: Math.max(0, demandWeight - totalFleetWeight),
         volumeM3: Math.max(0, demandVolume - totalFleetVolume),
     };
+
+    // 0) Piggyback: intentar sumar a rutas planificadas antes del clustering normal
+    let piggybackProposals = [];
+    if (piggySettings.enabled && plannedRoutes.length > 0 && validShipments.length > 0) {
+        // Re-incluir transportes planificados para tener acceso a sus datos (no se usaran como nuevos)
+        const allTxById = new Map();
+        for (const t of transports) { allTxById.set(t.id, t); }
+        const plannedTxFull = await Transport.findAll({
+            where: { id: { [Op.in]: [...plannedTxIds] }, branchId: supervisorBranchId },
+            include: [
+                { model: User, as: 'driver', required: false },
+                { model: Zone, as: 'zones',  required: false, through: { attributes: [] } },
+            ],
+        });
+        for (const t of plannedTxFull) { allTxById.set(t.id, t); }
+        const pb = await evaluatePiggyback({
+            plannedRoutes,
+            transportsById: allTxById,
+            shipments: validShipments,
+            branch,
+            thresholds: piggySettings,
+        });
+        piggybackProposals = pb.piggybackProposals;
+        if (pb.piggybackedShipmentIds.size > 0) {
+            validShipments = validShipments.filter(s => !pb.piggybackedShipmentIds.has(s.id));
+        }
+    }
 
     // 1) Cluster por provincia destino, priorizando clusters mas pesados
     const clusters = clusterByProvince(validShipments).sort((a, b) => b.totalWeight - a.totalWeight);
@@ -901,12 +1133,17 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
             : `Ningún envío pudo asignarse. ${fleetDesc} no tiene capacidad suficiente para ninguno de los ${validShipments.length} envíos seleccionados. Revisá los pesos/volúmenes o agregá más transportes a la sucursal.`;
     }
 
+    const allProposals = [...piggybackProposals, ...proposals];
+    const totalAssigned = allProposals.reduce((a, p) => a + (p.shipmentIds?.length || 0), 0);
+
     const summary = {
         totalShipments: shipmentIds.length,
-        validShipments: validShipments.length,
-        assignedCount,
+        validShipments: validShipments.length + piggybackProposals.reduce((a, p) => a + (p.addedShipmentIds?.length || 0), 0),
+        assignedCount: totalAssigned,
         unassignedCount: unassigned.length,
-        proposalsCount: proposals.length,
+        proposalsCount: allProposals.length,
+        piggybackCount: piggybackProposals.length,
+        piggybackEnabled: piggySettings.enabled,
         demandWeightKg: Number(demandWeight.toFixed(2)),
         demandVolumeM3: Number(demandVolume.toFixed(3)),
         fleetCapacityKg: totalFleetWeight,
@@ -916,7 +1153,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         unavailableTransports: { busy: busyTransports, zeroCap: zeroCapTransports },
     };
 
-    return { proposals, unassigned, rejected, summary };
+    return { proposals: allProposals, unassigned, rejected, summary };
 };
 
 module.exports = { optimizeRoutes, optimizeManual };

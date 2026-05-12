@@ -6,5 +6,6 @@ const { requireAdmin }  = require('../middlewares/auth');
 router.get('/',              requireAdmin, settingController.getSettings);
 router.post('/',             requireAdmin, settingController.saveSettings);
 router.post('/assign-branch', requireAdmin, settingController.assignBranch);
+router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 
 module.exports = router;

@@ -5,16 +5,17 @@ const userModel     = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 
 const getSettings = async (req, res) => {
-    const [settings, provinces, branches, users] = await Promise.all([
+    const [settings, provinces, branches, users, routeOpt] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
         userModel.getAll(),
+        getRouteOptimizerSettings(),
     ]);
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
-    res.render('setting/index', { settings, provinces, branches, users });
+    res.render('setting/index', { settings, provinces, branches, users, routeOpt });
 };
 
 const GEOREF = 'https://apis.datos.gob.ar/georef/api';
@@ -65,6 +66,34 @@ const saveSettings = async (req, res) => {
     res.redirect('/setting?success=1');
 };
 
+const ROUTE_SETTINGS = {
+    piggyback_enabled:           { default: 'false', parse: v => v === 'true' || v === 'on' || v === '1' },
+    piggyback_max_extra_pct:     { default: '15',    parse: v => Math.max(0, Number(v) || 0) },
+    piggyback_max_extra_km:      { default: '30',    parse: v => Math.max(0, Number(v) || 0) },
+    piggyback_max_extra_cost_pct:{ default: '20',    parse: v => Math.max(0, Number(v) || 0) },
+};
+
+const getRouteOptimizerSettings = async () => {
+    const result = {};
+    for (const [key, cfg] of Object.entries(ROUTE_SETTINGS)) {
+        const raw = await settingModel.get(key);
+        result[key] = cfg.parse(raw ?? cfg.default);
+    }
+    return result;
+};
+
+const saveRouteOptimizerSettings = async (req, res) => {
+    const body = req.body || {};
+    const piggyEnabled = body.piggyback_enabled === 'on' || body.piggyback_enabled === 'true' || body.piggyback_enabled === '1';
+    await Promise.all([
+        settingModel.set('piggyback_enabled',            piggyEnabled ? 'true' : 'false'),
+        settingModel.set('piggyback_max_extra_pct',      String(Math.max(0, Number(body.piggyback_max_extra_pct) || 0))),
+        settingModel.set('piggyback_max_extra_km',       String(Math.max(0, Number(body.piggyback_max_extra_km) || 0))),
+        settingModel.set('piggyback_max_extra_cost_pct', String(Math.max(0, Number(body.piggyback_max_extra_cost_pct) || 0))),
+    ]);
+    res.redirect('/setting?success=3');
+};
+
 const assignBranch = async (req, res) => {
     const userIds   = [].concat(req.body['userId[]']   || req.body.userId   || []);
     const branchIds = [].concat(req.body['branchId[]'] || req.body.branchId || []);
@@ -82,4 +111,4 @@ const assignBranch = async (req, res) => {
     res.redirect('/setting?success=2');
 };
 
-module.exports = { getSettings, saveSettings, assignBranch };
+module.exports = { getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings };

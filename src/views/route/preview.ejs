@@ -211,6 +211,29 @@
     };
 
     const applyOne = async (proposal, btn) => {
+        if (proposal.piggyback) {
+            const ps = proposal.piggybackSummary || {};
+            const msg = `¿Sumar ${proposal.addedShipmentIds.length} envío(s) a la Ruta #${proposal.existingRouteId} (${proposal.transport.name})?\n\n`
+                + `Distancia: ${ps.previousTotalKm}km → ${ps.newTotalKm}km (+${ps.totalExtraKm}km)\n`
+                + `Costo: $${ps.previousTotalCost} → $${ps.newTotalCost} (+$${ps.totalExtraCost})\n\n`
+                + `Los envíos se agregan al final de la secuencia. Si la ruta ya está En Curso, no se podrá sumar.`;
+            if (!confirm(msg)) return;
+            btn.disabled = true; btn.textContent = 'Sumando...';
+            const res = await fetch('/route/' + proposal.existingRouteId + '/append', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, shipmentIds: proposal.addedShipmentIds }),
+            });
+            const data = await res.json();
+            if (!res.ok) { btn.disabled = false; btn.textContent = '🔗 Sumar a ruta existente'; alert(data.error || 'Error'); return; }
+            appliedTxIds.add(proposal.transportId);
+            btn.classList.add('applied');
+            btn.textContent = `✅ SUMADO · Ruta #${data.routeId} (+${data.addedCount})`;
+            const card = btn.closest('.proposal-card');
+            card.classList.add('applied');
+            card.querySelectorAll('.shipment-chip').forEach(ch => { ch.draggable = false; ch.style.cursor = 'default'; });
+            return;
+        }
         if (!confirm(`¿Aplicar ruta para ${proposal.transport.name}? Se asignarán ${proposal.shipmentIds.length} envíos.`)) return;
         btn.disabled = true; btn.textContent = 'Aplicando...';
         const res = await fetch('/route/confirm-one', {
@@ -265,6 +288,21 @@
             card.dataset.transportId = p.transportId;
             const cb = p.costBreakdown || {};
             const cluster = p.clusterProvinceName ? `<span class="proposal-cluster-badge">📍 ${escapeHtml(p.clusterProvinceName)}</span>` : '';
+            const piggyBadge = p.piggyback ? `<span class="proposal-cluster-badge" style="background:#fef3c7;color:#92400e;border-color:#f59e0b">🔗 SUMAR A RUTA #${p.existingRouteId}</span>` : '';
+            let piggyBlock = '';
+            if (p.piggyback && p.piggybackSummary) {
+                const ps = p.piggybackSummary;
+                piggyBlock = `
+                <div style="background:#fef9c3;border-left:3px solid #f59e0b;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#92400e;margin-bottom:.3rem">🔗 Piggyback: sumar a ruta planificada #${ps.routeId}</div>
+                    <div style="color:#78350f">
+                        Distancia: <strong>${ps.previousTotalKm}km → ${ps.newTotalKm}km</strong> (+${ps.totalExtraKm}km)<br>
+                        Costo: <strong>$${ps.previousTotalCost} → $${ps.newTotalCost}</strong> (+$${ps.totalExtraCost})<br>
+                        Capacidad libre restante: ${ps.capWeightLeftAfter}kg / ${ps.capVolumeLeftAfter}m³<br>
+                        <em>Más barato que lanzar una ruta nueva. Se agregan ${ps.addedCount} envío(s) al final de la secuencia.</em>
+                    </div>
+                </div>`;
+            }
             const warns = (p.warnings || []).map(w => `<div class="warn-banner">⚠ ${escapeHtml(w)}</div>`).join('');
 
             const chipsHtml = (p.reasoning?.shipments || []).map(r => {
@@ -323,8 +361,9 @@
 
             card.innerHTML = `
                 <div class="proposal-header">
-                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster}</h3>
+                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster} ${piggyBadge}</h3>
                 </div>
+                ${piggyBlock}
                 <div class="proposal-meta">Conductor: ${p.transport.driver ? escapeHtml(p.transport.driver.fullName) : 'Sin asignar'}</div>
                 ${warns}
                 <div class="proposal-stats">
@@ -351,9 +390,9 @@
                 <div id="map-${idx}" class="proposal-map"></div>
                 <div class="proposal-actions">
                     <button class="btn-apply ${isApplied ? 'applied' : ''}" data-action="apply" ${isApplied ? 'disabled' : ''}>
-                        ${isApplied ? '✅ APLICADO' : '✓ Aplicar ruta'}
+                        ${isApplied ? '✅ APLICADO' : (p.piggyback ? '🔗 Sumar a ruta existente' : '✓ Aplicar ruta')}
                     </button>
-                    <button class="btn-exclude" data-action="exclude" ${isApplied ? 'disabled' : ''}>Recalcular sin este transporte</button>
+                    ${p.piggyback ? '' : `<button class="btn-exclude" data-action="exclude" ${isApplied ? 'disabled' : ''}>Recalcular sin este transporte</button>`}
                 </div>
             `;
             container.appendChild(card);

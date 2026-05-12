@@ -335,6 +335,121 @@ const dispatchRoute = async (req, res) => {
     }
 };
 
+// Append: sumar envios a una ruta PLANIFICADA existente (piggyback)
+const appendToRoute = async (req, res) => {
+    const routeId = Number(req.params.id);
+    const branchId = resolveBranchId(res.locals.currentUser, req.body);
+    if (!branchId) { return res.status(400).json({ error: 'Sin sucursal asignada' }); }
+
+    const shipmentIds = [].concat(req.body.shipmentIds || []).map(Number).filter(Boolean);
+    if (shipmentIds.length === 0) { return res.status(400).json({ error: 'No hay envíos para agregar' }); }
+
+    try {
+        const route = await routeModel.getById(routeId);
+        if (!route) { return res.status(404).json({ error: 'Ruta no encontrada' }); }
+        if (route.originBranchId !== branchId) { return res.status(403).json({ error: 'La ruta no pertenece a tu sucursal' }); }
+        if (route.statusId !== RouteStatus.PLANNED) {
+            return res.status(422).json({ error: 'Solo se pueden sumar envíos a rutas en estado Planificada. Estado actual no permite modificación.' });
+        }
+
+        const { Transport } = require('../models/transport');
+        const transport = await Transport.findByPk(route.transportId);
+        if (!transport || !transport.enabled) { return res.status(422).json({ error: 'El transporte de esta ruta no está habilitado.' }); }
+
+        const num = (v) => (v === null || v === undefined ? 0 : Number(v));
+        const newShipments = await Shipment.findAll({
+            where: { id: { [Op.in]: shipmentIds }, currentBranchId: branchId },
+            include: [{ model: Address, as: 'address', required: false }],
+        });
+        if (newShipments.length !== shipmentIds.length) {
+            return res.status(422).json({ error: 'Algún envío no pertenece a la sucursal o no existe.' });
+        }
+        for (const s of newShipments) {
+            if (![StatusEnum.PENDING.id, StatusEnum.AT_BRANCH.id, StatusEnum.IN_PREPARATION.id].includes(s.statusId)) {
+                return res.status(422).json({ error: `Envío ${s.trackingId} no está en estado ruteable (actual: ${s.statusId}).` });
+            }
+            if (!s.address?.lat || !s.address?.lng) {
+                return res.status(422).json({ error: `Envío ${s.trackingId} sin geolocalización; corregí la dirección antes de sumarlo.` });
+            }
+        }
+
+        const existingW = num(route.totalWeightKg);
+        const existingV = num(route.totalVolumeM3);
+        const addedW = newShipments.reduce((a, s) => a + num(s.weightKg), 0);
+        const addedV = newShipments.reduce((a, s) => a + num(s.volumeM3), 0);
+        if (existingW + addedW > num(transport.maxWeightKg)) {
+            return res.status(422).json({ error: `Peso total (${(existingW + addedW).toFixed(2)}kg) supera la capacidad del transporte (${num(transport.maxWeightKg)}kg).` });
+        }
+        if (existingV + addedV > num(transport.maxVolumeM3)) {
+            return res.status(422).json({ error: `Volumen total (${(existingV + addedV).toFixed(3)}m³) supera la capacidad del transporte (${num(transport.maxVolumeM3)}m³).` });
+        }
+
+        const haversineKm = (a, b) => {
+            const toRad = d => d * Math.PI / 180;
+            const R = 6371;
+            const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+            const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(x));
+        };
+
+        const sortedStops = (route.stops || []).sort((a, b) => a.sequence - b.sequence);
+        const lastStop = sortedStops[sortedStops.length - 1];
+        let extraKm = 0;
+        const transaction = await sequelize.transaction();
+        try {
+            let lastPoint = { lat: num(lastStop.lat), lng: num(lastStop.lng) };
+            let nextSeq = (lastStop.sequence || sortedStops.length) + 1;
+            for (const s of newShipments) {
+                const pt = { lat: num(s.address.lat), lng: num(s.address.lng) };
+                const legKm = haversineKm(lastPoint, pt);
+                extraKm += legKm;
+                await RouteStop.create({
+                    routeId, sequence: nextSeq++, stopType: 'delivery',
+                    branchId: null, shipmentId: s.id,
+                    lat: pt.lat, lng: pt.lng,
+                    distanceFromPrevKm: Number(legKm.toFixed(2)),
+                }, { transaction });
+                lastPoint = pt;
+            }
+            const newTotalKm = num(route.totalDistanceKm) + extraKm;
+            const newTotalCost = num(route.totalCost) + extraKm * num(transport.costPerKm);
+            await Route.update({
+                totalDistanceKm: Number(newTotalKm.toFixed(2)),
+                totalCost: Number(newTotalCost.toFixed(2)),
+                totalWeightKg: Number((existingW + addedW).toFixed(2)),
+                totalVolumeM3: Number((existingV + addedV).toFixed(3)),
+            }, { where: { id: routeId }, transaction });
+
+            const actor = res.locals.currentUser || {};
+            for (const s of newShipments) {
+                const fromStatusId = s.statusId;
+                await Shipment.update(
+                    { statusId: StatusEnum.ASSIGNED.id, deliveryUserId: transport.driverUserId || null },
+                    { where: { id: s.id }, transaction }
+                );
+                const comment = buildAutoComment({
+                    fromStatusId, toStatusId: StatusEnum.ASSIGNED.id,
+                    actor, extras: { routeId, driverName: route.transport?.driver?.fullName || null, transportName: transport.name },
+                });
+                await shipmentHistoryModel.create({
+                    shipmentId: s.id, fromStatusId, toStatusId: StatusEnum.ASSIGNED.id,
+                    comment: (comment || '') + ` (Piggyback: sumado a ruta existente #${routeId}).`,
+                    userId: actor.id || null, eventType: 'ROUTE_PIGGYBACK', branchId,
+                    transaction,
+                });
+            }
+            await transaction.commit();
+            res.json({ ok: true, routeId, addedCount: newShipments.length, extraKm: Number(extraKm.toFixed(2)) });
+        } catch (e) {
+            await transaction.rollback();
+            throw e;
+        }
+    } catch (err) {
+        console.error('ERROR appendToRoute:', err);
+        res.status(500).json({ error: err.message || 'Error al sumar envíos a la ruta' });
+    }
+};
+
 // Revertir ruta planificada: borra stops, devuelve envios a estado previo, marca ruta CANCELLED.
 // Validaciones:
 //  - Ruta debe existir
@@ -445,4 +560,4 @@ const revertRoute = async (req, res) => {
     }
 };
 
-module.exports = { optimizeForm, previewOptimization, recalcManual, confirm, confirmOne, list, detail, getQR, getScanPage, dispatchRoute, revertRoute };
+module.exports = { optimizeForm, previewOptimization, recalcManual, confirm, confirmOne, list, detail, getQR, getScanPage, dispatchRoute, revertRoute, appendToRoute };
