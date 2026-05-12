@@ -96,7 +96,6 @@ const saveEvidence = async (req, res) => {
     try {
 
         const trackingCode = req.params.id;
-        console.log('[saveEvidence] req.params.id =', JSON.stringify(trackingCode));
 
         const { Op } = require('sequelize');
         const orConds = [{ trackingId: trackingCode }];
@@ -108,7 +107,6 @@ const saveEvidence = async (req, res) => {
         });
 
         if (!shipment) {
-            console.log('[saveEvidence] Shipment NO encontrado para:', trackingCode);
             return res.status(404).send('Envío no encontrado');
         }
 
