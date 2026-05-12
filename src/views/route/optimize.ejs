@@ -137,7 +137,7 @@
                                                 <span style="color:var(--color-text-muted);font-size:var(--font-size-xs)">—</span>
                                             <% } else if (ar && ar.statusId === 2) { %>
                                                 <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="El repartidor ya salió. Bloqueado hasta que termine.">
-                                                    🔒 Ruta #<%= ar.id %> (En curso)
+                                                    🔒 Ruta #<%= ar.id %> (En tránsito)
                                                 </a>
                                             <% } else if (ar && ar.piggybackable) { %>
                                                 <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_sucursal" style="text-decoration:none;background:#fef3c7;color:#92400e" title="Tiene una ruta planificada. El optimizador puede sumar envíos si entran dentro de los umbrales configurados.">

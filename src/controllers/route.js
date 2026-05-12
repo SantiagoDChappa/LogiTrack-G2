@@ -75,7 +75,7 @@ const optimizeForm = async (req, res) => {
         attributes: ['id', 'transportId', 'statusId'],
     }).catch(() => []);
     const activeRouteByTx = new Map(activeRoutes.map(r => [r.transportId, r]));
-    const routeStatusLabel = { [RouteStatus.PLANNED]: 'Planificada', [RouteStatus.IN_ROUTE]: 'En curso' };
+    const routeStatusLabel = { [RouteStatus.PLANNED]: 'Planificada · sumable', [RouteStatus.IN_ROUTE]: 'En tránsito' };
 
     const settingModel = require('../models/setting');
     const piggyRaw = (await settingModel.get('piggyback_enabled')) ?? 'false';

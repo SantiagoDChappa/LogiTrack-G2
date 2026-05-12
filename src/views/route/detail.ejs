@@ -56,10 +56,10 @@
 
             <%
                 const _routeStatusMap = {
-                    1: { label: 'Pendiente',  cls: 'pendiente'   },
-                    2: { label: 'En curso',   cls: 'en_transito' },
-                    3: { label: 'Completada', cls: 'entregado'   },
-                    4: { label: 'Cancelada',  cls: 'cancelado'   },
+                    1: { label: 'Planificada · sumable', cls: 'en_sucursal' },
+                    2: { label: 'En tránsito',           cls: 'en_transito' },
+                    3: { label: 'Completada',            cls: 'entregado'   },
+                    4: { label: 'Cancelada',             cls: 'cancelado'   },
                 };
                 const _rs = _routeStatusMap[route.statusId] || { label: 'Estado ' + route.statusId, cls: 'inicial' };
             %>
