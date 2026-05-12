@@ -42,6 +42,8 @@ const optimizeForm = async (req, res) => {
         });
     }
 
+    const { Transport } = require('../models/transport');
+    const { User } = require('../models/user');
     const [shipments, transports] = await Promise.all([
         Shipment.findAll({
             where: {
@@ -55,8 +57,29 @@ const optimizeForm = async (req, res) => {
             ],
             order: [['createdAt', 'ASC']],
         }),
-        transportModel.getEnabledForBranch(branchId),
+        Transport.findAll({
+            where: { branchId },
+            include: [
+                { model: User, as: 'driver', required: false },
+                { model: Zone, as: 'zones',  required: false, through: { attributes: [] } },
+            ],
+            order: [['name', 'ASC']],
+        }),
     ]);
+
+    const activeRoutes = await Route.findAll({
+        where: {
+            transportId: { [Op.in]: transports.map(t => t.id) },
+            statusId: { [Op.in]: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
+        },
+        attributes: ['id', 'transportId', 'statusId'],
+    }).catch(() => []);
+    const activeRouteByTx = new Map(activeRoutes.map(r => [r.transportId, r]));
+    const routeStatusLabel = { [RouteStatus.PLANNED]: 'Planificada', [RouteStatus.IN_ROUTE]: 'En curso' };
+    for (const t of transports) {
+        const ar = activeRouteByTx.get(t.id);
+        t.activeRoute = ar ? { id: ar.id, statusLabel: routeStatusLabel[ar.statusId] || 'Activa' } : null;
+    }
 
     const predictionModel = require('../models/shipmentPrediction');
     const predMap = await predictionModel.getLatestByShipmentIds(shipments.map(s => s.id));
@@ -312,4 +335,114 @@ const dispatchRoute = async (req, res) => {
     }
 };
 
-module.exports = { optimizeForm, previewOptimization, recalcManual, confirm, confirmOne, list, detail, getQR, getScanPage, dispatchRoute };
+// Revertir ruta planificada: borra stops, devuelve envios a estado previo, marca ruta CANCELLED.
+// Validaciones:
+//  - Ruta debe existir
+//  - Solo se permite si statusId === PLANNED (no IN_ROUTE, ni FINISHED, ni CANCELLED)
+//  - Todos los envios delivery deben estar aun en ASSIGNED (si alguno ya transito, bloquea)
+//  - Permiso: admin o supervisor de la sucursal origen
+const revertRoute = async (req, res) => {
+    const routeId = Number(req.params.id);
+    const actor = res.locals.currentUser;
+    if (!Number.isInteger(routeId) || routeId <= 0) {
+        return res.status(400).json({ error: 'ID de ruta invalido' });
+    }
+    try {
+        const route = await routeModel.getById(routeId);
+        if (!route) { return res.status(404).json({ error: 'Ruta no encontrada' }); }
+
+        if (!isAdminUser(actor) && actor?.branchId !== route.originBranchId) {
+            return res.status(403).json({ error: 'No tenes permisos para revertir esta ruta (sucursal distinta).' });
+        }
+
+        const statusLabels = {
+            [RouteStatus.PLANNED]: 'Planificada',
+            [RouteStatus.IN_ROUTE]: 'En curso',
+            [RouteStatus.FINISHED]: 'Completada',
+            [RouteStatus.CANCELLED]: 'Cancelada',
+        };
+        if (route.statusId === RouteStatus.IN_ROUTE) {
+            return res.status(422).json({ error: 'La ruta ya esta En Curso (el repartidor escaneo el QR de salida). No se puede revertir desde aca. Cancela primero el despacho o espera a que termine.' });
+        }
+        if (route.statusId === RouteStatus.FINISHED) {
+            return res.status(422).json({ error: 'La ruta ya esta Completada. No se puede revertir una ruta cerrada.' });
+        }
+        if (route.statusId === RouteStatus.CANCELLED) {
+            return res.status(422).json({ error: 'La ruta ya fue Cancelada/Revertida previamente.' });
+        }
+        if (route.statusId !== RouteStatus.PLANNED) {
+            return res.status(422).json({ error: `Estado actual "${statusLabels[route.statusId] || route.statusId}" no es revertible. Solo rutas Planificadas pueden deshacerse.` });
+        }
+
+        const deliveryStops = (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId);
+        if (deliveryStops.length === 0) {
+            // Sin envios: solo cancelar la ruta
+            await sequelize.transaction(async (t) => {
+                await RouteStop.destroy({ where: { routeId }, transaction: t });
+                await Route.update({ statusId: RouteStatus.CANCELLED }, { where: { id: routeId }, transaction: t });
+            });
+            return res.json({ ok: true, revertedShipments: 0, routeId });
+        }
+
+        const shipmentIds = deliveryStops.map(s => s.shipmentId);
+        const ships = await Shipment.findAll({ where: { id: { [Op.in]: shipmentIds } }, attributes: ['id', 'trackingId', 'statusId'] });
+        const statusNameById = Object.fromEntries(Object.values(StatusEnum).map(s => [s.id, s.description]));
+
+        const blockers = [];
+        for (const s of ships) {
+            if (s.statusId !== StatusEnum.ASSIGNED.id) {
+                blockers.push({ id: s.id, trackingId: s.trackingId, currentStatus: statusNameById[s.statusId] || `Estado ${s.statusId}` });
+            }
+        }
+        if (blockers.length > 0) {
+            const lines = blockers.map(b => `${b.trackingId} (${b.currentStatus})`).join('; ');
+            return res.status(422).json({
+                error: `No se puede revertir: ${blockers.length} envio(s) ya cambiaron de estado y no estan mas en "Asignado". Detalles: ${lines}. Si es necesario, devolve manualmente esos envios al estado anterior antes de revertir.`,
+                blockers,
+            });
+        }
+
+        // Buscar fromStatusId del ultimo ROUTE_ASSIGNED por envio (para volver al estado original)
+        const histRows = await shipmentHistoryModel.ShipmentHistory.findAll({
+            where: { shipmentId: { [Op.in]: shipmentIds }, eventType: 'ROUTE_ASSIGNED' },
+            order: [['changedAt', 'DESC']],
+        }).catch(() => []);
+        const prevStatusByShipment = new Map();
+        for (const h of histRows) {
+            if (!prevStatusByShipment.has(h.shipmentId) && h.fromStatusId) {
+                prevStatusByShipment.set(h.shipmentId, h.fromStatusId);
+            }
+        }
+
+        let reverted = 0;
+        await sequelize.transaction(async (t) => {
+            for (const s of ships) {
+                const prevStatus = prevStatusByShipment.get(s.id) || StatusEnum.PENDING.id;
+                await Shipment.update(
+                    { statusId: prevStatus, deliveryUserId: null },
+                    { where: { id: s.id }, transaction: t }
+                );
+                await shipmentHistoryModel.create({
+                    shipmentId: s.id,
+                    fromStatusId: StatusEnum.ASSIGNED.id,
+                    toStatusId: prevStatus,
+                    comment: `Ruta #${routeId} revertida por ${actor?.fullName || 'supervisor'}. Envio devuelto a "${statusNameById[prevStatus] || 'estado previo'}".`,
+                    userId: actor?.id || null,
+                    eventType: 'ROUTE_REVERTED',
+                    branchId: route.originBranchId,
+                    transaction: t,
+                });
+                reverted++;
+            }
+            await RouteStop.destroy({ where: { routeId }, transaction: t });
+            await Route.update({ statusId: RouteStatus.CANCELLED }, { where: { id: routeId }, transaction: t });
+        });
+
+        res.json({ ok: true, revertedShipments: reverted, routeId });
+    } catch (err) {
+        console.error('ERROR revertRoute:', err);
+        res.status(500).json({ error: err.message || 'Error interno al revertir la ruta' });
+    }
+};
+
+module.exports = { optimizeForm, previewOptimization, recalcManual, confirm, confirmOne, list, detail, getQR, getScanPage, dispatchRoute, revertRoute };

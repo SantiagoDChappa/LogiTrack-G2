@@ -92,9 +92,9 @@
 
                 <!-- Transportes -->
                 <div class="update-card" style="margin-bottom:var(--space-5)">
-                    <h3><span class="material-symbols-outlined">local_shipping</span> Transportes habilitados</h3>
+                    <h3><span class="material-symbols-outlined">local_shipping</span> Transportes de la sucursal</h3>
                     <p style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
-                        El sistema elegirá los transportes según costo, capacidad y zonas habilitadas.
+                        El sistema sólo elegirá transportes <strong>Habilitados</strong> y <strong>Libres</strong>. Los deshabilitados o con ruta activa se muestran como referencia.
                     </p>
                     <div class="table-wrapper">
                         <table>
@@ -102,6 +102,8 @@
                                 <tr>
                                     <th>Nombre</th>
                                     <th>Patente</th>
+                                    <th>Estado</th>
+                                    <th>Disponibilidad</th>
                                     <th>Peso máx.</th>
                                     <th>Vol. máx.</th>
                                     <th>Costo fijo</th>
@@ -113,9 +115,33 @@
                             </thead>
                             <tbody>
                                 <% transports.forEach(t => { %>
-                                    <tr>
+                                    <%
+                                        const isEnabled = !!t.enabled;
+                                        const ar = t.activeRoute;
+                                        const usable = isEnabled && !ar;
+                                        const rowStyle = usable ? '' : 'opacity:.6';
+                                    %>
+                                    <tr style="<%= rowStyle %>">
                                         <td><strong><%= t.name %></strong></td>
                                         <td class="tracking-id"><%= t.plate || '-' %></td>
+                                        <td>
+                                            <% if (isEnabled) { %>
+                                                <span class="status-badge status-badge--sm entregado">✓ Habilitado</span>
+                                            <% } else { %>
+                                                <span class="status-badge status-badge--sm cancelado">✗ Deshabilitado</span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (!isEnabled) { %>
+                                                <span style="color:var(--color-text-muted);font-size:var(--font-size-xs)">—</span>
+                                            <% } else if (ar) { %>
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="Ver ruta activa">
+                                                    🔒 Ruta #<%= ar.id %> (<%= ar.statusLabel %>)
+                                                </a>
+                                            <% } else { %>
+                                                <span class="status-badge status-badge--sm inicial">🟢 Libre</span>
+                                            <% } %>
+                                        </td>
                                         <td><%= t.maxWeightKg %> kg</td>
                                         <td><%= t.maxVolumeM3 %> m³</td>
                                         <td><%= fmtMoney(t.fixedCost) %></td>

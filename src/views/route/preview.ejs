@@ -303,9 +303,10 @@
                         <summary style="cursor:pointer;color:#0f766e;font-weight:500">Ver detalle por envío</summary>
                         <ol style="margin:.4rem 0 0;padding-left:1.2rem">${oppShipDetails}</ol>
                     </details>
-                    <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
-                        <button disabled style="background:#dcfce7;color:#166534;border:1px solid #86efac;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:default;opacity:.75">✓ Extras aceptados</button>
-                        <button class="btn-opp-reject" data-tx="${p.transportId}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer" title="Quita estos envíos de la propuesta y los mueve al pool sin asignar">✗ Rechazar extras</button>
+                    <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center;flex-wrap:wrap">
+                        <button type="button" class="btn-opp-accept" data-tx="${p.transportId}" style="background:#dcfce7;color:#166534;border:1px solid #86efac;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s,transform .1s" title="Confirma los extras en la propuesta. La ruta se aplica con el botón APLICAR RUTA.">✓ Aceptar extras</button>
+                        <button type="button" class="btn-opp-reject" data-tx="${p.transportId}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer" title="Quita estos envíos de la propuesta y los mueve al pool sin asignar">✗ Rechazar extras</button>
+                        <span style="font-size:.7rem;color:var(--color-text-muted)">La ruta se confirma al presionar <strong>Aplicar ruta</strong>.</span>
                     </div>
                 </div>`;
             }
@@ -383,19 +384,62 @@
             }, 50);
         });
 
-        // Pool sin asignar
+        // Pool sin asignar — agrupar por código de razón para explicar 100% el motivo
         const un = data.unassigned || [];
-        const unChips = un.map(u => {
-            const sid = u.id || u.shipmentId;
-            const tracking = u.trackingId || `#${sid}`;
-            return `<span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" title="${escapeHtml(u.reason || '')}">
-                <span class="chip-priority priority-1">UN</span>
-                ${escapeHtml(tracking)}
-            </span>`;
+        const codeLabels = {
+            no_fit: 'No cabe en flota disponible',
+            oversized: 'Sobredimensionado vs. flota',
+            capacity: 'Excede capacidad del transporte',
+            no_geo: 'Sin geolocalización',
+            zone: 'Zona no compatible',
+            no_transports: 'Sin transportes disponibles',
+            branch_closed: 'Sucursal cerrada',
+            already_assigned: 'Ya asignado a otra ruta',
+            tx_invalid: 'Transporte inválido',
+            opp_rejected: 'Extra rechazado manualmente',
+            manual: 'Removido manualmente',
+            rejected: 'No cumple filtros',
+        };
+        const codeIcons = {
+            no_fit: '📦', oversized: '🚛', capacity: '⚖️', no_geo: '📍', zone: '🗺️',
+            no_transports: '🚫', branch_closed: '🔒', already_assigned: '🔗',
+            tx_invalid: '❌', opp_rejected: '↩️', manual: '✋', rejected: '⛔',
+        };
+        const grouped = new Map();
+        for (const u of un) {
+            const code = u.code || 'other';
+            if (!grouped.has(code)) { grouped.set(code, []); }
+            grouped.get(code).push(u);
+        }
+        const groupsHtml = [...grouped.entries()].map(([code, items]) => {
+            const label = codeLabels[code] || code;
+            const icon = codeIcons[code] || '⚠️';
+            const sampleReason = items[0]?.reason || '';
+            const itemsHtml = items.map(u => {
+                const sid = u.id || u.shipmentId;
+                const tracking = u.trackingId || `#${sid}`;
+                const reason = u.reason || sampleReason;
+                return `<div style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem .5rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;margin:.25rem 0">
+                    <span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" style="flex-shrink:0">
+                        <span class="chip-priority priority-1">UN</span>
+                        ${escapeHtml(tracking)}
+                    </span>
+                    <span style="font-size:.78rem;color:var(--color-text-secondary);line-height:1.35">${escapeHtml(reason)}</span>
+                </div>`;
+            }).join('');
+            return `<details open style="margin:.5rem 0">
+                <summary style="cursor:pointer;font-weight:600;font-size:.85rem;color:var(--color-text)">${icon} ${escapeHtml(label)} (${items.length})</summary>
+                <div style="padding:.3rem 0 0 .3rem">${itemsHtml}</div>
+            </details>`;
         }).join('');
-        poolEl.innerHTML = `<div class="unassigned-pool" data-transport-id="unassigned">
-            <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- arrastrá aquí para descartar de la ruta</span></h3>
-            <div>${unChips || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío)</span>'}</div>
+
+        const noProposalBanner = (data.proposals.length === 0 && un.length > 0)
+            ? `<div class="deficit-banner" style="background:#fef2f2;border-color:#dc2626;color:#991b1b">❌ <strong>No se generó ninguna propuesta.</strong> Ningún envío seleccionado pudo asignarse a un transporte. Ver detalle de causas abajo.</div>`
+            : '';
+
+        poolEl.innerHTML = `${noProposalBanner}<div class="unassigned-pool" data-transport-id="unassigned">
+            <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- razón visible por envío · arrastrá para reasignar o descartar</span></h3>
+            ${groupsHtml || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío — todos asignados)</span>'}
         </div>`;
 
         // Wire actions
@@ -415,6 +459,18 @@
         });
         container.querySelectorAll('.btn-opp-reject').forEach(btn => {
             btn.addEventListener('click', () => rejectExtras(Number(btn.dataset.tx)));
+        });
+        container.querySelectorAll('.btn-opp-accept').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Feedback visual. Los extras ya están en la propuesta; persistencia ocurre en "Aplicar ruta".
+                btn.style.background = '#16a34a';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#15803d';
+                btn.textContent = '✓ Extras confirmados';
+                btn.disabled = true;
+                btn.style.cursor = 'default';
+                btn.style.opacity = '.9';
+            });
         });
 
         // Popover hover/focus

@@ -11,14 +11,43 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Ruta #<%= route.id %></h1>
-            <div style="display:flex;gap:.5rem">
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button id="btn-print-labels" class="btn-secondary">🖨️ Imprimir todas las etiquetas</button>
+                <% if (route.statusId === 1) { %>
+                    <button id="btn-revert-route" class="btn-secondary" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" title="Cancela la ruta y devuelve los envios a su estado anterior. Solo disponible mientras la ruta este Planificada y ningun envio haya salido.">↩️ Deshabilitar ruteo</button>
+                <% } %>
                 <a href="/route" class="btn-secondary">Volver</a>
             </div>
             <script>
             document.getElementById('btn-print-labels')?.addEventListener('click', () => {
                 const ids = <%- JSON.stringify((route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId).map(s => s.shipmentId)) %>;
                 ids.forEach((id, i) => setTimeout(() => window.open('/shipment/' + id + '/label', '_blank'), i * 200));
+            });
+
+            document.getElementById('btn-revert-route')?.addEventListener('click', async () => {
+                const shipCount = <%= (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId).length %>;
+                const msg = `¿Deshabilitar el ruteo de la Ruta #<%= route.id %>?\n\n` +
+                    `- Se cancelara la ruta (estado: Cancelada).\n` +
+                    `- Los ${shipCount} envio(s) Asignados volveran a su estado anterior (Pendiente / En Sucursal / En Preparacion).\n` +
+                    `- El transporte y conductor quedan libres para otra ruta.\n\n` +
+                    `Solo procede si NINGUN envio salio aun (todos en estado Asignado).`;
+                if (!confirm(msg)) { return; }
+                const btn = document.getElementById('btn-revert-route');
+                btn.disabled = true; btn.textContent = '⏳ Revirtiendo...';
+                try {
+                    const res = await fetch('/route/<%= route.id %>/revert', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        alert('No se pudo revertir:\n\n' + (data.error || 'Error desconocido'));
+                        btn.disabled = false; btn.textContent = '↩️ Deshabilitar ruteo';
+                        return;
+                    }
+                    alert(`✓ Ruta revertida. ${data.revertedShipments} envio(s) devueltos a su estado anterior.`);
+                    window.location.href = '/route';
+                } catch (e) {
+                    alert('Error de red al revertir: ' + e.message);
+                    btn.disabled = false; btn.textContent = '↩️ Deshabilitar ruteo';
+                }
             });
             </script>
         </div>
