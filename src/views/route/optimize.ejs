@@ -118,7 +118,8 @@
                                     <%
                                         const isEnabled = !!t.enabled;
                                         const ar = t.activeRoute;
-                                        const usable = isEnabled && !ar;
+                                        const blocks = !!(ar && ar.blocks);
+                                        const usable = isEnabled && !blocks;
                                         const rowStyle = usable ? '' : 'opacity:.6';
                                     %>
                                     <tr style="<%= rowStyle %>">
@@ -134,9 +135,17 @@
                                         <td>
                                             <% if (!isEnabled) { %>
                                                 <span style="color:var(--color-text-muted);font-size:var(--font-size-xs)">—</span>
+                                            <% } else if (ar && ar.statusId === 2) { %>
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="El repartidor ya salió. Bloqueado hasta que termine.">
+                                                    🔒 Ruta #<%= ar.id %> (En curso)
+                                                </a>
+                                            <% } else if (ar && ar.piggybackable) { %>
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_sucursal" style="text-decoration:none;background:#fef3c7;color:#92400e" title="Tiene una ruta planificada. El optimizador puede sumar envíos si entran dentro de los umbrales configurados.">
+                                                    🔗 Ruta #<%= ar.id %> (Planificada · sumable)
+                                                </a>
                                             <% } else if (ar) { %>
-                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="Ver ruta activa">
-                                                    🔒 Ruta #<%= ar.id %> (<%= ar.statusLabel %>)
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="Tiene una ruta planificada. Activar piggyback en Ajustes para permitir sumar envíos.">
+                                                    🔒 Ruta #<%= ar.id %> (Planificada)
                                                 </a>
                                             <% } else { %>
                                                 <span class="status-badge status-badge--sm inicial">🟢 Libre</span>

@@ -328,17 +328,17 @@
 
                 <div class="form-field">
                     <label>Nombre</label>
-                    <input type="text" id="receiverName" name="receiverName" placeholder="Nombre del receptor">
+                    <input type="text" id="receiverName" name="receiverName" placeholder="Nombre del receptor" maxlength="60">
                 </div>
 
                 <div class="form-field">
                     <label>Apellido</label>
-                    <input type="text" id="receiverLastname" name="receiverLastname" placeholder="Apellido del receptor">
+                    <input type="text" id="receiverLastname" name="receiverLastname" placeholder="Apellido del receptor" maxlength="60">
                 </div>
 
                 <div class="form-field">
                     <label>DNI</label>
-                    <input type="text" id="receiverDni" name="receiverDni" placeholder="Número de documento">
+                    <input type="text" id="receiverDni" name="receiverDni" placeholder="Ej: 12.345.678" inputmode="numeric" maxlength="11">
                 </div>
             </div>
 
@@ -485,25 +485,64 @@
         signatureDrawn = false;
     });
 
+    // Filtros de input
+    const onlyLettersRegex = /[^A-Za-zÁÉÍÓÚÑáéíóúñÜü\s'-]/g;
+    const nameInput = document.getElementById('receiverName');
+    const lastnameInput = document.getElementById('receiverLastname');
+    [nameInput, lastnameInput].forEach(inp => {
+        inp.addEventListener('input', () => {
+            inp.value = inp.value.replace(onlyLettersRegex, '');
+        });
+    });
+
+    // DNI: solo dígitos + formato con puntos cada 3 desde la derecha
+    const dniInput = document.getElementById('receiverDni');
+    function formatDni(raw) {
+        const digits = raw.replace(/\D/g, '').slice(0, 8);
+        if (!digits) return '';
+        return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    dniInput.addEventListener('input', () => {
+        dniInput.value = formatDni(dniInput.value);
+    });
+
     // Validación al submit
     document.querySelector('form').addEventListener('submit', function(e) {
-        const name = document.getElementById('receiverName').value.trim();
-        const lastname = document.getElementById('receiverLastname').value.trim();
-        const dni = document.getElementById('receiverDni').value.trim();
+        const name = nameInput.value.trim();
+        const lastname = lastnameInput.value.trim();
+        const dniRaw = dniInput.value.replace(/\D/g, '');
         const photo = document.getElementById('photoBase64').value;
         const missing = [];
+        const invalid = [];
 
         if (!name) missing.push('Nombre del receptor');
+        else if (!/^[A-Za-zÁÉÍÓÚÑáéíóúñÜü\s'-]+$/.test(name)) invalid.push('Nombre solo puede contener letras');
+
         if (!lastname) missing.push('Apellido del receptor');
-        if (!dni) missing.push('DNI del receptor');
+        else if (!/^[A-Za-zÁÉÍÓÚÑáéíóúñÜü\s'-]+$/.test(lastname)) invalid.push('Apellido solo puede contener letras');
+
+        if (!dniRaw) missing.push('DNI del receptor');
+        else {
+            const dniNum = Number(dniRaw);
+            if (dniRaw.length < 7 || dniNum < 1000000) invalid.push('DNI debe tener al menos 7 dígitos');
+            else if (dniNum > 99999999) invalid.push('DNI no puede superar 99.999.999');
+        }
+
         if (!gpsOk) missing.push('Ubicación GPS');
         if (!photo) missing.push('Foto del paquete');
         if (!signatureDrawn) missing.push('Firma del receptor');
 
-        if (missing.length > 0) {
+        if (missing.length || invalid.length) {
             e.preventDefault();
-            showValidation('Faltan completar: ' + missing.join(', ') + '.');
+            const parts = [];
+            if (missing.length) parts.push('Faltan completar: ' + missing.join(', ') + '.');
+            if (invalid.length) parts.push(invalid.join('. ') + '.');
+            showValidation(parts.join(' '));
+            return;
         }
+
+        // Enviar DNI limpio al server
+        dniInput.value = dniRaw;
     });
 
     function showValidation(msg) {

@@ -76,9 +76,24 @@ const optimizeForm = async (req, res) => {
     }).catch(() => []);
     const activeRouteByTx = new Map(activeRoutes.map(r => [r.transportId, r]));
     const routeStatusLabel = { [RouteStatus.PLANNED]: 'Planificada', [RouteStatus.IN_ROUTE]: 'En curso' };
+
+    const settingModel = require('../models/setting');
+    const piggyRaw = (await settingModel.get('piggyback_enabled')) ?? 'false';
+    const piggybackEnabled = piggyRaw === 'true' || piggyRaw === 'on' || piggyRaw === '1';
+
     for (const t of transports) {
         const ar = activeRouteByTx.get(t.id);
-        t.activeRoute = ar ? { id: ar.id, statusLabel: routeStatusLabel[ar.statusId] || 'Activa' } : null;
+        if (!ar) { t.activeRoute = null; continue; }
+        const isInRoute = ar.statusId === RouteStatus.IN_ROUTE;
+        // PLANNED + piggyback ON => sumable (no bloquea). IN_ROUTE => siempre bloquea.
+        const blocks = isInRoute || (!isInRoute && !piggybackEnabled);
+        t.activeRoute = {
+            id: ar.id,
+            statusId: ar.statusId,
+            statusLabel: routeStatusLabel[ar.statusId] || 'Activa',
+            blocks,
+            piggybackable: !isInRoute && piggybackEnabled,
+        };
     }
 
     const predictionModel = require('../models/shipmentPrediction');
