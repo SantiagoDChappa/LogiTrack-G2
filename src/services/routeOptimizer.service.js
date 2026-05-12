@@ -331,7 +331,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
             lng: num(s.address.lng),
             label: `${s.trackingId} - ${s.recipient?.fullName || ''}`,
             priority: s.priority || 1,
-            priorityLabel: PRIORITY_LABEL[s.priority || 1],
+            priorityLabel: PRIORITY_LABEL[Number(s.priority) || 1] ?? 'normal',
             windowFromSec: parseTimeToSec(s.expectedDeliveryFrom),
             windowToSec:   parseTimeToSec(s.expectedDeliveryTo),
         }));
@@ -529,7 +529,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
     const transportPickReason = `Cluster destino: ${cluster.provinceName}. Elegido ${t.name} (${cls.type}) por menor costo unitario habilitado dentro del rango (fijo $${num(t.fixedCost)} + $${num(t.costPerKm)}/km). Capacidad ${num(t.maxWeightKg)}kg / ${num(t.maxVolumeM3)}m³. Zonas: ${t.zones?.length ? t.zones.map(z => z.name).join(', ') : 'todas'}.${distInfo}${autonomyInfo}${oppInfo}`;
 
     const reasons = bucket.shipments.map(s => {
-        const pri = PRIORITY_LABEL[s.priority || 1];
+        const pri = PRIORITY_LABEL[Number(s.priority) || 1] ?? 'normal';
         const win = (s.expectedDeliveryFrom && s.expectedDeliveryTo) ? ` Ventana ${s.expectedDeliveryFrom.slice(0,5)}-${s.expectedDeliveryTo.slice(0,5)}.` : '';
         const priText = pri !== 'normal' ? ` Prioridad ${pri.toUpperCase()}.` : '';
         const isOpportunistic = s.currentBranchId !== branch.id;
