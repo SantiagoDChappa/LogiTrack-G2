@@ -35,10 +35,16 @@ const parseTimeToSec = (t) => {
 // Evita usar moto en viajes interprovinciales largos.
 const classifyTransport = (t) => {
     const w = num(t.maxWeightKg);
-    if (w <= 50)   { return { type: 'moto',         maxRangeKm: 50  }; }
-    if (w <= 1000) { return { type: 'van',          maxRangeKm: 300 }; }
-    if (w <= 2000) { return { type: 'camion-chico', maxRangeKm: 600 }; }
-    return           { type: 'camion-grande', maxRangeKm: Infinity };
+    const autonomy = num(t.autonomyKm);
+    let type, defaultRange;
+    if (w <= 50)        { type = 'moto';          defaultRange = 50;   }
+    else if (w <= 1000) { type = 'van';           defaultRange = 600;  }
+    else if (w <= 2000) { type = 'camion-chico';  defaultRange = 1200; }
+    else                { type = 'camion-grande'; defaultRange = Infinity; }
+    // Si el vehículo declara autonomía real, usar el doble (dos tanques con paradas de servicio)
+    // como rango operativo. Toma el mayor entre default por categoría y autonomía declarada x2.
+    const effectiveRange = autonomy > 0 ? Math.max(defaultRange, autonomy * 2) : defaultRange;
+    return { type, maxRangeKm: effectiveRange };
 };
 
 // Margen de seguridad: paramos a recargar al 85% de la autonomia para evitar quedar varados
@@ -119,8 +125,61 @@ const isTransportEligibleForZone = (transport, zoneId) => {
 
 // nearest-neighbor inline en buildProposal (soporta startIdx variable por pickups oportunistas)
 
-// Agrupa envios por provincia destino
-const clusterByProvince = (shipments) => {
+// Centroide haversine de envíos con geo válido
+const clusterCentroid = (cluster) => {
+    const pts = cluster.shipments
+        .map(s => ({ lat: num(s.address?.lat), lng: num(s.address?.lng) }))
+        .filter(p => p.lat && p.lng);
+    if (pts.length === 0) { return null; }
+    return {
+        lat: pts.reduce((a, p) => a + p.lat, 0) / pts.length,
+        lng: pts.reduce((a, p) => a + p.lng, 0) / pts.length,
+    };
+};
+
+// Umbral km para fusionar clusters de provincias distintas pero geográficamente cercanas
+// (ej. CABA + Buenos Aires conurbano). Parametrizable via setting cluster_merge_radius_km.
+const DEFAULT_CLUSTER_MERGE_KM = 60;
+
+const mergeNearbyClusters = (clusters, radiusKm) => {
+    const rKm = Number(radiusKm) > 0 ? Number(radiusKm) : DEFAULT_CLUSTER_MERGE_KM;
+    if (clusters.length <= 1) { return clusters; }
+    const enriched = clusters.map(c => ({ ...c, centroid: clusterCentroid(c) }));
+    const merged = [];
+    const used = new Set();
+    for (let i = 0; i < enriched.length; i++) {
+        if (used.has(i)) { continue; }
+        const base = enriched[i];
+        used.add(i);
+        const group = [base];
+        if (base.centroid) {
+            for (let j = i + 1; j < enriched.length; j++) {
+                if (used.has(j)) { continue; }
+                const other = enriched[j];
+                if (!other.centroid) { continue; }
+                const d = haversineKm(base.centroid, other.centroid);
+                if (d <= rKm) { group.push(other); used.add(j); }
+            }
+        }
+        if (group.length === 1) {
+            merged.push(base);
+        } else {
+            const names = [...new Set(group.map(g => g.provinceName))].join(' + ');
+            merged.push({
+                provinceId: base.provinceId,
+                provinceName: names,
+                shipments: group.flatMap(g => g.shipments),
+                totalWeight: group.reduce((a, g) => a + g.totalWeight, 0),
+                totalVolume: group.reduce((a, g) => a + g.totalVolume, 0),
+                mergedFrom: group.map(g => ({ provinceId: g.provinceId, provinceName: g.provinceName, count: g.shipments.length })),
+            });
+        }
+    }
+    return merged;
+};
+
+// Agrupa envios por provincia destino, luego fusiona clusters cercanos por centroide.
+const clusterByProvince = (shipments, mergeRadiusKm) => {
     const map = new Map();
     for (const s of shipments) {
         const key = s.address?.provinceId || 0;
@@ -138,7 +197,7 @@ const clusterByProvince = (shipments) => {
         g.totalWeight += num(s.weightKg);
         g.totalVolume += num(s.volumeM3);
     }
-    return [...map.values()];
+    return mergeNearbyClusters([...map.values()], mergeRadiusKm);
 };
 
 // Asigna 1 cluster -> 1+ transportes. Greedy: transporte mas barato que entre el cluster entero;
@@ -154,7 +213,7 @@ const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) =
         .sort((a, b) => (num(a.fixedCost) + num(a.costPerKm)) - (num(b.fixedCost) + num(b.costPerKm)));
 
     if (candidates.length === 0) {
-        return { buckets: [], unassigned: sortedShipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `No hay transporte habilitado para cubrir ${distKm.toFixed(0)}km hacia ${cluster.provinceName}. Rangos máx: moto 50km, van 300km, camión chico 600km, camión grande ilimitado. Agregar un vehículo con mayor rango a la sucursal o verificar zonas habilitadas.` })) };
+        return { buckets: [], unassigned: sortedShipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `No hay transporte habilitado para cubrir ${distKm.toFixed(0)}km hacia ${cluster.provinceName}. Rangos máx: moto 50km, van 600km, camión chico 1200km, camión grande ilimitado. Agregar un vehículo con mayor rango a la sucursal o verificar zonas habilitadas.` })) };
     }
 
     const buckets = [];
@@ -169,6 +228,30 @@ const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) =
         const v = num(s.volumeM3);
         const isUrgent = (s.priority || 1) === 3;
         let placed = false;
+
+        // No-urgent: intentar primero sumarse a un bucket URGENTE dedicado existente
+        // si el destino entra dentro del umbral configurado (urgent_combine_max_km).
+        // Aprovecha el viaje del urgente sin abrir vehículo adicional.
+        if (!isUrgent && urgentCombine.enabled && urgentCombine.maxKm > 0) {
+            let bestBucket = null, bestDist = Infinity;
+            for (const b of buckets) {
+                if (!b.dedicated) { continue; }
+                const check = isUrgentBucketCompatible(b, s, urgentCombine.maxKm);
+                if (check.ok && check.distKm < bestDist) { bestBucket = b; bestDist = check.distKm; }
+            }
+            if (bestBucket) {
+                bestBucket.shipments.push(s);
+                bestBucket.usedWeight += w;
+                bestBucket.usedVolume += v;
+                bestBucket.urgentFilled = (bestBucket.urgentFilled || []).concat([{
+                    shipmentId: s.id,
+                    trackingId: s.trackingId,
+                    priority: PRIORITY_LABEL[s.priority || 1],
+                    pairedDistKm: Number(bestDist.toFixed(2)),
+                }]);
+                continue;
+            }
+        }
 
         // No-urgent: intentar compartir bucket NO dedicado
         if (!isUrgent) {
@@ -548,7 +631,10 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
     const urgentCombinedInfo = (bucket.dedicated && urgentShips.length > 1)
         ? ` 🚨 ${urgentShips.length} envíos URGENTES combinados en este vehículo dedicado por destinos cercanos (max ${(bucket.urgentCombined || []).reduce((m, c) => Math.max(m, c.pairedDistKm || 0), 0).toFixed(1)}km entre destinos).`
         : '';
-    const transportPickReason = `Cluster destino: ${cluster.provinceName}. Elegido ${t.name} (${cls.type}) por menor costo unitario habilitado dentro del rango (fijo $${num(t.fixedCost)} + $${num(t.costPerKm)}/km). Capacidad ${num(t.maxWeightKg)}kg / ${num(t.maxVolumeM3)}m³. Zonas: ${t.zones?.length ? t.zones.map(z => z.name).join(', ') : 'todas'}.${distInfo}${autonomyInfo}${oppInfo}${urgentCombinedInfo}`;
+    const urgentFilledInfo = (bucket.dedicated && (bucket.urgentFilled || []).length > 0)
+        ? ` ➕ ${bucket.urgentFilled.length} envío(s) de prioridad menor sumados al vehículo urgente por destinos dentro del umbral (max ${bucket.urgentFilled.reduce((m, c) => Math.max(m, c.pairedDistKm || 0), 0).toFixed(1)}km).`
+        : '';
+    const transportPickReason = `Cluster destino: ${cluster.provinceName}. Elegido ${t.name} (${cls.type}) por menor costo unitario habilitado dentro del rango (fijo $${num(t.fixedCost)} + $${num(t.costPerKm)}/km). Capacidad ${num(t.maxWeightKg)}kg / ${num(t.maxVolumeM3)}m³. Zonas: ${t.zones?.length ? t.zones.map(z => z.name).join(', ') : 'todas'}.${distInfo}${autonomyInfo}${oppInfo}${urgentCombinedInfo}${urgentFilledInfo}`;
 
     const reasons = bucket.shipments.map(s => {
         const pri = PRIORITY_LABEL[Number(s.priority) || 1] ?? 'normal';
@@ -812,6 +898,16 @@ const loadUrgentCombineSettings = async () => {
     } catch { return { enabled: true, maxKm: 15 }; }
 };
 
+const loadClusterMergeRadius = async () => {
+    try {
+        const settingModel = require('../models/setting');
+        const v = await settingModel.get('cluster_merge_radius_km');
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? n : DEFAULT_CLUSTER_MERGE_KM;
+    } catch { return DEFAULT_CLUSTER_MERGE_KM; }
+};
+
+
 // Devuelve true si el envio s "cabe" en un bucket urgente existente:
 // - capacidad libre suficiente
 // - zona compatible
@@ -1059,6 +1155,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     // IN_ROUTE siempre bloquea (el repartidor salió, no se puede modificar).
     const piggySettings = await loadPiggybackSettings();
     const urgentCombine = await loadUrgentCombineSettings();
+    const clusterMergeKm = await loadClusterMergeRadius();
     const { Route: _RouteCheck, RouteStatus: _RSCheck } = require('../models/route');
     const activeTxRoutes = await _RouteCheck.findAll({
         where: {
@@ -1176,7 +1273,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     }
 
     // 1) Cluster por provincia destino, priorizando clusters mas pesados
-    const clusters = clusterByProvince(validShipments).sort((a, b) => b.totalWeight - a.totalWeight);
+    const clusters = clusterByProvince(validShipments, clusterMergeKm).sort((a, b) => b.totalWeight - a.totalWeight);
 
     // 2) Asignar transportes por cluster (un transporte solo sirve un cluster)
     const proposals = [];

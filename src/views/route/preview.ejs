@@ -268,10 +268,15 @@
 
         const s = data.summary || {};
         const totalCost = data.proposals.reduce((a,p) => a + p.totalCost, 0);
+        // Asignados: solo los originalmente seleccionados, sin contar pickups oportunistas
+        const selectedSet = new Set(lastShipmentIds);
+        const assignedSelected = data.proposals.reduce((a, p) =>
+            a + (p.shipmentIds || []).filter(id => selectedSet.has(Number(id))).length, 0);
+        const totalSelected = lastShipmentIds.length || (s.totalShipments ?? 0);
         let summaryHtml = `
             <div class="summary-grid">
                 <div class="item">Propuestas<strong>${data.proposals.length}</strong></div>
-                <div class="item">Asignados<strong>${s.assignedCount ?? data.proposals.reduce((a,p) => a + p.shipmentIds.length, 0)} de ${s.validShipments ?? s.totalShipments ?? '-'}</strong></div>
+                <div class="item">Asignados<strong>${assignedSelected} de ${totalSelected}</strong></div>
                 <div class="item">Sin asignar<strong>${(data.unassigned || []).filter(u => u.code !== 'already_assigned').length}</strong></div>
                 <div class="item">Costo total<strong>${fmtMoney(totalCost)}</strong></div>
                 <div class="item">Demanda<strong>${s.demandWeightKg ?? '-'}kg / ${s.demandVolumeM3 ?? '-'}m³</strong></div>
@@ -386,8 +391,8 @@
                     <div class="proposal-stat">Distancia<strong>${p.totalDistanceKm} km</strong></div>
                     <div class="proposal-stat">Tiempo<strong>${fmtDuration(p.totalDurationMin)}</strong></div>
                     <div class="proposal-stat">Costo<strong>${fmtMoney(p.totalCost)}</strong></div>
-                    <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
-                    <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
+                    <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight >= 1 ? 'color:#dc2626' : (p.utilizationWeight >= 0.8 ? 'color:#d97706' : '')}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
+                    <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume >= 1 ? 'color:#dc2626' : (p.utilizationVolume >= 0.8 ? 'color:#d97706' : '')}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
                 </div>
                 ${oppBlock}
                 <div><strong style="font-size:.8rem">Envíos (${p.shipmentIds.length}):</strong></div>

@@ -73,6 +73,7 @@ const ROUTE_SETTINGS = {
     piggyback_max_extra_cost_pct:{ default: '20',    parse: v => Math.max(0, Number(v) || 0) },
     urgent_combine_enabled:      { default: 'true',  parse: v => v === 'true' || v === 'on' || v === '1' },
     urgent_combine_max_km:       { default: '15',    parse: v => Math.max(0, Number(v) || 0) },
+    cluster_merge_radius_km:     { default: '60',    parse: v => Math.max(0, Number(v) || 0) },
 };
 
 const getRouteOptimizerSettings = async () => {
@@ -95,6 +96,7 @@ const saveRouteOptimizerSettings = async (req, res) => {
         settingModel.set('piggyback_max_extra_cost_pct', String(Math.max(0, Number(body.piggyback_max_extra_cost_pct) || 0))),
         settingModel.set('urgent_combine_enabled',       urgentEnabled ? 'true' : 'false'),
         settingModel.set('urgent_combine_max_km',        String(Math.max(0, Number(body.urgent_combine_max_km) || 0))),
+        settingModel.set('cluster_merge_radius_km',      String(Math.max(0, Number(body.cluster_merge_radius_km) || 0))),
     ]);
     res.redirect('/setting?success=3');
 };

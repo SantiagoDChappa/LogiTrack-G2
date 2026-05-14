@@ -399,6 +399,22 @@ const appendToRoute = async (req, res) => {
             return res.status(422).json({ error: `Volumen total (${(existingV + addedV).toFixed(3)}m³) supera la capacidad del transporte (${num(transport.maxVolumeM3)}m³).` });
         }
 
+        // Validar umbrales piggyback configurados en Ajustes
+        const settingModel = require('../models/setting');
+        const [enabledRaw, pctRaw, kmRaw, costPctRaw] = await Promise.all([
+            settingModel.get('piggyback_enabled'),
+            settingModel.get('piggyback_max_extra_pct'),
+            settingModel.get('piggyback_max_extra_km'),
+            settingModel.get('piggyback_max_extra_cost_pct'),
+        ]);
+        const piggyEnabled = enabledRaw === 'true' || enabledRaw === 'on' || enabledRaw === '1';
+        if (!piggyEnabled) {
+            return res.status(422).json({ error: 'La opción "Sumar envíos a rutas pendientes" está desactivada en Ajustes. Activarla para permitir esta operación.' });
+        }
+        const maxExtraPct     = Number(pctRaw)     || 0;
+        const maxExtraKm      = Number(kmRaw)      || 0;
+        const maxExtraCostPct = Number(costPctRaw) || 0;
+
         const haversineKm = (a, b) => {
             const toRad = d => d * Math.PI / 180;
             const R = 6371;
@@ -409,6 +425,33 @@ const appendToRoute = async (req, res) => {
 
         const sortedStops = (route.stops || []).sort((a, b) => a.sequence - b.sequence);
         const lastStop = sortedStops[sortedStops.length - 1];
+
+        // Pre-cálculo del detour total antes de tocar BD, para validar umbrales
+        let plannedExtraKm = 0;
+        {
+            let lp = { lat: num(lastStop.lat), lng: num(lastStop.lng) };
+            for (const s of newShipments) {
+                const pt = { lat: num(s.address.lat), lng: num(s.address.lng) };
+                plannedExtraKm += haversineKm(lp, pt);
+                lp = pt;
+            }
+        }
+        const baseKm = num(route.totalDistanceKm);
+        const baseCost = num(route.totalCost);
+        const plannedExtraCost = plannedExtraKm * num(transport.costPerKm);
+        const pctExtraKm   = baseKm  > 0 ? (plannedExtraKm   / baseKm)  * 100 : Infinity;
+        const pctExtraCost = baseCost > 0 ? (plannedExtraCost / baseCost) * 100 : Infinity;
+
+        if (maxExtraKm > 0 && plannedExtraKm > maxExtraKm) {
+            return res.status(422).json({ error: `Desvío absoluto (+${plannedExtraKm.toFixed(1)}km) supera el umbral de ${maxExtraKm}km configurado en Ajustes. No se suma para no penalizar la ruta original.` });
+        }
+        if (maxExtraPct > 0 && pctExtraKm > maxExtraPct) {
+            return res.status(422).json({ error: `Desvío relativo (+${pctExtraKm.toFixed(1)}%) supera el umbral de ${maxExtraPct}% sobre la distancia actual (${baseKm.toFixed(1)}km).` });
+        }
+        if (maxExtraCostPct > 0 && pctExtraCost > maxExtraCostPct) {
+            return res.status(422).json({ error: `Costo extra (+$${plannedExtraCost.toFixed(0)} = ${pctExtraCost.toFixed(1)}%) supera el umbral de ${maxExtraCostPct}% sobre el costo actual ($${baseCost.toFixed(0)}).` });
+        }
+
         let extraKm = 0;
         const transaction = await sequelize.transaction();
         try {
