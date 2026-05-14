@@ -92,14 +92,24 @@
 
                 <!-- Transportes -->
                 <div class="update-card" style="margin-bottom:var(--space-5)">
-                    <h3><span class="material-symbols-outlined">local_shipping</span> Transportes de la sucursal</h3>
-                    <p style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
-                        El sistema sólo elegirá transportes <strong>Habilitados</strong> y <strong>Libres</strong>. Los deshabilitados o con ruta activa se muestran como referencia.
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+                        <h3><span class="material-symbols-outlined">local_shipping</span> Transportes de la sucursal</h3>
+                        <button type="button" id="toggle-manual-tx" class="btn-secondary" style="font-size:var(--font-size-xs)">
+                            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">tune</span>
+                            Elegir transporte manualmente
+                        </button>
+                    </div>
+                    <p id="tx-help-auto" style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
+                        Modo <strong>automático</strong>: el optimizador elige los transportes habilitados y libres. Los deshabilitados o con ruta activa se muestran como referencia.
+                    </p>
+                    <p id="tx-help-manual" style="display:none;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
+                        Modo <strong>manual</strong>: solo se considerarán los transportes tildados. Los no tildados quedan excluidos del optimizador.
                     </p>
                     <div class="table-wrapper">
                         <table>
                             <thead>
                                 <tr>
+                                    <th class="tx-cb-col" style="display:none;width:2rem"><input type="checkbox" id="select-all-tx"></th>
                                     <th>Nombre</th>
                                     <th>Patente</th>
                                     <th>Estado</th>
@@ -122,7 +132,14 @@
                                         const usable = isEnabled && !blocks;
                                         const rowStyle = usable ? '' : 'opacity:.6';
                                     %>
-                                    <tr style="<%= rowStyle %>">
+                                    <tr style="<%= rowStyle %>" data-tx-row="<%= t.id %>">
+                                        <td class="tx-cb-col" style="display:none">
+                                            <% if (usable) { %>
+                                                <input type="checkbox" class="tx-cb" name="transportIds" value="<%= t.id %>" checked>
+                                            <% } else { %>
+                                                <span style="color:var(--color-text-muted);font-size:.7rem">—</span>
+                                            <% } %>
+                                        </td>
                                         <td><strong><%= t.name %></strong></td>
                                         <td class="tracking-id"><%= t.plate || '-' %></td>
                                         <td>
@@ -189,6 +206,23 @@
 
     window.CURRENT_BRANCH_ID = <%= branchId ? branchId : 'null' %>;
 
+    // Toggle modo manual de transportes
+    let manualTxMode = false;
+    const allTxIds = Array.from(document.querySelectorAll('[data-tx-row]')).map(r => Number(r.dataset.txRow));
+    const toggleBtn = document.getElementById('toggle-manual-tx');
+    toggleBtn?.addEventListener('click', () => {
+        manualTxMode = !manualTxMode;
+        document.querySelectorAll('.tx-cb-col').forEach(el => { el.style.display = manualTxMode ? '' : 'none'; });
+        document.getElementById('tx-help-auto').style.display    = manualTxMode ? 'none' : '';
+        document.getElementById('tx-help-manual').style.display  = manualTxMode ? '' : 'none';
+        toggleBtn.innerHTML = manualTxMode
+            ? '<span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">auto_mode</span> Volver a modo automático'
+            : '<span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">tune</span> Elegir transporte manualmente';
+    });
+    document.getElementById('select-all-tx')?.addEventListener('change', e => {
+        document.querySelectorAll('.tx-cb').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
     document.getElementById('optimize-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
@@ -197,10 +231,19 @@
             alert('Seleccioná al menos un envío.');
             return;
         }
+        const body = { shipmentIds, branchId: window.CURRENT_BRANCH_ID };
+        if (manualTxMode) {
+            const selectedTx = fd.getAll('transportIds').map(Number);
+            if (selectedTx.length === 0) {
+                alert('Modo manual activo: tildá al menos un transporte.');
+                return;
+            }
+            body.excludeTransportIds = allTxIds.filter(id => !selectedTx.includes(id));
+        }
         const res = await fetch('/route/optimize/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ shipmentIds, branchId: window.CURRENT_BRANCH_ID }),
+            body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!res.ok) { alert(data.error || 'Error'); return; }

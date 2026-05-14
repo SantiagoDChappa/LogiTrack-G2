@@ -1052,11 +1052,55 @@ const evaluatePiggyback = async ({ plannedRoutes, transportsById, shipments, bra
         additionsByRoute.set(c.routeId, arr);
     }
 
-    // Construir propuestas piggyback (no necesitan stops/geometria nueva; el UI mostrara resumen + lista)
+    // Construir propuestas piggyback con stops merged + geometry para que el mapa pinte el recorrido
     const piggybackProposals = [];
     for (const [routeId, adds] of additionsByRoute.entries()) {
         const ctx = ctxByRouteId.get(routeId);
         const t = ctx.transport;
+
+        // Merge: stops existentes + nuevos inserciones por insertPos (orden descendente para no romper indices)
+        const mergedStops = ctx.stops.map(s => ({
+            stopType: s.stopType,
+            shipmentId: s.shipmentId || null,
+            branchId: s.branchId || null,
+            lat: s.lat, lng: s.lng,
+            label: s.stopType === 'pickup' ? 'Sucursal origen (ruta existente)'
+                 : (s.stopType === 'service' ? 'Parada servicio (ruta existente)'
+                                              : `Envío existente #${s.shipmentId}`),
+            existing: true,
+        }));
+        const sortedAdds = [...adds].sort((a, b) => b.insertPos - a.insertPos);
+        for (const c of sortedAdds) {
+            mergedStops.splice(c.insertPos, 0, {
+                stopType: 'delivery',
+                shipmentId: c.shipment.id,
+                branchId: null,
+                lat: num(c.shipment.address.lat),
+                lng: num(c.shipment.address.lng),
+                label: `${c.shipment.trackingId} - ${c.shipment.recipient?.fullName || ''} (NUEVO)`,
+                added: true,
+            });
+        }
+
+        // Distancia por tramo + geometry
+        const routePts = mergedStops.map(s => ({ lat: s.lat, lng: s.lng }));
+        let geometry = null, distanceSource = 'haversine';
+        try {
+            const road = await routeViaRoads(routePts);
+            geometry = road.geometry;
+            distanceSource = road.source;
+            for (let i = 0; i < mergedStops.length; i++) {
+                const legKm = i === 0 ? 0 : (road.legDistancesKm[i - 1] ?? haversineKm(routePts[i - 1], routePts[i]));
+                mergedStops[i].sequence = i + 1;
+                mergedStops[i].distanceFromPrevKm = Number(legKm.toFixed(2));
+            }
+        } catch {
+            for (let i = 0; i < mergedStops.length; i++) {
+                const legKm = i === 0 ? 0 : haversineKm(routePts[i - 1], routePts[i]);
+                mergedStops[i].sequence = i + 1;
+                mergedStops[i].distanceFromPrevKm = Number(legKm.toFixed(2));
+            }
+        }
         const totalExtraKm = adds.reduce((a, c) => a + c.extraKm, 0);
         const totalExtraCost = adds.reduce((a, c) => a + c.extraCost, 0);
         const reasoningShipments = adds.map(c => ({
@@ -1084,7 +1128,9 @@ const evaluatePiggyback = async ({ plannedRoutes, transportsById, shipments, bra
             transportId: t.id,
             transport: { id: t.id, name: t.name, plate: t.plate, maxWeightKg: num(t.maxWeightKg), maxVolumeM3: num(t.maxVolumeM3), fixedCost: num(t.fixedCost), costPerKm: num(t.costPerKm), driver: t.driver ? { id: t.driver.id, fullName: t.driver.fullName } : null },
             clusterProvinceName: ctx.provinceName,
-            stops: [],
+            stops: mergedStops,
+            geometry,
+            distanceSource,
             totalDistanceKm: Number(ctx.totalKm.toFixed(2)),
             totalDurationMin: null,
             totalCost: Number(ctx.totalCost.toFixed(2)),
