@@ -6,77 +6,150 @@
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    .main-content { height: calc(100vh - 56px); display: flex; flex-direction: column; padding: 0; }
+
+    .route-toolbar {
+        padding: .65rem 1rem;
+        border-bottom: 1px solid var(--color-border, #e2e8f0);
+        background: var(--color-surface, #fff);
+        display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .route-toolbar h1 { font-size: 1.05rem; margin: 0; }
+    .route-toolbar .meta { font-size: .82rem; color: var(--color-text-secondary, #64748b); }
+    .progress-wrap { flex: 1; min-width: 180px; max-width: 360px; }
+    .progress-bar { width: 100%; height: 8px; background: var(--color-border, #e2e8f0); border-radius: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #16a34a; transition: width .35s ease; }
+    .progress-label { font-size: .78rem; color: var(--color-text-secondary, #64748b); margin-top: 3px; }
+
+    .route-body { flex: 1; display: flex; min-height: 0; }
+    .route-sidebar {
+        width: 380px; border-right: 1px solid var(--color-border, #e2e8f0);
+        background: var(--color-bg, #f8fafc);
+        overflow-y: auto; padding: .65rem;
+    }
+    .route-map-wrap { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+    .btn-recenter {
+        position: absolute; bottom: 16px; right: 16px; z-index: 600;
+        background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0);
+        border-radius: 50%; width: 44px; height: 44px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.18);
+    }
+
     .stop-row {
         background: var(--color-surface, #fff);
         border: 1px solid var(--color-border, #e2e8f0);
         border-radius: 10px;
-        padding: 1rem;
-        margin: .65rem 0;
+        padding: .75rem .85rem;
+        margin: .5rem 0;
         list-style: none;
+        position: relative;
     }
     .stop-row.completed { opacity: .55; }
-    .stop-row .stop-title { font-weight: 600; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-    .stop-row .stop-meta { color: var(--color-text-secondary, #64748b); font-size: .9rem; margin-top: .25rem; }
-    .stop-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .65rem; }
+    .stop-row.is-current {
+        border-color: var(--color-primary, #2563eb);
+        border-width: 2px;
+        box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .stop-bubble {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 50%; font-weight: 700; font-size: .82rem;
+        color: #fff; margin-right: .5rem;
+    }
+    .stop-bubble.pending { background: #94a3b8; }
+    .stop-bubble.current { background: #1976d2; animation: pulse 1.4s infinite; }
+    .stop-bubble.delivered { background: #16a34a; }
+    .stop-bubble.failed { background: #dc2626; }
+    .stop-bubble.pickup { background: #f59e0b; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(25,118,210,.55);} 50% { box-shadow: 0 0 0 8px rgba(25,118,210,0);} }
+
+    .stop-title { font-weight: 600; display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+    .stop-meta { color: var(--color-text-secondary, #64748b); font-size: .82rem; margin-top: .25rem; padding-left: 34px; }
+    .stop-actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .55rem; padding-left: 34px; }
     .stop-actions button, .stop-actions a {
-        font-size: .85rem; padding: .4rem .8rem; border-radius: 6px;
+        font-size: .8rem; padding: .35rem .7rem; border-radius: 6px;
         border: 1px solid var(--color-border, #ccc); cursor: pointer;
         text-decoration: none; display: inline-flex; align-items: center; gap: .25rem;
     }
-    .btn-arrive { background: #0284c7; color: #fff; border-color: #0284c7; }
-    .btn-pickup { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .btn-arrive    { background: #0284c7; color: #fff; border-color: #0284c7; }
+    .btn-pickup    { background: #f59e0b; color: #fff; border-color: #f59e0b; }
     .btn-delivered { background: #16a34a; color: #fff; border-color: #16a34a; }
-    .btn-failed { background: #dc2626; color: #fff; border-color: #dc2626; }
+    .btn-failed    { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+    @media (max-width: 768px) {
+        body { overflow: auto; }
+        .main-content { height: auto; }
+        .route-body { flex-direction: column; }
+        .route-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--color-border, #e2e8f0); max-height: 50vh; }
+        .route-map-wrap { height: 50vh; }
+    }
     </style>
 </head>
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
-            <h1>Mi Ruta #<%= route.id %></h1>
-            <p>Transporte: <%= route.transport.name %> · Distancia: <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</p>
+        <div class="route-toolbar">
+            <div>
+                <h1>Ruta #<%= route.id %></h1>
+                <div class="meta"><%= route.transport.name %> · <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</div>
+            </div>
+            <div class="progress-wrap">
+                <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+                <div class="progress-label"><span id="progress-text">0 / 0</span> completadas</div>
+            </div>
         </div>
 
-        <div id="map" style="height: 380px; margin-bottom: 1rem; border-radius: 8px; overflow: hidden;"></div>
-
-        <h2>Recorrido</h2>
-        <ol id="stops-list" style="padding:0">
-            <% (route.stops || []).forEach(s => { %>
-                <li class="stop-row <%= s.completed ? 'completed' : '' %>" data-stop-id="<%= s.id %>">
-                    <div class="stop-title">
-                        <% if (s.stopType === 'pickup') { %>
-                            📦 Pickup en <%= s.branch ? (s.branch.name.startsWith('Sucursal') ? s.branch.name : 'Sucursal ' + s.branch.name) : 'sucursal' %>
-                        <% } else { %>
-                            🏠 Entrega <%= s.shipment ? s.shipment.trackingId : '' %>
-                        <% } %>
-                        <% if (s.completed) { %><span style="color:#16a34a">✅</span><% } %>
-                    </div>
-                    <div class="stop-meta">
-                        <% if (s.stopType === 'delivery' && s.shipment && s.shipment.address) { %>
-                            <%= s.shipment.address.street %> <%= s.shipment.address.number %>
-                            <% if (s.shipment.recipient) { %> · <%= s.shipment.recipient.fullName %><% } %>
-                        <% } else if (s.branch) { %>
-                            <%= s.branch.address || '' %>
-                        <% } %>
-                        <br>+<%= s.distanceFromPrevKm %> km
-                    </div>
-                    <% if (!s.completed) { %>
-                        <div class="stop-actions">
-                            <% if (s.stopType === 'pickup') { %>
-                                <button class="btn-pickup" data-action="pickup-confirmed" data-stop-id="<%= s.id %>">📦 Confirmar pickup</button>
-                            <% } else { %>
-                                <button class="btn-arrive" data-action="arrive" data-stop-id="<%= s.id %>">🏁 Llegué</button>
-                                <button class="btn-delivered" data-action="delivered" data-stop-id="<%= s.id %>">✅ Entregado</button>
-                                <button class="btn-failed" data-action="failed" data-stop-id="<%= s.id %>">❌ No pude entregar</button>
-                                <% if (s.shipment) { %>
-                                    <a class="btn-secondary" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod">📷 Foto + firma</a>
+        <div class="route-body">
+            <aside class="route-sidebar">
+                <ol id="stops-list" style="padding:0;margin:0">
+                    <% (route.stops || []).forEach(s => { %>
+                        <li class="stop-row <%= s.completed ? 'completed' : '' %>" data-stop-id="<%= s.id %>" data-stop-type="<%= s.stopType %>">
+                            <div class="stop-title">
+                                <span class="stop-bubble <%= s.completed ? (s.stopType === 'pickup' ? 'pickup' : 'delivered') : 'pending' %>"><%= s.sequence %></span>
+                                <% if (s.stopType === 'pickup') { %>
+                                    📦 Pickup <%= s.branch ? (s.branch.name.startsWith('Sucursal') ? s.branch.name : 'Sucursal ' + s.branch.name) : 'sucursal' %>
+                                <% } else { %>
+                                    🏠 <%= s.shipment ? s.shipment.trackingId : 'Entrega' %>
                                 <% } %>
+                            </div>
+                            <div class="stop-meta">
+                                <% if (s.stopType === 'delivery' && s.shipment && s.shipment.address) { %>
+                                    <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                                    <% if (s.shipment.recipient) { %> · <%= s.shipment.recipient.fullName %><% } %>
+                                <% } else if (s.branch) { %>
+                                    <%= s.branch.address || '' %>
+                                <% } %>
+                                <br>+<%= s.distanceFromPrevKm %> km
+                            </div>
+                            <% if (!s.completed) { %>
+                                <div class="stop-actions">
+                                    <% if (s.stopType === 'pickup') { %>
+                                        <button class="btn-pickup" data-action="pickup-confirmed" data-stop-id="<%= s.id %>">📦 Confirmar pickup</button>
+                                    <% } else { %>
+                                        <button class="btn-arrive" data-action="arrive" data-stop-id="<%= s.id %>">🏁 Llegué</button>
+                                        <button class="btn-delivered" data-action="delivered" data-stop-id="<%= s.id %>">✅ Entregado</button>
+                                        <button class="btn-failed" data-action="failed" data-stop-id="<%= s.id %>">❌ Fallido</button>
+                                        <% if (s.shipment) { %>
+                                            <a class="btn-secondary" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod">📷 POD</a>
+                                        <% } %>
+                                    <% } %>
+                                </div>
                             <% } %>
-                        </div>
-                    <% } %>
-                </li>
-            <% }) %>
-        </ol>
+                        </li>
+                    <% }) %>
+                </ol>
+            </aside>
+
+            <div class="route-map-wrap">
+                <div id="map"></div>
+                <button class="btn-recenter" id="btn-recenter" title="Centrar en mi posición">
+                    <span class="material-symbols-outlined">my_location</span>
+                </button>
+            </div>
+        </div>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -88,18 +161,39 @@
         label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
     }))) %>;
 
+    const markers = {};
     const map = L.map('map').setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
-    const latlngs = [];
-    stops.forEach(s => {
-        const color = s.completed ? '#94a3b8' : (s.stopType === 'pickup' ? '#f59e0b' : '#1976d2');
-        const icon = L.divIcon({
-            html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${s.sequence}</div>`,
+
+    function buildIcon(stop, state) {
+        // state: pending | current | delivered | failed | pickup-done
+        const colors = {
+            'pending': '#94a3b8', 'current': '#1976d2',
+            'delivered': '#16a34a', 'failed': '#dc2626', 'pickup-done': '#f59e0b',
+        };
+        const color = colors[state] || '#94a3b8';
+        const pulse = state === 'current' ? 'animation:pulse 1.4s infinite;' : '';
+        return L.divIcon({
+            html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);${pulse}">${stop.sequence}</div>`,
             className: '', iconSize: [30,30], iconAnchor: [15,15],
         });
-        L.marker([s.lat, s.lng], { icon }).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label}`).addTo(map);
+    }
+
+    function stateForStop(s) {
+        if (s.completed) return s.stopType === 'pickup' ? 'pickup-done' : 'delivered';
+        return 'pending';
+    }
+
+    const latlngs = [];
+    stops.forEach(s => {
+        if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
+        const m = L.marker([s.lat, s.lng], { icon: buildIcon(s, stateForStop(s)) })
+            .bindPopup(`#${s.sequence} · ${s.stopType}<br>${s.label}`)
+            .addTo(map);
+        markers[s.id] = m;
         latlngs.push([s.lat, s.lng]);
     });
+
     let routeLayer = null;
     if (latlngs.length > 1) {
         routeLayer = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.5 }).addTo(map);
@@ -111,33 +205,38 @@
                 if (!d || !d.routes || !d.routes[0]) return;
                 const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
                 if (routeLayer) map.removeLayer(routeLayer);
-                L.polyline(poly, { color: '#1976d2', weight: 4, opacity: 0.85 }).addTo(map);
+                routeLayer = L.polyline(poly, { color: '#1976d2', weight: 4, opacity: 0.85 }).addTo(map);
                 map.fitBounds(poly, { padding: [25,25] });
             }).catch(() => {});
     }
 
-    const getGeo = () => new Promise((resolve) => {
-        if (!navigator.geolocation) return resolve({});
-        navigator.geolocation.getCurrentPosition(
-            p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-            () => resolve({}),
-            { timeout: 4000 }
-        );
+    // ---- Driver live dot ----
+    let driverMarker = null;
+    let lastPos = null;
+    function updateDriverDot(lat, lng) {
+        lastPos = [lat, lng];
+        if (!driverMarker) {
+            const icon = L.divIcon({
+                html: `<div style="background:#1d4ed8;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(29,78,216,.35);animation:pulse 1.6s infinite"></div>`,
+                className: '', iconSize: [18,18], iconAnchor: [9,9],
+            });
+            driverMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map);
+        } else {
+            driverMarker.setLatLng([lat, lng]);
+        }
+    }
+    document.getElementById('btn-recenter').addEventListener('click', () => {
+        if (lastPos) map.setView(lastPos, 15);
     });
 
-    const post = async (url, body) => {
-        const res = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body || {}),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) { alert(data.error || 'Error'); return null; }
-        return data;
-    };
-
-    // GPS live heartbeat cada 30s
+    // ---- GPS heartbeat + live dot ----
     if (navigator.geolocation) {
+        navigator.geolocation.watchPosition((pos) => {
+            updateDriverDot(pos.coords.latitude, pos.coords.longitude);
+        }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 });
+
         const sendHb = (pos) => {
+            updateDriverDot(pos.coords.latitude, pos.coords.longitude);
             fetch('/delivery/heartbeat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -154,26 +253,111 @@
         }, 30000);
     }
 
-    document.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const action = btn.dataset.action;
-            const stopId = btn.dataset.stopId;
-            const geo = await getGeo();
-            const url = `/delivery/route/${routeId}/stop/${stopId}/${action}`;
+    // ---- Progress + current stop logic ----
+    function recomputeProgress() {
+        const rows = Array.from(document.querySelectorAll('.stop-row'));
+        const total = rows.length;
+        const done  = rows.filter(r => r.classList.contains('completed')).length;
+        const pct = total ? Math.round((done/total)*100) : 0;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-text').textContent = `${done} / ${total}`;
 
-            if (action === 'failed') {
-                const reason = prompt('Motivo del intento fallido:');
-                if (!reason) return;
-                const r = await post(url, { ...geo, comment: reason });
-                if (r) location.reload();
-                return;
+        // primer no-completado = is-current
+        rows.forEach(r => r.classList.remove('is-current'));
+        const next = rows.find(r => !r.classList.contains('completed'));
+        if (next) {
+            next.classList.add('is-current');
+            // bubble del actual a azul
+            const bubble = next.querySelector('.stop-bubble');
+            if (bubble) {
+                bubble.classList.remove('pending');
+                bubble.classList.add('current');
             }
-            if (action === 'delivered') {
-                if (!confirm('¿Confirmar entrega? (sin foto/firma)')) return;
+            // recolorear marker
+            const stopId = Number(next.dataset.stopId);
+            const stop = stops.find(s => s.id === stopId);
+            if (stop && markers[stopId]) {
+                markers[stopId].setIcon(buildIcon(stop, 'current'));
             }
-            const r = await post(url, geo);
-            if (r) location.reload();
+            // scroll into view solo en mobile
+            if (window.innerWidth <= 768) {
+                next.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    }
+
+    function markStopDone(stopId, kind) {
+        // kind: 'delivered' | 'failed' | 'pickup-done'
+        const row = document.querySelector(`.stop-row[data-stop-id="${stopId}"]`);
+        if (!row) return;
+        row.classList.add('completed');
+        row.classList.remove('is-current');
+        const actions = row.querySelector('.stop-actions'); if (actions) actions.remove();
+        const bubble = row.querySelector('.stop-bubble');
+        if (bubble) {
+            bubble.classList.remove('pending', 'current');
+            bubble.classList.add(kind === 'failed' ? 'failed' : (kind === 'pickup-done' ? 'pickup' : 'delivered'));
+        }
+        const stop = stops.find(s => s.id === Number(stopId));
+        if (stop) {
+            stop.completed = true;
+            if (markers[stop.id]) markers[stop.id].setIcon(buildIcon(stop, kind));
+        }
+        recomputeProgress();
+    }
+
+    recomputeProgress();
+
+    // ---- Acciones de stops (sin reload) ----
+    const getGeo = () => new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve({});
+        navigator.geolocation.getCurrentPosition(
+            p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+            () => resolve({}),
+            { timeout: 4000 }
+        );
+    });
+    const post = async (url, body) => {
+        const res = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {}),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(data.error || 'Error'); return null; }
+        return data;
+    };
+
+    document.getElementById('stops-list').addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const stopId = btn.dataset.stopId;
+        const geo = await getGeo();
+        const url = `/delivery/route/${routeId}/stop/${stopId}/${action}`;
+
+        if (action === 'arrive') {
+            const r = await post(url, geo);
+            if (r) btn.remove();
+            return;
+        }
+        if (action === 'failed') {
+            const reason = prompt('Motivo del intento fallido:');
+            if (!reason) return;
+            const r = await post(url, { ...geo, comment: reason });
+            if (r) markStopDone(stopId, 'failed');
+            return;
+        }
+        if (action === 'delivered') {
+            if (!confirm('¿Confirmar entrega? (sin foto/firma)')) return;
+            const r = await post(url, geo);
+            if (r) markStopDone(stopId, 'delivered');
+            return;
+        }
+        if (action === 'pickup-confirmed') {
+            const r = await post(url, geo);
+            if (r) markStopDone(stopId, 'pickup-done');
+            return;
+        }
     });
     </script>
 </body>

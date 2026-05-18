@@ -16,6 +16,7 @@ router.get('/', requireDelivery, async (req, res) => {
             shipmentModel.search({ deliveryUserId: userId }),
             routeModel.getActiveByDriver(userId),
         ]);
+        if (activeRoute) return res.redirect(`/delivery/route/${activeRoute.id}`);
         res.render('delivery/home', { shipments, activeRoute });
     } catch (err) {
         console.error(err);
