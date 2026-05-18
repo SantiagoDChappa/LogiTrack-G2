@@ -23,6 +23,36 @@
                 <p>Sistema de gestión de envíos</p>
             </div>
 
+            <!-- Acceso rápido DEV -->
+            <div style="margin-bottom:1rem">
+                <label style="display:block;font-size:.78rem;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px">
+                    <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle">science</span>
+                    Cuenta de prueba
+                </label>
+                <select id="dev-accounts" style="width:100%;padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:.85rem;font-family:inherit;cursor:pointer">
+                    <option value="">— Seleccioná una cuenta —</option>
+                    <optgroup label="Supervisor">
+                        <option value="santiagochappa@logitrack.com.ar">Santiago Chappa · Supervisor</option>
+                        <option value="amin@logitrack.com.ar">Amin · Supervisor</option>
+                        <option value="juan@logitrack.com.ar">Juan · Supervisor</option>
+                        <option value="floresmaximovalentin@gmail.com">Flores · Supervisor</option>
+                    </optgroup>
+                    <optgroup label="Operador">
+                        <option value="juanoperador@logitrack.com.ar">Juan · Operador</option>
+                        <option value="aminoperador@logitrack.com.ar">Amin · Operador</option>
+                        <option value="rubirose@gmail.com">Rubi Rose · Operador</option>
+                    </optgroup>
+                    <optgroup label="Repartidor">
+                        <option value="carlos@logitrack.com.ar">Carlos Repartidor</option>
+                        <option value="maria@logitrack.com.ar">Maria Repartidora</option>
+                        <option value="pedro@logitrack.com.ar">Pedro Repartidor</option>
+                    </optgroup>
+                    <optgroup label="Admin">
+                        <option value="admin@logitrack.com.ar">Admin</option>
+                    </optgroup>
+                </select>
+            </div>
+
             <!-- Formulario -->
             <form class="login-form" action="/login" method="post">
                 <% if (locals.returnTo) { %>
@@ -88,5 +118,12 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+    document.getElementById('dev-accounts').addEventListener('change', function () {
+        if (!this.value) return;
+        document.getElementById('user-email').value = this.value;
+        document.getElementById('password').value = 'Test1234!';
+    });
+    </script>
 </body>
 </html>
