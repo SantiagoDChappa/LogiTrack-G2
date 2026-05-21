@@ -33,6 +33,7 @@ const portalRoutes        = require('./src/routes/portal');
 const routeRoutes      = require('./src/routes/route');
 const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
+const incidentRoutes   = require('./src/routes/incident');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -92,6 +93,7 @@ app.post('/route/scan/:id/dispatch', requireAuth, routeCtrl.dispatchRoute);
 app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
 app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
 app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
+app.use('/incident',  requireAuth, incidentRoutes);
 
 ;
 app.use('/api/persons',personRoutes);

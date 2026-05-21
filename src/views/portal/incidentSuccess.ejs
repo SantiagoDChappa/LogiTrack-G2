@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incidencia recibida — LogiTrack</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <nav class="portal-nav">
+        <a href="/" class="portal-brand">
+            <img src="/images/logo.png" alt="LogiTrack" class="portal-logo">
+            <span>LogiTrack</span>
+        </a>
+    </nav>
+
+    <section class="portal-incident-section">
+        <div class="portal-incident-wrapper portal-incident-success">
+            <span class="material-symbols-outlined portal-incident-success-icon">check_circle</span>
+            <h1>Incidencia registrada</h1>
+            <% if (incidentId) { %>
+                <p>Tu incidencia fue registrada con el número <strong>#<%= incidentId %></strong>.</p>
+            <% } %>
+            <% if (trackingId) { %>
+                <p>Envío asociado: <strong><%= trackingId %></strong></p>
+            <% } %>
+            <p>Un supervisor la revisará a la brevedad. Guardá el número de incidencia para futuras consultas.</p>
+            <a href="/" class="btn-primary">Volver al portal</a>
+        </div>
+    </section>
+</body>
+</html>

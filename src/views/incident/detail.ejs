@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Incidencia #<%= incident.id %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Incidencia #<%= incident.id %></h1>
+            <div class="page-header__actions">
+                <a href="/incident" class="btn-secondary">Volver</a>
+            </div>
+        </div>
+
+        <% const err = (typeof query !== 'undefined' && query.error) || null; %>
+        <% if (err) { %>
+            <div class="alert alert-error"><%= err %></div>
+        <% } %>
+
+        <section class="incident-detail-grid">
+            <div class="incident-detail-card">
+                <h2>Datos</h2>
+                <dl class="incident-detail-list">
+                    <dt>Envío</dt>
+                    <dd>
+                        <% if (incident.shipment) { %>
+                            <a href="/shipment/detail/<%= incident.shipment.id %>"><%= incident.shipment.trackingId %></a>
+                        <% } else { %>—<% } %>
+                    </dd>
+                    <dt>Tipo</dt><dd><%= incident.type ? incident.type.description : '—' %></dd>
+                    <dt>Estado</dt><dd><span class="incident-badge incident-badge--<%= incident.status.toLowerCase() %>"><%= incident.status %></span></dd>
+                    <dt>Resolución</dt><dd><%= incident.resolution || '—' %></dd>
+                    <dt>Prioridad</dt><dd>P<%= incident.priority %></dd>
+                    <dt>Escalado</dt><dd><%= incident.escalated ? 'Sí' : 'No' %></dd>
+                    <dt>Canal</dt><dd><%= incident.openedChannel %></dd>
+                    <dt>Reportada por</dt>
+                    <dd>
+                        <% if (incident.openedByUser) { %>
+                            <%= incident.openedByUser.fullName %> (interno)
+                        <% } else if (incident.openedByPerson) { %>
+                            <%= incident.openedByPerson.fullName %> (vínculo Person)
+                        <% } else { %>
+                            <%= incident.reporterName || '—' %> <% if (incident.reporterEmail) { %>&lt;<%= incident.reporterEmail %>&gt;<% } %>
+                        <% } %>
+                    </dd>
+                    <dt>Asignada a</dt><dd><%= incident.assignedTo ? incident.assignedTo.fullName : '—' %></dd>
+                    <dt>Creada</dt><dd><%= new Date(incident.createdAt).toLocaleString('es-AR') %></dd>
+                    <% if (incident.closedAt) { %>
+                        <dt>Cerrada</dt><dd><%= new Date(incident.closedAt).toLocaleString('es-AR') %> por <%= incident.closedBy ? incident.closedBy.fullName : '—' %></dd>
+                    <% } %>
+                </dl>
+                <h3>Descripción</h3>
+                <p class="incident-description"><%= incident.description %></p>
+            </div>
+
+            <div class="incident-detail-card">
+                <h2>Acciones</h2>
+
+                <% if (flags.canAssign && assignableUsers.length) { %>
+                    <form method="POST" action="/incident/<%= incident.id %>/assign" class="incident-action-form">
+                        <label>Asignar a
+                            <select name="assignedToUserId">
+                                <option value="">— Sin asignar —</option>
+                                <% assignableUsers.forEach(u => { %>
+                                    <option value="<%= u.id %>" <%= incident.assignedToUserId === u.id ? 'selected' : '' %>><%= u.fullName %></option>
+                                <% }) %>
+                            </select>
+                        </label>
+                        <button type="submit" class="btn-secondary">Asignar</button>
+                    </form>
+                <% } %>
+
+                <% if (flags.canChangeStatus) { %>
+                    <form method="POST" action="/incident/<%= incident.id %>/status" class="incident-action-form">
+                        <label>Cambiar estado a
+                            <select name="status">
+                                <% if (incident.status !== 'OPEN')      { %><option value="OPEN">Abierta</option><% } %>
+                                <% if (incident.status !== 'IN_REVIEW') { %><option value="IN_REVIEW">En revisión</option><% } %>
+                            </select>
+                        </label>
+                        <input type="text" name="comment" placeholder="Comentario (opcional)">
+                        <button type="submit" class="btn-secondary">Cambiar</button>
+                    </form>
+                <% } %>
+
+                <% if (flags.canEscalate) { %>
+                    <form method="POST" action="/incident/<%= incident.id %>/escalate" class="incident-action-form">
+                        <input type="hidden" name="escalate" value="<%= incident.escalated ? 'false' : 'true' %>">
+                        <label>Prioridad
+                            <select name="priority">
+                                <% [1,2,3,4].forEach(p => { %>
+                                    <option value="<%= p %>" <%= incident.priority === p ? 'selected' : '' %>>P<%= p %></option>
+                                <% }) %>
+                            </select>
+                        </label>
+                        <button type="submit" class="<%= incident.escalated ? 'btn-secondary' : 'btn-warning' %>">
+                            <%= incident.escalated ? 'Quitar escalado' : 'Escalar' %>
+                        </button>
+                    </form>
+                <% } %>
+
+                <% if (flags.canClose) { %>
+                    <form method="POST" action="/incident/<%= incident.id %>/close" class="incident-action-form incident-close-form">
+                        <label>Cerrar como
+                            <select name="resolution" required>
+                                <option value="">Seleccionar resolución...</option>
+                                <option value="PROCEDENTE">Procedente</option>
+                                <option value="NO_PROCEDENTE">No procedente</option>
+                            </select>
+                        </label>
+                        <input type="text" name="comment" placeholder="Comentario de cierre">
+                        <button type="submit" class="btn-primary">Cerrar incidencia</button>
+                    </form>
+                <% } %>
+
+                <% if (flags.canReopen) { %>
+                    <form method="POST" action="/incident/<%= incident.id %>/reopen" class="incident-action-form">
+                        <input type="text" name="comment" placeholder="Motivo de reapertura">
+                        <button type="submit" class="btn-secondary">Reabrir</button>
+                    </form>
+                <% } %>
+
+                <% if (flags.canComment) { %>
+                    <form method="POST" action="/incident/<%= incident.id %>/comment" class="incident-action-form">
+                        <textarea name="comment" rows="3" placeholder="Agregar comentario..." required></textarea>
+                        <button type="submit" class="btn-secondary">Comentar</button>
+                    </form>
+                <% } %>
+            </div>
+        </section>
+
+        <section class="incident-history">
+            <h2>Historial</h2>
+            <ol class="incident-timeline">
+                <% history.forEach(h => { %>
+                    <li class="incident-timeline-item">
+                        <span class="incident-timeline-type"><%= h.eventType %></span>
+                        <span class="incident-timeline-meta">
+                            <%= new Date(h.changedAt).toLocaleString('es-AR') %>
+                            — <%= h.user ? h.user.fullName : (h.person ? h.person.fullName : 'Portal público') %>
+                        </span>
+                        <% if (h.fromValue || h.toValue) { %>
+                            <div class="incident-timeline-values">
+                                <%= h.fromValue || '∅' %> → <%= h.toValue || '∅' %>
+                            </div>
+                        <% } %>
+                        <% if (h.comment) { %>
+                            <p class="incident-timeline-comment"><%= h.comment %></p>
+                        <% } %>
+                    </li>
+                <% }) %>
+            </ol>
+        </section>
+    </main>
+    <script src="/js/header.js" defer></script>
+</body>
+</html>

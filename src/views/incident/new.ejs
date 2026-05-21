@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Nueva incidencia - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Reportar incidencia</h1>
+        </div>
+
+        <% if (error) { %>
+            <div class="alert alert-error"><%= error %></div>
+        <% } %>
+
+        <form method="POST" action="/incident" class="incident-form">
+            <div class="form-group">
+                <label for="shipmentId">Envío (ID interno)</label>
+                <input type="number" id="shipmentId" name="shipmentId"
+                       value="<%= shipment ? shipment.id : (form.shipmentId || '') %>"
+                       required <%= shipment ? 'readonly' : '' %>>
+                <% if (shipment) { %>
+                    <small>Tracking: <strong><%= shipment.trackingId %></strong></small>
+                <% } else { %>
+                    <small>Pegue el ID del envío. Para abrir desde el detalle del envío, use el botón "Reportar incidencia".</small>
+                <% } %>
+            </div>
+
+            <div class="form-group">
+                <label for="incidentTypeId">Tipo</label>
+                <select id="incidentTypeId" name="incidentTypeId" required>
+                    <option value="">Seleccione un tipo...</option>
+                    <% types.forEach(t => { %>
+                        <option value="<%= t.id %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
+                    <% }) %>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="priority">Prioridad</label>
+                <select id="priority" name="priority">
+                    <option value="1" <%= String(form.priority) === '1' ? 'selected' : '' %>>Baja</option>
+                    <option value="2" <%= (!form.priority || form.priority === '2') ? 'selected' : '' %>>Media</option>
+                    <option value="3" <%= String(form.priority) === '3' ? 'selected' : '' %>>Alta</option>
+                    <option value="4" <%= String(form.priority) === '4' ? 'selected' : '' %>>Urgente</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Descripción</label>
+                <textarea id="description" name="description" rows="6" maxlength="2000" required><%= form.description || '' %></textarea>
+            </div>
+
+            <div class="form-actions">
+                <a href="/incident" class="btn-secondary">Cancelar</a>
+                <button type="submit" class="btn-primary">Crear incidencia</button>
+            </div>
+        </form>
+    </main>
+    <script src="/js/header.js" defer></script>
+</body>
+</html>

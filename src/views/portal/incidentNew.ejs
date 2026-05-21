@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportar incidencia — LogiTrack</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <nav class="portal-nav">
+        <a href="/" class="portal-brand">
+            <img src="/images/logo.png" alt="LogiTrack" class="portal-logo">
+            <span>LogiTrack</span>
+        </a>
+        <div class="portal-nav-right">
+            <a href="/" class="portal-nav-login">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Volver al portal
+            </a>
+        </div>
+    </nav>
+
+    <section class="portal-incident-section">
+        <div class="portal-incident-wrapper">
+            <h1>Reportar una incidencia</h1>
+            <p class="portal-incident-help">
+                Si el envío sufrió demoras, daños o cualquier otro inconveniente, podés abrir una incidencia.
+                Un supervisor la revisará y le dará seguimiento.
+            </p>
+
+            <% if (error) { %>
+                <div class="alert alert-error"><%= error %></div>
+            <% } %>
+
+            <form method="POST" action="/portal/incident" class="portal-incident-form">
+                <div class="form-group">
+                    <label for="trackingId">Número de seguimiento</label>
+                    <input type="text" id="trackingId" name="trackingId"
+                           value="<%= form.trackingId || trackingId || '' %>"
+                           placeholder="Ej: ENV-001" required>
+                </div>
+
+                <% if (shipment) { %>
+                    <div class="portal-incident-shipment">
+                        <strong>Envío encontrado:</strong> <%= shipment.trackingId %><br>
+                        Destinatario: <%= shipment.recipient ? shipment.recipient.fullName : '—' %>
+                    </div>
+                <% } %>
+
+                <div class="form-group">
+                    <label for="incidentTypeId">Tipo de incidencia</label>
+                    <select id="incidentTypeId" name="incidentTypeId" required>
+                        <option value="">Seleccione un tipo...</option>
+                        <% types.forEach(t => { %>
+                            <option value="<%= t.id %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Descripción del problema</label>
+                    <textarea id="description" name="description" rows="5" maxlength="2000" required><%= form.description || '' %></textarea>
+                </div>
+
+                <fieldset class="portal-incident-reporter">
+                    <legend>Sus datos</legend>
+                    <div class="form-group">
+                        <label for="reporterName">Nombre y apellido</label>
+                        <input type="text" id="reporterName" name="reporterName"
+                               value="<%= form.reporterName || '' %>" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reporterEmail">Email (opcional)</label>
+                        <input type="email" id="reporterEmail" name="reporterEmail"
+                               value="<%= form.reporterEmail || '' %>">
+                    </div>
+                    <div class="form-group">
+                        <label for="reporterDocument">DNI (opcional)</label>
+                        <input type="text" id="reporterDocument" name="reporterDocument"
+                               value="<%= form.reporterDocument || '' %>"
+                               placeholder="Si coincide con remitente/destinatario, se vincula automáticamente">
+                    </div>
+                </fieldset>
+
+                <div class="form-actions">
+                    <a href="/" class="btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn-primary">Enviar incidencia</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</body>
+</html>

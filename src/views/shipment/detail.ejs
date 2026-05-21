@@ -57,6 +57,9 @@
             <h1>Detalle de Envío</h1>
             <div style="display:flex;gap:var(--space-3)">
                 <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
+                <a href="/incident/new?shipmentId=<%= shipment.id %>" class="btn-secondary">
+                    <span class="material-symbols-outlined">report</span>Reportar incidencia
+                </a>
                 <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
                 <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="btn-primary">
                     <span class="material-symbols-outlined">edit</span>Modificar

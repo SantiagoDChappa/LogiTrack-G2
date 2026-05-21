@@ -155,4 +155,113 @@ const getPortal = async (req, res) => {
     }
 };
 
-module.exports = { getPortal };
+// ===== Incidencias publicas (sin login) =====
+const sequelize           = require('../database/connection');
+const { Incident }        = require('../models/incident');
+const incidentTypeModel   = require('../models/incidentType');
+const incidentHistoryModel = require('../models/incidentHistory');
+const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
+
+const findShipmentByTracking = (trackingId) => {
+    const t = (trackingId || '').trim();
+    if (!t) { return null; }
+    return Shipment.findOne({
+        where: { trackingId: t.toUpperCase() },
+        include: [
+            { model: Person, as: 'sender',    attributes: ['id', 'fullName', 'document', 'email'] },
+            { model: Person, as: 'recipient', attributes: ['id', 'fullName', 'document', 'email'] }
+        ]
+    });
+};
+
+const getPublicCreateForm = async (req, res) => {
+    const trackingId = (req.query.trackingId || '').trim().toUpperCase();
+    const shipment = trackingId ? await findShipmentByTracking(trackingId) : null;
+
+    if (trackingId && !shipment) {
+        return res.status(404).render('portal/incidentNew', {
+            shipment: null,
+            trackingId,
+            types: await incidentTypeModel.getActive(),
+            error: 'No se encontró un envío con ese código de seguimiento.',
+            form: {}
+        });
+    }
+
+    res.render('portal/incidentNew', {
+        shipment,
+        trackingId,
+        types: await incidentTypeModel.getActive(),
+        error: null,
+        form: {}
+    });
+};
+
+const createPublic = async (req, res) => {
+    const trackingId = (req.body.trackingId || '').trim().toUpperCase();
+    const { incidentTypeId, description, reporterName, reporterEmail, reporterDocument } = req.body;
+
+    const types = await incidentTypeModel.getActive();
+    const renderError = async (msg, status = 400) => res.status(status).render('portal/incidentNew', {
+        shipment: await findShipmentByTracking(trackingId),
+        trackingId,
+        types,
+        error: msg,
+        form: req.body
+    });
+
+    if (!trackingId)                                  { return renderError('Código de seguimiento requerido.'); }
+    if (!incidentTypeId)                              { return renderError('Seleccione un tipo de incidencia.'); }
+    if (!description || description.trim().length === 0) { return renderError('La descripción es obligatoria.'); }
+    if (!reporterName || reporterName.trim().length === 0) { return renderError('Su nombre es obligatorio.'); }
+
+    const shipment = await findShipmentByTracking(trackingId);
+    if (!shipment) { return renderError('No se encontró un envío con ese código de seguimiento.', 404); }
+
+    const type = await incidentTypeModel.getById(Number(incidentTypeId));
+    if (!type || !type.active) { return renderError('Tipo de incidencia inválido.'); }
+
+    let openedByPersonId = null;
+    const docNumber = reporterDocument ? Number(String(reporterDocument).replace(/\D/g, '')) : null;
+    if (docNumber) {
+        if (shipment.sender && shipment.sender.document === docNumber)    { openedByPersonId = shipment.sender.id; }
+        else if (shipment.recipient && shipment.recipient.document === docNumber) { openedByPersonId = shipment.recipient.id; }
+    }
+
+    const incident = await sequelize.transaction(async (t) => {
+        const created = await Incident.create({
+            shipmentId:       shipment.id,
+            incidentTypeId:   type.id,
+            status:           IncidentStatus.OPEN,
+            priority:         2,
+            escalated:        false,
+            description:      description.trim().slice(0, 2000),
+            openedChannel:    IncidentChannel.PORTAL,
+            openedByPersonId,
+            reporterName:     reporterName.trim().slice(0, 120),
+            reporterEmail:    reporterEmail ? reporterEmail.trim().slice(0, 160) : null
+        }, { transaction: t });
+
+        await incidentHistoryModel.create({
+            incidentId: created.id,
+            eventType:  IncidentEventType.CREATED,
+            toValue:    IncidentStatus.OPEN,
+            comment:    `Reportada por ${reporterName} (portal público, ${type.code})`,
+            personId:   openedByPersonId,
+            transaction: t
+        });
+
+        return created;
+    });
+
+    res.redirect(`/portal/incident/success?id=${incident.id}&trackingId=${encodeURIComponent(shipment.trackingId)}`);
+};
+
+const publicSuccess = (req, res) => {
+    res.render('portal/incidentSuccess', {
+        incidentId: req.query.id || null,
+        trackingId: req.query.trackingId || null
+    });
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, publicSuccess };
