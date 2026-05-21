@@ -16,6 +16,9 @@ const { Transport }       = require('./transport');
 const { TransportZone }   = require('./transportZone');
 const { Route }           = require('./route');
 const { RouteStop }       = require('./routeStop');
+const { IncidentType }    = require('./incidentType');
+const { Incident }        = require('./incident');
+const { IncidentHistory } = require('./incidentHistory');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -103,6 +106,25 @@ const safeAssociate = () => {
         RouteStop.belongsTo(Branch,   { as: 'branch',   foreignKey: 'branchId' });
         RouteStop.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' });
     }
+
+    if (Incident.belongsTo) {
+        if (Shipment)     { Incident.belongsTo(Shipment,     { as: 'shipment',       foreignKey: 'shipmentId' }); }
+        if (IncidentType) { Incident.belongsTo(IncidentType, { as: 'type',           foreignKey: 'incidentTypeId' }); }
+        if (User)         {
+            Incident.belongsTo(User,   { as: 'openedByUser',   foreignKey: 'openedByUserId' });
+            Incident.belongsTo(User,   { as: 'assignedTo',     foreignKey: 'assignedToUserId' });
+            Incident.belongsTo(User,   { as: 'closedBy',       foreignKey: 'closedByUserId' });
+        }
+        if (Person)       { Incident.belongsTo(Person,       { as: 'openedByPerson', foreignKey: 'openedByPersonId' }); }
+    }
+    if (Incident.hasMany && IncidentHistory) {
+        Incident.hasMany(IncidentHistory, { as: 'history', foreignKey: 'incidentId' });
+    }
+    if (IncidentHistory.belongsTo) {
+        IncidentHistory.belongsTo(Incident, { as: 'incident', foreignKey: 'incidentId' });
+        if (User)   { IncidentHistory.belongsTo(User,   { as: 'user',   foreignKey: 'userId' }); }
+        if (Person) { IncidentHistory.belongsTo(Person, { as: 'person', foreignKey: 'personId' }); }
+    }
 };
 
 safeAssociate();
@@ -124,5 +146,8 @@ module.exports = {
     Transport,
     TransportZone,
     Route,
-    RouteStop
+    RouteStop,
+    IncidentType,
+    Incident,
+    IncidentHistory
 };

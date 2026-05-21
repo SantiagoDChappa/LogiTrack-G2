@@ -14,7 +14,15 @@ const getSettings = async (req, res) => {
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
-    res.render('setting/index', { settings, provinces, branches, users });
+    res.render('setting/index', { settings, provinces, branches, users,
+        params: {
+            max_intentos_fallidos:  settings.max_intentos_fallidos  || '3',
+            dias_expiracion_envio:  settings.dias_expiracion_envio  || '30',
+            notificaciones_activas: settings.notificaciones_activas || 'true',
+            horario_entrega_inicio: settings.horario_entrega_inicio || '08:00',
+            horario_entrega_fin:    settings.horario_entrega_fin    || '20:00',
+        }
+    });
 };
 
 const GEOREF = 'https://apis.datos.gob.ar/georef/api';
@@ -82,4 +90,48 @@ const assignBranch = async (req, res) => {
     res.redirect('/setting?success=2');
 };
 
-module.exports = { getSettings, saveSettings, assignBranch };
+const saveParams = async (req, res) => {
+    try {
+        const params = [
+            'max_intentos_fallidos',
+            'dias_expiracion_envio',
+            'notificaciones_activas',
+            'horario_entrega_inicio',
+            'horario_entrega_fin',
+        ];
+
+        // Validaciones
+        const maxIntentos = parseInt(req.body.max_intentos_fallidos);
+        if (isNaN(maxIntentos) || maxIntentos < 1 || maxIntentos > 10) {
+            return res.redirect('/setting?error=max_intentos');
+        }
+
+        const diasExpiracion = parseInt(req.body.dias_expiracion_envio);
+        if (isNaN(diasExpiracion) || diasExpiracion < 1 || diasExpiracion > 365) {
+            return res.redirect('/setting?error=dias_expiracion');
+        }
+
+        const horaInicio = req.body.horario_entrega_inicio;
+        const horaFin    = req.body.horario_entrega_fin;
+        if (horaInicio >= horaFin) {
+            return res.redirect('/setting?error=horario');
+        }
+
+        await Promise.all(params.map(key => {
+            let value;
+            if (key === 'notificaciones_activas') {
+                value = req.body[key] === 'true' ? 'true' : 'false';
+            } else {
+                value = req.body[key] || '';
+            }
+            return settingModel.set(key, value);
+        }));
+
+        res.redirect('/setting?success=3');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send(err.message);
+    }
+};
+
+module.exports = { getSettings, saveSettings, assignBranch, saveParams };

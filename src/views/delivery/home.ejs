@@ -92,6 +92,9 @@
                                         <a href="/scan/<%= shipment.trackingId %>" class="action-btn estado" data-tooltip="Cambiar Estado">
                                             <span class="material-symbols-outlined">swap_horiz</span>
                                         </a>
+                                        <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn" data-tooltip="Reportar incidencia">
+                                            <span class="material-symbols-outlined">report</span>
+                                        </a>
                                     </td>
                                 </tr>
                             <% }) %>
