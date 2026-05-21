@@ -20,6 +20,11 @@
                     <a href="/zone"><ul><span class="material-symbols-outlined">map</span>Zonas</ul></a>
                     <a href="/shipment/kanban"><ul><span class="material-symbols-outlined">view_kanban</span>Kanban</ul></a>
                 <% } %>
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 2 || currentUser.roleId === 4) { %>
+                    <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
+                <% } else if (currentUser.roleId === 3) { %>
+                    <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Mis incidencias</ul></a>
+                <% } %>
                 <% if (currentUser.roleId === 4) { %>
                     <a href="/shipment/import"><ul><span class="material-symbols-outlined">upload_file</span>Importar CSV</ul></a>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>

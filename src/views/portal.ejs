@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
 </head>
@@ -273,6 +274,13 @@
                     </div>
                     <% } %>
 
+                    <!-- Reportar incidencia -->
+                    <div class="portal-card-incident-cta">
+                        <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(s.trackingId) %>">
+                            <span class="material-symbols-outlined">report</span>
+                            Reportar incidencia
+                        </a>
+                    </div>
                 </div>
                 <% }); %>
             </div>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Incidencias - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Incidencias</h1>
+            <div class="page-header__actions">
+                <a href="/incident/new" class="btn-primary">
+                    <span class="material-symbols-outlined">add</span>Nueva incidencia
+                </a>
+            </div>
+        </div>
+
+        <form method="GET" action="/incident" class="incident-filters">
+            <div class="incident-filter">
+                <label for="status">Estado</label>
+                <select id="status" name="status">
+                    <option value="">Todos</option>
+                    <option value="OPEN"      <%= filters.status === 'OPEN'      ? 'selected' : '' %>>Abierta</option>
+                    <option value="IN_REVIEW" <%= filters.status === 'IN_REVIEW' ? 'selected' : '' %>>En revisión</option>
+                    <option value="CLOSED"    <%= filters.status === 'CLOSED'    ? 'selected' : '' %>>Cerrada</option>
+                </select>
+            </div>
+            <div class="incident-filter">
+                <label for="escalated">Escalado</label>
+                <select id="escalated" name="escalated">
+                    <option value="">Todos</option>
+                    <option value="1" <%= filters.escalated === '1' ? 'selected' : '' %>>Sí</option>
+                    <option value="0" <%= filters.escalated === '0' ? 'selected' : '' %>>No</option>
+                </select>
+            </div>
+            <div class="incident-filter">
+                <label for="priority">Prioridad</label>
+                <select id="priority" name="priority">
+                    <option value="">Todas</option>
+                    <option value="4" <%= filters.priority === '4' ? 'selected' : '' %>>Urgente</option>
+                    <option value="3" <%= filters.priority === '3' ? 'selected' : '' %>>Alta</option>
+                    <option value="2" <%= filters.priority === '2' ? 'selected' : '' %>>Media</option>
+                    <option value="1" <%= filters.priority === '1' ? 'selected' : '' %>>Baja</option>
+                </select>
+            </div>
+            <% if (assignableUsers && assignableUsers.length) { %>
+            <div class="incident-filter">
+                <label for="assignedToUserId">Asignado a</label>
+                <select id="assignedToUserId" name="assignedToUserId">
+                    <option value="">Todos</option>
+                    <% assignableUsers.forEach(u => { %>
+                        <option value="<%= u.id %>" <%= String(filters.assignedToUserId) === String(u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                    <% }) %>
+                </select>
+            </div>
+            <% } %>
+            <div class="incident-filter">
+                <label for="shipmentId">Envío (ID)</label>
+                <input type="number" id="shipmentId" name="shipmentId" value="<%= filters.shipmentId || '' %>">
+            </div>
+            <button type="submit" class="btn-primary">Filtrar</button>
+            <a href="/incident" class="btn-secondary">Limpiar</a>
+        </form>
+
+        <div class="incident-table-wrapper">
+            <table class="incident-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Tracking</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Prioridad</th>
+                        <th>Escalado</th>
+                        <th>Asignado</th>
+                        <th>Abierta</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (incidents.length === 0) { %>
+                        <tr><td colspan="9" class="incident-empty">No hay incidencias para mostrar.</td></tr>
+                    <% } %>
+                    <% incidents.forEach(i => { %>
+                        <tr class="<%= i.escalated ? 'is-escalated' : '' %>">
+                            <td>#<%= i.id %></td>
+                            <td><%= i.shipment ? i.shipment.trackingId : '-' %></td>
+                            <td><%= i.type ? i.type.description : '-' %></td>
+                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= i.status %></span></td>
+                            <td><span class="incident-priority incident-priority--<%= i.priority %>">P<%= i.priority %></span></td>
+                            <td><%= i.escalated ? '🔥' : '—' %></td>
+                            <td><%= i.assignedTo ? i.assignedTo.fullName : '—' %></td>
+                            <td><%= new Date(i.createdAt).toLocaleString('es-AR') %></td>
+                            <td><a href="/incident/<%= i.id %>" class="btn-link">Ver</a></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+    <script src="/js/header.js" defer></script>
+</body>
+</html>
