@@ -30,6 +30,7 @@ const deliveryRoutes = require('./src/routes/delivery');
 const scanRoutes     = require('./src/routes/scan');
 const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
+const chatbotRoutes       = require('./src/routes/chatbot');
 const routeRoutes      = require('./src/routes/route');
 const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
@@ -65,6 +66,7 @@ app.use((req, res, next) => {
 
 // Rutas Publicas
 app.use('/', portalRoutes);
+app.use('/chatbot', chatbotRoutes);
 app.use('/', authRoutes);
 
 
