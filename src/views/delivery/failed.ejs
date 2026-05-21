@@ -200,6 +200,10 @@
                         <option value="zona inaccesible">Zona inaccesible</option>
                         <option value="otro">Otro</option>
                     </select>
+                    <div id="suggested-date-box" style="display:none; margin-top:8px; padding:10px 14px; background:var(--color-bg); border:1.5px solid var(--color-border); border-radius:var(--radius-sm); font-size:var(--font-size-sm);">
+                    <span class="material-symbols-outlined" style="font-size:1rem; vertical-align:middle; color:var(--color-danger);">event</span>
+                    Próximo intento sugerido: <strong id="suggested-date-text"></strong>
+                </div>
                 </div>
                 <div class="form-field">
                     <label>Observación (opcional)</label>
@@ -281,6 +285,32 @@
             document.querySelector('.photo-btn').innerHTML = '<span class="material-symbols-outlined">check_circle</span> Foto cargada';
         };
         reader.readAsDataURL(file);
+    });
+    // Fecha sugerida según motivo
+    const daysMap = {
+        'ausente': 1,
+        'domicilio incorrecto': 2,
+        'rechazo': 3,
+        'zona inaccesible': 2,
+        'otro': 1
+    };
+
+    function addBusinessDays(date, days) {
+        const result = new Date(date);
+        let added = 0;
+        while (added < days) {
+            result.setDate(result.getDate() + 1);
+            const day = result.getDay();
+            if (day !== 0 && day !== 6) added++;
+        }
+        return result.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    document.querySelector('select[name="reason"]').addEventListener('change', function() {
+        const days = daysMap[this.value] || 1;
+        const date = addBusinessDays(new Date(), days);
+        document.getElementById('suggested-date-text').textContent = date;
+        document.getElementById('suggested-date-box').style.display = 'block';
     });
 </script>
 
