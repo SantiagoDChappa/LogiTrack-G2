@@ -35,18 +35,17 @@ const ShipmentPriority = Object.freeze({
 });
 
 const NotificationEvent = Object.freeze({
-    SHIPMENT_PENDING,
-    SHIPMENT_IN_TRANSIT,
-    SHIPMENT_IN_BRANCH,
-    SHIPMENT_DELIVERED,
-    SHIPMENT_CANCELLED,
-    SHIPMENT_ASSIGNED,
-    SHIPMENT_IN_PREPARATION,
-    SHIPMENT_PACKAGE_FAILED,
-    SHIPMENT_FAILED_ATTEMPT,
+    SHIPMENT_PENDING:        'SHIPMENT_PENDING',
+    SHIPMENT_IN_TRANSIT:     'SHIPMENT_IN_TRANSIT',
+    SHIPMENT_IN_BRANCH:      'SHIPMENT_IN_BRANCH',
+    SHIPMENT_DELIVERED:      'SHIPMENT_DELIVERED',
+    SHIPMENT_CANCELLED:      'SHIPMENT_CANCELLED',
+    SHIPMENT_ASSIGNED:       'SHIPMENT_ASSIGNED',
+    SHIPMENT_IN_PREPARATION: 'SHIPMENT_IN_PREPARATION',
+    SHIPMENT_PACKAGE_FAILED: 'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_FAILED_ATTEMPT: 'SHIPMENT_FAILED_ATTEMPT',
 });
 
-module.exports = { Status, PersonType, RoleType, ShipmentType, ShipmentPriority, NotificationEvent };
 const IncidentStatus = Object.freeze({
     OPEN:      'OPEN',
     IN_REVIEW: 'IN_REVIEW',
@@ -83,6 +82,6 @@ const IncidentPriority = Object.freeze({
 });
 
 module.exports = {
-    Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
+    Status, PersonType, RoleType, ShipmentType, ShipmentPriority, NotificationEvent,
     IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority
 };

@@ -11,6 +11,7 @@
 
   --color-bg:             #f0f2f5;
   --color-surface:        #ffffff;
+  --color-surface-alt:    #f8fafc;
   --color-border:         #e2e8f0;
 
   --color-text:           #1e293b;
@@ -110,6 +111,7 @@
 
   --color-bg:             #0f172a;
   --color-surface:        #1e293b;
+  --color-surface-alt:    #273548;
   --color-border:         #334155;
 
   --color-text:           #f1f5f9;

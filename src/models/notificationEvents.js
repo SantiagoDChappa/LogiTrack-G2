@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
-const { NotificationEvent } = require('../constants/enums') 
+const { NotificationEvent: NotificationEventCodes } = require('../constants/enums');
 
 const NotificationEvent = sequelize.define('notification_event', {
     id: {
@@ -8,7 +8,7 @@ const NotificationEvent = sequelize.define('notification_event', {
         primaryKey: true,
         autoIncrement: true,
     },
-    code:        { type: DataTypes.ENUM(...NotificationEvent) },
+    code:        { type: DataTypes.ENUM(...Object.values(NotificationEventCodes)) },
     description: { type: DataTypes.STRING },
 },
 { tableName: 'notification_event' });
