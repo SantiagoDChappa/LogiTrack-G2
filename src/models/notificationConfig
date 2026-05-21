@@ -1,0 +1,23 @@
+const { DataTypes } = require('sequelize');
+const sequelize = require('../database/connection');
+
+const NotificationEvent = sequelize.define('notification_event', {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+    },
+    eventId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+    },
+    enabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+    },
+},
+    {
+        tableName: 'notification_config',
+    });
+
+module.exports = { NotificationEvent };

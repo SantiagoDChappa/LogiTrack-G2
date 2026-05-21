@@ -34,6 +34,19 @@ const ShipmentPriority = Object.freeze({
     URGENT: { id: 4, description: 'Urgente' },
 });
 
+const NotificationEvent = Object.freeze({
+    SHIPMENT_PENDING,
+    SHIPMENT_IN_TRANSIT,
+    SHIPMENT_IN_BRANCH,
+    SHIPMENT_DELIVERED,
+    SHIPMENT_CANCELLED,
+    SHIPMENT_ASSIGNED,
+    SHIPMENT_IN_PREPARATION,
+    SHIPMENT_PACKAGE_FAILED,
+    SHIPMENT_FAILED_ATTEMPT,
+});
+
+module.exports = { Status, PersonType, RoleType, ShipmentType, ShipmentPriority, NotificationEvent };
 const IncidentStatus = Object.freeze({
     OPEN:      'OPEN',
     IN_REVIEW: 'IN_REVIEW',
