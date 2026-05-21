@@ -1,0 +1,340 @@
+/* ============================================================
+   Settings — design tokens (ref: ajustes / incidents)
+   ============================================================ */
+:root {
+    --st-bg:          #f0f2f5;
+    --st-surface:     #ffffff;
+    --st-surface-alt: #f8fafc;
+    --st-blue:        #2563eb;
+    --st-blue-dark:   #1a3566;
+    --st-blue-soft:   #3b82f6;
+    --st-green:       #16a34a;
+    --st-red:         #dc2626;
+    --st-amber:       #f59e0b;
+    --st-text:        #0f172a;
+    --st-text-strong: #1a3566;
+    --st-muted:       #64748b;
+    --st-border:      rgba(15, 23, 42, .08);
+    --st-border-soft: rgba(15, 23, 42, .05);
+    --st-shadow-sm:   0 1px 2px rgba(15, 23, 42, .04);
+    --st-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --st-radius-sm:   8px;
+    --st-radius-md:   12px;
+    --st-radius-lg:   18px;
+    --st-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+html[data-theme="dark"] {
+    --st-bg:          #0b1220;
+    --st-surface:     #111827;
+    --st-surface-alt: #0f172a;
+    --st-blue:        #60a5fa;
+    --st-text:        #e2e8f0;
+    --st-text-strong: #f1f5f9;
+    --st-muted:       #94a3b8;
+    --st-border:      rgba(148, 163, 184, .18);
+    --st-border-soft: rgba(148, 163, 184, .10);
+    --st-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --st-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+}
+
+/* ============================================================
+   Page wrapper
+   ============================================================ */
+.settings-content {
+    padding: 1rem clamp(1.25rem, 2.5vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.settings-card {
+    background: var(--st-surface);
+    border: 1px solid var(--st-border);
+    border-radius: var(--st-radius-lg);
+    padding: 1.6rem 1.75rem 1.4rem;
+    box-shadow: var(--st-shadow-md);
+    max-width: 1100px;
+}
+
+.settings-card-title {
+    margin: 0 0 .85rem;
+    padding-bottom: .65rem;
+    border-bottom: 1px solid var(--st-border-soft);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--st-text-strong);
+    letter-spacing: -.02em;
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+}
+
+.settings-card-title .material-symbols-outlined {
+    font-size: 1.2rem;
+    color: var(--st-blue);
+}
+
+.settings-subtitle {
+    color: var(--st-muted);
+    font-size: .88rem;
+    line-height: 1.55;
+    margin: 0 0 1.25rem;
+}
+
+/* ============================================================
+   Form fields
+   ============================================================ */
+.settings-card .field {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    margin-bottom: 1rem;
+}
+
+.settings-card .field > label {
+    font-weight: 600;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--st-muted);
+}
+
+.settings-card .field .req { color: var(--st-red); margin-left: 2px; }
+
+.settings-card .field small {
+    color: var(--st-muted);
+    font-size: .76rem;
+    line-height: 1.4;
+}
+
+.settings-card .field input[type=text],
+.settings-card .field input[type=number],
+.settings-card .field input[type=time],
+.settings-card .field input[type=date],
+.settings-card .field input[type=email],
+.settings-card .field select,
+.settings-card .field textarea {
+    padding: .6rem .85rem;
+    border: 1px solid var(--st-border);
+    border-radius: var(--st-radius-sm);
+    background: var(--st-surface);
+    color: var(--st-text);
+    font: inherit;
+    font-size: .92rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    width: 100%;
+}
+
+.settings-card .field input:focus,
+.settings-card .field select:focus,
+.settings-card .field textarea:focus {
+    outline: none;
+    border-color: var(--st-blue);
+    box-shadow: var(--st-ring);
+}
+
+.settings-card input[type=checkbox] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--st-blue);
+    cursor: pointer;
+}
+
+.settings-addr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.25rem;
+    align-items: start;
+}
+
+.settings-addr .addr-full,
+.settings-addr .span-full { grid-column: 1 / -1; }
+
+@media (max-width: 960px) {
+    .settings-addr { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Actions
+   ============================================================ */
+.settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .65rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--st-border-soft);
+}
+
+/* ============================================================
+   Branch select (table)
+   ============================================================ */
+.branch-select {
+    width: 100%;
+    min-width: 180px;
+    padding: .45rem .65rem;
+    border: 1px solid var(--st-border);
+    border-radius: var(--st-radius-sm);
+    background: var(--st-surface);
+    color: var(--st-text);
+    font-size: .88rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.branch-select:focus {
+    outline: none;
+    border-color: var(--st-blue);
+    box-shadow: var(--st-ring);
+}
+
+/* ============================================================
+   Address chip (custom address autocomplete)
+   ============================================================ */
+.addr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .55rem .85rem;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    border: 1px solid #93c5fd;
+    border-radius: 999px;
+    color: var(--st-blue-dark);
+    font-size: .88rem;
+    font-weight: 600;
+}
+
+.addr-chip .material-symbols-outlined {
+    color: var(--st-blue);
+    font-size: 1.1rem;
+}
+
+.addr-selected-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    flex-wrap: wrap;
+}
+
+.addr-clear-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .45rem .85rem;
+    background: var(--st-surface-alt);
+    border: 1px solid var(--st-border);
+    border-radius: var(--st-radius-sm);
+    color: var(--st-muted);
+    font-size: .82rem;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+}
+
+.addr-clear-btn:hover {
+    border-color: var(--st-red);
+    color: var(--st-red);
+}
+
+.addr-clear-btn .material-symbols-outlined { font-size: 1rem; }
+
+.addr-validation-box {
+    padding: .65rem .85rem;
+    border-radius: var(--st-radius-md);
+    font-size: .85rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.addr-validation-box--empty { display: none; }
+
+.addr-validation-box--valid {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+
+.addr-validation-box--invalid {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+}
+
+.addr-dropdown {
+    background: var(--st-surface);
+    border: 1px solid var(--st-border);
+    border-radius: var(--st-radius-md);
+    box-shadow: var(--st-shadow-md);
+    overflow: hidden;
+    margin-top: .35rem;
+}
+
+/* ============================================================
+   Tabla de asignación de sucursales
+   ============================================================ */
+.settings-card .table-wrapper {
+    margin: 0;
+    background: var(--st-surface);
+    border: 1px solid var(--st-border);
+    border-radius: var(--st-radius-md);
+    box-shadow: var(--st-shadow-sm);
+    overflow: hidden;
+}
+
+.settings-card .table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.settings-card .table-wrapper thead tr {
+    background: var(--st-surface-alt);
+}
+
+.settings-card .table-wrapper th {
+    padding: .85rem 1rem;
+    text-align: left;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--st-muted);
+}
+
+.settings-card .table-wrapper td {
+    padding: .75rem 1rem;
+    border-bottom: 1px solid var(--st-border-soft);
+    font-size: .9rem;
+    color: var(--st-text);
+}
+
+.settings-card .table-wrapper tr:last-child td { border-bottom: 0; }
+.settings-card .table-wrapper tbody tr:hover { background: var(--st-surface-alt); }
+
+/* ============================================================
+   Botones (consistencia con resto del sistema)
+   ============================================================ */
+.settings-card .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .6rem 1.2rem;
+    background: linear-gradient(135deg, var(--st-blue), var(--st-blue-soft));
+    color: #fff !important;
+    border: 1px solid var(--st-blue);
+    border-radius: var(--st-radius-sm);
+    font-size: .9rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .25);
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.settings-card .btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
+    transform: translateY(-1px);
+}

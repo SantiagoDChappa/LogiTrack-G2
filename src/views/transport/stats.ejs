@@ -4,14 +4,7 @@
     <%- include('../partials/head') %>
     <title>Stats <%= transport.name %> - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
-    <style>
-    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 1rem; margin: 1rem 0; }
-    .stat-card { background: var(--color-surface); border: 1px solid var(--color-border); padding: 1rem; border-radius: 10px; }
-    .stat-card .label { font-size: .8rem; color: var(--color-text-secondary); }
-    .stat-card .value { font-size: 1.6rem; font-weight: 700; color: var(--color-text); margin-top: .25rem; }
-    .recent-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    .recent-table th, .recent-table td { padding: .5rem; border-bottom: 1px solid var(--color-border); text-align: left; font-size: .85rem; }
-    </style>
+    <link rel="stylesheet" href="/css/transport.css">
 </head>
 <body>
     <%- include('../partials/header') %>

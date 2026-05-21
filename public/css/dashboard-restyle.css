@@ -1,0 +1,194 @@
+/* ============================================================
+   Dashboard — restyle layer (sobre /css/dashboard.css)
+   Tokens --dsh-*, mismo lenguaje visual que routes/incidents
+   ============================================================ */
+:root {
+    --dsh-bg:          #f0f2f5;
+    --dsh-surface:     #ffffff;
+    --dsh-surface-alt: #f8fafc;
+    --dsh-blue:        #2563eb;
+    --dsh-blue-dark:   #1a3566;
+    --dsh-blue-soft:   #3b82f6;
+    --dsh-green:       #16a34a;
+    --dsh-amber:       #f59e0b;
+    --dsh-amber-dark:  #d97706;
+    --dsh-red:         #dc2626;
+    --dsh-purple:      #7c3aed;
+    --dsh-text:        #0f172a;
+    --dsh-text-strong: #1a3566;
+    --dsh-muted:       #64748b;
+    --dsh-border:      rgba(15, 23, 42, .08);
+    --dsh-border-soft: rgba(15, 23, 42, .05);
+    --dsh-glass:       rgba(255, 255, 255, .72);
+    --dsh-glass-brdr:  rgba(255, 255, 255, .55);
+    --dsh-shadow-sm:   0 1px 2px rgba(15, 23, 42, .04);
+    --dsh-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --dsh-shadow-lg:   0 12px 32px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+    --dsh-radius-sm:   8px;
+    --dsh-radius-md:   12px;
+    --dsh-radius-lg:   18px;
+    --dsh-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+html[data-theme="dark"] {
+    --dsh-bg:          #0b1220;
+    --dsh-surface:     #111827;
+    --dsh-surface-alt: #0f172a;
+    --dsh-blue:        #60a5fa;
+    --dsh-text:        #e2e8f0;
+    --dsh-text-strong: #f1f5f9;
+    --dsh-muted:       #94a3b8;
+    --dsh-border:      rgba(148, 163, 184, .18);
+    --dsh-border-soft: rgba(148, 163, 184, .10);
+    --dsh-glass:       rgba(17, 24, 39, .72);
+    --dsh-glass-brdr:  rgba(148, 163, 184, .15);
+    --dsh-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --dsh-shadow-lg:   0 12px 32px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.3);
+    --dsh-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+}
+
+/* ============================================================
+   Page header
+   ============================================================ */
+.dashboard-wrapper .page-header {
+    padding: 0;
+    border-bottom: 0;
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-wrapper .page-header h1 {
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--dsh-text-strong);
+}
+
+/* ============================================================
+   KPI / metric cards
+   ============================================================ */
+.kpi-card,
+.metric-card,
+.stat-card,
+.dashboard-card {
+    background: var(--dsh-surface);
+    border: 1px solid var(--dsh-border);
+    border-radius: var(--dsh-radius-lg);
+    padding: 1.4rem 1.5rem;
+    box-shadow: var(--dsh-shadow-md);
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.kpi-card:hover,
+.metric-card:hover,
+.stat-card:hover,
+.dashboard-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--dsh-shadow-lg);
+}
+
+.kpi-card .label,
+.metric-card .label,
+.stat-card .label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--dsh-muted);
+}
+
+.kpi-card .value,
+.metric-card .value,
+.stat-card .value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--dsh-text-strong);
+    letter-spacing: -.02em;
+    line-height: 1.1;
+    margin-top: .35rem;
+}
+
+/* ============================================================
+   Charts container
+   ============================================================ */
+.chart-card,
+.charts-grid .card {
+    background: var(--dsh-surface);
+    border: 1px solid var(--dsh-border);
+    border-radius: var(--dsh-radius-lg);
+    padding: 1.4rem 1.5rem;
+    box-shadow: var(--dsh-shadow-md);
+}
+
+.chart-card h2,
+.chart-card h3,
+.charts-grid h2,
+.charts-grid h3 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--dsh-text-strong);
+    letter-spacing: -.02em;
+    padding-bottom: .65rem;
+    border-bottom: 1px solid var(--dsh-border-soft);
+}
+
+/* ============================================================
+   Tables (si dashboard usa table-wrapper)
+   ============================================================ */
+.dashboard-wrapper .table-wrapper {
+    background: var(--dsh-surface);
+    border: 1px solid var(--dsh-border);
+    border-radius: var(--dsh-radius-md);
+    box-shadow: var(--dsh-shadow-sm);
+    overflow: hidden;
+}
+
+.dashboard-wrapper .table-wrapper thead th {
+    background: var(--dsh-surface-alt);
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--dsh-muted);
+    padding: .85rem 1rem;
+}
+
+.dashboard-wrapper .table-wrapper tbody td {
+    padding: .75rem 1rem;
+    border-bottom: 1px solid var(--dsh-border-soft);
+}
+
+.dashboard-wrapper .table-wrapper tbody tr:hover {
+    background: var(--dsh-surface-alt);
+}
+
+/* ============================================================
+   Botones consistentes
+   ============================================================ */
+.dashboard-wrapper .btn-primary {
+    background: linear-gradient(135deg, var(--dsh-blue), var(--dsh-blue-soft));
+    border: 1px solid var(--dsh-blue);
+    border-radius: var(--dsh-radius-sm);
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .25);
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.dashboard-wrapper .btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
+    transform: translateY(-1px);
+}
+
+/* ============================================================
+   Filter bar / toolbar — glass
+   ============================================================ */
+.dashboard-filters,
+.dashboard-toolbar {
+    background: var(--dsh-glass);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border: 1px solid var(--dsh-glass-brdr);
+    border-radius: var(--dsh-radius-lg);
+    box-shadow: var(--dsh-shadow-md);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+}

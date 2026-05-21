@@ -1,0 +1,171 @@
+/* ============================================================
+   Zones — design tokens
+   ============================================================ */
+:root {
+    --zn-bg:          #f0f2f5;
+    --zn-surface:     #ffffff;
+    --zn-surface-alt: #f8fafc;
+    --zn-blue:        #2563eb;
+    --zn-blue-dark:   #1a3566;
+    --zn-blue-soft:   #3b82f6;
+    --zn-green:       #16a34a;
+    --zn-red:         #dc2626;
+    --zn-text:        #0f172a;
+    --zn-text-strong: #1a3566;
+    --zn-muted:       #64748b;
+    --zn-border:      rgba(15, 23, 42, .08);
+    --zn-border-soft: rgba(15, 23, 42, .05);
+    --zn-shadow-sm:   0 1px 2px rgba(15, 23, 42, .04);
+    --zn-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --zn-radius-sm:   8px;
+    --zn-radius-md:   12px;
+    --zn-radius-lg:   18px;
+    --zn-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+html[data-theme="dark"] {
+    --zn-bg:          #0b1220;
+    --zn-surface:     #111827;
+    --zn-surface-alt: #0f172a;
+    --zn-blue:        #60a5fa;
+    --zn-text:        #e2e8f0;
+    --zn-text-strong: #f1f5f9;
+    --zn-muted:       #94a3b8;
+    --zn-border:      rgba(148, 163, 184, .18);
+    --zn-border-soft: rgba(148, 163, 184, .10);
+    --zn-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --zn-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+}
+
+/* ============================================================
+   Listado (heredan estilo de routes.css/shipments.css). Refuerzo
+   tipográfico únicamente.
+   ============================================================ */
+.page-header h1 {
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--zn-text-strong);
+}
+
+/* ============================================================
+   Form (new + update): .form-new > form > .usuario (card)
+   ============================================================ */
+.form-new {
+    max-width: 720px;
+    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.form-new .usuario {
+    background: var(--zn-surface);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-lg);
+    padding: 1.75rem 1.75rem 1.5rem;
+    box-shadow: var(--zn-shadow-md);
+}
+
+.form-new .usuario h3 {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--zn-text-strong);
+    letter-spacing: -.02em;
+    padding-bottom: .65rem;
+    border-bottom: 1px solid var(--zn-border-soft);
+}
+
+.form-new .field {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    margin-bottom: 1.1rem;
+}
+
+.form-new .field > label {
+    font-weight: 600;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--zn-muted);
+}
+
+.form-new .field .req { color: var(--zn-red); margin-left: 2px; }
+
+.form-new .search-input {
+    padding: .65rem .85rem;
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    background: var(--zn-surface);
+    color: var(--zn-text);
+    font: inherit;
+    font-size: .92rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    width: 100%;
+}
+
+.form-new .search-input:hover { border-color: rgba(15, 23, 42, .18); }
+
+.form-new .search-input:focus {
+    outline: none;
+    border-color: var(--zn-blue);
+    box-shadow: var(--zn-ring);
+}
+
+.form-new input[type=checkbox] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--zn-blue);
+    cursor: pointer;
+}
+
+.form-new .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .65rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--zn-border-soft);
+}
+
+/* ============================================================
+   Botones (reasegurar consistencia si no se cargó routes.css)
+   ============================================================ */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.1rem;
+    background: linear-gradient(135deg, var(--zn-blue), var(--zn-blue-soft));
+    color: #fff !important;
+    border: 1px solid var(--zn-blue);
+    border-radius: var(--zn-radius-sm);
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .25);
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.1rem;
+    background: var(--zn-surface);
+    color: var(--zn-text-strong);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.btn-secondary:hover { background: var(--zn-surface-alt); border-color: var(--zn-blue); }
