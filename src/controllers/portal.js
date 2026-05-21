@@ -6,6 +6,7 @@ const { Address } = require('../models/address');
 const { Province } = require('../models/province');
 const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
+const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -38,6 +39,42 @@ const formatDate = (value, options = { day: '2-digit', month: 'short', year: 'nu
     return new Date(value).toLocaleDateString('es-AR', options);
 };
 
+const buildSafeChatbotComment = (item) => {
+    const eventType = String(item?.eventType || '').toUpperCase();
+    const statusLabel = item?.toStatus?.description || item?.toStatus || '';
+    const statusKey = normalizeStatusKey(statusLabel);
+
+    if (eventType === 'CREATED') {
+        return 'Tu envio fue registrado en el sistema.';
+    }
+
+    if (eventType === 'RESCHEDULED') {
+        return 'Tu envio fue reprogramado.';
+    }
+
+    if (eventType === 'ARRIVED') {
+        return 'El repartidor llego al punto de entrega.';
+    }
+
+    if (eventType === 'DELIVERED' || statusKey === 'entregado') {
+        return 'Tu envio fue entregado.';
+    }
+
+    if (statusKey === 'intento_fallido') {
+        return 'Se registro un intento de entrega.';
+    }
+
+    if (statusKey === 'en_sucursal') {
+        return 'Tu envio fue registrado en sucursal.';
+    }
+
+    if (statusKey === 'en_transito') {
+        return 'Tu envio sigue en camino.';
+    }
+
+    return null;
+};
+
 const buildChatbotShipment = (shipment) => {
     const statusLabel = shipment.status?.description || 'Sin estado';
     const statusKey = normalizeStatusKey(statusLabel);
@@ -51,15 +88,12 @@ const buildChatbotShipment = (shipment) => {
         ? `${String(shipment.expectedDeliveryFrom).slice(0, 5)} a ${String(shipment.expectedDeliveryTo).slice(0, 5)}`
         : null;
 
-    return {
+    return applyStatusExposurePolicy({
         id: shipment.id,
         trackingId: shipment.trackingId,
         status: statusLabel,
         statusKey,
-        recipient: shipment.recipient?.fullName || '-',
-        sender: shipment.sender?.fullName || '-',
         destination: shipment.address?.province?.description || '-',
-        destinationAddress: [shipment.address?.street, shipment.address?.number].filter(Boolean).join(' ') || '-',
         shipmentType: shipment.shipmentType?.description || '-',
         weightKg: shipment.weightKg ? `${Number(shipment.weightKg).toFixed(2)} kg` : '-',
         packageQty: shipment.packageQty ? `${shipment.packageQty} bulto${shipment.packageQty > 1 ? 's' : ''}` : '-',
@@ -67,20 +101,18 @@ const buildChatbotShipment = (shipment) => {
         currentBranchName: latestBranch?.name || null,
         expectedDeliveryDateLabel: formatDate(shipment.expectedDeliveryDate, { day: '2-digit', month: 'long', year: 'numeric' }),
         expectedDeliveryWindow,
-        hasLiveTracking: Boolean(shipment.activeRouteId),
-        activeRouteId: shipment.activeRouteId || null,
         lastMovementLabel: latestHistory?.toStatus?.description || statusLabel,
         lastMovementDateLabel: formatDate(latestHistory?.changedAt),
-        lastComment: latestHistory?.comment || null,
+        lastComment: sanitizeChatbotComment(buildSafeChatbotComment(latestHistory)),
         history: history.map((item) => ({
             changedAtLabel: formatDate(item.changedAt) || '-',
             fromStatus: item.fromStatus?.description || null,
             toStatus: item.toStatus?.description || '-',
-            comment: item.comment || null,
+            comment: sanitizeChatbotComment(buildSafeChatbotComment(item)),
             branchName: item.branch?.name || null,
             eventType: item.eventType || null,
         })),
-    };
+    });
 };
 
 const buildChatbotData = ({ searched, query, error = '', searchType = null, shipments = [] }) => ({
@@ -95,11 +127,13 @@ const buildChatbotData = ({ searched, query, error = '', searchType = null, ship
 const getPortal = async (req, res) => {
     const raw = req.query.q;
     const q = (Array.isArray(raw) ? raw.find((value) => value.trim() !== '') || '' : raw || '').trim();
+    const searchType = /^\d+$/.test(q) ? 'dni' : 'codigo';
 
     if (!q) {
         return res.render('portal', {
             searched: false,
             query: '',
+            searchType: null,
             chatbotData: buildChatbotData({ searched: false, query: '' }),
         });
     }
@@ -141,8 +175,6 @@ const getPortal = async (req, res) => {
             seen.add(shipment.id);
             return true;
         });
-
-        const searchType = /^\d+$/.test(q) ? 'dni' : 'codigo';
 
         if (shipments.length === 0) {
             const errorMsg = searchType === 'dni'
@@ -254,7 +286,8 @@ const getPortal = async (req, res) => {
             searched: true,
             query: q,
             error: errorMsg,
-            chatbotData: buildChatbotData({ searched: true, query: q, error: errorMsg }),
+            searchType,
+            chatbotData: buildChatbotData({ searched: true, query: q, error: errorMsg, searchType }),
         });
     }
 };

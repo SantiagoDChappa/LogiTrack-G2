@@ -59,5 +59,10 @@
         </form>
     </section>
 
-    <script type="application/json" id="portal-chatbot-data"><%- JSON.stringify(chatbotData || {}) %></script>
+    <script type="application/json" id="portal-chatbot-data"><%- JSON.stringify(chatbotData || {})
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029') %></script>
 </div>

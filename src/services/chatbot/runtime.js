@@ -1,30 +1,34 @@
 const { DEFAULT_SUPPORT } = require('./constants');
+const {
+    applyStatusExposurePolicy,
+    CHATBOT_PUBLIC_POLICY,
+    sanitizeChatbotComment,
+} = require('./publicPolicy');
 
 function asString(value, fallback = '') {
     return value === null || value === undefined ? fallback : String(value);
 }
 
 function normalizeHistoryItem(item) {
-    return {
+    const normalized = {
         changedAtLabel: asString(item?.changedAtLabel, '-'),
         fromStatus: item?.fromStatus ? asString(item.fromStatus) : null,
         toStatus: asString(item?.toStatus, '-'),
-        comment: item?.comment ? asString(item.comment) : null,
+        comment: sanitizeChatbotComment(item?.comment),
         branchName: item?.branchName ? asString(item.branchName) : null,
         eventType: item?.eventType ? asString(item.eventType) : null,
     };
+
+    return pickAllowedFields(normalized, CHATBOT_PUBLIC_POLICY.history.allow);
 }
 
 function normalizeShipment(shipment) {
-    return {
+    const normalized = {
         id: asString(shipment?.id),
         trackingId: asString(shipment?.trackingId, '-'),
         status: asString(shipment?.status, 'Sin estado'),
         statusKey: asString(shipment?.statusKey, 'default'),
-        recipient: asString(shipment?.recipient, '-'),
-        sender: asString(shipment?.sender, '-'),
         destination: asString(shipment?.destination, '-'),
-        destinationAddress: asString(shipment?.destinationAddress, '-'),
         shipmentType: asString(shipment?.shipmentType, '-'),
         weightKg: asString(shipment?.weightKg, '-'),
         packageQty: asString(shipment?.packageQty, '-'),
@@ -32,15 +36,26 @@ function normalizeShipment(shipment) {
         currentBranchName: shipment?.currentBranchName ? asString(shipment.currentBranchName) : null,
         expectedDeliveryDateLabel: shipment?.expectedDeliveryDateLabel ? asString(shipment.expectedDeliveryDateLabel) : null,
         expectedDeliveryWindow: shipment?.expectedDeliveryWindow ? asString(shipment.expectedDeliveryWindow) : null,
-        hasLiveTracking: Boolean(shipment?.hasLiveTracking),
-        activeRouteId: shipment?.activeRouteId ? asString(shipment.activeRouteId) : null,
         lastMovementLabel: asString(shipment?.lastMovementLabel, 'Sin estado'),
         lastMovementDateLabel: shipment?.lastMovementDateLabel ? asString(shipment.lastMovementDateLabel) : null,
-        lastComment: shipment?.lastComment ? asString(shipment.lastComment) : null,
+        lastComment: sanitizeChatbotComment(shipment?.lastComment),
         history: Array.isArray(shipment?.history)
             ? shipment.history.map(normalizeHistoryItem)
             : [],
     };
+
+    return applyStatusExposurePolicy(
+        pickAllowedFields(normalized, CHATBOT_PUBLIC_POLICY.modes.detail.allow)
+    );
+}
+
+function pickAllowedFields(source, allowedFields) {
+    return allowedFields.reduce((acc, field) => {
+        if (Object.prototype.hasOwnProperty.call(source, field)) {
+            acc[field] = source[field];
+        }
+        return acc;
+    }, {});
 }
 
 function normalizeContext(context) {

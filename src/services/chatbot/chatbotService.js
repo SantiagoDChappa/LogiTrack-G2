@@ -14,13 +14,19 @@ const ACTION_SELECTION_REASONS = {
     'show-issues': 'revisar incidencias',
     'show-branch': 'revisar sucursal o retiro',
     'show-pod': 'revisar el comprobante',
+    'show-delivery-issue': 'revisar un problema con la entrega',
 };
 
 const ACTIONS_REQUIRING_SELECTION = new Set(Object.keys(ACTION_SELECTION_REASONS));
 
 const ACTION_HANDLERS = {
     'request-lookup': (runtime) => generalHandlers.buildRequestLookupResponse(runtime),
-    'show-main-menu': () => generalHandlers.buildMainMenuResponse(),
+    'show-main-menu': (runtime) => generalHandlers.buildMainMenuResponse(runtime),
+    'show-understand-menu': (runtime) => generalHandlers.buildUnderstandMenuResponse(runtime),
+    'show-location-menu': (runtime) => generalHandlers.buildLocationMenuResponse(runtime),
+    'show-problem-menu': (runtime) => generalHandlers.buildProblemMenuResponse(runtime),
+    'show-delivery-menu': (runtime) => generalHandlers.buildDeliveryMenuResponse(runtime),
+    'show-management-menu': (runtime) => generalHandlers.buildManagementMenuResponse(runtime),
     'show-status': (runtime) => statusHandlers.buildStatusResponse(getSelectedShipment(runtime)),
     'show-status-guide': (runtime, value) => statusHandlers.buildStatusGuideResponse(value || ''),
     'show-location': (runtime) => shipmentHandlers.buildLocationResponse(getSelectedShipment(runtime)),
@@ -29,9 +35,10 @@ const ACTION_HANDLERS = {
     'show-issues': (runtime) => shipmentHandlers.buildIssuesResponse(getSelectedShipment(runtime)),
     'show-branch': (runtime) => shipmentHandlers.buildBranchResponse(getSelectedShipment(runtime)),
     'show-pod': (runtime) => shipmentHandlers.buildPodResponse(getSelectedShipment(runtime)),
+    'show-delivery-issue': (runtime) => shipmentHandlers.buildDeliveryIssueResponse(getSelectedShipment(runtime)),
     'show-management': (runtime) => shipmentHandlers.buildManagementResponse(getSelectedShipment(runtime)),
     'show-notifications': (runtime) => shipmentHandlers.buildNotificationsResponse(getSelectedShipment(runtime)),
-    'show-support': (runtime) => supportHandlers.buildSupportResponse(runtime.context.support),
+    'show-support': (runtime) => supportHandlers.buildSupportResponse(runtime.context.support, getSelectedShipment(runtime)),
     'scroll-faq': () => navigationHandlers.buildFaqResponse(),
     'go-support': () => navigationHandlers.buildSupportSectionResponse(),
     'go-results': () => navigationHandlers.buildResultsResponse(),

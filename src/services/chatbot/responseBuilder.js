@@ -1,5 +1,5 @@
 const { MAIN_MENU_ACTIONS, ORDERED_STATUS_KEYS } = require('./constants');
-const { escapeHtml, getStatusCopy } = require('./utils');
+const { escapeHtml, getShipmentStage, getStatusCopy } = require('./utils');
 
 function createAction(label, action, value) {
     const nextAction = {
@@ -41,7 +41,7 @@ function createEffect(type, payload = {}) {
 function buildMainMenuMessage(isInitial) {
     return createMessage({
         text: isInitial
-            ? 'Estas son las consultas principales que ya cubre el asistente:'
+            ? 'Estas son las formas principales en las que te puedo ayudar:'
             : 'Estas son las opciones principales del asistente:',
         actions: MAIN_MENU_ACTIONS.map((item) => createAction(item.label, item.action, item.value)),
     });
@@ -55,13 +55,90 @@ function buildShipmentSelectionActions(shipments) {
     ));
 }
 
-function buildShipmentContextActions(shipment) {
+function buildShipmentSelectionHtml(shipments) {
     return [
-        createAction('Estado actual', 'show-status'),
-        createAction('Ubicacion y recorrido', 'show-location'),
-        createAction('Fecha estimada', 'show-eta'),
-        createAction('Historial', 'show-history'),
-        createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
+        '<ul class="portal-chatbot-rich-list">',
+        shipments.map((shipment) => {
+            const parts = [
+                '<strong>' + escapeHtml(shipment.trackingId || '-') + '</strong>',
+                escapeHtml(shipment.status || '-'),
+            ];
+
+            if (shipment.createdAtLabel && shipment.createdAtLabel !== '-') {
+                parts.push('Fecha: ' + escapeHtml(shipment.createdAtLabel));
+            }
+
+            if (shipment.destination && shipment.destination !== '-') {
+                parts.push('Destino: ' + escapeHtml(shipment.destination));
+            }
+
+            return '<li>' + parts.join(' | ') + '</li>';
+        }).join(''),
+        '</ul>',
+    ].join('');
+}
+
+function buildShipmentContextActions(shipment) {
+    const stage = getShipmentStage(shipment?.statusKey);
+
+    if (stage === 'aun_no_salio') {
+        return [
+            createAction('Estado actual', 'show-status'),
+            createAction('Fecha estimada', 'show-eta'),
+            createAction('Que significa este estado', 'show-status-guide', shipment.statusKey),
+            createAction('Cambios o gestiones', 'show-management'),
+        ];
+    }
+
+    if (stage === 'en_camino') {
+        return [
+            createAction('Donde esta', 'show-location'),
+            createAction('Fecha estimada', 'show-eta'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    }
+
+    if (stage === 'en_sucursal') {
+        return [
+            createAction('Sucursal o retiro', 'show-branch'),
+            createAction('Donde esta', 'show-location'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    }
+
+    if (stage === 'con_problema') {
+        return [
+            createAction('Que paso con mi envio', 'show-issues'),
+            createAction('Fecha estimada', 'show-eta'),
+            createAction('Sucursal o retiro', 'show-branch'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    }
+
+    if (stage === 'entregado') {
+        return [
+            createAction('Estado actual', 'show-status'),
+            createAction('Comprobante de entrega', 'show-pod'),
+            createAction('Historial', 'show-history'),
+            createAction('No reconozco la entrega', 'show-delivery-issue'),
+        ];
+    }
+
+    if (stage === 'cancelado') {
+        return [
+            createAction('Estado actual', 'show-status'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    }
+
+    return [
+        createAction('Entender mi envio', 'show-understand-menu'),
+        createAction('Donde esta y cuando llega', 'show-location-menu'),
+        createAction('Hubo un problema', 'show-problem-menu'),
+        createAction('Hablar con soporte', 'show-support'),
     ];
 }
 
@@ -72,16 +149,15 @@ function buildShipmentSummary(shipment) {
         '<strong>' + escapeHtml(shipment.trackingId || '-') + '</strong>',
         '<span class="portal-chatbot-status portal-chatbot-status--' + escapeHtml(shipment.statusKey || 'default') + '">' + escapeHtml(shipment.status || '-') + '</span>',
         '</div>',
-        '<p><strong>Destinatario:</strong> ' + escapeHtml(shipment.recipient || '-') + '</p>',
-        '<p><strong>Destino:</strong> ' + escapeHtml(shipment.destinationAddress && shipment.destinationAddress !== '-' ? shipment.destinationAddress + ', ' + shipment.destination : shipment.destination || '-') + '</p>',
+        '<p><strong>Destino general:</strong> ' + escapeHtml(shipment.destination || '-') + '</p>',
     ];
 
     if (shipment.currentBranchName) {
-        lines.push('<p><strong>Ultimo nodo:</strong> ' + escapeHtml(shipment.currentBranchName) + '</p>');
+        lines.push('<p><strong>Ultima referencia:</strong> ' + escapeHtml(shipment.currentBranchName) + '</p>');
     }
 
     if (shipment.expectedDeliveryDateLabel) {
-        lines.push('<p><strong>ETA:</strong> ' + escapeHtml(shipment.expectedDeliveryDateLabel + (shipment.expectedDeliveryWindow ? ' - ' + shipment.expectedDeliveryWindow : '')) + '</p>');
+        lines.push('<p><strong>Fecha estimada:</strong> ' + escapeHtml(shipment.expectedDeliveryDateLabel + (shipment.expectedDeliveryWindow ? ' - ' + shipment.expectedDeliveryWindow : '')) + '</p>');
     }
 
     lines.push('</div>');
@@ -128,9 +204,9 @@ function buildHistoryHtml(shipment) {
 function buildIssuesHtml() {
     return [
         '<ul class="portal-chatbot-rich-list">',
-        '<li><strong>Intento fallido:</strong> hubo una visita de entrega que no se pudo cerrar.</li>',
-        '<li><strong>Paquete fallido:</strong> hay una incidencia operativa que requiere revision.</li>',
-        '<li><strong>Retrasado:</strong> existe una demora respecto del circuito esperado.</li>',
+        '<li><strong>Intento fallido:</strong> no se pudo completar la entrega en esa visita.</li>',
+        '<li><strong>Paquete fallido:</strong> hubo un problema con el envio y el equipo tiene que revisarlo.</li>',
+        '<li><strong>Retrasado:</strong> el envio viene con una demora respecto de lo esperado.</li>',
         '</ul>',
     ].join('');
 }
@@ -150,6 +226,7 @@ module.exports = {
     buildIssuesHtml,
     buildMainMenuMessage,
     buildShipmentContextActions,
+    buildShipmentSelectionHtml,
     buildShipmentSelectionActions,
     buildShipmentSummary,
     buildStatusGuideHtml,

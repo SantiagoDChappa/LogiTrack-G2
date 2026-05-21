@@ -18,13 +18,17 @@
     const STORAGE_KEYS = {
         open: 'portalChatbotOpen',
         selectedShipmentId: 'portalChatbotSelectedShipmentId',
+        restorePending: 'portalChatbotRestorePending',
+        thread: 'portalChatbotThread',
     };
+    const INIT_GREETING = 'Hola. Te ayudo a seguir tu envio y entender que esta pasando.';
 
     const bootstrap = parseBootstrap(bootstrapEl);
     const state = {
         pendingAction: null,
         selectedShipmentId: readStorage(STORAGE_KEYS.selectedShipmentId) || null,
     };
+    let thread = [];
 
     let requestInFlight = false;
 
@@ -88,7 +92,13 @@
     }
 
     async function hydrateConversation() {
-        messagesEl.innerHTML = '';
+        const restored = restoreConversationIfNeeded();
+        if (!restored) {
+            messagesEl.innerHTML = '';
+            thread = [];
+            persistThread();
+        }
+
         clearShipmentHighlight();
 
         try {
@@ -96,7 +106,9 @@
                 type: 'init',
             });
 
-            applyBotResponse(response);
+            applyBotResponse(response, {
+                skipLeadingGreeting: restored && thread.length > 0,
+            });
         } catch (error) {
             addBotMessage({
                 text: 'No pude iniciar el asistente en este momento. Si queres, proba de nuevo o usa el formulario principal del portal.',
@@ -144,11 +156,22 @@
         }
     }
 
-    function applyBotResponse(response) {
+    function applyBotResponse(response, options) {
         syncState(response?.state || {});
 
-        if (Array.isArray(response?.messages)) {
-            response.messages.forEach(function (message) {
+        const settings = options || {};
+        let nextMessages = Array.isArray(response?.messages) ? response.messages.slice() : [];
+
+        if (
+            settings.skipLeadingGreeting
+            && nextMessages.length
+            && normalizeText(nextMessages[0]?.text || '') === normalizeText(INIT_GREETING)
+        ) {
+            nextMessages = nextMessages.slice(1);
+        }
+
+        if (nextMessages.length) {
+            nextMessages.forEach(function (message) {
                 addMessage(message.role || 'bot', message);
             });
         }
@@ -228,6 +251,8 @@
         documentInput.value = isDocument ? normalizedDigits : '';
 
         writeStorage(STORAGE_KEYS.open, '1');
+        writeStorage(STORAGE_KEYS.restorePending, '1');
+        persistThread();
 
         window.setTimeout(function () {
             searchForm.submit();
@@ -265,6 +290,21 @@
     }
 
     function addMessage(role, payload) {
+        const message = {
+            role,
+            text: payload.text || '',
+            html: payload.html || '',
+            actions: Array.isArray(payload.actions)
+                ? payload.actions.map(function (item) { return { ...item }; })
+                : [],
+        };
+
+        thread.push(message);
+        persistThread();
+        renderMessage(message.role, message);
+    }
+
+    function renderMessage(role, payload) {
         const wrapper = document.createElement('article');
         wrapper.className = 'portal-chatbot-message portal-chatbot-message--' + role;
 
@@ -309,6 +349,52 @@
 
         messagesEl.appendChild(wrapper);
         scrollThreadToBottom();
+    }
+
+    function restoreConversationIfNeeded() {
+        if (readStorage(STORAGE_KEYS.restorePending) !== '1') {
+            removeStorage(STORAGE_KEYS.thread);
+            return false;
+        }
+
+        removeStorage(STORAGE_KEYS.restorePending);
+
+        const restoredThread = readThread();
+        if (!restoredThread.length) {
+            return false;
+        }
+
+        messagesEl.innerHTML = '';
+        thread = restoredThread;
+        restoredThread.forEach(function (message) {
+            renderMessage(message.role || 'bot', message);
+        });
+
+        return true;
+    }
+
+    function persistThread() {
+        try {
+            window.sessionStorage.setItem(STORAGE_KEYS.thread, JSON.stringify(thread));
+        } catch (error) {
+            // ignore storage errors
+        }
+    }
+
+    function readThread() {
+        try {
+            const raw = window.sessionStorage.getItem(STORAGE_KEYS.thread);
+            if (!raw) { return []; }
+
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed)
+                ? parsed.filter(function (message) {
+                    return message && typeof message === 'object';
+                })
+                : [];
+        } catch (error) {
+            return [];
+        }
     }
 
     function highlightShipmentCard(id) {
@@ -356,6 +442,16 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function normalizeText(value) {
+        return String(value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     function writeStorage(key, value) {

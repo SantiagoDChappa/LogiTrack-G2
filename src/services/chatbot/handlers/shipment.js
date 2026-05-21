@@ -4,17 +4,34 @@ const {
     createAction,
     createMessage,
 } = require('../responseBuilder');
-const { containsAny } = require('../utils');
+const { containsAny, normalizeText } = require('../utils');
+
+function appendUniqueSentence(base, sentence) {
+    const prefix = String(base || '').trim();
+    const value = String(sentence || '').trim();
+
+    if (!value) {
+        return prefix;
+    }
+
+    const normalizedPrefix = normalizeText(prefix);
+    const normalizedValue = normalizeText(value);
+
+    if (normalizedPrefix && normalizedPrefix.includes(normalizedValue)) {
+        return prefix;
+    }
+
+    return [prefix, value].filter(Boolean).join(' ');
+}
 
 function buildLocationResponse(shipment) {
     if (!shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'Para ubicar un envio puntual necesito un tracking o un DNI. Si ya lo tenes, te puedo decir la ultima sucursal visible, el destino y si tiene ruta activa.',
+                    text: 'Si me pasas un tracking o un DNI, te digo la ultima referencia visible y te muestro el recorrido general.',
                     actions: [
                         createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Ver preguntas frecuentes', 'scroll-faq'),
                         createAction('Volver al menu', 'show-main-menu'),
                     ],
                 }),
@@ -25,27 +42,19 @@ function buildLocationResponse(shipment) {
 
     const parts = [];
 
-    if (shipment.hasLiveTracking) {
-        parts.push('Este envio tiene una ruta activa, asi que el mapa del portal puede mostrar actividad en vivo.');
-    } else {
-        parts.push('La ubicacion publica depende de los movimientos que se fueron escaneando en el circuito.');
-    }
+    parts.push('Te muestro la ubicacion segun los movimientos que fueron quedando registrados.');
 
     if (shipment.currentBranchName) {
-        parts.push('Ultimo nodo visible: ' + shipment.currentBranchName + '.');
-    }
-
-    if (shipment.destinationAddress && shipment.destinationAddress !== '-') {
-        parts.push('Destino informado: ' + shipment.destinationAddress + ', ' + shipment.destination + '.');
+        parts.push('Ultima referencia: ' + shipment.currentBranchName + '.');
     } else if (shipment.destination && shipment.destination !== '-') {
-        parts.push('Destino informado: ' + shipment.destination + '.');
+        parts.push('Zona de destino: ' + shipment.destination + '.');
     }
 
     if (shipment.lastMovementDateLabel) {
-        parts.push('Ultimo movimiento visible: ' + shipment.lastMovementDateLabel + '.');
+        parts.push('Ultimo movimiento: ' + shipment.lastMovementDateLabel + '.');
     }
 
-    parts.push('Si queres, baja al mapa de la tarjeta para ver el recorrido cargado.');
+    parts.push('Si queres, baja al mapa de la tarjeta para ver el recorrido general.');
 
     return {
         messages: [
@@ -55,7 +64,6 @@ function buildLocationResponse(shipment) {
                     createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
                     createAction('Fecha estimada', 'show-eta'),
                     createAction('Historial', 'show-history'),
-                    createAction('Volver al menu', 'show-main-menu'),
                 ],
             }),
         ],
@@ -68,10 +76,9 @@ function buildEtaResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'La fecha estimada depende del envio. Si hay una fecha o una ventana horaria cargada, te la muestro apenas identifiquemos el seguimiento.',
+                    text: 'Si me pasas un tracking o un DNI, te digo si ya hay una fecha estimada cargada.',
                     actions: [
                         createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Incidencias', 'show-issues'),
                         createAction('Volver al menu', 'show-main-menu'),
                     ],
                 }),
@@ -84,20 +91,20 @@ function buildEtaResponse(shipment) {
 
     if (shipment.statusKey === 'entregado') {
         text = shipment.lastMovementDateLabel
-            ? 'El envio ya figura entregado. La ultima fecha visible es ' + shipment.lastMovementDateLabel + '.'
-            : 'El envio ya figura entregado.';
+            ? 'Este envio ya fue entregado. La ultima actualizacion visible es ' + shipment.lastMovementDateLabel + '.'
+            : 'Este envio ya fue entregado.';
     } else if (shipment.statusKey === 'cancelado' || shipment.statusKey === 'cancelada') {
-        text = 'El envio esta cancelado, asi que ya no tiene una fecha estimada activa.';
+        text = 'Este envio esta cancelado, asi que ya no tiene una fecha estimada activa.';
     } else if (shipment.expectedDeliveryDateLabel && shipment.expectedDeliveryWindow) {
-        text = 'La entrega estimada es para ' + shipment.expectedDeliveryDateLabel + ' en la ventana de ' + shipment.expectedDeliveryWindow + '.';
+        text = 'Por ahora, la entrega esta prevista para ' + shipment.expectedDeliveryDateLabel + ' entre ' + shipment.expectedDeliveryWindow + '.';
     } else if (shipment.expectedDeliveryDateLabel) {
-        text = 'La entrega estimada figura para ' + shipment.expectedDeliveryDateLabel + '.';
+        text = 'Por ahora, la fecha estimada es ' + shipment.expectedDeliveryDateLabel + '.';
     } else if (shipment.statusKey === 'retrasado' || shipment.statusKey === 'intento_fallido' || shipment.statusKey === 'paquete_fallido') {
-        text = 'No veo una nueva ETA publica confirmada para este envio. Como hubo una incidencia o una demora, el horario final puede cambiar.';
+        text = 'Por ahora no aparece una nueva fecha estimada. Como hubo una demora o un problema con el envio, puede actualizarse mas adelante.';
     } else if (shipment.statusKey === 'en_transito' || shipment.statusKey === 'en_sucursal') {
-        text = 'El envio ya esta en operacion, pero este portal todavia no muestra una ETA mas precisa para este caso.';
+        text = 'El envio ya esta en camino, pero por ahora no aparece una fecha mas precisa.';
     } else {
-        text = 'Todavia no veo una fecha estimada publica cargada para este envio.';
+        text = 'Por ahora no veo una fecha estimada publica para este envio.';
     }
 
     return {
@@ -108,7 +115,6 @@ function buildEtaResponse(shipment) {
                     createAction('Estado actual', 'show-status'),
                     createAction('Incidencias', 'show-issues'),
                     createAction('Hablar con soporte', 'show-support'),
-                    createAction('Volver al menu', 'show-main-menu'),
                 ],
             }),
         ],
@@ -121,10 +127,9 @@ function buildHistoryResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'Para mostrarte el historial necesito identificar el envio. Si ya tenes tracking o DNI, lo busco y te muestro el paso a paso.',
+                    text: 'Si me pasas un tracking o un DNI, te muestro el historial del envio paso a paso.',
                     actions: [
                         createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Estado actual', 'show-status'),
                         createAction('Volver al menu', 'show-main-menu'),
                     ],
                 }),
@@ -137,7 +142,7 @@ function buildHistoryResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'Todavia no veo movimientos publicos para ' + shipment.trackingId + '.',
+                    text: 'Por ahora no veo movimientos publicos para ' + shipment.trackingId + '.',
                     actions: [
                         createAction('Estado actual', 'show-status'),
                         createAction('Fecha estimada', 'show-eta'),
@@ -151,13 +156,12 @@ function buildHistoryResponse(shipment) {
     return {
         messages: [
             createMessage({
-                text: 'Este es el historial que veo para ' + shipment.trackingId + ':',
+                text: 'Este es el historial visible de ' + shipment.trackingId + '.',
                 html: buildHistoryHtml(shipment),
                 actions: [
-                    createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
                     createAction('Estado actual', 'show-status'),
+                    createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
                     createAction('Incidencias', 'show-issues'),
-                    createAction('Volver al menu', 'show-main-menu'),
                 ],
             }),
         ],
@@ -170,7 +174,7 @@ function buildIssuesResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'Estas son las incidencias mas comunes que te puedo explicar desde el portal:',
+                    text: 'Estas son las situaciones mas comunes que te puedo explicar desde el portal:',
                     html: buildIssuesHtml(),
                     actions: [
                         createAction('Buscar un envio', 'request-lookup'),
@@ -186,21 +190,21 @@ function buildIssuesResponse(shipment) {
     let text = '';
 
     if (shipment.statusKey === 'retrasado') {
-        text = 'Este envio figura con demora. Es probable que la fecha final de entrega se mueva respecto de lo planeado.';
+        text = 'Este envio viene con demora. La fecha de entrega puede correrse respecto de lo previsto.';
     } else if (shipment.statusKey === 'intento_fallido') {
-        text = 'Este envio tuvo un intento de entrega sin exito. Normalmente sigue con reintento, coordinacion o retiro por sucursal.';
+        text = 'No se pudo completar la entrega en la ultima visita. Puede resolverse con un nuevo intento o con retiro por sucursal.';
     } else if (shipment.statusKey === 'paquete_fallido') {
-        text = 'Este envio tiene una incidencia operativa y necesita gestion interna antes de seguir avanzando.';
+        text = 'Hubo un problema con el envio y el equipo tiene que revisarlo antes de que siga avanzando.';
     } else if (shipment.statusKey === 'cancelado' || shipment.statusKey === 'cancelada') {
-        text = 'El envio ya figura cancelado. No deberia seguir moviendose salvo una reapertura interna.';
+        text = 'Este envio esta cancelado, asi que ya no deberia seguir moviendose.';
     } else if (shipment.statusKey === 'entregado') {
-        text = 'No veo una incidencia activa. Si tenes un reclamo despues de la entrega, conviene revisarlo con soporte.';
+        text = 'No veo un problema activo con este envio. Si no reconoces la entrega, te conviene hablar con soporte.';
     } else {
-        text = 'No veo una incidencia explicita en este momento. El envio viene siguiendo un circuito normal segun el estado actual.';
+        text = 'Por ahora no veo un problema visible en este envio.';
     }
 
     if (shipment.lastComment) {
-        text += ' Ultimo detalle visible: ' + shipment.lastComment + '.';
+        text = appendUniqueSentence(text, 'Ultima novedad visible: ' + shipment.lastComment + '.');
     }
 
     return {
@@ -208,10 +212,69 @@ function buildIssuesResponse(shipment) {
             createMessage({
                 text,
                 actions: [
-                    createAction('Fecha estimada', 'show-eta'),
+                    ...(shipment.statusKey === 'entregado'
+                        ? [createAction('No reconozco la entrega', 'show-delivery-issue')]
+                        : [createAction('Fecha estimada', 'show-eta')]),
                     createAction('Sucursal o retiro', 'show-branch'),
                     createAction('Hablar con soporte', 'show-support'),
-                    createAction('Volver al menu', 'show-main-menu'),
+                ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
+function buildDeliveryIssueResponse(shipment) {
+    if (!shipment) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'Si el problema es con una entrega puntual, primero pasame el tracking o el DNI para revisar ese envio.',
+                    actions: [
+                        createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Hablar con soporte', 'show-support'),
+                        createAction('Volver al menu', 'show-main-menu'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (shipment.statusKey !== 'entregado') {
+        return {
+            messages: [
+                createMessage({
+                    text: shipment.trackingId + ' todavia no figura como entregado. Si queres, puedo mostrarte el estado actual o revisar si hubo un problema en el recorrido.',
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Que paso con mi envio', 'show-issues'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    const parts = [
+        shipment.trackingId + ' ya figura entregado.',
+    ];
+
+    if (shipment.lastMovementDateLabel) {
+        parts.push('La ultima actualizacion visible es ' + shipment.lastMovementDateLabel + '.');
+    }
+
+    parts.push('Si no reconoces la entrega, lo mejor es revisar este caso con soporte cuanto antes.');
+
+    return {
+        messages: [
+            createMessage({
+                text: parts.join(' '),
+                actions: [
+                    createAction('Comprobante de entrega', 'show-pod'),
+                    createAction('Historial', 'show-history'),
+                    createAction('Hablar con soporte', 'show-support'),
                 ],
             }),
         ],
@@ -224,10 +287,9 @@ function buildBranchResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'La sucursal visible depende del envio y de los escaneos operativos. Si queres, busca un tracking o DNI y te digo la ultima sucursal o nodo registrado.',
+                    text: 'Si me pasas un tracking o un DNI, te digo cual es la ultima referencia visible del envio.',
                     actions: [
                         createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Hablar con soporte', 'show-support'),
                         createAction('Volver al menu', 'show-main-menu'),
                     ],
                 }),
@@ -239,17 +301,17 @@ function buildBranchResponse(shipment) {
     const parts = [];
 
     if (shipment.currentBranchName) {
-        parts.push('La ultima sucursal o nodo visible es ' + shipment.currentBranchName + '.');
+        parts.push('La ultima referencia visible es ' + shipment.currentBranchName + '.');
     } else {
-        parts.push('Este portal no expone una sucursal actual confirmada para este envio.');
+        parts.push('Por ahora no aparece una sucursal visible para este envio.');
     }
 
     if (shipment.statusKey === 'en_sucursal') {
-        parts.push('Como el estado actual es En Sucursal, esa referencia es la mas util para consulta o posible retiro.');
+        parts.push('Como ahora esta en sucursal, esa referencia es la mejor para consultar un posible retiro.');
     } else if (shipment.statusKey === 'intento_fallido') {
-        parts.push('Despues de un intento fallido, el retiro por sucursal puede depender de la gestion interna.');
+        parts.push('Si queres retirarlo, te conviene revisar esta referencia con soporte.');
     } else {
-        parts.push('La disponibilidad para retiro depende de la operacion y no siempre queda habilitada desde el portal publico.');
+        parts.push('Si necesitas confirmar retiro, soporte puede orientarte segun el estado actual.');
     }
 
     return {
@@ -257,10 +319,9 @@ function buildBranchResponse(shipment) {
             createMessage({
                 text: parts.join(' '),
                 actions: [
-                    createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
                     createAction('Incidencias', 'show-issues'),
                     createAction('Hablar con soporte', 'show-support'),
-                    createAction('Volver al menu', 'show-main-menu'),
+                    createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
                 ],
             }),
         ],
@@ -273,10 +334,9 @@ function buildPodResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'El comprobante de entrega solo aplica a envios ya entregados. Si queres revisar uno puntual, busca el tracking o el DNI y validamos el estado.',
+                    text: 'El comprobante de entrega solo aplica a envios que ya fueron entregados. Si queres revisar uno puntual, pasame el tracking o el DNI.',
                     actions: [
                         createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Hablar con soporte', 'show-support'),
                         createAction('Volver al menu', 'show-main-menu'),
                     ],
                 }),
@@ -286,8 +346,8 @@ function buildPodResponse(shipment) {
     }
 
     const text = shipment.statusKey === 'entregado'
-        ? 'Este envio ya figura entregado. El portal publico no muestra todavia la evidencia completa o firma del POD, asi que ese detalle debe revisarse por soporte o por el panel empresarial.'
-        : 'Todavia no te puedo mostrar un comprobante porque el envio no figura como entregado.';
+        ? 'Este envio ya fue entregado. Desde este portal no se ve el comprobante completo, asi que si lo necesitas te conviene pedirlo a soporte.'
+        : 'Todavia no puedo mostrar un comprobante porque el envio aun no figura como entregado.';
 
     return {
         messages: [
@@ -309,7 +369,7 @@ function buildManagementResponse(shipment) {
         return {
             messages: [
                 createMessage({
-                    text: 'Desde el portal publico no hay autogestion para cambiar direccion, contacto, horario, cancelacion o reprogramacion. Esos pedidos hoy van por soporte o por el panel empresarial.',
+                    text: 'Desde este portal no podes cambiar direccion, horario o contacto. Si necesitas hacerlo, tenes que verlo con soporte o desde el acceso empresas.',
                     actions: [
                         createAction('Hablar con soporte', 'show-support'),
                         createAction('Acceso empresas', 'go-login'),
@@ -321,16 +381,16 @@ function buildManagementResponse(shipment) {
         };
     }
 
-    let text = 'Desde el portal publico no podes autogestionar cambios de este envio.';
+    let text = 'Desde este portal no podes hacer cambios sobre este envio.';
 
     if (containsAny(shipment.statusKey, ['pendiente', 'asignado', 'en_preparacion', 'inicial'])) {
-        text += ' Como todavia no esta cerrado, soporte podria revisar si existe margen operativo para cambios.';
+        text += ' Como todavia no esta cerrado, soporte puede revisar si todavia hay margen para ayudarte.';
     } else if (containsAny(shipment.statusKey, ['en_transito', 'en_sucursal', 'retrasado', 'intento_fallido', 'paquete_fallido'])) {
-        text += ' Como ya esta en operacion, los cambios suelen tener mas restricciones y necesitan validacion interna.';
+        text += ' Como ya esta en camino o en revision, los cambios suelen tener mas restricciones.';
     } else if (shipment.statusKey === 'entregado') {
-        text += ' Ya fue entregado, asi que no admite reprogramaciones.';
+        text += ' Como ya fue entregado, no admite reprogramaciones.';
     } else if (shipment.statusKey === 'cancelado' || shipment.statusKey === 'cancelada') {
-        text += ' Ya fue cancelado, asi que no tiene gestion activa.';
+        text += ' Como ya fue cancelado, no tiene una gestion activa.';
     }
 
     return {
@@ -350,8 +410,8 @@ function buildManagementResponse(shipment) {
 
 function buildNotificationsResponse(shipment) {
     const text = shipment
-        ? 'Para ' + shipment.trackingId + ', este portal funciona como un canal de consulta manual. Todavia no hay alta de notificaciones configurables desde esta vista publica.'
-        : 'El portal publico todavia no ofrece autogestion de alertas por mail o SMS. Por ahora la consulta es manual desde esta pagina.';
+        ? 'Por ahora no podes activar alertas para ' + shipment.trackingId + ' desde esta vista. La consulta sigue siendo manual desde esta pagina.'
+        : 'Por ahora este portal no permite activar alertas por mail o SMS. La consulta sigue siendo manual desde esta pagina.';
 
     return {
         messages: [
@@ -360,7 +420,7 @@ function buildNotificationsResponse(shipment) {
                 actions: [
                     createAction('Historial de movimientos', 'show-history'),
                     createAction('Hablar con soporte', 'show-support'),
-                    createAction('Volver al menu', 'show-main-menu'),
+                    createAction('Estado actual', 'show-status'),
                 ],
             }),
         ],
@@ -370,6 +430,7 @@ function buildNotificationsResponse(shipment) {
 
 module.exports = {
     buildBranchResponse,
+    buildDeliveryIssueResponse,
     buildEtaResponse,
     buildHistoryResponse,
     buildIssuesResponse,

@@ -31,8 +31,40 @@ function resolveTextIntent(input) {
         return { kind: 'action', action: 'show-main-menu' };
     }
 
+    if (containsAny(normalized, ['entender mi envio', 'entender el envio', 'entender que esta pasando', 'explicame mi envio'])) {
+        return { kind: 'action', action: 'show-understand-menu' };
+    }
+
+    if (containsAny(normalized, ['donde esta y cuando llega', 'ubicacion y fecha', 'donde esta mi envio y cuando llega'])) {
+        return { kind: 'action', action: 'show-location-menu' };
+    }
+
+    if (containsAny(normalized, ['hubo un problema', 'tengo un problema con mi envio', 'problema con el envio'])) {
+        return { kind: 'action', action: 'show-problem-menu' };
+    }
+
+    if (containsAny(normalized, ['retiro entrega comprobante', 'retiro o entrega', 'comprobante de entrega', 'retiro y entrega'])) {
+        return { kind: 'action', action: 'show-delivery-menu' };
+    }
+
+    if (containsAny(normalized, ['cambios y soporte', 'gestiones y soporte'])) {
+        return { kind: 'action', action: 'show-management-menu' };
+    }
+
     if (containsAny(normalized, ['preguntas frecuentes', 'faq'])) {
         return { kind: 'action', action: 'scroll-faq' };
+    }
+
+    if (containsAny(normalized, [
+        'no reconozco la entrega',
+        'figura entregado pero no lo tengo',
+        'figura entregado pero no llego',
+        'dice entregado pero no lo recibi',
+        'entregado pero no lo tengo',
+        'entregado pero no llego',
+        'no recibi el envio',
+    ])) {
+        return { kind: 'action', action: 'show-delivery-issue' };
     }
 
     if (containsAny(normalized, ['soporte', 'asesor', 'agente', 'humano', 'ayuda', 'contacto', 'reclamo'])) {

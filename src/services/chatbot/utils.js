@@ -38,6 +38,36 @@ function getStatusCopy(statusKey) {
     return STATUS_COPY[statusKey] || STATUS_COPY.default;
 }
 
+function getShipmentStage(statusKey) {
+    const key = String(statusKey || '');
+
+    if (['pendiente', 'inicial', 'asignado', 'en_preparacion'].includes(key)) {
+        return 'aun_no_salio';
+    }
+
+    if (key === 'en_transito') {
+        return 'en_camino';
+    }
+
+    if (key === 'en_sucursal') {
+        return 'en_sucursal';
+    }
+
+    if (['retrasado', 'intento_fallido', 'paquete_fallido'].includes(key)) {
+        return 'con_problema';
+    }
+
+    if (key === 'entregado') {
+        return 'entregado';
+    }
+
+    if (key === 'cancelado' || key === 'cancelada') {
+        return 'cancelado';
+    }
+
+    return 'default';
+}
+
 function resolveLookupQuery(text) {
     const trimmed = String(text || '').trim();
     if (!trimmed) { return null; }
@@ -76,6 +106,7 @@ module.exports = {
     containsAny,
     detectStatusKeyFromText,
     escapeHtml,
+    getShipmentStage,
     getStatusCopy,
     isValidString,
     normalizeText,
