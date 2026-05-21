@@ -17,10 +17,13 @@ const Transport = sequelize.define('transport', {
     fuelLPer100Km:         { type: DataTypes.DECIMAL(5, 2),  allowNull: false, defaultValue: 10, field: 'fuel_l_per_100km' },
 }, { tableName: 'transport', timestamps: false });
 
-const getAll = () => {
+const getAll = ({ branchId } = {}) => {
     const { User } = require('./user');
     const { Branch } = require('./branch');
+    const where = {};
+    if (branchId) { where.branchId = branchId; }
     return Transport.findAll({
+        where,
         include: [
             { model: User,   as: 'driver', required: false },
             { model: Branch, as: 'branch', required: false },

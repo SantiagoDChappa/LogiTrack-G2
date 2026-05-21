@@ -6,8 +6,12 @@ const { RoleType } = require('../constants/enums');
 const transportModel = require('../models/transport');
 const zoneModel = require('../models/zone');
 
+const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
+
 const list = async (req, res) => {
-    const transports = await transportModel.getAll();
+    const user = res.locals.currentUser;
+    const branchId = isAdminUser(user) ? null : (user?.branchId || null);
+    const transports = await transportModel.getAll({ branchId });
     res.render('transport/index', { transports });
 };
 
