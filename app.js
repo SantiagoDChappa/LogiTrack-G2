@@ -30,9 +30,11 @@ const deliveryRoutes = require('./src/routes/delivery');
 const scanRoutes     = require('./src/routes/scan');
 const personRoutes = require('./src/routes/person');
 const portalRoutes        = require('./src/routes/portal');
+const chatbotRoutes       = require('./src/routes/chatbot');
 const routeRoutes      = require('./src/routes/route');
 const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
+const incidentRoutes   = require('./src/routes/incident');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -65,6 +67,7 @@ app.use((req, res, next) => {
 
 // Rutas Publicas
 app.use('/', portalRoutes);
+app.use('/chatbot', chatbotRoutes);
 app.use('/', authRoutes);
 
 
@@ -92,6 +95,7 @@ app.post('/route/scan/:id/dispatch', requireAuth, routeCtrl.dispatchRoute);
 app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
 app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
 app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
+app.use('/incident',  requireAuth, incidentRoutes);
 
 ;
 app.use('/api/persons',personRoutes);

@@ -442,6 +442,10 @@ const updateShipment = async (req, res) => {
         if (body.newStatusId) {
             const targetStatusId = Number(body.newStatusId);
 
+            if (!stateMachine.canTransition({ fromStatusId: shipment.statusId, toStatusId: targetStatusId, actorRoleId: currentUser.roleId })) {
+                return res.status(403).redirect(`/shipment/update/${id}?smError=FORBIDDEN_ROLE&smMsg=${encodeURIComponent('No tenés permiso para realizar esa transición de estado')}`);
+            }
+
             if (targetStatusId === Status.IN_TRANSIT.id) {
                 const submittedDeliveryUserId = body.deliveryUserId || null;
                 if (!submittedDeliveryUserId) {

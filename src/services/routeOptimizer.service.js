@@ -207,13 +207,23 @@ const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) =
     const sortedShipments = [...cluster.shipments].sort((a, b) => num(b.weightKg) - num(a.weightKg));
     // Filtra transportes elegibles para alguna zona del cluster (al menos uno)
     const zoneIds = [...new Set(cluster.shipments.map(s => s.zoneId).filter(Boolean))];
-    const candidates = availableTx
-        .filter(t => zoneIds.length === 0 || !t.zones?.length || zoneIds.some(z => t.zones.some(tz => tz.id === z)))
-        .filter(t => classifyTransport(t).maxRangeKm >= distKm)
-        .sort((a, b) => (num(a.fixedCost) + num(a.costPerKm)) - (num(b.fixedCost) + num(b.costPerKm)));
+    const zoneEligible = availableTx.filter(t => zoneIds.length === 0 || !t.zones?.length || zoneIds.some(z => t.zones.some(tz => tz.id === z)));
+    const rangeEligible = zoneEligible.filter(t => classifyTransport(t).maxRangeKm >= distKm);
+    const candidates = rangeEligible.sort((a, b) => (num(a.fixedCost) + num(a.costPerKm)) - (num(b.fixedCost) + num(b.costPerKm)));
 
     if (candidates.length === 0) {
-        return { buckets: [], unassigned: sortedShipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason: `No hay transporte habilitado para cubrir ${distKm.toFixed(0)}km hacia ${cluster.provinceName}. Rangos máx: moto 50km, van 600km, camión chico 1200km, camión grande ilimitado. Agregar un vehículo con mayor rango a la sucursal o verificar zonas habilitadas.` })) };
+        const zoneNames = [...new Set(cluster.shipments.map(s => s.zone?.name).filter(Boolean))].join(', ');
+        let reason;
+        if (zoneEligible.length === 0 && availableTx.length > 0) {
+            const txZones = availableTx.flatMap(t => (t.zones || []).map(z => z.name)).filter(Boolean);
+            const txZonesText = txZones.length ? [...new Set(txZones)].join(', ') : 'sin zonas asignadas';
+            reason = `Ningún transporte habilitado cubre la zona ${zoneNames || 'destino'}. Transportes disponibles cubren: ${txZonesText}. Asigná la zona al transporte o usá otro vehículo.`;
+        } else if (rangeEligible.length === 0) {
+            reason = `No hay transporte habilitado para cubrir ${distKm.toFixed(0)}km hacia ${cluster.provinceName}. Rangos máx: moto 50km, van 600km, camión chico 1200km, camión grande ilimitado. Agregar un vehículo con mayor rango a la sucursal o verificar zonas habilitadas.`;
+        } else {
+            reason = `Sin transporte adecuado para ${cluster.provinceName}.`;
+        }
+        return { buckets: [], unassigned: sortedShipments.map(s => ({ id: s.id, trackingId: s.trackingId, code: 'no_fit', reason })) };
     }
 
     const buckets = [];

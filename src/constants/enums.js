@@ -34,4 +34,55 @@ const ShipmentPriority = Object.freeze({
     URGENT: { id: 4, description: 'Urgente' },
 });
 
-module.exports = { Status, PersonType, RoleType, ShipmentType, ShipmentPriority };
+const NotificationEvent = Object.freeze({
+    SHIPMENT_PENDING,
+    SHIPMENT_IN_TRANSIT,
+    SHIPMENT_IN_BRANCH,
+    SHIPMENT_DELIVERED,
+    SHIPMENT_CANCELLED,
+    SHIPMENT_ASSIGNED,
+    SHIPMENT_IN_PREPARATION,
+    SHIPMENT_PACKAGE_FAILED,
+    SHIPMENT_FAILED_ATTEMPT,
+});
+
+module.exports = { Status, PersonType, RoleType, ShipmentType, ShipmentPriority, NotificationEvent };
+const IncidentStatus = Object.freeze({
+    OPEN:      'OPEN',
+    IN_REVIEW: 'IN_REVIEW',
+    CLOSED:    'CLOSED',
+});
+
+const IncidentResolution = Object.freeze({
+    PROCEDENTE:    'PROCEDENTE',
+    NO_PROCEDENTE: 'NO_PROCEDENTE',
+});
+
+const IncidentChannel = Object.freeze({
+    PORTAL:   'PORTAL',
+    INTERNAL: 'INTERNAL',
+});
+
+const IncidentEventType = Object.freeze({
+    CREATED:         'CREATED',
+    STATUS_CHANGE:   'STATUS_CHANGE',
+    ASSIGNED:        'ASSIGNED',
+    ESCALATED:       'ESCALATED',
+    UNESCALATED:     'UNESCALATED',
+    PRIORITY_CHANGE: 'PRIORITY_CHANGE',
+    COMMENT:         'COMMENT',
+    CLOSED:          'CLOSED',
+    REOPENED:        'REOPENED',
+});
+
+const IncidentPriority = Object.freeze({
+    LOW:    { id: 1, description: 'Baja'    },
+    MEDIUM: { id: 2, description: 'Media'   },
+    HIGH:   { id: 3, description: 'Alta'    },
+    URGENT: { id: 4, description: 'Urgente' },
+});
+
+module.exports = {
+    Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
+    IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority
+};

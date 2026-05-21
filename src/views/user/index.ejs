@@ -98,6 +98,12 @@
                                     <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
                                         <span class="material-symbols-outlined">edit</span>
                                     </a>
+                                    <% if (user.active) { %>
+                                    <button type="button" class="action-btn eliminar" data-tooltip="Dar de baja"
+                                        onclick="confirmarBaja('<%= user.id %>', '<%= user.fullName %>')">
+                                        <span class="material-symbols-outlined">person_off</span>
+                                    </button>
+                                    <% } %>
                                 </td>
                             </tr>
                         <% }); %>
@@ -140,13 +146,37 @@
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             Swal.fire({
                 icon: 'success',
-                title: '¡Usuario eliminado con éxito!',
+                title: '¡Usuario dado de baja con éxito!',
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color: isDark ? '#f1f5f9' : '#1e293b',
             }).then(() => {
                 history.replaceState(null, '', '/user');
+            });
+        }
+
+        function confirmarBaja(userId, userName) {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'warning',
+                title: '¿Dar de baja al usuario?',
+                text: `"${userName}" quedará inactivo en el sistema.`,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, dar de baja',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: isDark ? '#475569' : '#6b7280',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/user/delete/${userId}`;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
             });
         }
     </script>

@@ -1,0 +1,68 @@
+<div class="portal-chatbot-shell" data-chatbot-shell>
+    <button
+        type="button"
+        class="portal-chatbot-launcher"
+        data-chatbot-toggle
+        aria-expanded="false"
+        aria-controls="portal-chatbot-window"
+    >
+        <span class="material-symbols-outlined">forum</span>
+        <span>Asistente</span>
+    </button>
+
+    <section
+        class="portal-chatbot-window"
+        id="portal-chatbot-window"
+        data-chatbot-window
+        aria-label="Asistente del portal publico"
+        hidden
+    >
+        <header class="portal-chatbot-header">
+            <div>
+                <p class="portal-chatbot-eyebrow">Portal publico</p>
+                <h2>Asistente LogiTrack</h2>
+                <p class="portal-chatbot-subtitle">Seguimiento, estados y soporte</p>
+            </div>
+
+            <button
+                type="button"
+                class="portal-chatbot-close"
+                data-chatbot-close
+                aria-label="Cerrar asistente"
+            >
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </header>
+
+        <div class="portal-chatbot-body">
+            <div
+                class="portal-chatbot-thread"
+                data-chatbot-messages
+                aria-live="polite"
+                aria-atomic="false"
+            ></div>
+        </div>
+
+        <form class="portal-chatbot-compose" data-chatbot-form>
+            <label class="portal-chatbot-sr-only" for="portal-chatbot-input">Escribi tu consulta</label>
+            <input
+                id="portal-chatbot-input"
+                class="portal-chatbot-input"
+                data-chatbot-input
+                type="text"
+                placeholder="Escribi un tracking, un DNI o tu consulta..."
+                autocomplete="off"
+            >
+            <button type="submit" class="portal-chatbot-send" aria-label="Enviar mensaje">
+                <span class="material-symbols-outlined">send</span>
+            </button>
+        </form>
+    </section>
+
+    <script type="application/json" id="portal-chatbot-data"><%- JSON.stringify(chatbotData || {})
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029') %></script>
+</div>

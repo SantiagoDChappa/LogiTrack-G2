@@ -134,6 +134,10 @@ const recalcManual = async (req, res) => {
 };
 
 const persistProposal = async ({ p, branchId, actor, t }) => {
+    const transport = await transportModel.getById(p.transportId);
+    if (!transport) { throw new Error('Transporte no encontrado'); }
+    if (!transport.driverUserId) { throw new Error('El transporte no tiene conductor asignado. Asigná un conductor antes de confirmar la ruta.'); }
+
     const route = await Route.create({
         transportId:     p.transportId,
         originBranchId:  branchId,
@@ -170,10 +174,9 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
         }
     }
 
-    const transport = await transportModel.getById(p.transportId);
-    const driverId = transport?.driverUserId || null;
-    const driverName = transport?.driver?.fullName || null;
-    const transportName = transport?.name || `#${p.transportId}`;
+    const driverId = transport.driverUserId;
+    const driverName = transport.driver?.fullName || null;
+    const transportName = transport.name || `#${p.transportId}`;
     const shipmentIds = (p.shipmentIds || []);
     if (shipmentIds.length > 0) {
         const prev = await Shipment.findAll({
@@ -212,6 +215,7 @@ const confirmOne = async (req, res) => {
         const { Transport } = require('../models/transport');
         const transport = await Transport.findOne({ where: { id: proposal.transportId, branchId, enabled: true } });
         if (!transport) { return res.status(400).json({ error: 'Transporte no disponible' }); }
+        if (!transport.driverUserId) { return res.status(400).json({ error: 'El transporte no tiene conductor asignado. Asigná un conductor antes de confirmar la ruta.' }); }
 
         const shipmentIds = (proposal.shipmentIds || []).map(Number).filter(Boolean);
         if (shipmentIds.length > 0) {
@@ -247,13 +251,17 @@ const confirm = async (req, res) => {
 
     const createdRoutes = [];
     const actor = res.locals.currentUser || {};
-    await sequelize.transaction(async (t) => {
-        for (const p of proposals) {
-            const id = await persistProposal({ p, branchId, actor, t });
-            createdRoutes.push(id);
-        }
-    });
-    res.json({ ok: true, routeIds: createdRoutes });
+    try {
+        await sequelize.transaction(async (t) => {
+            for (const p of proposals) {
+                const id = await persistProposal({ p, branchId, actor, t });
+                createdRoutes.push(id);
+            }
+        });
+        res.json({ ok: true, routeIds: createdRoutes });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
 };
 
 const list = async (req, res) => {

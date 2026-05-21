@@ -93,10 +93,28 @@ CREATE TABLE "logitrack"."settings" (
     "value" text
 );
 
+CREATE TABLE "logitrack"."notificationSettings" (
+    "id"             SERIAL,
+    "eventId"         int     NOT NULL,
+    "enabled"      boolean DEFAULT false  NOT NULL,
+    PRIMARY KEY ("id")
+);
+
+CREATE TABLE "logitrack"."notificationEvent" (
+    "id"          int     NOT NULL,
+    "code"        varchar NOT NULL UNIQUE,
+    "description" varchar NOT NULL,
+    PRIMARY KEY ("id")
+);
+
 -- ============================================================
 -- FK
 -- ============================================================
 
+ALTER TABLE "logitrack"."notificationSettings"
+    ADD CONSTRAINT "fk_notification_eventId"
+    FOREIGN KEY ("eventId") REFERENCES "logitrack"."notificationEvent" ("id");
+    
 ALTER TABLE "logitrack"."address"
     ADD CONSTRAINT "fk_address_provinceId_province_id"
     FOREIGN KEY ("provinceId") REFERENCES "logitrack"."province" ("id");
