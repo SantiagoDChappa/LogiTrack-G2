@@ -22,6 +22,11 @@ const mockShipment         = { id: 99, trackingId: 'TEST-001', statusId: 2 }; //
 const mockDeliveryEvidence = { create: jest.fn().mockResolvedValue({}) };
 const mockShipmentModel    = { findOne: jest.fn() };
 
+// delivery.js usa ShipmentModel.updateStatus() directamente del modelo individual
+jest.mock('../src/models/shipment', () => ({
+    updateStatus: jest.fn().mockResolvedValue(),
+}));
+
 jest.mock('../src/models', () => ({
     DeliveryEvidence: { create: jest.fn().mockResolvedValue({}) },
     Shipment:         { findOne: jest.fn(), update: jest.fn().mockResolvedValue([]) },

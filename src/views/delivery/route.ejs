@@ -5,175 +5,1499 @@
     <title>Mi Ruta - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+    :root {
+        --lt-bg:        #f0f2f5;
+        --lt-surface:   #ffffff;
+        --lt-blue:      #2563eb;
+        --lt-blue-dark: #1a3566;
+        --lt-blue-soft: #3b82f6;
+        --lt-amber:     #f59e0b;
+        --lt-green:     #16a34a;
+        --lt-red:       #dc2626;
+        --lt-purple:    #7c3aed;
+        --lt-text:      #0f172a;
+        --lt-text-strong: #1a3566;
+        --lt-muted:     #64748b;
+        --lt-border:    rgba(15, 23, 42, .08);
+        --glass-bg:     rgba(255, 255, 255, .72);
+        --glass-brdr:   rgba(255, 255, 255, .55);
+        --row-bg:       rgba(255,255,255,.65);
+        --row-bg-cur:   rgba(255,255,255,.95);
+        --row-bg-locked:rgba(241,245,249,.5);
+        --row-bg-skip:  rgba(254, 243, 199, .35);
+        --shadow-md:    0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+        --shadow-sheet: 0 -12px 40px rgba(15, 23, 42, .12), 0 -2px 6px rgba(15, 23, 42, .04);
+        --tile-filter:  saturate(.85) brightness(1.02);
+        --lock-chip-bg: rgba(15,23,42,.04);
+    }
+    html[data-theme="dark"] {
+        --lt-bg:        #0b1220;
+        --lt-surface:   #111827;
+        --lt-blue:      #60a5fa;
+        --lt-blue-dark: #cbd5e1;
+        --lt-blue-soft: #93c5fd;
+        --lt-text:      #e2e8f0;
+        --lt-text-strong: #f1f5f9;
+        --lt-muted:     #94a3b8;
+        --lt-border:    rgba(148, 163, 184, .18);
+        --glass-bg:     rgba(17, 24, 39, .72);
+        --glass-brdr:   rgba(148, 163, 184, .15);
+        --row-bg:       rgba(30, 41, 59, .55);
+        --row-bg-cur:   rgba(30, 41, 59, .92);
+        --row-bg-locked:rgba(15, 23, 42, .55);
+        --row-bg-skip:  rgba(120, 53, 15, .25);
+        --shadow-md:    0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+        --shadow-sheet: 0 -12px 40px rgba(0,0,0,.55), 0 -2px 6px rgba(0,0,0,.3);
+        --tile-filter:  invert(1) hue-rotate(180deg) saturate(.6) brightness(.9);
+        --lock-chip-bg: rgba(148,163,184,.12);
+    }
+
+    html, body { height: 100%; }
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: var(--lt-bg);
+        color: var(--lt-text);
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        letter-spacing: -0.01em;
+    }
+    .main-content { height: calc(100vh - 56px); display: flex; flex-direction: column; padding: 0; position: relative; }
+
+    /* === Top bar === */
+    .route-toolbar {
+        position: absolute; top: 12px; left: 12px; right: 12px; z-index: 700;
+        padding: .75rem 1rem;
+        background: var(--glass-bg);
+        backdrop-filter: blur(18px) saturate(180%);
+        -webkit-backdrop-filter: blur(18px) saturate(180%);
+        border: 1px solid var(--glass-brdr);
+        border-radius: 18px;
+        box-shadow: var(--shadow-md);
+        display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    }
+    .route-toolbar h1 {
+        font-size: .95rem; margin: 0; font-weight: 700;
+        color: var(--lt-text-strong); letter-spacing: -0.02em;
+    }
+    .route-toolbar .meta {
+        font-size: .72rem; color: var(--lt-muted);
+        font-weight: 500; margin-top: 2px;
+    }
+    .progress-wrap { flex: 1; min-width: 140px; max-width: 320px; }
+    .progress-bar {
+        width: 100%; height: 6px;
+        background: rgba(15,23,42,.06); border-radius: 999px; overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+        transition: width .5s cubic-bezier(.22,1,.36,1);
+        border-radius: 999px;
+    }
+    .progress-label {
+        font-size: .68rem; color: var(--lt-muted);
+        margin-top: 4px; font-weight: 500;
+        text-transform: uppercase; letter-spacing: .04em;
+    }
+    .live-metrics {
+        display: flex; gap: 14px; flex-wrap: wrap;
+        font-size: .7rem; color: var(--lt-muted);
+        margin-top: 6px;
+    }
+    .live-metrics b { color: var(--lt-text-strong); font-weight: 700; }
+
+    /* === Map === */
+    .route-map-wrap { flex: 1; position: relative; background: var(--lt-bg); }
+    #map { width: 100%; height: 100%; }
+    .leaflet-tile-pane { filter: var(--tile-filter); }
+    .leaflet-control-attribution { background: var(--glass-bg) !important; color: var(--lt-muted) !important; }
+    .leaflet-control-attribution a { color: var(--lt-blue) !important; }
+    .leaflet-control-zoom a {
+        background: var(--glass-bg) !important;
+        color: var(--lt-text) !important;
+        border-color: var(--lt-border) !important;
+    }
+
+    .map-actions {
+        position: absolute; right: 16px; z-index: 600;
+        display: flex; flex-direction: column; gap: 8px;
+    }
+    /* Top-left floating: back + menú — esquina superior izquierda, mínimo intrusivo */
+    .map-topleft {
+        position: fixed; left: 10px; top: 10px; z-index: 1200;
+        display: flex; gap: 6px;
+        pointer-events: auto;
+    }
+    /* Cuando el drawer del menú está abierto, debe estar encima de todo */
+    .left-header.open    { z-index: 9999 !important; }
+    .nav-overlay.open    { z-index: 9998 !important; }
+    body.nav-open .map-topleft,
+    body.nav-open .map-actions,
+    body.nav-open .route-toolbar,
+    body.nav-open .bottom-sheet,
+    body.nav-open .pause-banner { z-index: 1 !important; }
+    .btn-back, .btn-menu { width: 38px; height: 38px; }
+    .btn-back .material-symbols-outlined, .btn-menu .material-symbols-outlined { font-size: 20px; }
+    .btn-back, .btn-menu {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-brdr);
+        border-radius: 50%; width: 44px; height: 44px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: var(--shadow-md);
+        color: var(--lt-text-strong);
+        text-decoration: none !important;
+        transition: transform .15s ease;
+        font-family: inherit;
+    }
+    .btn-back:hover, .btn-menu:hover { transform: scale(1.05); }
+    .btn-back .material-symbols-outlined, .btn-menu .material-symbols-outlined { font-size: 22px; }
+
+    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-brdr);
+        border-radius: 50%; width: 48px; height: 48px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: var(--shadow-md);
+        color: var(--lt-blue); transition: transform .15s ease;
+        font-family: inherit;
+    }
+    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover { transform: scale(1.05); }
+    .btn-gmaps    { color: var(--lt-green); }
+    .btn-pause    { color: var(--lt-amber); }
+    .btn-incident { color: var(--lt-purple); }
+    .btn-panic    {
+        background: linear-gradient(135deg,#dc2626,#ef4444); color: #fff;
+        border-color: rgba(255,255,255,.3);
+        box-shadow: 0 8px 24px rgba(220,38,38,.5);
+        animation: panic-pulse 2.4s infinite;
+    }
+    @keyframes panic-pulse {
+        0%,100% { box-shadow: 0 8px 24px rgba(220,38,38,.5); }
+        50%     { box-shadow: 0 8px 28px rgba(220,38,38,.85); }
+    }
+    .btn-recenter .material-symbols-outlined,
+    .btn-gmaps .material-symbols-outlined,
+    .btn-pause .material-symbols-outlined,
+    .btn-incident .material-symbols-outlined,
+    .btn-panic .material-symbols-outlined { font-size: 22px; }
+
+    /* === Bottom sheet === */
+    .bottom-sheet {
+        position: absolute; left: 0; right: 0; bottom: 0; z-index: 650;
+        max-height: 62vh;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border-top: 1px solid var(--glass-brdr);
+        border-radius: 24px 24px 0 0;
+        box-shadow: var(--shadow-sheet);
+        padding: .25rem 1rem 1.25rem;
+        overflow-y: auto;
+        transition: transform .35s cubic-bezier(.22,1,.36,1), max-height .35s cubic-bezier(.22,1,.36,1);
+    }
+    .sheet-grab {
+        display: flex; align-items: center; justify-content: center;
+        padding: 8px 0 10px; cursor: pointer;
+        position: sticky; top: 0; z-index: 5;
+        background: linear-gradient(180deg, var(--glass-bg) 60%, transparent 100%);
+        margin: -.25rem -1rem 0;
+    }
+    .sheet-handle {
+        width: 44px; height: 5px; border-radius: 999px;
+        background: var(--lt-muted); opacity: .4;
+        transition: opacity .2s ease, width .2s ease;
+    }
+    .sheet-grab:hover .sheet-handle { opacity: .7; width: 52px; }
+    .bottom-sheet.collapsed { max-height: 80px !important; overflow: hidden; }
+    .bottom-sheet.collapsed .stops-list, .bottom-sheet.collapsed .section-title { opacity: 0; pointer-events: none; }
+
+    /* === Sections === */
+    .section-title {
+        font-size: .68rem; font-weight: 700; color: var(--lt-muted);
+        text-transform: uppercase; letter-spacing: .12em;
+        margin: 14px 0 4px; padding: 0 4px;
+    }
+
+    /* === Stop cards === */
+    .stops-list { padding: 0; margin: 0; list-style: none; }
     .stop-row {
-        background: var(--color-surface, #fff);
-        border: 1px solid var(--color-border, #e2e8f0);
-        border-radius: 10px;
-        padding: 1rem;
-        margin: .65rem 0;
-        list-style: none;
+        background: var(--row-bg);
+        border: 1px solid var(--lt-border);
+        border-radius: 16px;
+        padding: .75rem .9rem;
+        margin: .5rem 0;
+        position: relative;
+        transition: all .3s cubic-bezier(.22,1,.36,1);
     }
-    .stop-row.completed { opacity: .55; }
-    .stop-row .stop-title { font-weight: 600; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-    .stop-row .stop-meta { color: var(--color-text-secondary, #64748b); font-size: .9rem; margin-top: .25rem; }
-    .stop-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .65rem; }
-    .stop-actions button, .stop-actions a {
-        font-size: .85rem; padding: .4rem .8rem; border-radius: 6px;
-        border: 1px solid var(--color-border, #ccc); cursor: pointer;
-        text-decoration: none; display: inline-flex; align-items: center; gap: .25rem;
+    .stop-row.completed {
+        opacity: .55; padding: .5rem .9rem;
+        background: var(--row-bg);
     }
-    .btn-arrive { background: #0284c7; color: #fff; border-color: #0284c7; }
-    .btn-pickup { background: #f59e0b; color: #fff; border-color: #f59e0b; }
-    .btn-delivered { background: #16a34a; color: #fff; border-color: #16a34a; }
-    .btn-failed { background: #dc2626; color: #fff; border-color: #dc2626; }
+    .stop-row.completed .stop-meta,
+    .stop-row.completed .stop-actions,
+    .stop-row.completed .lock-msg { display: none; }
+    .stop-row.locked {
+        background: var(--row-bg-locked);
+        border-style: dashed; opacity: .7;
+    }
+    .stop-row.locked .stop-actions { display: none; }
+    .stop-row.locked .stop-title { color: var(--lt-muted); }
+    .stop-row.skipped {
+        background: var(--row-bg-skip);
+        border: 1px dashed rgba(245, 158, 11, .55);
+    }
+    .stop-row.is-current {
+        background: var(--row-bg-cur);
+        border: 1.5px solid rgba(37, 99, 235, .45);
+        box-shadow:
+            0 0 0 4px rgba(37, 99, 235, .12),
+            0 8px 24px rgba(37, 99, 235, .18);
+        padding: 1.1rem;
+    }
+
+    .stop-head { display: flex; align-items: center; gap: .65rem; }
+    .stop-bubble {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px; border-radius: 10px;
+        font-weight: 700; font-size: .88rem;
+        color: #fff; flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(15,23,42,.12);
+    }
+    .stop-bubble.pending  { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
+    .stop-bubble.current  { background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%); }
+    .stop-bubble.delivered{ background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); }
+    .stop-bubble.failed   { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); }
+    .stop-bubble.pickup   { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
+    .stop-bubble.locked   { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); }
+    .stop-bubble.skipped  { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
+
+    .stop-title-wrap { flex: 1; min-width: 0; }
+    .stop-tracking {
+        font-size: .68rem; font-weight: 600; color: var(--lt-muted);
+        text-transform: uppercase; letter-spacing: .08em;
+        margin-bottom: 1px;
+    }
+    .stop-title {
+        font-weight: 700; font-size: 1rem; color: var(--lt-text-strong);
+        line-height: 1.2; letter-spacing: -0.015em;
+    }
+    .stop-eta {
+        font-size: .72rem; font-weight: 600;
+        color: var(--lt-blue); margin-top: 2px;
+    }
+
+    /* Package badges */
+    .pkg-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+    .pkg-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: .68rem; font-weight: 700; padding: 3px 8px;
+        border-radius: 999px; text-transform: uppercase; letter-spacing: .05em;
+    }
+    .pkg-chip .material-symbols-outlined { font-size: 14px; }
+    .pkg-chip.fragile   { background: rgba(220,38,38,.12);  color: #b91c1c; }
+    .pkg-chip.cold      { background: rgba(59,130,246,.14); color: #1d4ed8; }
+    .pkg-chip.big       { background: rgba(124,58,237,.13); color: #6d28d9; }
+    .pkg-chip.cod       { background: rgba(22,163,74,.13);  color: #166534; }
+    .pkg-chip.weight    { background: rgba(100,116,139,.12);color: #475569; }
+    html[data-theme="dark"] .pkg-chip.fragile { background: rgba(239,68,68,.2);  color: #fca5a5; }
+    html[data-theme="dark"] .pkg-chip.cold    { background: rgba(96,165,250,.2); color: #93c5fd; }
+    html[data-theme="dark"] .pkg-chip.big     { background: rgba(167,139,250,.2);color: #c4b5fd; }
+    html[data-theme="dark"] .pkg-chip.cod     { background: rgba(74,222,128,.2); color: #86efac; }
+    html[data-theme="dark"] .pkg-chip.weight  { background: rgba(148,163,184,.2);color: #cbd5e1; }
+
+    .status-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: .65rem; font-weight: 700;
+        padding: 3px 9px; border-radius: 999px;
+        text-transform: uppercase; letter-spacing: .06em;
+    }
+    .status-badge.amber {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: #92400e;
+        box-shadow: 0 1px 3px rgba(245, 158, 11, .25);
+    }
+    html[data-theme="dark"] .status-badge.amber {
+        background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(245,158,11,.12));
+        color: #fbbf24;
+    }
+    html[data-theme="dark"] .status-badge.green { background: rgba(22,163,74,.18); color: #4ade80; }
+    html[data-theme="dark"] .status-badge.gray  { background: rgba(148,163,184,.15); color: #cbd5e1; }
+    .status-badge.amber::before {
+        content: ''; width: 6px; height: 6px; border-radius: 50%;
+        background: var(--lt-amber);
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, .25);
+        animation: pulse-dot 1.6s infinite;
+    }
+    .status-badge.green { background: #dcfce7; color: #166534; }
+    .status-badge.gray  { background: #f1f5f9; color: #475569; }
+    @keyframes pulse-dot {
+        0%,100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, .25); }
+        50%     { box-shadow: 0 0 0 5px rgba(245, 158, 11, .05); }
+    }
+
+    .stop-meta {
+        margin-top: .65rem;
+        font-size: .85rem; color: var(--lt-muted);
+        line-height: 1.45;
+    }
+    .stop-meta .addr {
+        font-weight: 600; color: var(--lt-text-strong);
+        font-size: .92rem;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .stop-meta .addr .material-symbols-outlined { color: var(--lt-blue); font-size: 18px; }
+    .stop-meta .row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .stop-meta .row .material-symbols-outlined { font-size: 16px; color: var(--lt-muted); }
+    .stop-meta .dist {
+        font-size: .7rem; color: var(--lt-muted); margin-top: 6px;
+        font-weight: 500;
+    }
+    .stop-meta .instructions {
+        margin-top: 8px; padding: 8px 10px;
+        background: rgba(245, 158, 11, .08);
+        border-left: 3px solid var(--lt-amber);
+        border-radius: 6px;
+        color: var(--lt-text); font-size: .82rem;
+    }
+    html[data-theme="dark"] .stop-meta .instructions { background: rgba(245,158,11,.12); }
+
+    .stop-actions {
+        display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem;
+    }
+    .btn-ui {
+        font-size: .85rem; padding: .6rem 1rem;
+        border-radius: 12px; border: 1px solid var(--lt-border);
+        background: var(--lt-surface); color: var(--lt-text);
+        cursor: pointer; font-weight: 600; font-family: inherit;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        text-decoration: none !important;
+        transition: transform .12s ease, box-shadow .15s ease;
+        outline: none;
+    }
+    .btn-ui,
+    .btn-ui:hover,
+    .btn-ui:focus,
+    .btn-ui:active,
+    .btn-ui:visited { text-decoration: none !important; }
+    .btn-ui:focus-visible { box-shadow: 0 0 0 3px rgba(37,99,235,.3); }
+    .btn-ui:active { transform: scale(.97); }
+    .btn-ui .material-symbols-outlined { font-size: 18px; }
+    /* color en estados, sobreescribiendo defaults de <a> */
+    .btn-cta, .btn-cta:hover, .btn-cta:focus, .btn-cta:visited { color: #fff !important; }
+    .btn-pickup-cta, .btn-pickup-cta:hover, .btn-pickup-cta:focus, .btn-pickup-cta:visited { color: #fff !important; }
+    .btn-secondary-ui, .btn-secondary-ui:hover, .btn-secondary-ui:focus, .btn-secondary-ui:visited { color: var(--lt-blue) !important; }
+    .btn-failed-ui, .btn-failed-ui:hover, .btn-failed-ui:focus, .btn-failed-ui:visited { color: #ef4444 !important; }
+    .btn-skip-ui, .btn-skip-ui:hover, .btn-skip-ui:focus, .btn-skip-ui:visited { color: #b45309 !important; }
+    html[data-theme="dark"] .btn-skip-ui, html[data-theme="dark"] .btn-skip-ui:hover, html[data-theme="dark"] .btn-skip-ui:focus, html[data-theme="dark"] .btn-skip-ui:visited { color: #fcd34d !important; }
+    .btn-cta {
+        background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+        color: #fff; border-color: transparent;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, .35), inset 0 1px 0 rgba(255,255,255,.2);
+        font-weight: 700;
+    }
+    .btn-cta:hover { box-shadow: 0 6px 20px rgba(37,99,235,.45); }
+    .btn-pickup-cta {
+        background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        color: #fff; border-color: transparent;
+        box-shadow: 0 4px 14px rgba(245, 158, 11, .35), inset 0 1px 0 rgba(255,255,255,.2);
+        font-weight: 700;
+    }
+    .btn-failed-ui {
+        background: var(--lt-surface); color: #ef4444;
+        border: 1.5px solid rgba(220, 38, 38, .35);
+    }
+    html[data-theme="dark"] .btn-failed-ui { background: rgba(239,68,68,.1); }
+    .btn-skip-ui {
+        background: rgba(245, 158, 11, .1); color: #b45309;
+        border: 1.5px solid rgba(245, 158, 11, .3);
+    }
+    html[data-theme="dark"] .btn-skip-ui { background: rgba(251,191,36,.12); color: #fcd34d; }
+    .btn-secondary-ui {
+        background: rgba(37,99,235,.08); color: var(--lt-blue);
+        border-color: rgba(37,99,235,.18);
+    }
+    html[data-theme="dark"] .btn-secondary-ui {
+        background: rgba(96,165,250,.12); color: var(--lt-blue);
+        border-color: rgba(96,165,250,.22);
+    }
+    .btn-finish-route {
+        background: linear-gradient(135deg, var(--lt-green), #22c55e);
+        color: #fff; border: none; font-weight: 700;
+        padding: .85rem 1rem; width: 100%; margin-top: 1rem;
+        border-radius: 14px; cursor: pointer;
+        box-shadow: 0 6px 18px rgba(22,163,74,.4);
+        font-family: inherit; font-size: 1rem;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
+
+    .lock-msg {
+        margin-top: .55rem; font-size: .78rem;
+        color: var(--lt-muted);
+        display: flex; align-items: center; gap: 5px;
+        background: var(--lock-chip-bg);
+        padding: .4rem .65rem; border-radius: 8px;
+    }
+    .lock-msg .material-symbols-outlined { font-size: 16px; }
+
+    /* Pause banner */
+    .pause-banner {
+        position: absolute; top: 70px; left: 12px; right: 12px; z-index: 720;
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        color: #78350f;
+        padding: 12px 16px; border-radius: 14px;
+        display: flex; align-items: center; gap: 12px;
+        font-weight: 700;
+        box-shadow: 0 8px 24px rgba(245,158,11,.4);
+    }
+    .pause-banner .material-symbols-outlined { font-size: 22px; }
+    .pause-banner button {
+        margin-left: auto; background: #fff; color: #92400e;
+        border: none; padding: 8px 14px; border-radius: 10px;
+        font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+
+    /* Desktop */
+    @media (min-width: 769px) {
+        .main-content { flex-direction: row; align-items: stretch; }
+        .route-toolbar {
+            position: absolute; top: 16px; left: auto; right: 16px;
+            width: auto; max-width: 460px; z-index: 700;
+        }
+        .route-map-wrap { flex: 1; order: 2; min-width: 0; }
+        .bottom-sheet {
+            position: relative; max-height: none; height: 100%;
+            width: 440px; flex-shrink: 0; order: 1;
+            border-radius: 0; border-top: none;
+            border-right: 1px solid var(--lt-border);
+            background: var(--glass-bg);
+            padding: 1rem 1.25rem 1.5rem;
+            box-shadow: 4px 0 24px rgba(15,23,42,.05);
+        }
+        .sheet-grab { display: none; }
+        .bottom-sheet.collapsed { max-height: none !important; }
+        .bottom-sheet.collapsed .stops-list { opacity: 1; pointer-events: auto; }
+        .map-actions { top: 16px; bottom: auto; right: 16px; }
+        .map-actions { top: auto; bottom: 24px; }
+    }
+
+    /* Mobile - bottom sheet con drag estilo Instagram */
+    @media (max-width: 768px) {
+        .main-content { height: calc(100vh - 56px); overflow: hidden; }
+        .route-toolbar { padding: .55rem .8rem; top: 70px; }
+        .route-toolbar h1 { font-size: .85rem; }
+        .route-map-wrap { position: absolute; inset: 0; }
+        .map-actions { bottom: calc(var(--sheet-visible, 50vh) + 16px); right: 14px; transition: bottom .35s cubic-bezier(.22,1,.36,1); }
+        .bottom-sheet {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            height: 90vh; max-height: none;
+            padding-bottom: 5rem;
+            transform: translateY(var(--sheet-y, 60vh));
+            transition: transform .35s cubic-bezier(.22,1,.36,1);
+            touch-action: pan-y;
+        }
+        .bottom-sheet.dragging { transition: none !important; }
+        .bottom-sheet .sheet-grab {
+            padding: 14px 0 12px; touch-action: none;
+        }
+        .bottom-sheet .sheet-handle { width: 56px; height: 6px; }
+        .bottom-sheet.collapsed { /* clase legada, ya no se usa en mobile */ }
+        .stop-row.is-current { padding: 1.15rem; border-radius: 18px; }
+        .stop-row.is-current .stop-title { font-size: 1.1rem; }
+        .stop-row.is-current .stop-meta { font-size: .95rem; }
+        .stop-row.is-current .stop-actions { flex-direction: column; gap: .55rem; }
+        .stop-row.is-current .btn-ui { width: 100%; padding: 1rem 1rem; min-height: 54px; font-size: 1rem; border-radius: 14px; }
+        .stop-row.is-current .btn-cta, .stop-row.is-current .btn-pickup-cta { font-size: 1.05rem; }
+        .stop-row.is-current .secondary-row { display: flex; gap: .55rem; width: 100%; }
+        .stop-row.is-current .secondary-row .btn-ui { flex: 1; min-height: 46px; font-size: .9rem; padding: .65rem; }
+        .fab-current {
+            position: fixed; right: 16px; bottom: 16px; z-index: 800;
+            background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+            color: #fff;
+            border-radius: 999px; padding: .9rem 1.1rem;
+            box-shadow: 0 8px 24px rgba(37,99,235,.45);
+            display: flex; align-items: center; gap: .4rem;
+            font-weight: 700; font-size: .9rem; border: none;
+            cursor: pointer; font-family: inherit;
+        }
+    }
+    @media (min-width: 769px) { .fab-current { display: none; } }
+
+    @keyframes pulse {
+        0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,.55);}
+        50%     { box-shadow: 0 0 0 14px rgba(37,99,235,0);}
+    }
     </style>
 </head>
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
-            <h1>Mi Ruta #<%= route.id %></h1>
-            <p>Transporte: <%= route.transport.name %> · Distancia: <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</p>
+
+        <div class="route-map-wrap">
+            <div id="map"></div>
+            <div class="map-topleft">
+                <a class="btn-back" href="/delivery" title="Volver a Mi Ruteo">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <button class="btn-menu" id="btn-route-menu" title="Menú">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+            </div>
+            <div class="map-actions">
+                <% if (!readOnly) { %>
+                    <button class="btn-panic"    id="btn-panic"    title="Pánico: enviar ubicación a despacho">
+                        <span class="material-symbols-outlined">sos</span>
+                    </button>
+                    <button class="btn-incident" id="btn-incident" title="Reportar incidente vehicular / accidente">
+                        <span class="material-symbols-outlined">report</span>
+                    </button>
+                    <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)">
+                        <span class="material-symbols-outlined">pause_circle</span>
+                    </button>
+                <% } %>
+                <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps">
+                    <span class="material-symbols-outlined">map</span>
+                </button>
+                <button class="btn-recenter" id="btn-recenter" title="Centrar en mi posición">
+                    <span class="material-symbols-outlined">my_location</span>
+                </button>
+                <% if (readOnly) { %>
+                    <a class="btn-gmaps" href="/delivery/route/<%= route.id %>/summary" title="Ver resumen" style="color: var(--lt-blue)">
+                        <span class="material-symbols-outlined">summarize</span>
+                    </a>
+                <% } %>
+            </div>
         </div>
 
-        <div id="map" style="height: 380px; margin-bottom: 1rem; border-radius: 8px; overflow: hidden;"></div>
+        <% const activePause = !readOnly && (route.pauses || []).find(p => !p.endedAt && p.startedAt); %>
+        <div class="pause-banner" id="pause-banner" <%= activePause ? '' : 'hidden' %>>
+            <span class="material-symbols-outlined">pause_circle</span>
+            <div>
+                Ruta en pausa <small id="pause-reason"><%= activePause ? '· ' + activePause.reason : '' %></small>
+                <div style="font-size:.72rem;font-weight:500;opacity:.85" id="pause-elapsed">—</div>
+            </div>
+            <button id="btn-resume">Reanudar</button>
+        </div>
 
-        <h2>Recorrido</h2>
-        <ol id="stops-list" style="padding:0">
-            <% (route.stops || []).forEach(s => { %>
-                <li class="stop-row <%= s.completed ? 'completed' : '' %>" data-stop-id="<%= s.id %>">
-                    <div class="stop-title">
-                        <% if (s.stopType === 'pickup') { %>
-                            📦 Pickup en <%= s.branch ? (s.branch.name.startsWith('Sucursal') ? s.branch.name : 'Sucursal ' + s.branch.name) : 'sucursal' %>
-                        <% } else { %>
-                            🏠 Entrega <%= s.shipment ? s.shipment.trackingId : '' %>
-                        <% } %>
-                        <% if (s.completed) { %><span style="color:#16a34a">✅</span><% } %>
-                    </div>
-                    <div class="stop-meta">
-                        <% if (s.stopType === 'delivery' && s.shipment && s.shipment.address) { %>
-                            <%= s.shipment.address.street %> <%= s.shipment.address.number %>
-                            <% if (s.shipment.recipient) { %> · <%= s.shipment.recipient.fullName %><% } %>
-                        <% } else if (s.branch) { %>
-                            <%= s.branch.address || '' %>
-                        <% } %>
-                        <br>+<%= s.distanceFromPrevKm %> km
-                    </div>
-                    <% if (!s.completed) { %>
-                        <div class="stop-actions">
-                            <% if (s.stopType === 'pickup') { %>
-                                <button class="btn-pickup" data-action="pickup-confirmed" data-stop-id="<%= s.id %>">📦 Confirmar pickup</button>
-                            <% } else { %>
-                                <button class="btn-arrive" data-action="arrive" data-stop-id="<%= s.id %>">🏁 Llegué</button>
-                                <button class="btn-delivered" data-action="delivered" data-stop-id="<%= s.id %>">✅ Entregado</button>
-                                <button class="btn-failed" data-action="failed" data-stop-id="<%= s.id %>">❌ No pude entregar</button>
-                                <% if (s.shipment) { %>
-                                    <a class="btn-secondary" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod">📷 Foto + firma</a>
+        <div class="route-toolbar">
+            <div style="flex:1;min-width:0">
+                <h1>Ruta #<%= route.id %></h1>
+                <div class="meta"><%= route.transport.name %> · <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</div>
+                <div class="live-metrics">
+                    <span>ETA fin: <b id="m-eta">—</b></span>
+                    <span>Km: <b id="m-km">0 / <%= route.totalDistanceKm %></b></span>
+                    <span>Prom/parada: <b id="m-avg">—</b></span>
+                </div>
+            </div>
+            <div class="progress-wrap">
+                <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+                <div class="progress-label"><span id="progress-text">0 / 0</span> completadas</div>
+            </div>
+        </div>
+
+        <section class="bottom-sheet" id="bottom-sheet">
+            <div class="sheet-grab" id="sheet-grab" role="button" aria-label="Mostrar u ocultar lista de envíos">
+                <div class="sheet-handle"></div>
+            </div>
+
+            <ol class="stops-list" id="stops-list">
+                <% (route.stops || []).forEach((s) => {
+                    const isPickup = s.stopType === 'pickup';
+                    const recipientPhone = s.shipment && s.shipment.recipient ? s.shipment.recipient.phone : null;
+                    const trackingId = s.shipment ? s.shipment.trackingId : null;
+                    const sh = s.shipment || {};
+                %>
+                    <li class="stop-row <%= s.completed ? 'completed' : '' %> <%= (s.skipped && !s.completed) ? 'skipped' : '' %>"
+                        data-stop-id="<%= s.id %>"
+                        data-stop-seq="<%= s.sequence %>"
+                        data-stop-type="<%= s.stopType %>"
+                        data-skipped="<%= s.skipped ? '1' : '0' %>"
+                        data-est-min="<%= s.estimatedMinutes || 5 %>"
+                        data-lat="<%= s.lat %>"
+                        data-lng="<%= s.lng %>">
+
+                        <div class="stop-head">
+                            <span class="stop-bubble <%= s.completed ? (isPickup ? 'pickup' : 'delivered') : 'pending' %>"><%= s.sequence %></span>
+                            <div class="stop-title-wrap">
+                                <% if (isPickup) { %>
+                                    <div class="stop-tracking">Pickup</div>
+                                    <div class="stop-title"><%= s.branch ? (s.branch.name.startsWith('Sucursal') ? s.branch.name : 'Sucursal ' + s.branch.name) : 'Sucursal' %></div>
+                                <% } else { %>
+                                    <div class="stop-tracking"><%= trackingId || 'Entrega' %></div>
+                                    <div class="stop-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                        Entrega
+                                        <span class="status-badge amber js-status-badge">En camino</span>
+                                    </div>
                                 <% } %>
+                                <div class="stop-eta js-stop-eta"></div>
+                            </div>
+                        </div>
+
+                        <% if (!isPickup && (sh.fragile || sh.refrigerated || sh.oversized || sh.weightKg || sh.codAmount)) { %>
+                            <div class="pkg-chips">
+                                <% if (sh.fragile)      { %><span class="pkg-chip fragile"><span class="material-symbols-outlined">warning</span>Frágil</span><% } %>
+                                <% if (sh.refrigerated) { %><span class="pkg-chip cold"><span class="material-symbols-outlined">ac_unit</span>Refrig.</span><% } %>
+                                <% if (sh.oversized)    { %><span class="pkg-chip big"><span class="material-symbols-outlined">inventory</span>Voluminoso</span><% } %>
+                                <% if (sh.weightKg)     { %><span class="pkg-chip weight"><span class="material-symbols-outlined">scale</span><%= sh.weightKg %> kg<%= sh.packageQty ? ' · ' + sh.packageQty + ' bultos' : '' %></span><% } %>
+                                <% if (sh.codAmount)    { %><span class="pkg-chip cod"><span class="material-symbols-outlined">payments</span>$<%= sh.codAmount %> <%= sh.codMethod || '' %></span><% } %>
+                            </div>
+                        <% } %>
+
+                        <div class="stop-meta">
+                            <% if (!isPickup && s.shipment && s.shipment.address) { %>
+                                <div class="addr">
+                                    <span class="material-symbols-outlined">location_on</span>
+                                    <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                                </div>
+                                <% if (s.shipment.recipient) { %>
+                                    <div class="row"><span class="material-symbols-outlined">person</span><%= s.shipment.recipient.fullName %></div>
+                                <% } %>
+                                <% if (sh.expectedDeliveryFrom || sh.expectedDeliveryTo) { %>
+                                    <div class="row"><span class="material-symbols-outlined">schedule</span>Ventana: <%= sh.expectedDeliveryFrom || '?' %> - <%= sh.expectedDeliveryTo || '?' %></div>
+                                <% } %>
+                                <% if (sh.specialInstructions) { %>
+                                    <div class="instructions">
+                                        <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-2px">info</span>
+                                        <%= sh.specialInstructions %>
+                                    </div>
+                                <% } %>
+                            <% } else if (s.branch) { %>
+                                <div class="addr">
+                                    <span class="material-symbols-outlined">store</span>
+                                    <%= s.branch.address || 'Punto de retiro' %>
+                                </div>
+                            <% } %>
+                            <div class="dist">+ <%= s.distanceFromPrevKm %> km desde paso anterior</div>
+                            <% if (s.skipped && !s.completed) { %>
+                                <div class="row" style="color:#b45309;font-weight:600;margin-top:6px">
+                                    <span class="material-symbols-outlined">schedule_send</span>Postergada<%= s.skipReason ? ': ' + s.skipReason : '' %>
+                                </div>
                             <% } %>
                         </div>
-                    <% } %>
-                </li>
-            <% }) %>
-        </ol>
+
+                        <% if (!s.completed && !readOnly) { %>
+                            <div class="stop-actions">
+                                <% if (isPickup) { %>
+                                    <button class="btn-ui btn-pickup-cta" data-action="pickup-confirmed" data-stop-id="<%= s.id %>" style="width:100%">
+                                        <span class="material-symbols-outlined">inventory_2</span>Confirmar pickup
+                                    </button>
+                                <% } else { %>
+                                    <button class="btn-ui btn-cta" data-action="delivered" data-stop-id="<%= s.id %>" style="width:100%">
+                                        <span class="material-symbols-outlined">check_circle</span>Confirmar Entrega
+                                    </button>
+                                    <div class="secondary-row" style="display:flex;gap:.5rem;width:100%;margin-top:.55rem">
+                                        <a class="btn-ui btn-secondary-ui" target="_blank" style="flex:1"
+                                           href="https://www.google.com/maps/dir/?api=1&destination=<%= s.lat %>,<%= s.lng %>">
+                                            <span class="material-symbols-outlined">navigation</span>Navegar
+                                        </a>
+                                        <% if (recipientPhone) { %>
+                                            <a class="btn-ui btn-secondary-ui" href="tel:<%= recipientPhone %>" style="flex:1">
+                                                <span class="material-symbols-outlined">call</span>Llamar
+                                            </a>
+                                        <% } %>
+                                    </div>
+                                    <div class="secondary-row" style="display:flex;gap:.5rem;width:100%;margin-top:.55rem">
+                                        <% if (s.skipped) { %>
+                                            <button class="btn-ui btn-skip-ui" data-action="unskip" data-stop-id="<%= s.id %>" style="flex:1">
+                                                <span class="material-symbols-outlined">restart_alt</span>Retomar
+                                            </button>
+                                        <% } else { %>
+                                            <button class="btn-ui btn-skip-ui" data-action="skip" data-stop-id="<%= s.id %>" style="flex:1">
+                                                <span class="material-symbols-outlined">schedule_send</span>Volver luego
+                                            </button>
+                                        <% } %>
+                                        <button class="btn-ui btn-failed-ui" data-action="failed" data-stop-id="<%= s.id %>" style="flex:1">
+                                            <span class="material-symbols-outlined">close</span>Fallido
+                                        </button>
+                                    </div>
+                                    <% if (s.shipment) { %>
+                                        <a class="btn-ui btn-secondary-ui" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod" style="width:100%;margin-top:.55rem">
+                                            <span class="material-symbols-outlined">photo_camera</span>Capturar POD (foto + firma)
+                                        </a>
+                                    <% } %>
+                                <% } %>
+                            </div>
+                            <div class="lock-msg" hidden>
+                                <span class="material-symbols-outlined">lock</span>
+                                <span class="lock-text">Completá el paso anterior</span>
+                            </div>
+                        <% } %>
+                    </li>
+                <% }) %>
+            </ol>
+
+            <% if (!readOnly) { %>
+                <button class="btn-finish-route" id="btn-finish-route" hidden>
+                    <span class="material-symbols-outlined">flag</span>Finalizar ruta y ver resumen
+                </button>
+            <% } else { %>
+                <a class="btn-finish-route" href="/delivery/route/<%= route.id %>/summary" style="background: linear-gradient(135deg, #475569, #64748b); text-decoration: none !important;">
+                    <span class="material-symbols-outlined">summarize</span>Ver resumen de la ruta
+                </a>
+            <% } %>
+        </section>
+
+        <button class="fab-current" id="fab-current" hidden>
+            <span class="material-symbols-outlined">arrow_downward</span>Paso actual
+        </button>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <style>
+    /* === SweetAlert dark + fixes === */
+    html[data-theme="dark"] .swal2-popup {
+        background: #1e293b !important; color: #e2e8f0 !important;
+        border: 1px solid rgba(148, 163, 184, .15);
+    }
+    html[data-theme="dark"] .swal2-title,
+    html[data-theme="dark"] .swal2-html-container,
+    html[data-theme="dark"] .swal2-content,
+    html[data-theme="dark"] .swal2-label { color: #f1f5f9 !important; }
+    html[data-theme="dark"] .swal2-input,
+    html[data-theme="dark"] .swal2-textarea,
+    html[data-theme="dark"] .swal2-select,
+    html[data-theme="dark"] .swal2-file {
+        background: #0f172a !important; color: #f1f5f9 !important;
+        border: 1px solid rgba(148, 163, 184, .25) !important;
+        box-shadow: none !important;
+    }
+    html[data-theme="dark"] .swal2-input::placeholder,
+    html[data-theme="dark"] .swal2-textarea::placeholder { color: #64748b !important; }
+    html[data-theme="dark"] .swal2-validation-message {
+        background: #334155 !important; color: #f1f5f9 !important;
+    }
+    html[data-theme="dark"] .swal2-cancel { background: #475569 !important; color: #f1f5f9 !important; }
+    html[data-theme="dark"] .swal2-icon.swal2-warning { color: #fbbf24 !important; border-color: #fbbf24 !important; }
+    html[data-theme="dark"] .swal2-icon.swal2-question { color: #60a5fa !important; border-color: #60a5fa !important; }
+    html[data-theme="dark"] .swal2-icon.swal2-info { color: #60a5fa !important; border-color: #60a5fa !important; }
+    html[data-theme="dark"] .swal2-icon.swal2-success { color: #4ade80 !important; border-color: #4ade80 !important; }
+
+    /* Fix: input overflow del popup (caso "Volver más tarde") */
+    .swal2-popup .swal2-input,
+    .swal2-popup .swal2-textarea,
+    .swal2-popup .swal2-select {
+        max-width: calc(100% - 2.4em);
+        box-sizing: border-box;
+    }
+    </style>
+
     <script>
     const routeId = <%= route.id %>;
+    const readOnly = <%= readOnly ? 'true' : 'false' %>;
+
+    // === Swal defaults: respeta tema oscuro automáticamente ===
+    (function() {
+        const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+        const origFire = Swal.fire.bind(Swal);
+        Swal.fire = function(...args) {
+            const opts = (args.length === 1 && typeof args[0] === 'object') ? args[0] : null;
+            if (opts) {
+                if (isDark()) {
+                    opts.background = opts.background || '#1e293b';
+                    opts.color      = opts.color      || '#f1f5f9';
+                }
+                return origFire(opts);
+            }
+            return origFire(...args);
+        };
+    })();
+    const routeStarted = <%= route.startedAt ? 'true' : 'false' %>;
+    let activePauseId = <%= activePause ? activePause.id : 'null' %>;
+    let activePauseStart = <%- activePause ? JSON.stringify(activePause.startedAt) : 'null' %>;
+
     const stops = <%- JSON.stringify((route.stops || []).map(s => ({
         id: s.id, sequence: s.sequence, stopType: s.stopType,
-        lat: Number(s.lat), lng: Number(s.lng), completed: s.completed,
+        lat: Number(s.lat), lng: Number(s.lng),
+        completed: s.completed, skipped: s.skipped,
+        estimatedMinutes: s.estimatedMinutes || 5,
+        distanceFromPrevKm: Number(s.distanceFromPrevKm || 0),
+        completedAt: s.completedAt || null,
         label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
     }))) %>;
+    const totalKm = <%= route.totalDistanceKm || 0 %>;
 
-    const map = L.map('map').setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+    const markers = {};
+    const map = L.map('map', { zoomControl: false }).setView([stops[0]?.lat || -34.6, stops[0]?.lng || -58.4], 12);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OSM © CARTO', subdomains: 'abcd', maxZoom: 19,
+    }).addTo(map);
+
+    function buildIcon(stop, state) {
+        const grads = {
+            pending:      'linear-gradient(135deg,#94a3b8,#64748b)',
+            current:      'linear-gradient(135deg,#2563eb,#3b82f6)',
+            delivered:    'linear-gradient(135deg,#16a34a,#22c55e)',
+            failed:       'linear-gradient(135deg,#dc2626,#ef4444)',
+            'pickup-done':'linear-gradient(135deg,#f59e0b,#fbbf24)',
+            locked:       'linear-gradient(135deg,#cbd5e1,#94a3b8)',
+            skipped:      'linear-gradient(135deg,#f59e0b,#fbbf24)',
+        };
+        const grad = grads[state] || grads.pending;
+        const pulse = state === 'current' ? 'animation:pulse 1.6s infinite;' : '';
+        return L.divIcon({
+            html: `<div style="background:${grad};color:#fff;border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.88rem;border:2px solid #fff;box-shadow:0 4px 12px rgba(15,23,42,.25);${pulse}font-family:Inter,sans-serif">${stop.sequence}</div>`,
+            className: '', iconSize: [34,34], iconAnchor: [17,17],
+        });
+    }
+
+    function stateForStop(s) {
+        if (s.completed) return s.stopType === 'pickup' ? 'pickup-done' : 'delivered';
+        if (s.skipped) return 'skipped';
+        return 'pending';
+    }
+
     const latlngs = [];
     stops.forEach(s => {
-        const color = s.completed ? '#94a3b8' : (s.stopType === 'pickup' ? '#f59e0b' : '#1976d2');
-        const icon = L.divIcon({
-            html: `<div style="background:${color};color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${s.sequence}</div>`,
-            className: '', iconSize: [30,30], iconAnchor: [15,15],
-        });
-        L.marker([s.lat, s.lng], { icon }).bindPopup(`#${s.sequence} ${s.stopType}<br>${s.label}`).addTo(map);
+        if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
+        const m = L.marker([s.lat, s.lng], { icon: buildIcon(s, stateForStop(s)) })
+            .bindPopup(`#${s.sequence} · ${s.label}`)
+            .addTo(map);
+        markers[s.id] = m;
         latlngs.push([s.lat, s.lng]);
     });
-    let routeLayer = null;
+
+    let routeGlow = null, routeLine = null;
+    function drawRoute(coords) {
+        if (routeGlow) map.removeLayer(routeGlow);
+        if (routeLine) map.removeLayer(routeLine);
+        routeGlow = L.polyline(coords, { color: '#3b82f6', weight: 14, opacity: 0.18 }).addTo(map);
+        routeLine = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }).addTo(map);
+    }
     if (latlngs.length > 1) {
-        routeLayer = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.5 }).addTo(map);
-        map.fitBounds(latlngs, { padding: [25,25] });
+        drawRoute(latlngs);
+        map.fitBounds(latlngs, { padding: [40,40] });
         const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
         fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
             .then(r => r.ok ? r.json() : null)
             .then(d => {
                 if (!d || !d.routes || !d.routes[0]) return;
                 const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
-                if (routeLayer) map.removeLayer(routeLayer);
-                L.polyline(poly, { color: '#1976d2', weight: 4, opacity: 0.85 }).addTo(map);
-                map.fitBounds(poly, { padding: [25,25] });
+                drawRoute(poly);
+                map.fitBounds(poly, { padding: [40,40] });
             }).catch(() => {});
     }
 
+    let driverMarker = null, lastPos = null;
+    function updateDriverDot(lat, lng) {
+        lastPos = [lat, lng];
+        if (!driverMarker) {
+            const icon = L.divIcon({
+                html: `<div style="background:radial-gradient(circle,#3b82f6,#2563eb);width:20px;height:20px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25),0 4px 12px rgba(37,99,235,.4);animation:pulse 1.8s infinite"></div>`,
+                className: '', iconSize: [20,20], iconAnchor: [10,10],
+            });
+            driverMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map);
+        } else {
+            driverMarker.setLatLng([lat, lng]);
+        }
+    }
+    document.getElementById('btn-recenter').addEventListener('click', () => {
+        if (lastPos) map.setView(lastPos, 15);
+    });
+
+    // Google Maps URL
+    document.getElementById('btn-gmaps').addEventListener('click', () => {
+        const pending = stops.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng) && !s.completed);
+        const points = pending.length ? pending : stops.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+        if (points.length === 0) {
+            Swal.fire({ icon: 'info', title: 'Sin paradas', text: 'No hay puntos válidos.', confirmButtonColor: '#2563eb' });
+            return;
+        }
+        const origin = lastPos ? `${lastPos[0]},${lastPos[1]}` : `${points[0].lat},${points[0].lng}`;
+        const dest = `${points[points.length - 1].lat},${points[points.length - 1].lng}`;
+        const middle = points.slice(lastPos ? 0 : 1, -1).map(p => `${p.lat},${p.lng}`);
+        const waypoints = middle.slice(0, 9).join('|');
+        const params = new URLSearchParams({ api: '1', travelmode: 'driving', origin, destination: dest });
+        if (waypoints) params.set('waypoints', waypoints);
+        window.open('https://www.google.com/maps/dir/?' + params.toString(), '_blank');
+    });
+
+    // === Bottom sheet drag (Instagram-style) ===
+    const sheet = document.getElementById('bottom-sheet');
+    const grab  = document.getElementById('sheet-grab');
+    const isMobile = () => window.innerWidth <= 768;
+
+    // Snap points en px (translateY desde la posición full)
+    function snapPoints() {
+        const vh = window.innerHeight;
+        const tucked = vh - 44;              // sólo handle visible (~44px) → mapa full
+        const mid    = Math.round(vh * 0.42); // ~58% visible
+        const full   = 0;                     // sheet abierto al máximo (~95% visible)
+        return { tucked, mid, full };
+    }
+    let currentSnap = 'mid';
+
+    function setSheetY(px) {
+        sheet.style.setProperty('--sheet-y', px + 'px');
+        // exporta cuánto se ve para reposicionar map-actions
+        const vh = window.innerHeight;
+        const visible = Math.max(0, vh - px);
+        sheet.style.setProperty('--sheet-visible', visible + 'px');
+        document.documentElement.style.setProperty('--sheet-visible', visible + 'px');
+    }
+
+    function snapTo(name) {
+        if (!isMobile()) return;
+        const pts = snapPoints();
+        currentSnap = name;
+        setSheetY(pts[name]);
+        setTimeout(() => map.invalidateSize(), 380);
+    }
+
+    function nearestSnap(px, velocityPxPerMs) {
+        const pts = snapPoints();
+        const order = ['full', 'mid', 'tucked'];
+        // Swipe hacia abajo
+        if (velocityPxPerMs > 0.25) {
+            for (const name of order) if (pts[name] > px + 10) return name;
+            return 'tucked';
+        }
+        // Swipe hacia arriba
+        if (velocityPxPerMs < -0.25) {
+            for (const name of [...order].reverse()) if (pts[name] < px - 10) return name;
+            return 'full';
+        }
+        // Sin velocidad: el más cercano
+        let best = order[0], bestDist = Math.abs(px - pts[best]);
+        for (const name of order) {
+            const d = Math.abs(px - pts[name]);
+            if (d < bestDist) { best = name; bestDist = d; }
+        }
+        return best;
+    }
+
+    // Inicializa posición mid en mobile, full (sin transform) en desktop
+    function initSheet() {
+        if (isMobile()) snapTo('mid');
+        else setSheetY(0);
+    }
+    initSheet();
+    window.addEventListener('resize', initSheet);
+
+    // === Drag handler ===
+    if (sheet && grab) {
+        let dragging = false;
+        let startY = 0, startYpx = 0, lastY = 0, lastT = 0, velocity = 0;
+
+        const onDown = (e) => {
+            if (!isMobile()) return;
+            // Solo arrastra si el target es el handle, la zona grab o la cima del sheet (no la lista)
+            const target = e.target;
+            const insideGrab = grab.contains(target);
+            const sheetScrollTop = sheet.scrollTop;
+            const onTopEdge = !insideGrab && sheetScrollTop === 0 && (e.clientY - sheet.getBoundingClientRect().top < 50);
+            if (!insideGrab && !onTopEdge) return;
+
+            dragging = true;
+            sheet.classList.add('dragging');
+            startY = e.clientY;
+            const cur = parseFloat(getComputedStyle(sheet).getPropertyValue('--sheet-y')) || 0;
+            startYpx = cur;
+            lastY = e.clientY; lastT = performance.now();
+            sheet.setPointerCapture?.(e.pointerId);
+            e.preventDefault();
+        };
+        const onMove = (e) => {
+            if (!dragging) return;
+            const dy = e.clientY - startY;
+            let next = startYpx + dy;
+            const pts = snapPoints();
+            // Permite un pequeño overscroll arriba/abajo con resistencia
+            if (next < pts.full - 20)    next = pts.full - 20;
+            if (next > pts.tucked + 20)  next = pts.tucked + 20;
+            setSheetY(next);
+            const now = performance.now();
+            velocity = (e.clientY - lastY) / Math.max(1, now - lastT);
+            lastY = e.clientY; lastT = now;
+        };
+        const onUp = (e) => {
+            if (!dragging) return;
+            dragging = false;
+            sheet.classList.remove('dragging');
+            const cur = parseFloat(getComputedStyle(sheet).getPropertyValue('--sheet-y')) || 0;
+            const target = nearestSnap(cur, velocity);
+            snapTo(target);
+            try { sheet.releasePointerCapture?.(e.pointerId); } catch (_) {}
+        };
+
+        sheet.addEventListener('pointerdown', onDown);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+
+        // Click rápido en el handle → cicla snap
+        let downTime = 0;
+        grab.addEventListener('pointerdown', () => { downTime = performance.now(); });
+        grab.addEventListener('pointerup', () => {
+            if (performance.now() - downTime < 200) {
+                // tap cicla: tucked → mid → full → tucked
+                const order = ['tucked', 'mid', 'full'];
+                const idx = order.indexOf(currentSnap);
+                const next = order[(idx + 1) % order.length];
+                snapTo(next);
+            }
+        });
+    }
+
+    // Menú: dispara el hamburger del header. Espera a que ui.js termine de bindear.
+    document.getElementById('btn-route-menu')?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const hb = document.getElementById('btn-hamburger');
+        if (hb) { hb.click(); }
+        else {
+            // Fallback: abre manualmente
+            document.querySelector('.left-header')?.classList.add('open');
+            document.getElementById('nav-overlay')?.classList.add('open');
+        }
+    });
+
+    // Sincroniza body.nav-open con .left-header.open para z-index correcto
+    const leftHdr = document.querySelector('.left-header');
+    if (leftHdr) {
+        const obs = new MutationObserver(() => {
+            document.body.classList.toggle('nav-open', leftHdr.classList.contains('open'));
+        });
+        obs.observe(leftHdr, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    if (navigator.geolocation && !readOnly) {
+        navigator.geolocation.watchPosition(
+            (pos) => updateDriverDot(pos.coords.latitude, pos.coords.longitude),
+            () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+        );
+        const sendHb = (pos) => {
+            updateDriverDot(pos.coords.latitude, pos.coords.longitude);
+            fetch('/delivery/heartbeat', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    latitude: pos.coords.latitude, longitude: pos.coords.longitude,
+                    speedKmh: pos.coords.speed ? pos.coords.speed * 3.6 : null, routeId,
+                }),
+            }).catch(() => {});
+        };
+        navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 });
+        setInterval(() => navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 }), 30000);
+    }
+
+    // Inicia ruta automáticamente si aún no se inició (sólo modo activo)
+    if (!routeStarted && !readOnly) {
+        fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+    }
+
+    // === Step gating + métricas live ===
+    function fmtTime(d) { return d.toTimeString().slice(0, 5); }
+    function fmtDuration(sec) {
+        if (!sec || sec < 60) return Math.max(0, Math.floor(sec)) + 's';
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        return (h ? h + 'h ' : '') + m + 'm';
+    }
+
+    function applyStepState() {
+        const rows = Array.from(document.querySelectorAll('.stop-row'));
+        let currentFound = false;
+        let kmDone = 0, kmAcc = 0;
+        const now = new Date();
+        let etaCursor = new Date(now);
+
+        rows.forEach(r => {
+            r.classList.remove('is-current', 'locked');
+            const lockMsg = r.querySelector('.lock-msg'); if (lockMsg) lockMsg.hidden = true;
+            const bubble = r.querySelector('.stop-bubble');
+            const etaEl  = r.querySelector('.js-stop-eta');
+            if (bubble) bubble.classList.remove('current', 'locked', 'skipped');
+            const badge = r.querySelector('.js-status-badge');
+            if (badge) {
+                badge.classList.remove('amber', 'gray', 'green');
+                badge.classList.add('gray');
+                badge.textContent = 'En espera';
+            }
+
+            const stopId = Number(r.dataset.stopId);
+            const stop = stops.find(s => s.id === stopId);
+            const estMin = Number(r.dataset.estMin || 5);
+
+            if (r.classList.contains('completed')) {
+                if (badge) { badge.classList.remove('amber','gray'); badge.classList.add('green'); badge.textContent = 'Entregado'; }
+                if (etaEl) etaEl.textContent = '';
+                if (stop) kmDone += stop.distanceFromPrevKm;
+                kmAcc += (stop ? stop.distanceFromPrevKm : 0);
+                return;
+            }
+
+            if (r.dataset.skipped === '1') {
+                r.classList.add('skipped');
+                if (bubble) { bubble.classList.remove('pending'); bubble.classList.add('skipped'); }
+                if (etaEl) etaEl.textContent = 'Postergada';
+                return;
+            }
+
+            if (!currentFound && !readOnly) {
+                r.classList.add('is-current');
+                if (bubble) { bubble.classList.remove('pending'); bubble.classList.add('current'); }
+                if (badge) { badge.classList.remove('gray'); badge.classList.add('amber'); badge.textContent = 'En camino'; }
+                if (stop && markers[stopId]) markers[stopId].setIcon(buildIcon(stop, 'current'));
+                etaCursor = new Date(now.getTime() + estMin * 60000);
+                if (etaEl) etaEl.textContent = 'ETA ~ ' + fmtTime(etaCursor);
+                currentFound = true;
+            } else if (!currentFound && readOnly) {
+                // Modo solo lectura: marca el stop incompleto pero sin "is-current" interactivo
+                if (etaEl) etaEl.textContent = '';
+                currentFound = true;
+            } else {
+                r.classList.add('locked');
+                if (bubble) { bubble.classList.remove('pending'); bubble.classList.add('locked'); }
+                if (lockMsg) {
+                    const prev = r.previousElementSibling;
+                    const prevSeq = prev ? prev.dataset.stopSeq : '?';
+                    const txt = lockMsg.querySelector('.lock-text');
+                    if (txt) txt.textContent = `Completá el paso #${prevSeq} antes`;
+                    lockMsg.hidden = false;
+                }
+                etaCursor = new Date(etaCursor.getTime() + estMin * 60000);
+                if (etaEl) etaEl.textContent = 'ETA ~ ' + fmtTime(etaCursor);
+            }
+        });
+
+        const total = rows.length;
+        const done = rows.filter(r => r.classList.contains('completed')).length;
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-text').textContent = `${done} / ${total}`;
+
+        // Métricas en vivo
+        document.getElementById('m-eta').textContent = currentFound ? fmtTime(etaCursor) : (done === total ? 'completa' : '—');
+        document.getElementById('m-km').textContent = `${kmDone.toFixed(1)} / ${Number(totalKm).toFixed(1)}`;
+        const completedWithTime = stops.filter(s => s.completed && s.completedAt);
+        if (completedWithTime.length > 0) {
+            const elapsedMin = completedWithTime.reduce((acc, s) => acc + Math.max(0, (Date.now() - new Date(s.completedAt).getTime())/60000), 0);
+            // promedio simple: tiempo total transcurrido / cantidad — más útil sería elapsed_since_start/done
+            document.getElementById('m-avg').textContent = Math.round(elapsedMin / completedWithTime.length) + 'm';
+        } else {
+            document.getElementById('m-avg').textContent = '—';
+        }
+
+        // Botón finalizar visible cuando todo está done o no hay pendientes accionables
+        const finishBtn = document.getElementById('btn-finish-route');
+        if (finishBtn && !readOnly) {
+            const pendingActionable = rows.some(r => !r.classList.contains('completed') && r.dataset.skipped !== '1');
+            finishBtn.hidden = pendingActionable;
+        }
+
+        if (window.innerWidth <= 768) {
+            const cur = document.querySelector('.stop-row.is-current');
+            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function markStopDone(stopId, kind) {
+        const row = document.querySelector(`.stop-row[data-stop-id="${stopId}"]`);
+        if (!row) return;
+        row.classList.add('completed');
+        row.dataset.skipped = '0';
+        const actions = row.querySelector('.stop-actions'); if (actions) actions.remove();
+        const lock = row.querySelector('.lock-msg'); if (lock) lock.remove();
+        const bubble = row.querySelector('.stop-bubble');
+        if (bubble) {
+            bubble.classList.remove('pending', 'current', 'locked', 'skipped');
+            bubble.classList.add(kind === 'failed' ? 'failed' : (kind === 'pickup-done' ? 'pickup' : 'delivered'));
+        }
+        const stop = stops.find(s => s.id === Number(stopId));
+        if (stop) {
+            stop.completed = true; stop.completedAt = new Date().toISOString();
+            if (markers[stop.id]) markers[stop.id].setIcon(buildIcon(stop, kind));
+        }
+        applyStepState();
+    }
+
+    function markStopSkipped(stopId, skipped) {
+        const row = document.querySelector(`.stop-row[data-stop-id="${stopId}"]`);
+        if (!row) return;
+        row.dataset.skipped = skipped ? '1' : '0';
+        const stop = stops.find(s => s.id === Number(stopId));
+        if (stop) { stop.skipped = !!skipped; if (markers[stop.id]) markers[stop.id].setIcon(buildIcon(stop, skipped ? 'skipped' : 'pending')); }
+        applyStepState();
+    }
+
+    applyStepState();
+    setInterval(applyStepState, 30000);
+
+    // FAB
+    const fab = document.getElementById('fab-current');
+    if (fab) {
+        fab.addEventListener('click', () => {
+            const cur = document.querySelector('.stop-row.is-current');
+            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        const onScroll = () => {
+            if (window.innerWidth > 768) { fab.hidden = true; return; }
+            const cur = document.querySelector('.stop-row.is-current');
+            if (!cur) { fab.hidden = true; return; }
+            const r = cur.getBoundingClientRect();
+            fab.hidden = r.top > 80 && r.bottom < window.innerHeight - 80;
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+    }
+
+    // === Helpers ===
     const getGeo = () => new Promise((resolve) => {
         if (!navigator.geolocation) return resolve({});
         navigator.geolocation.getCurrentPosition(
             p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-            () => resolve({}),
-            { timeout: 4000 }
+            () => resolve({}), { timeout: 4000 }
         );
     });
-
     const post = async (url, body) => {
         const res = await fetch(url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body || {}),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) { alert(data.error || 'Error'); return null; }
+        if (!res.ok) {
+            Swal.fire({ icon: 'warning', title: 'No se puede', text: data.error || 'Error', confirmButtonColor: '#2563eb' });
+            return null;
+        }
         return data;
     };
 
-    // GPS live heartbeat cada 30s
-    if (navigator.geolocation) {
-        const sendHb = (pos) => {
-            fetch('/delivery/heartbeat', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                    speedKmh: pos.coords.speed ? pos.coords.speed * 3.6 : null,
-                    routeId,
-                }),
-            }).catch(() => {});
-        };
-        navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 });
-        setInterval(() => {
-            navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 });
-        }, 30000);
+    // === Stop actions ===
+    const FAILED_REASONS = [
+        { code: 'ausente',          label: 'Destinatario ausente'   },
+        { code: 'domicilio_erroneo',label: 'Dirección errónea'      },
+        { code: 'rechazo',          label: 'Rechazo del destinatario' },
+        { code: 'calle_cortada',    label: 'Calle cortada / inaccesible' },
+        { code: 'paquete_dañado',   label: 'Paquete dañado'         },
+        { code: 'otro',             label: 'Otro motivo'            },
+    ];
+
+    async function openFailedModal(stopId) {
+        const optionsHtml = FAILED_REASONS.map(r => `<option value="${r.code}">${r.label}</option>`).join('');
+        const { value: form } = await Swal.fire({
+            title: 'Intento fallido',
+            html: `
+                <div style="text-align:left;display:flex;flex-direction:column;gap:8px">
+                    <label style="font-size:.85rem;font-weight:600">Motivo</label>
+                    <select id="fa-reason" class="swal2-input" style="margin:0">${optionsHtml}</select>
+                    <label style="font-size:.85rem;font-weight:600">Detalle (opcional)</label>
+                    <input id="fa-detail" class="swal2-input" placeholder="Comentario..." style="margin:0">
+                    <details style="margin-top:6px">
+                        <summary style="cursor:pointer;font-weight:600;font-size:.85rem">Entregado a vecino / portero</summary>
+                        <input id="fa-neighbor-name" class="swal2-input" placeholder="Nombre del vecino" style="margin:6px 0">
+                        <input id="fa-neighbor-rel"  class="swal2-input" placeholder="Relación (vecino, portero, familiar)" style="margin:6px 0">
+                        <input id="fa-neighbor-phone" class="swal2-input" placeholder="Teléfono (opcional)" style="margin:6px 0">
+                    </details>
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.9rem">
+                        <input type="checkbox" id="fa-retry"> Reintentar el mismo día (volver al final de la ruta)
+                    </label>
+                </div>`,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Registrar',
+            confirmButtonColor: '#dc2626',
+            preConfirm: () => {
+                const reasonCode = document.getElementById('fa-reason').value;
+                const reasonText = FAILED_REASONS.find(r => r.code === reasonCode)?.label || reasonCode;
+                return {
+                    reasonCode, reasonText,
+                    comment:          document.getElementById('fa-detail').value || null,
+                    neighborName:     document.getElementById('fa-neighbor-name').value || null,
+                    neighborRelation: document.getElementById('fa-neighbor-rel').value  || null,
+                    neighborPhone:    document.getElementById('fa-neighbor-phone').value || null,
+                    retrySameDay:     document.getElementById('fa-retry').checked,
+                };
+            },
+        });
+        return form || null;
     }
 
-    document.querySelectorAll('[data-action]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const action = btn.dataset.action;
-            const stopId = btn.dataset.stopId;
-            const geo = await getGeo();
-            const url = `/delivery/route/${routeId}/stop/${stopId}/${action}`;
+    if (!readOnly) document.getElementById('stops-list').addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-action]');
+        if (!btn) return;
+        const row = btn.closest('.stop-row');
+        const action = btn.dataset.action;
+        const stopId = btn.dataset.stopId;
 
-            if (action === 'failed') {
-                const reason = prompt('Motivo del intento fallido:');
-                if (!reason) return;
-                const r = await post(url, { ...geo, comment: reason });
-                if (r) location.reload();
-                return;
+        // Skipped puede retomarse aunque el step gating diga otra cosa
+        if (row && row.classList.contains('locked') && action !== 'unskip') {
+            Swal.fire({ icon: 'info', title: 'Paso bloqueado', text: 'Completá el paso anterior primero.', confirmButtonColor: '#2563eb' });
+            return;
+        }
+
+        const geo = await getGeo();
+        const baseUrl = `/delivery/route/${routeId}/stop/${stopId}`;
+
+        if (action === 'skip') {
+            const { value: reason } = await Swal.fire({
+                title: 'Volver más tarde', input: 'text',
+                inputPlaceholder: 'Ej: timbre roto, tráfico, etc.',
+                showCancelButton: true, confirmButtonText: 'Postergar',
+                confirmButtonColor: '#f59e0b',
+            });
+            if (reason === undefined) return;
+            const r = await post(`${baseUrl}/skip`, { reason });
+            if (r) markStopSkipped(stopId, true);
+            return;
+        }
+        if (action === 'unskip') {
+            const r = await post(`${baseUrl}/unskip`);
+            if (r) markStopSkipped(stopId, false);
+            return;
+        }
+        if (action === 'failed') {
+            const form = await openFailedModal(stopId);
+            if (!form) return;
+            const r = await post(`${baseUrl}/failed`, { ...form, ...geo });
+            if (r) {
+                if (r.retrySameDay) markStopSkipped(stopId, true);
+                else markStopDone(stopId, 'failed');
             }
-            if (action === 'delivered') {
-                if (!confirm('¿Confirmar entrega? (sin foto/firma)')) return;
-            }
-            const r = await post(url, geo);
-            if (r) location.reload();
+            return;
+        }
+        if (action === 'delivered') {
+            const c = await Swal.fire({
+                icon: 'question', title: '¿Confirmar entrega?',
+                text: 'Asegurate de tener el paquete con el destinatario.',
+                showCancelButton: true, confirmButtonText: 'Sí, entregar',
+                confirmButtonColor: '#16a34a',
+            });
+            if (!c.isConfirmed) return;
+            const r = await post(`${baseUrl}/delivered`, geo);
+            if (r) markStopDone(stopId, 'delivered');
+            return;
+        }
+        if (action === 'pickup-confirmed') {
+            const r = await post(`${baseUrl}/pickup-confirmed`, geo);
+            if (r) markStopDone(stopId, 'pickup-done');
+            return;
+        }
+    });
+
+    // === Pausa ===
+    const pauseBanner   = document.getElementById('pause-banner');
+    const pauseElapsedE = document.getElementById('pause-elapsed');
+    const pauseReasonE  = document.getElementById('pause-reason');
+    let pauseTimer = null;
+    function startPauseTimer() {
+        if (pauseTimer) clearInterval(pauseTimer);
+        const tick = () => {
+            if (!activePauseStart) return;
+            const sec = Math.floor((Date.now() - new Date(activePauseStart).getTime()) / 1000);
+            pauseElapsedE.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
+        };
+        tick();
+        pauseTimer = setInterval(tick, 1000);
+    }
+    if (activePauseId) startPauseTimer();
+
+    document.getElementById('btn-pause')?.addEventListener('click', async () => {
+        if (activePauseId) {
+            Swal.fire({ icon: 'info', title: 'Ya está en pausa', confirmButtonColor: '#2563eb' });
+            return;
+        }
+        const { value: reason } = await Swal.fire({
+            title: 'Pausar ruta',
+            input: 'select',
+            inputOptions: { almuerzo: 'Almuerzo', combustible: 'Recarga combustible', descanso: 'Descanso', otro: 'Otro' },
+            showCancelButton: true, confirmButtonText: 'Pausar', confirmButtonColor: '#f59e0b',
         });
+        if (!reason) return;
+        const r = await post(`/delivery/route/${routeId}/pause`, { reason });
+        if (r) {
+            activePauseId = r.pauseId; activePauseStart = r.startedAt;
+            pauseReasonE.textContent = '· ' + reason;
+            pauseBanner.hidden = false;
+            startPauseTimer();
+        }
+    });
+    function clearPauseUI() {
+        activePauseId = null; activePauseStart = null;
+        if (pauseTimer) { clearInterval(pauseTimer); pauseTimer = null; }
+        pauseBanner.hidden = true;
+    }
+    document.getElementById('btn-resume')?.addEventListener('click', async () => {
+        // Fuerza hide UI aún si backend no encuentra pausa (estado inconsistente)
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/resume`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+            });
+            await res.json().catch(() => ({}));
+        } catch (_) { /* ignora red */ }
+        clearPauseUI();
+    });
+
+    // === Incidente ===
+    document.getElementById('btn-incident')?.addEventListener('click', async () => {
+        const { value: form } = await Swal.fire({
+            title: 'Reportar incidente',
+            html: `
+                <div style="text-align:left;display:flex;flex-direction:column;gap:8px">
+                    <label style="font-size:.85rem;font-weight:600">Tipo</label>
+                    <select id="inc-type" class="swal2-input" style="margin:0">
+                        <option value="vehicular">Problema vehicular</option>
+                        <option value="accidente">Accidente</option>
+                        <option value="trafico">Tráfico severo</option>
+                        <option value="clima">Clima adverso</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                    <label style="font-size:.85rem;font-weight:600">Severidad</label>
+                    <select id="inc-sev" class="swal2-input" style="margin:0">
+                        <option value="baja">Baja</option>
+                        <option value="media" selected>Media</option>
+                        <option value="alta">Alta</option>
+                    </select>
+                    <label style="font-size:.85rem;font-weight:600">Descripción</label>
+                    <textarea id="inc-desc" class="swal2-textarea" placeholder="¿Qué pasó?"></textarea>
+                </div>`,
+            focusConfirm: false, showCancelButton: true,
+            confirmButtonText: 'Reportar', confirmButtonColor: '#7c3aed',
+            preConfirm: () => ({
+                incidentType: document.getElementById('inc-type').value,
+                severity:     document.getElementById('inc-sev').value,
+                description:  document.getElementById('inc-desc').value,
+            }),
+        });
+        if (!form) return;
+        const geo = await getGeo();
+        const r = await post(`/delivery/route/${routeId}/incident`, { ...form, ...geo });
+        if (r) Swal.fire({ icon: 'success', title: 'Incidente reportado', text: 'Despacho ya fue notificado.', confirmButtonColor: '#2563eb' });
+    });
+
+    // === Pánico ===
+    document.getElementById('btn-panic')?.addEventListener('click', async () => {
+        const c = await Swal.fire({
+            icon: 'warning', title: '¿Activar pánico?',
+            text: 'Se enviará tu ubicación al despachante de inmediato.',
+            showCancelButton: true, confirmButtonText: 'Sí, enviar SOS',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!c.isConfirmed) return;
+        const geo = await getGeo();
+        const r = await post('/delivery/panic', { ...geo, routeId, message: 'SOS desde la app del repartidor' });
+        if (r) Swal.fire({ icon: 'success', title: 'SOS enviado', text: 'Despacho fue alertado.', confirmButtonColor: '#dc2626' });
+    });
+
+    // === Finalizar ruta ===
+    document.getElementById('btn-finish-route')?.addEventListener('click', async (ev) => {
+        // Si es <a> (modo readOnly), dejamos el navegador hacer su trabajo
+        if (ev.currentTarget.tagName === 'A') return;
+        const c = await Swal.fire({
+            icon: 'question', title: '¿Finalizar ruta?',
+            text: 'Verás el resumen y podrás escanear los no entregados al volver a sucursal.',
+            showCancelButton: true, confirmButtonText: 'Sí, finalizar',
+            confirmButtonColor: '#16a34a',
+        });
+        if (!c.isConfirmed) return;
+        const r = await post(`/delivery/route/${routeId}/finish`);
+        if (r) window.location.href = `/delivery/route/${routeId}/summary`;
     });
     </script>
 </body>

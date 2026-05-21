@@ -11,6 +11,8 @@ router.post('/confirm-one',      ctrl.confirmOne);
 router.get('/scan/:id',          ctrl.getScanPage);
 router.post('/scan/:id/dispatch', ctrl.dispatchRoute);
 router.get('/:id/qr',            ctrl.getQR);
+router.post('/:id/revert',       ctrl.revertRoute);
+router.post('/:id/append',       ctrl.appendToRoute);
 router.get('/:id',               ctrl.detail);
 
 module.exports = router;

@@ -24,6 +24,9 @@ jest.mock('../src/models/setting');
 jest.mock('../src/models/user');
 jest.mock('../src/services/geocode');
 jest.mock('../src/utils/notifications');
+jest.mock('../src/services/zoneResolver.service', () => ({
+    resolveZone: jest.fn().mockResolvedValue(null),
+}));
 
 const personModel          = require('../src/models/person');
 const addressModel         = require('../src/models/address');

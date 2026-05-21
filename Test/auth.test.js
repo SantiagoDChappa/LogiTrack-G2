@@ -2,9 +2,9 @@ const request = require('supertest');
 const bcrypt  = require('bcryptjs');
 
 // Mock DB — no necesita Neon en CI
-jest.mock('../src/models/user', () => ({
-    findByEmail: jest.fn(),
-}));
+// Mockear index evita que safeAssociate() falle al pasar mock User a Sequelize.belongsTo()
+jest.mock('../src/models/index', () => ({}));
+jest.mock('../src/models/user', () => ({ findByEmail: jest.fn() }));
 
 const userModel = require('../src/models/user');
 const app       = require('../app');

@@ -13,6 +13,12 @@ const RouteStop = sequelize.define('route_stop', {
     distanceFromPrevKm: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0, field: 'distance_from_prev_km' },
     completed:          { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     completedAt:        { type: DataTypes.DATE, allowNull: true, field: 'completed_at' },
+    skipped:            { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    skipReason:         { type: DataTypes.STRING(255), allowNull: true, field: 'skip_reason' },
+    skippedAt:          { type: DataTypes.DATE, allowNull: true, field: 'skipped_at' },
+    arrivedAt:          { type: DataTypes.DATE, allowNull: true, field: 'arrived_at' },
+    etaAt:              { type: DataTypes.DATE, allowNull: true, field: 'eta_at' },
+    estimatedMinutes:   { type: DataTypes.INTEGER, allowNull: false, defaultValue: 5, field: 'estimated_minutes' },
 }, { tableName: 'route_stop', timestamps: false });
 
 module.exports = { RouteStop };

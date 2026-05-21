@@ -70,7 +70,17 @@
                                 <option value="<%= z.id %>" <%= selectedZoneIds.includes(z.id) ? 'selected' : '' %>><%= z.name %></option>
                             <% }) %>
                         </select>
+                        <button type="button" id="clear-zones" class="btn-secondary" style="margin-top:0.5rem;font-size:var(--font-size-xs)">
+                            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">backspace</span>
+                            Limpiar zonas seleccionadas
+                        </button>
                     </div>
+                    <script>
+                    document.getElementById('clear-zones')?.addEventListener('click', () => {
+                        const sel = document.getElementById('zoneIds');
+                        [...sel.options].forEach(o => { o.selected = false; });
+                    });
+                    </script>
                     <div class="field" style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem">
                         <input type="checkbox" id="enabled" name="enabled" <%= transport.enabled ? 'checked' : '' %> style="width:auto">
                         <label for="enabled" style="margin:0;text-transform:none;font-size:var(--font-size-sm)">Habilitado</label>

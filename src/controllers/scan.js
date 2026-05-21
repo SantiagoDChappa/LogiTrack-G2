@@ -30,7 +30,7 @@ const getScanPage = async (req, res) => {
         if (error) { return renderError(res, error, status); }
 
         const actions = stateMachine.getAvailableActions({ shipment, actor: currentUser })
-            .map(a => ({ ...a, endpoint: a.endpoint.replace(':trackingId', trackingId) }));
+            .map(a => ({ ...a, endpoint: a.endpoint.replace(':trackingId', trackingId).replace(':id', trackingId) }));
         const success = req.query.success === '1';
         const suggestedDate = req.query.suggestedDate || null;
         res.render('scan/index', { shipment, actions, error: null, success, suggestedDate });

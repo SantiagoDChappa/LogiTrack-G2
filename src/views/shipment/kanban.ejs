@@ -138,8 +138,8 @@
                             %>
                             <% if (_isInTransit) { %>
                                 <% _groups.forEach(g => { %>
-                                    <div class="k-transport-group">
-                                        <div class="k-transport-head">
+                                    <div class="k-transport-group" data-transport-group>
+                                        <div class="k-transport-head" onclick="this.closest('[data-transport-group]').classList.toggle('k-transport-group--collapsed')">
                                             <span class="material-symbols-outlined">local_shipping</span>
                                             <div class="k-transport-info">
                                                 <span class="k-transport-name"><%= g.transportName %></span>
@@ -147,6 +147,9 @@
                                                 <% if (g.driverName) { %><span class="k-transport-driver"><%= g.driverName %></span><% } %>
                                             </div>
                                             <span class="k-transport-count"><%= g.shipments.length %></span>
+                                            <button class="k-transport-toggle" title="Expandir / colapsar" onclick="event.stopPropagation();this.closest('[data-transport-group]').classList.toggle('k-transport-group--collapsed')">
+                                                <span class="material-symbols-outlined">expand_more</span>
+                                            </button>
                                         </div>
                                         <div class="k-transport-cards">
                                             <% g.shipments.forEach(s => { %>

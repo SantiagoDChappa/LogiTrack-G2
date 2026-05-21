@@ -52,7 +52,12 @@ const FailedAttempt = sequelize.define('failedAttempt', {
     operatorId: {
         type: DataTypes.INTEGER,
         allowNull: true
-    }
+    },
+    reasonCode:       { type: DataTypes.STRING(40),  allowNull: true, field: 'reason_code' },
+    neighborName:     { type: DataTypes.STRING(150), allowNull: true, field: 'neighbor_name' },
+    neighborPhone:    { type: DataTypes.STRING(40),  allowNull: true, field: 'neighbor_phone' },
+    neighborRelation: { type: DataTypes.STRING(80),  allowNull: true, field: 'neighbor_relation' },
+    retrySameDay:     { type: DataTypes.BOOLEAN,     allowNull: false, defaultValue: false, field: 'retry_same_day' }
 }, {
     tableName: 'failedAttempt',
     timestamps: true

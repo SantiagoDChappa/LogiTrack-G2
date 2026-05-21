@@ -200,6 +200,68 @@
                     </div>
                 </form>
             </div>
+
+            <!-- ── Card: Optimización de ruteo (piggyback) ─────────────────── -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">alt_route</span>
+                    Optimización de ruteo · Sumar a rutas pendientes
+                </h2>
+                <p class="settings-subtitle">
+                    Cuando un transporte tiene una ruta <strong>Planificada</strong> (todavía no salió), el optimizador puede evaluar si un envío nuevo cabe en esa ruta sin disparar el costo. Configurá los umbrales aceptables. Si el envío está <strong>En Tránsito</strong>, el transporte queda siempre bloqueado.
+                </p>
+                <form method="POST" action="/setting/route-optimizer">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4) var(--space-5)">
+                        <div class="field" style="grid-column:1/-1">
+                            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer">
+                                <input type="checkbox" name="piggyback_enabled" value="on" <%= routeOpt.piggyback_enabled ? 'checked' : '' %>>
+                                <strong>Permitir sumar envíos a rutas pendientes (piggyback)</strong>
+                            </label>
+                            <small style="color:var(--color-text-secondary)">Si está desactivado, los transportes con ruta Planificada se excluyen completamente del optimizador.</small>
+                        </div>
+                        <div class="field">
+                            <label for="piggyback_max_extra_pct">Desvío máximo permitido (% sobre distancia actual)</label>
+                            <input type="number" id="piggyback_max_extra_pct" name="piggyback_max_extra_pct" min="0" max="100" step="1" value="<%= routeOpt.piggyback_max_extra_pct %>">
+                            <small style="color:var(--color-text-secondary)">Ej: 15% — si la ruta actual es 100km, acepta hasta +15km extra.</small>
+                        </div>
+                        <div class="field">
+                            <label for="piggyback_max_extra_km">Desvío máximo absoluto (km extra)</label>
+                            <input type="number" id="piggyback_max_extra_km" name="piggyback_max_extra_km" min="0" max="500" step="1" value="<%= routeOpt.piggyback_max_extra_km %>">
+                            <small style="color:var(--color-text-secondary)">Tope independiente del %. Bloquea sumar si el detour supera este número de km.</small>
+                        </div>
+                        <div class="field">
+                            <label for="piggyback_max_extra_cost_pct">Costo extra máximo (% sobre costo actual)</label>
+                            <input type="number" id="piggyback_max_extra_cost_pct" name="piggyback_max_extra_cost_pct" min="0" max="100" step="1" value="<%= routeOpt.piggyback_max_extra_cost_pct %>">
+                            <small style="color:var(--color-text-secondary)">Costo adicional aceptable comparado con el costo total de la ruta planificada.</small>
+                        </div>
+
+                        <div class="field" style="grid-column:1/-1;padding-top:var(--space-3);border-top:1px solid var(--color-border)">
+                            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer">
+                                <input type="checkbox" name="urgent_combine_enabled" value="on" <%= routeOpt.urgent_combine_enabled ? 'checked' : '' %>>
+                                <strong>Combinar envíos urgentes cercanos en un mismo transporte</strong>
+                            </label>
+                            <small style="color:var(--color-text-secondary)">Si está activado, los envíos urgentes que vayan a destinos cercanos se agrupan en un solo vehículo dedicado. Si está desactivado, cada urgente fuerza un vehículo propio.</small>
+                        </div>
+                        <div class="field">
+                            <label for="urgent_combine_max_km">Distancia máxima entre urgentes combinables (km)</label>
+                            <input type="number" id="urgent_combine_max_km" name="urgent_combine_max_km" min="0" max="200" step="1" value="<%= routeOpt.urgent_combine_max_km %>">
+                            <small style="color:var(--color-text-secondary)">Ej: 15km — dos urgentes a menos de 15km entre sí viajan juntos.</small>
+                        </div>
+                        <div class="field">
+                            <label for="cluster_merge_radius_km">Radio para agrupar envíos en un mismo transporte (km a la redonda)</label>
+                            <input type="number" id="cluster_merge_radius_km" name="cluster_merge_radius_km" min="0" max="500" step="1" value="<%= routeOpt.cluster_merge_radius_km %>">
+                            <small style="color:var(--color-text-secondary)">Ej: 60km — envíos cuyos destinos estén dentro de este radio entre sí se asignan al mismo vehículo aunque figuren en provincias distintas (típico CABA + GBA).</small>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar ajustes
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- ── Card 2: Asignación de sucursales a usuarios ─────────────── -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -306,11 +368,12 @@
         }
 
         const _param = new URLSearchParams(window.location.search).get('success');
-        if (_param === '1' || _param === '2' || _param === '3') {
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            const _titles = { '1': 'Ajustes guardados', '2': 'Sucursal asignada correctamente', '3': 'Configuración de ruteo guardada', '4': 'Parámetros guardados correctamente' };
             Swal.fire({
                 icon: 'success',
-                title: _param === '1' ? 'Ajustes guardados' : _param === '2' ? 'Sucursal asignada correctamente' : 'Parámetros guardados correctamente',
+                title: _titles[_param],
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',

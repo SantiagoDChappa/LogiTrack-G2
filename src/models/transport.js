@@ -13,6 +13,8 @@ const Transport = sequelize.define('transport', {
     driverUserId:  { type: DataTypes.INTEGER, allowNull: true, field: 'driver_user_id' },
     branchId:      { type: DataTypes.INTEGER, allowNull: true, field: 'branch_id' },
     enabled:       { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    commissionPerDelivery: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0,  field: 'commission_per_delivery' },
+    fuelLPer100Km:         { type: DataTypes.DECIMAL(5, 2),  allowNull: false, defaultValue: 10, field: 'fuel_l_per_100km' },
 }, { tableName: 'transport', timestamps: false });
 
 const getAll = () => {

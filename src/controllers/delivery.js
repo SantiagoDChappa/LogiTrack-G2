@@ -97,8 +97,13 @@ const saveEvidence = async (req, res) => {
 
         const trackingCode = req.params.id;
 
+        const { Op } = require('sequelize');
+        const orConds = [{ trackingId: trackingCode }];
+        const asNum = Number(trackingCode);
+        if (Number.isInteger(asNum)) orConds.push({ id: asNum });
+
         const shipment = await Shipment.findOne({
-            where: { trackingId: trackingCode }
+            where: { [Op.or]: orConds }
         });
 
         if (!shipment) {

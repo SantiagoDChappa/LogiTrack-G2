@@ -26,6 +26,13 @@ const Shipment = sequelize.define('shipment', {
     expectedDeliveryTo:   { type: DataTypes.TIME, allowNull: true },
     priority:             { type: DataTypes.INTEGER, defaultValue: 1 },
     basePriority:         { type: DataTypes.INTEGER, defaultValue: 1 },
+    codAmount:            { type: DataTypes.DECIMAL(12, 2), allowNull: true,  field: 'cod_amount' },
+    codMethod:            { type: DataTypes.STRING(20),     allowNull: true,  field: 'cod_method' },
+    specialInstructions:  { type: DataTypes.TEXT,           allowNull: true,  field: 'special_instructions' },
+    fragile:              { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'fragile' },
+    refrigerated:         { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'refrigerated' },
+    oversized:            { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'oversized' },
+    estimatedMinutes:     { type: DataTypes.INTEGER,        allowNull: false, defaultValue: 5,     field: 'estimated_minutes' },
 },
 { timestamps: true, tableName: 'shipment' });
 

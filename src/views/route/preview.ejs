@@ -144,6 +144,7 @@
     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const fmtEta = (iso) => { if (!iso) return ''; return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
     const fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDuration = (min) => { if (min == null) return '-'; const h = Math.floor(min / 60); const m = min % 60; return h > 0 ? `${h}h${m > 0 ? ' ' + m + 'min' : ''}` : `${m}min`; };
 
     const buildAssignmentsFromState = () => {
         return currentState.proposals.map(p => ({
@@ -178,6 +179,23 @@
         render();
     };
 
+    const rejectExtras = (txId) => {
+        const proposal = currentState.proposals.find(p => p.transportId === txId);
+        if (!proposal || !proposal.opportunisticSummary) { return; }
+        const oppIds = new Set(
+            (proposal.reasoning?.shipments || []).filter(r => r.opportunistic).map(r => r.shipmentId)
+        );
+        if (oppIds.size === 0) { return; }
+        proposal.shipmentIds = proposal.shipmentIds.filter(id => !oppIds.has(id));
+        currentState.unassigned = currentState.unassigned || [];
+        for (const r of (proposal.reasoning?.shipments || [])) {
+            if (r.opportunistic && r.shipmentId) {
+                currentState.unassigned.push({ id: r.shipmentId, trackingId: r.trackingId, code: 'opp_rejected', reason: 'Extra rechazado. Puede arrastrarse a otra propuesta o dejarse para la siguiente ruta.' });
+            }
+        }
+        recalc();
+    };
+
     const recalcExcluding = async (txId) => {
         excludedTxIds.add(txId);
         appliedTxIds.delete(txId);
@@ -193,6 +211,29 @@
     };
 
     const applyOne = async (proposal, btn) => {
+        if (proposal.piggyback) {
+            const ps = proposal.piggybackSummary || {};
+            const msg = `¿Sumar ${proposal.addedShipmentIds.length} envío(s) a la Ruta #${proposal.existingRouteId} (${proposal.transport.name})?\n\n`
+                + `Distancia: ${ps.previousTotalKm}km → ${ps.newTotalKm}km (+${ps.totalExtraKm}km)\n`
+                + `Costo: $${ps.previousTotalCost} → $${ps.newTotalCost} (+$${ps.totalExtraCost})\n\n`
+                + `Los envíos se agregan al final de la secuencia. Si la ruta ya está En Curso, no se podrá sumar.`;
+            if (!confirm(msg)) return;
+            btn.disabled = true; btn.textContent = 'Sumando...';
+            const res = await fetch('/route/' + proposal.existingRouteId + '/append', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, shipmentIds: proposal.addedShipmentIds }),
+            });
+            const data = await res.json();
+            if (!res.ok) { btn.disabled = false; btn.textContent = '🔗 Sumar a ruta existente'; alert(data.error || 'Error'); return; }
+            appliedTxIds.add(proposal.transportId);
+            btn.classList.add('applied');
+            btn.textContent = `✅ SUMADO · Ruta #${data.routeId} (+${data.addedCount})`;
+            const card = btn.closest('.proposal-card');
+            card.classList.add('applied');
+            card.querySelectorAll('.shipment-chip').forEach(ch => { ch.draggable = false; ch.style.cursor = 'default'; });
+            return;
+        }
         if (!confirm(`¿Aplicar ruta para ${proposal.transport.name}? Se asignarán ${proposal.shipmentIds.length} envíos.`)) return;
         btn.disabled = true; btn.textContent = 'Aplicando...';
         const res = await fetch('/route/confirm-one', {
@@ -227,16 +268,23 @@
 
         const s = data.summary || {};
         const totalCost = data.proposals.reduce((a,p) => a + p.totalCost, 0);
+        // Asignados: solo los originalmente seleccionados, sin contar pickups oportunistas
+        const selectedSet = new Set(lastShipmentIds);
+        const assignedSelected = data.proposals.reduce((a, p) =>
+            a + (p.shipmentIds || []).filter(id => selectedSet.has(Number(id))).length, 0);
+        const totalSelected = lastShipmentIds.length || (s.totalShipments ?? 0);
         let summaryHtml = `
             <div class="summary-grid">
                 <div class="item">Propuestas<strong>${data.proposals.length}</strong></div>
-                <div class="item">Asignados<strong>${s.assignedCount ?? data.proposals.reduce((a,p) => a + p.shipmentIds.length, 0)} de ${s.validShipments ?? s.totalShipments ?? '-'}</strong></div>
+                <div class="item">Asignados<strong>${assignedSelected} de ${totalSelected}</strong></div>
                 <div class="item">Sin asignar<strong>${(data.unassigned || []).filter(u => u.code !== 'already_assigned').length}</strong></div>
                 <div class="item">Costo total<strong>${fmtMoney(totalCost)}</strong></div>
                 <div class="item">Demanda<strong>${s.demandWeightKg ?? '-'}kg / ${s.demandVolumeM3 ?? '-'}m³</strong></div>
                 <div class="item">Aplicadas<strong>${appliedTxIds.size}</strong></div>
             </div>`;
         if (s.deficitWarning) summaryHtml += `<div class="deficit-banner">⚠ ${escapeHtml(s.deficitWarning)}</div>`;
+        if (s.unavailableTransports?.busy?.length) summaryHtml += `<div class="deficit-banner">🔒 ${s.unavailableTransports.busy.length} transporte(s) excluido(s) por tener ruta activa: <strong>${escapeHtml(s.unavailableTransports.busy.map(t => t.name).join(', '))}</strong>. Completar o cancelar esas rutas para liberarlos.</div>`;
+        if (s.unavailableTransports?.zeroCap?.length) summaryHtml += `<div class="deficit-banner">⚠ ${s.unavailableTransports.zeroCap.length} transporte(s) excluido(s) por no tener capacidad de carga configurada: <strong>${escapeHtml(s.unavailableTransports.zeroCap.map(t => t.name).join(', '))}</strong>. Actualizar el peso máximo en Transportes.</div>`;
         summaryEl.innerHTML = summaryHtml;
 
         data.proposals.forEach((p, idx) => {
@@ -245,6 +293,36 @@
             card.dataset.transportId = p.transportId;
             const cb = p.costBreakdown || {};
             const cluster = p.clusterProvinceName ? `<span class="proposal-cluster-badge">📍 ${escapeHtml(p.clusterProvinceName)}</span>` : '';
+            const piggyBadge = p.piggyback ? `<span class="proposal-cluster-badge" style="background:#fef3c7;color:#92400e;border-color:#f59e0b">🔗 SUMAR A RUTA #${p.existingRouteId}</span>` : '';
+            const urgentBadge = p.urgentCombinedSummary ? `<span class="proposal-cluster-badge" style="background:#fee2e2;color:#991b1b;border-color:#dc2626">🚨 ${p.urgentCombinedSummary.count} URGENTES COMBINADOS</span>` : '';
+            let urgentBlock = '';
+            if (p.urgentCombinedSummary) {
+                const us = p.urgentCombinedSummary;
+                const ships = us.shipments.map(s => escapeHtml(s.trackingId)).join(', ');
+                urgentBlock = `
+                <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#991b1b;margin-bottom:.3rem">🚨 ${us.count} envíos urgentes combinados en este vehículo dedicado</div>
+                    <div style="color:#7f1d1d">
+                        Tracking: <strong>${ships}</strong><br>
+                        Distancia máxima entre destinos: <strong>${us.maxPairDistKm.toFixed(1)}km</strong> (dentro del umbral configurado).<br>
+                        <em>Ahorra ${us.count - 1} vehículo(s) dedicado(s) adicional(es) — costo fijo evitado.</em>
+                    </div>
+                </div>`;
+            }
+            let piggyBlock = '';
+            if (p.piggyback && p.piggybackSummary) {
+                const ps = p.piggybackSummary;
+                piggyBlock = `
+                <div style="background:#fef9c3;border-left:3px solid #f59e0b;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#92400e;margin-bottom:.3rem">🔗 Piggyback: sumar a ruta planificada #${ps.routeId}</div>
+                    <div style="color:#78350f">
+                        Distancia: <strong>${ps.previousTotalKm}km → ${ps.newTotalKm}km</strong> (+${ps.totalExtraKm}km)<br>
+                        Costo: <strong>$${ps.previousTotalCost} → $${ps.newTotalCost}</strong> (+$${ps.totalExtraCost})<br>
+                        Capacidad libre restante: ${ps.capWeightLeftAfter}kg / ${ps.capVolumeLeftAfter}m³<br>
+                        <em>Más barato que lanzar una ruta nueva. Se agregan ${ps.addedCount} envío(s) al final de la secuencia.</em>
+                    </div>
+                </div>`;
+            }
             const warns = (p.warnings || []).map(w => `<div class="warn-banner">⚠ ${escapeHtml(w)}</div>`).join('');
 
             const chipsHtml = (p.reasoning?.shipments || []).map(r => {
@@ -283,6 +361,11 @@
                         <summary style="cursor:pointer;color:#0f766e;font-weight:500">Ver detalle por envío</summary>
                         <ol style="margin:.4rem 0 0;padding-left:1.2rem">${oppShipDetails}</ol>
                     </details>
+                    <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center;flex-wrap:wrap">
+                        <button type="button" class="btn-opp-accept" data-tx="${p.transportId}" style="background:#dcfce7;color:#166534;border:1px solid #86efac;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s,transform .1s" title="Confirma los extras en la propuesta. La ruta se aplica con el botón APLICAR RUTA.">✓ Aceptar extras</button>
+                        <button type="button" class="btn-opp-reject" data-tx="${p.transportId}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer" title="Quita estos envíos de la propuesta y los mueve al pool sin asignar">✗ Rechazar extras</button>
+                        <span style="font-size:.7rem;color:var(--color-text-muted)">La ruta se confirma al presionar <strong>Aplicar ruta</strong>.</span>
+                    </div>
                 </div>`;
             }
 
@@ -298,16 +381,18 @@
 
             card.innerHTML = `
                 <div class="proposal-header">
-                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster}</h3>
+                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster} ${piggyBadge} ${urgentBadge}</h3>
                 </div>
+                ${piggyBlock}
+                ${urgentBlock}
                 <div class="proposal-meta">Conductor: ${p.transport.driver ? escapeHtml(p.transport.driver.fullName) : 'Sin asignar'}</div>
                 ${warns}
                 <div class="proposal-stats">
                     <div class="proposal-stat">Distancia<strong>${p.totalDistanceKm} km</strong></div>
-                    <div class="proposal-stat">Tiempo<strong>${p.totalDurationMin ?? '-'} min</strong></div>
+                    <div class="proposal-stat">Tiempo<strong>${fmtDuration(p.totalDurationMin)}</strong></div>
                     <div class="proposal-stat">Costo<strong>${fmtMoney(p.totalCost)}</strong></div>
-                    <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
-                    <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume > 0.9 ? 'color:var(--color-error,#dc2626)' : ''}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
+                    <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight >= 1 ? 'color:#dc2626' : (p.utilizationWeight >= 0.8 ? 'color:#d97706' : '')}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
+                    <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume >= 1 ? 'color:#dc2626' : (p.utilizationVolume >= 0.8 ? 'color:#d97706' : '')}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
                 </div>
                 ${oppBlock}
                 <div><strong style="font-size:.8rem">Envíos (${p.shipmentIds.length}):</strong></div>
@@ -326,9 +411,9 @@
                 <div id="map-${idx}" class="proposal-map"></div>
                 <div class="proposal-actions">
                     <button class="btn-apply ${isApplied ? 'applied' : ''}" data-action="apply" ${isApplied ? 'disabled' : ''}>
-                        ${isApplied ? '✅ APLICADO' : '✓ Aplicar ruta'}
+                        ${isApplied ? '✅ APLICADO' : (p.piggyback ? '🔗 Sumar a ruta existente' : '✓ Aplicar ruta')}
                     </button>
-                    <button class="btn-exclude" data-action="exclude" ${isApplied ? 'disabled' : ''}>Recalcular sin este transporte</button>
+                    ${p.piggyback ? '' : `<button class="btn-exclude" data-action="exclude" ${isApplied ? 'disabled' : ''}>Recalcular sin este transporte</button>`}
                 </div>
             `;
             container.appendChild(card);
@@ -359,33 +444,62 @@
             }, 50);
         });
 
-        // Pool sin asignar
+        // Pool sin asignar — agrupar por código de razón para explicar 100% el motivo
         const un = data.unassigned || [];
-        const unChips = un.map(u => {
-            const sid = u.id || u.shipmentId;
-            const tracking = u.trackingId || `#${sid}`;
-            return `<span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" title="${escapeHtml(u.reason || '')}">
-                <span class="chip-priority priority-1">UN</span>
-                ${escapeHtml(tracking)}
-            </span>`;
-        }).join('');
-        // Agrupar por motivo para mostrar diagnóstico claro
-        const reasonGroups = new Map();
+        const codeLabels = {
+            no_fit: 'No cabe en flota disponible',
+            oversized: 'Sobredimensionado vs. flota',
+            capacity: 'Excede capacidad del transporte',
+            no_geo: 'Sin geolocalización',
+            zone: 'Zona no compatible',
+            no_transports: 'Sin transportes disponibles',
+            branch_closed: 'Sucursal cerrada',
+            already_assigned: 'Ya asignado a otra ruta',
+            tx_invalid: 'Transporte inválido',
+            opp_rejected: 'Extra rechazado manualmente',
+            manual: 'Removido manualmente',
+            rejected: 'No cumple filtros',
+        };
+        const codeIcons = {
+            no_fit: '📦', oversized: '🚛', capacity: '⚖️', no_geo: '📍', zone: '🗺️',
+            no_transports: '🚫', branch_closed: '🔒', already_assigned: '🔗',
+            tx_invalid: '❌', opp_rejected: '↩️', manual: '✋', rejected: '⛔',
+        };
+        const grouped = new Map();
         for (const u of un) {
-            const r = u.reason || 'Sin motivo';
-            if (!reasonGroups.has(r)) reasonGroups.set(r, []);
-            reasonGroups.get(r).push(u.trackingId || `#${u.id || u.shipmentId}`);
+            const code = u.code || 'other';
+            if (!grouped.has(code)) { grouped.set(code, []); }
+            grouped.get(code).push(u);
         }
-        const reasonsHtml = un.length === 0 ? '' : [...reasonGroups.entries()].map(([reason, tracks]) =>
-            `<div style="margin-top:.5rem;padding:.5rem .7rem;background:var(--color-surface);border-left:3px solid var(--color-warning);border-radius:4px;font-size:.8rem">
-                <div style="color:var(--color-text);margin-bottom:.2rem"><strong>${tracks.length} envío${tracks.length>1?'s':''}:</strong> ${escapeHtml(reason)}</div>
-                <div style="color:var(--color-text-muted);font-size:.72rem">${tracks.map(escapeHtml).join(', ')}</div>
-            </div>`
-        ).join('');
-        poolEl.innerHTML = `<div class="unassigned-pool" data-transport-id="unassigned">
-            <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- arrastrá aquí para descartar de la ruta</span></h3>
-            <div>${unChips || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío)</span>'}</div>
-            ${reasonsHtml}
+        const groupsHtml = [...grouped.entries()].map(([code, items]) => {
+            const label = codeLabels[code] || code;
+            const icon = codeIcons[code] || '⚠️';
+            const sampleReason = items[0]?.reason || '';
+            const itemsHtml = items.map(u => {
+                const sid = u.id || u.shipmentId;
+                const tracking = u.trackingId || `#${sid}`;
+                const reason = u.reason || sampleReason;
+                return `<div style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem .5rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;margin:.25rem 0">
+                    <span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" style="flex-shrink:0">
+                        <span class="chip-priority priority-1">UN</span>
+                        ${escapeHtml(tracking)}
+                    </span>
+                    <span style="font-size:.78rem;color:var(--color-text-secondary);line-height:1.35">${escapeHtml(reason)}</span>
+                </div>`;
+            }).join('');
+            return `<details open style="margin:.5rem 0">
+                <summary style="cursor:pointer;font-weight:600;font-size:.85rem;color:var(--color-text)">${icon} ${escapeHtml(label)} (${items.length})</summary>
+                <div style="padding:.3rem 0 0 .3rem">${itemsHtml}</div>
+            </details>`;
+        }).join('');
+
+        const noProposalBanner = (data.proposals.length === 0 && un.length > 0)
+            ? `<div class="deficit-banner" style="background:#fef2f2;border-color:#dc2626;color:#991b1b">❌ <strong>No se generó ninguna propuesta.</strong> Ningún envío seleccionado pudo asignarse a un transporte. Ver detalle de causas abajo.</div>`
+            : '';
+
+        poolEl.innerHTML = `${noProposalBanner}<div class="unassigned-pool" data-transport-id="unassigned">
+            <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- razón visible por envío · arrastrá para reasignar o descartar</span></h3>
+            ${groupsHtml || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío — todos asignados)</span>'}
         </div>`;
 
         // Wire actions
@@ -401,6 +515,21 @@
             btn.addEventListener('click', () => {
                 const txId = Number(btn.closest('.proposal-card').dataset.transportId);
                 recalcExcluding(txId);
+            });
+        });
+        container.querySelectorAll('.btn-opp-reject').forEach(btn => {
+            btn.addEventListener('click', () => rejectExtras(Number(btn.dataset.tx)));
+        });
+        container.querySelectorAll('.btn-opp-accept').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Feedback visual. Los extras ya están en la propuesta; persistencia ocurre en "Aplicar ruta".
+                btn.style.background = '#16a34a';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#15803d';
+                btn.textContent = '✓ Extras confirmados';
+                btn.disabled = true;
+                btn.style.cursor = 'default';
+                btn.style.opacity = '.9';
             });
         });
 

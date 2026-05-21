@@ -4,104 +4,380 @@
     <%- include('../partials/head') %>
     <title>Mis Envíos - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
+    <style>
+    .dlv-wrap { padding: clamp(1rem, 2.5vw, 2rem); max-width: 1200px; margin: 0 auto; }
+    .dlv-section-title {
+        font-size: .72rem; font-weight: 800; color: var(--color-text-secondary);
+        text-transform: uppercase; letter-spacing: .12em;
+        margin: 28px 0 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .dlv-section-title .material-symbols-outlined { font-size: 18px; }
+
+    /* ===== HERO ACTIVA ===== */
+    .active-hero {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        color: #fff;
+        border-radius: 22px;
+        padding: 28px 30px;
+        box-shadow: 0 16px 48px rgba(37, 99, 235, .35);
+        position: relative; overflow: hidden;
+        display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center;
+        text-decoration: none !important;
+        transition: transform .2s ease, box-shadow .2s ease;
+        outline: none;
+    }
+    .active-hero,
+    .active-hero:hover,
+    .active-hero:focus,
+    .active-hero:active,
+    .active-hero:visited { color: #fff !important; text-decoration: none !important; }
+    .active-hero *,
+    .active-hero:focus *,
+    .active-hero:hover * { text-decoration: none !important; }
+    .active-hero:focus-visible {
+        box-shadow: 0 16px 48px rgba(37, 99, 235, .35), 0 0 0 3px rgba(255,255,255,.6);
+    }
+    .active-hero .cta,
+    .active-hero:hover .cta,
+    .active-hero:focus .cta,
+    .active-hero:visited .cta { color: #1d4ed8 !important; }
+    .active-hero::before {
+        content:''; position:absolute; right:-60px; top:-60px;
+        width: 220px; height: 220px; border-radius: 50%;
+        background: rgba(255,255,255,.08);
+    }
+    .active-hero::after {
+        content:''; position:absolute; left:-40px; bottom:-80px;
+        width: 180px; height: 180px; border-radius: 50%;
+        background: rgba(255,255,255,.06);
+    }
+    .active-hero:hover { transform: translateY(-2px); box-shadow: 0 20px 56px rgba(37,99,235,.45); }
+    .active-hero .badge-status {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,.18);
+        backdrop-filter: blur(8px);
+        padding: 5px 12px; border-radius: 999px;
+        font-size: .72rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .08em;
+        margin-bottom: 12px;
+    }
+    .active-hero .badge-status .dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.3);
+        animation: pulse-dot 1.6s infinite;
+    }
+    @keyframes pulse-dot {
+        0%,100% { box-shadow: 0 0 0 3px rgba(74,222,128,.3); }
+        50%     { box-shadow: 0 0 0 6px rgba(74,222,128,.0); }
+    }
+    .active-hero h2 {
+        margin: 0; font-size: 1.7rem; font-weight: 800;
+        letter-spacing: -0.02em; line-height: 1.1;
+    }
+    .active-hero .sub { opacity: .9; font-size: .92rem; margin-top: 4px; font-weight: 500; }
+    .active-hero .stats {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+        margin-top: 22px; position: relative; z-index: 1;
+    }
+    .active-hero .stat .val { font-size: 1.55rem; font-weight: 800; line-height: 1; }
+    .active-hero .stat .lbl {
+        font-size: .68rem; opacity: .82;
+        text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; font-weight: 600;
+    }
+    .active-hero .progress-bar {
+        height: 8px; background: rgba(255,255,255,.18);
+        border-radius: 999px; overflow: hidden; margin-top: 22px;
+        position: relative; z-index: 1;
+    }
+    .active-hero .progress-fill {
+        height: 100%; background: linear-gradient(90deg, #fff, #f0f9ff);
+        border-radius: 999px; transition: width .6s ease;
+    }
+    .active-hero .cta {
+        background: #fff; color: #1d4ed8;
+        padding: 14px 22px; border-radius: 14px;
+        font-weight: 800; font-size: .92rem;
+        display: inline-flex; align-items: center; gap: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,.15);
+        position: relative; z-index: 1;
+        white-space: nowrap;
+    }
+    .active-hero .cta .material-symbols-outlined { font-size: 22px; }
+    @media (max-width: 640px) {
+        .active-hero { grid-template-columns: 1fr; padding: 22px; }
+        .active-hero h2 { font-size: 1.35rem; }
+        .active-hero .cta { width: 100%; justify-content: center; }
+    }
+
+    /* ===== ROUTE CARDS ===== */
+    .routes-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+    }
+    .route-card {
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 16px; padding: 18px;
+        text-decoration: none !important; color: var(--color-text) !important;
+        transition: all .2s ease;
+        display: flex; flex-direction: column; gap: 10px;
+        outline: none;
+    }
+    .route-card,
+    .route-card:hover,
+    .route-card:focus,
+    .route-card:active,
+    .route-card:visited { color: var(--color-text) !important; text-decoration: none !important; }
+    .route-card * { text-decoration: none !important; }
+    .route-card:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(15,23,42,.08);
+    }
+    .route-card:focus-visible {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(37,99,235,.25);
+    }
+    .route-card .rc-head {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .route-card .rc-title {
+        font-weight: 700; font-size: 1rem; color: var(--color-text);
+    }
+    .route-card .rc-badge {
+        font-size: .65rem; font-weight: 800;
+        padding: 3px 8px; border-radius: 999px;
+        text-transform: uppercase; letter-spacing: .06em;
+    }
+    .route-card .rc-badge.planned   { background: rgba(245,158,11,.14); color: #b45309; }
+    .route-card .rc-badge.finished  { background: rgba(22,163,74,.14);  color: #166534; }
+    .route-card .rc-badge.cancelled { background: rgba(100,116,139,.14);color: #475569; }
+    .route-card .rc-meta {
+        font-size: .82rem; color: var(--color-text-secondary);
+        display: flex; flex-direction: column; gap: 4px;
+    }
+    .route-card .rc-meta .row {
+        display: flex; align-items: center; gap: 6px;
+    }
+    .route-card .rc-meta .material-symbols-outlined { font-size: 15px; color: var(--color-text-secondary); }
+    .route-card .rc-progress-wrap { margin-top: 4px; }
+    .route-card .rc-progress-bar {
+        height: 5px; background: rgba(15,23,42,.06);
+        border-radius: 999px; overflow: hidden;
+    }
+    .route-card .rc-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #2563eb, #3b82f6);
+        border-radius: 999px;
+    }
+    .route-card .rc-progress-fill.finished {
+        background: linear-gradient(90deg, #16a34a, #22c55e);
+    }
+
+    .empty-routes {
+        text-align: center; padding: 40px 20px;
+        color: var(--color-text-secondary);
+        background: var(--color-surface);
+        border: 1px dashed var(--color-border);
+        border-radius: 16px;
+    }
+    .empty-routes .material-symbols-outlined { font-size: 36px; opacity: .5; }
+
+    /* ===== Acordeón envíos ===== */
+    .shipments-collapse {
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 16px; margin-top: 22px; overflow: hidden;
+    }
+    .shipments-collapse summary {
+        padding: 14px 18px; cursor: pointer; font-weight: 700;
+        display: flex; align-items: center; gap: 10px;
+        list-style: none;
+    }
+    .shipments-collapse summary::-webkit-details-marker { display: none; }
+    .shipments-collapse summary::after {
+        content: 'expand_more'; font-family: 'Material Symbols Outlined';
+        margin-left: auto; font-size: 22px;
+        transition: transform .2s ease;
+    }
+    .shipments-collapse[open] summary::after { transform: rotate(180deg); }
+    .shipments-collapse .table-wrapper { border-top: 1px solid var(--color-border); }
+    </style>
 </head>
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
-            <h1>Mis Envíos Asignados</h1>
-        </div>
+        <div class="dlv-wrap">
 
-        <% if (typeof activeRoute !== 'undefined' && activeRoute) { %>
-            <div style="margin:0 clamp(1.25rem,2.5vw,2rem) 1rem;background:var(--color-info-bg);border:1px solid var(--color-info);border-radius:var(--radius-md);padding:var(--space-4) var(--space-5);display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:var(--space-3)">
-                    <span class="material-symbols-outlined" style="color:var(--color-info);font-size:1.5rem">map</span>
-                    <div>
-                        <strong style="font-size:var(--font-size-sm);color:var(--color-text)">Tenés una ruta activa</strong>
-                        <p style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:0">Ruta #<%= activeRoute.id %> · <%= activeRoute.totalDistanceKm %> km</p>
-                    </div>
-                </div>
-                <a href="/delivery/route/<%= activeRoute.id %>" class="btn-primary">
-                    <span class="material-symbols-outlined">directions</span>Ver mi recorrido
-                </a>
+            <div class="page-header" style="padding:0;margin-bottom:8px">
+                <h1>Mi Ruteo</h1>
             </div>
-        <% } %>
 
-        <div style="padding:0 clamp(1.25rem,2.5vw,2rem);margin-bottom:var(--space-4)">
-            <button id="btn-reschedule-failed" class="btn-secondary">
-                <span class="material-symbols-outlined">replay</span>Reprogramar intentos fallidos
-            </button>
-        </div>
-        <script>
-        document.getElementById('btn-reschedule-failed')?.addEventListener('click', async () => {
-            if (!confirm('¿Devolver tus envíos con intento fallido a sucursal para reprogramar?')) return;
-            const r = await fetch('/delivery/reschedule-failed', { method: 'POST' });
-            const d = await r.json();
-            if (r.ok) { alert('Reprogramados: ' + d.rescheduled); location.reload(); }
-            else { alert(d.error || 'Error'); }
-        });
-        </script>
+            <% if (activeSummary) { %>
+                <a class="active-hero" href="/delivery/route/<%= activeSummary.id %>">
+                    <div>
+                        <div class="badge-status">
+                            <% if (activeSummary.statusId === 2) { %><span class="dot"></span><% } %>
+                            <%= activeSummary.statusLabel %>
+                        </div>
+                        <h2>Ruta #<%= activeSummary.id %></h2>
+                        <div class="sub">
+                            <%= activeSummary.transportName %>
+                            <% if (activeSummary.originBranch) { %>· <%= activeSummary.originBranch %><% } %>
+                        </div>
 
-        <div class="shipments-wrapper">
-            <div class="table-wrapper">
-                <table id="shipments-table">
-                    <thead>
-                        <tr>
-                            <th class="th-sortable" data-col="0" data-sort="">
-                                ID Tracking <span class="material-symbols-outlined sort-icon">unfold_more</span>
-                            </th>
-                            <th>Destinatario</th>
-                            <th>Dirección</th>
-                            <th class="th-sortable" data-col="3" data-sort="">
-                                Estado <span class="material-symbols-outlined sort-icon">unfold_more</span>
-                            </th>
-                            <th class="col-actions">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% if (shipments.length === 0) { %>
-                            <tr>
-                                <td colspan="5" class="empty-row">
-                                    <span class="material-symbols-outlined">inbox</span>
-                                    No tenés envíos asignados.
-                                </td>
-                            </tr>
-                        <% } else { %>
-                            <% shipments.forEach(shipment => { %>
-                                <%
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="val"><%= activeSummary.completedStops %>/<%= activeSummary.totalStops %></div>
+                                <div class="lbl">Paradas</div>
+                            </div>
+                            <div class="stat">
+                                <div class="val"><%= activeSummary.totalDistanceKm.toFixed(1) %></div>
+                                <div class="lbl">km totales</div>
+                            </div>
+                            <div class="stat">
+                                <div class="val"><%= activeSummary.progressPct %>%</div>
+                                <div class="lbl">Progreso</div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: <%= activeSummary.progressPct %>%"></div>
+                        </div>
+                    </div>
+                    <span class="cta">
+                        <span class="material-symbols-outlined">map</span>
+                        <%= activeSummary.statusId === 2 ? 'Seguir ruta' : 'Iniciar ruta' %>
+                        <span class="material-symbols-outlined">arrow_forward</span>
+                    </span>
+                </a>
+            <% } else { %>
+                <div class="empty-routes">
+                    <span class="material-symbols-outlined">local_shipping</span>
+                    <div style="margin-top:10px;font-weight:700">No tenés una ruta activa</div>
+                    <div style="font-size:.85rem;margin-top:4px">Cuando un operador te asigne una ruta, aparecerá acá.</div>
+                </div>
+            <% } %>
+
+            <% if (upcomingRoutes && upcomingRoutes.length > 0) { %>
+                <div class="dlv-section-title">
+                    <span class="material-symbols-outlined">event_upcoming</span>
+                    Próximas rutas
+                </div>
+                <div class="routes-grid">
+                    <% upcomingRoutes.forEach(r => { %>
+                        <a class="route-card" href="/delivery/route/<%= r.id %>">
+                            <div class="rc-head">
+                                <div class="rc-title">Ruta #<%= r.id %></div>
+                                <span class="rc-badge planned">Asignada</span>
+                            </div>
+                            <div class="rc-meta">
+                                <div class="row"><span class="material-symbols-outlined">local_shipping</span><%= r.transportName %></div>
+                                <% if (r.originBranch) { %>
+                                    <div class="row"><span class="material-symbols-outlined">store</span><%= r.originBranch %></div>
+                                <% } %>
+                                <div class="row"><span class="material-symbols-outlined">route</span><%= r.totalDistanceKm.toFixed(1) %> km · <%= r.totalStops %> paradas</div>
+                            </div>
+                        </a>
+                    <% }) %>
+                </div>
+            <% } %>
+
+            <% if (finishedRoutes && finishedRoutes.length > 0) { %>
+                <div class="dlv-section-title">
+                    <span class="material-symbols-outlined">history</span>
+                    Historial
+                </div>
+                <div class="routes-grid">
+                    <% finishedRoutes.forEach(r => { %>
+                        <a class="route-card" href="/delivery/route/<%= r.id %>/summary">
+                            <div class="rc-head">
+                                <div class="rc-title">Ruta #<%= r.id %></div>
+                                <span class="rc-badge <%= r.statusId === 4 ? 'cancelled' : 'finished' %>">
+                                    <%= r.statusId === 4 ? 'Cancelada' : 'Finalizada' %>
+                                </span>
+                            </div>
+                            <div class="rc-meta">
+                                <div class="row"><span class="material-symbols-outlined">local_shipping</span><%= r.transportName %></div>
+                                <div class="row"><span class="material-symbols-outlined">route</span><%= r.totalDistanceKm.toFixed(1) %> km · <%= r.totalStops %> paradas</div>
+                                <% if (r.finishedAt) { %>
+                                    <div class="row"><span class="material-symbols-outlined">schedule</span>
+                                        <%= new Date(r.finishedAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+                                    </div>
+                                <% } %>
+                            </div>
+                            <div class="rc-progress-wrap">
+                                <div class="rc-progress-bar">
+                                    <div class="rc-progress-fill finished" style="width: <%= r.totalStops ? Math.round(r.completedStops / r.totalStops * 100) : 0 %>%"></div>
+                                </div>
+                                <div style="font-size:.7rem;color:var(--color-text-secondary);margin-top:4px;font-weight:600">
+                                    <%= r.completedStops %>/<%= r.totalStops %> completadas
+                                </div>
+                            </div>
+                        </a>
+                    <% }) %>
+                </div>
+            <% } %>
+
+            <% if (shipments && shipments.length > 0) { %>
+                <details class="shipments-collapse">
+                    <summary>
+                        <span class="material-symbols-outlined">inventory_2</span>
+                        Todos mis envíos asignados (<%= shipments.length %>)
+                    </summary>
+                    <div style="padding: 12px 18px">
+                        <button id="btn-reschedule-failed" class="btn-secondary">
+                            <span class="material-symbols-outlined">replay</span>Reprogramar intentos fallidos
+                        </button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="shipments-table">
+                            <thead>
+                                <tr>
+                                    <th>ID Tracking</th>
+                                    <th>Destinatario</th>
+                                    <th>Dirección</th>
+                                    <th>Estado</th>
+                                    <th class="col-actions">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% shipments.forEach(shipment => {
                                     const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
                                     const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
                                 %>
-                                <tr>
-                                    <td class="tracking-id"><%= shipment.trackingId %></td>
-                                    <td><%= shipment.recipient.fullName %></td>
-                                    <td><%= shipment.address.street %> <%= shipment.address.number %></td>
-                                    <td>
-                                        <span class="status-badge <%= _sk %>">
-                                            <%= _sl[_sk] || shipment.status.description %>
-                                        </span>
-                                    </td>
-                                    <td class="col-actions">
-                                        <a href="/shipment/detail/<%= shipment.id %>?from=/delivery&fromLabel=Mis%20Env%C3%ADos" class="action-btn detalle" data-tooltip="Detalle">
-                                            <span class="material-symbols-outlined">info</span>
-                                        </a>
-                                        <button type="button" class="action-btn" data-tooltip="Ver QR"
-                                                onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
-                                            <span class="material-symbols-outlined">qr_code</span>
-                                        </button>
-                                        <a href="/scan/<%= shipment.trackingId %>" class="action-btn estado" data-tooltip="Cambiar Estado">
-                                            <span class="material-symbols-outlined">swap_horiz</span>
-                                        </a>
-                                        <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn" data-tooltip="Reportar incidencia">
-                                            <span class="material-symbols-outlined">report</span>
-                                        </a>
-                                    </td>
-                                </tr>
-                            <% }) %>
-                        <% } %>
-                    </tbody>
-                </table>
-            </div>
+                                    <tr>
+                                        <td class="tracking-id"><%= shipment.trackingId %></td>
+                                        <td><%= shipment.recipient.fullName %></td>
+                                        <td><%= shipment.address.street %> <%= shipment.address.number %></td>
+                                        <td>
+                                            <span class="status-badge <%= _sk %>">
+                                                <%= _sl[_sk] || shipment.status.description %>
+                                            </span>
+                                        </td>
+                                        <td class="col-actions">
+                                            <a href="/shipment/detail/<%= shipment.id %>?from=/delivery&fromLabel=Mis%20Env%C3%ADos" class="action-btn detalle" data-tooltip="Detalle">
+                                                <span class="material-symbols-outlined">info</span>
+                                            </a>
+                                            <button type="button" class="action-btn" data-tooltip="Ver QR"
+                                                    onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
+                                                <span class="material-symbols-outlined">qr_code</span>
+                                            </button>
+                                            <a href="/scan/<%= shipment.trackingId %>" class="action-btn estado" data-tooltip="Cambiar Estado">
+                                                <span class="material-symbols-outlined">swap_horiz</span>
+                                            </a>
+                                            <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn" data-tooltip="Reportar incidencia">
+                                                <span class="material-symbols-outlined">report</span>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            <% } %>
+
         </div>
     </main>
 
@@ -109,8 +385,16 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script>
+        document.getElementById('btn-reschedule-failed')?.addEventListener('click', async (ev) => {
+            ev.preventDefault();
+            if (!confirm('¿Devolver tus envíos con intento fallido a sucursal para reprogramar?')) return;
+            const r = await fetch('/delivery/reschedule-failed', { method: 'POST' });
+            const d = await r.json();
+            if (r.ok) { alert('Reprogramados: ' + d.rescheduled); location.reload(); }
+            else { alert(d.error || 'Error'); }
+        });
+
         function showQR(id, trackingId) {
-            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             Swal.fire({
                 title: trackingId,
                 html: '<img src="/shipment/' + id + '/qr" style="width:200px;height:200px;display:block;margin:0 auto;" alt="QR">',
@@ -121,66 +405,21 @@
                 if (result.isConfirmed) window.open('/shipment/' + id + '/label', '_blank');
             });
         }
+
+        if (new URLSearchParams(window.location.search).get('delivered') === 'true') {
+            Swal.fire({
+                icon: 'success', title: '¡Entrega confirmada!',
+                text: 'La evidencia fue registrada correctamente.',
+                confirmButtonText: 'Aceptar', confirmButtonColor: '#2563eb',
+            }).then(() => history.replaceState(null, '', '/delivery'));
+        }
+        if (new URLSearchParams(window.location.search).get('failed') === 'true') {
+            Swal.fire({
+                icon: 'warning', title: '¡Intento fallido registrado!',
+                text: 'El operador recibirá la notificación para reprogramar la entrega.',
+                confirmButtonText: 'Aceptar', confirmButtonColor: '#2563eb',
+            }).then(() => history.replaceState(null, '', '/delivery'));
+        }
     </script>
-    <script>
-        document.querySelectorAll('.th-sortable').forEach(function(th) {
-            th.addEventListener('click', function() {
-                const col   = parseInt(this.dataset.col);
-                const tbody = document.querySelector('#shipments-table tbody');
-                const rows  = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.querySelector('.empty-row'));
-                if (rows.length === 0) return;
-
-                const isAsc = this.dataset.sort !== 'asc';
-
-                document.querySelectorAll('.th-sortable').forEach(function(t) {
-                    t.dataset.sort = '';
-                    t.querySelector('.sort-icon').textContent = 'unfold_more';
-                });
-
-                this.dataset.sort = isAsc ? 'asc' : 'desc';
-                this.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
-
-                rows.sort(function(a, b) {
-                    const aVal = (a.cells[col]?.textContent || '').trim();
-                    const bVal = (b.cells[col]?.textContent || '').trim();
-                    return isAsc ? aVal.localeCompare(bVal, 'es') : bVal.localeCompare(aVal, 'es');
-                });
-
-                rows.forEach(function(r) { tbody.appendChild(r); });
-            });
-        });
-    </script>
-
-<script>
-    if (new URLSearchParams(window.location.search).get('delivered') === 'true') {
-        const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
-        Swal.fire({
-            icon: 'success',
-            title: '¡Entrega confirmada!',
-            text: 'La evidencia fue registrada correctamente.',
-            confirmButtonText: 'Aceptar',
-            confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
-            background: isDark ? '#1e293b' : '#ffffff',
-            color: isDark ? '#f1f5f9' : '#1e293b',
-        }).then(() => {
-            history.replaceState(null, '', '/delivery');
-        });
-    }
-</script>
-
-<script>
-    if (new URLSearchParams(window.location.search).get('failed') === 'true') {
-        Swal.fire({
-            icon: 'warning',
-            title: '¡Intento fallido registrado!',
-            text: 'El operador recibirá la notificación para reprogramar la entrega.',
-            confirmButtonText: 'Aceptar',
-            confirmButtonColor: '#2563eb',
-        }).then(() => {
-            history.replaceState(null, '', '/delivery');
-        });
-    }
-</script>
-
 </body>
 </html>
