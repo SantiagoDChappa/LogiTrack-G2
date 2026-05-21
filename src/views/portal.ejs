@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiTrack — Seguimiento de Envíos</title>
+    <title>LogiTrack - Seguimiento de Envios</title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -14,7 +14,6 @@
 </head>
 <body>
 
-    <!-- NAVBAR -->
     <nav class="portal-nav">
         <a href="/" class="portal-brand">
             <img src="/images/logo.png" alt="LogiTrack" class="portal-logo">
@@ -32,21 +31,20 @@
         </div>
     </nav>
 
-    <!-- HERO -->
     <section class="portal-hero">
         <div class="portal-hero-wrapper">
-            <!-- SEARCH PANEL (Izquierda) -->
             <aside class="portal-search-panel">
-                <h2 class="portal-search-panel-title">Rastrear Envío</h2>
-                <form class="portal-search-form" action="/" method="GET">
+                <h2 class="portal-search-panel-title">Rastrear Envio</h2>
+                <form class="portal-search-form" id="portal-search-form" action="/" method="GET">
                     <div class="portal-search-field">
-                        <label for="tracking" class="portal-search-label">Número de Seguimiento</label>
+                        <label for="tracking" class="portal-search-label">Numero de Seguimiento</label>
                         <input
                             type="text"
                             id="tracking"
                             name="q"
                             class="portal-search-input-field"
                             placeholder="Ej: ENV-001"
+                            value="<%= /^\d+$/.test(query || '') ? '' : (query || '') %>"
                             autocomplete="off"
                             autofocus
                         >
@@ -63,6 +61,7 @@
                             name="q"
                             class="portal-search-input-field"
                             placeholder="Ej: 12345678"
+                            value="<%= /^\d+$/.test(query || '') ? (query || '') : '' %>"
                             autocomplete="off"
                         >
                         <span class="portal-search-help">Sin puntos ni guiones</span>
@@ -75,30 +74,27 @@
                 </form>
             </aside>
 
-            <!-- HERO CONTENT (Derecha) -->
             <div class="portal-hero-content">
                 <p class="portal-hero-label">Zona de Seguimiento</p>
-                <h1 class="portal-hero-title">Seguimiento de Envíos</h1>
-                <p class="portal-hero-sub">Ingresá tu número de seguimiento o DNI del destinatario para rastrear tu paquete en tiempo real.</p>
+                <h1 class="portal-hero-title">Seguimiento de Envios</h1>
+                <p class="portal-hero-sub">Ingresa tu numero de seguimiento o DNI del destinatario para rastrear tu paquete en tiempo real.</p>
             </div>
         </div>
     </section>
 
-    <!-- RESULTADOS -->
     <% if (typeof searched !== 'undefined' && searched) { %>
-    <section class="portal-results">
+    <section class="portal-results" id="portal-results-section">
         <div class="portal-results-inner">
 
             <% if (typeof error !== 'undefined' && error) { %>
-            <!-- ERROR -->
             <div class="portal-empty">
                 <span class="material-symbols-outlined portal-empty-icon">search_off</span>
                 <% if (searchType === 'dni') { %>
-                    <h2>No encontramos envíos con el DNI <strong><%= query %></strong></h2>
-                    <p>Verificá que el número de documento sea correcto e intentá de nuevo.</p>
+                    <h2>No encontramos envios con el DNI <strong><%= query %></strong></h2>
+                    <p>Verifica que el numero de documento sea correcto e intenta de nuevo.</p>
                 <% } else { %>
-                    <h2>No encontramos envíos con el código <strong><%= query %></strong></h2>
-                    <p>Verificá el número de seguimiento e intentá de nuevo.</p>
+                    <h2>No encontramos envios con el codigo <strong><%= query %></strong></h2>
+                    <p>Verifica el numero de seguimiento e intenta de nuevo.</p>
                 <% } %>
             </div>
 
@@ -118,7 +114,11 @@
                     const sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_');
                     const statusLabels = {
                         pendiente: 'Pendiente',
-                        en_transito: 'En Tránsito',
+                        asignado: 'Asignado',
+                        en_preparacion: 'En Preparacion',
+                        en_transito: 'En Transito',
+                        intento_fallido: 'Intento Fallido',
+                        paquete_fallido: 'Paquete Fallido',
                         entregado: 'Entregado',
                         cancelado: 'Cancelado',
                         cancelada: 'Cancelada',
@@ -128,69 +128,49 @@
                     };
                     const statusLabel = statusLabels[sk] || s.status.description;
 
-                    const steps = ['inicial', 'pendiente', 'en_transito', 'en_sucursal', 'entregado'];
-                    let stepIdx = steps.indexOf(sk);
-                    if (stepIdx === -1) stepIdx = 0;
-
-                    const stepIcons = {
-                        inicial: 'inventory_2',
-                        pendiente: 'inventory_2',
-                        en_transito: 'local_shipping',
-                        en_sucursal: 'warehouse',
-                        entregado: 'home',
-                        retrasado: 'warning',
-                        cancelado: 'cancel',
-                        cancelada: 'cancel'
-                    };
-                    const stepNames = {
-                        inicial: 'Registrado',
-                        pendiente: 'Confirmado',
-                        en_transito: 'En Tránsito',
-                        en_sucursal: 'En Sucursal',
-                        entregado: 'Entregado',
-                        retrasado: 'Retrasado',
-                        cancelado: 'Cancelado',
-                        cancelada: 'Cancelado'
-                    };
-
                     const isCancelled = sk === 'cancelado' || sk === 'cancelada';
-                    const isDelayed   = sk === 'retrasado';
+                    const isDelayed = sk === 'retrasado';
                 %>
-                <div class="portal-card">
-                    <!-- Card header -->
+                <div class="portal-card" id="portal-shipment-<%= s.id %>">
                     <div class="portal-card-header">
                         <div class="portal-card-tracking">
-                            <span class="portal-card-tracking-label">N° de seguimiento</span>
+                            <span class="portal-card-tracking-label">N de seguimiento</span>
                             <span class="portal-card-tracking-id"><%= s.trackingId %></span>
                         </div>
                         <span class="portal-badge <%= sk %>"><%= statusLabel %></span>
                     </div>
 
-                    <!-- Timeline -->
                     <div class="portal-timeline">
                         <% const timelineSteps = isCancelled
                                ? ['pendiente', 'en_transito', 'en_sucursal', 'cancelado']
                                : ['pendiente', 'en_transito', 'en_sucursal', 'entregado'];
                            const timelineLabels = isCancelled
-                               ? ['Confirmado', 'En Tránsito', 'En Sucursal', 'Cancelado']
-                               : ['Confirmado', 'En Tránsito', 'En Sucursal', 'Entregado'];
+                               ? ['Confirmado', 'En Transito', 'En Sucursal', 'Cancelado']
+                               : ['Confirmado', 'En Transito', 'En Sucursal', 'Entregado'];
                            const timelineIcons = isCancelled
                                ? ['check_circle', 'local_shipping', 'warehouse', 'cancel']
                                : ['check_circle', 'local_shipping', 'warehouse', 'home'];
-                           let activeIdx = timelineSteps.indexOf(sk);
-                           if (activeIdx === -1) activeIdx = isCancelled ? timelineSteps.length - 1 : (isDelayed ? 1 : 0);
-
                            const statusToStep = {
-                               'pendiente': 'pendiente', 'confirmado': 'pendiente', 'inicial': 'pendiente',
-                               'en tránsito': 'en_transito', 'en transito': 'en_transito',
-                               'en sucursal': 'en_sucursal', 'llegada a centro de distribución': 'en_sucursal',
-                               'entregado': 'entregado',
-                               'cancelado': 'cancelado', 'cancelada': 'cancelado'
+                               pendiente: 'pendiente',
+                               confirmado: 'pendiente',
+                               inicial: 'pendiente',
+                               asignado: 'pendiente',
+                               en_preparacion: 'pendiente',
+                               en_transito: 'en_transito',
+                               en_sucursal: 'en_sucursal',
+                               intento_fallido: 'en_transito',
+                               paquete_fallido: 'en_transito',
+                               entregado: 'entregado',
+                               cancelado: 'cancelado',
+                               cancelada: 'cancelado'
                            };
+                           const currentStep = statusToStep[sk] || 'pendiente';
+                           let activeIdx = timelineSteps.indexOf(currentStep);
+                           if (activeIdx === -1) activeIdx = isCancelled ? timelineSteps.length - 1 : (isDelayed ? 1 : 0);
                            const stepDates = {};
                            if (s.history) {
                                s.history.forEach(function(h) {
-                                   const desc = h.toStatus.description.toLowerCase();
+                                   const desc = h.toStatus.description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
                                    const mapped = statusToStep[desc];
                                    if (mapped && !stepDates[mapped]) {
                                        stepDates[mapped] = new Date(h.changedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -213,21 +193,18 @@
                         <% }); %>
                     </div>
 
-                    <!-- Info grid -->
                     <div class="portal-card-grid">
                         <div class="portal-card-field">
                             <span class="portal-card-label">Destinatario</span>
                             <span class="portal-card-value"><%= s.recipient.fullName %></span>
                         </div>
                         <div class="portal-card-field">
-                            <span class="portal-card-label">Tipo de envío</span>
+                            <span class="portal-card-label">Tipo de envio</span>
                             <span class="portal-card-value"><%= s.shipmentType ? s.shipmentType.description : '-' %></span>
                         </div>
                         <div class="portal-card-field">
                             <span class="portal-card-label">Destino</span>
-                            <span class="portal-card-value">
-                                <%= s.address.province ? s.address.province.description : '-' %>
-                            </span>
+                            <span class="portal-card-value"><%= s.address.province ? s.address.province.description : '-' %></span>
                         </div>
                         <div class="portal-card-field">
                             <span class="portal-card-label">Peso / Bultos</span>
@@ -246,7 +223,6 @@
                         </div>
                     </div>
 
-                    <!-- Mapa de seguimiento -->
                     <% if (s.mapStops && s.mapStops.length >= 1) { %>
                     <div class="portal-map-section">
                         <span class="portal-history-title">Recorrido</span>
@@ -254,7 +230,6 @@
                     </div>
                     <% } %>
 
-                    <!-- Historial de estados -->
                     <% if (s.history && s.history.length > 0) { %>
                     <div class="portal-history">
                         <span class="portal-history-title">Historial de estados</span>
@@ -290,42 +265,41 @@
     </section>
     <% } %>
 
-    <!-- FAQ / AYUDA -->
-    <section class="portal-faq">
+    <section class="portal-faq" id="portal-faq-section">
         <div class="portal-faq-inner">
             <div class="portal-faq-col">
                 <h2 class="portal-faq-title">Preguntas frecuentes</h2>
 
                 <details class="portal-faq-item">
-                    <summary>¿Cómo funciona el seguimiento?</summary>
-                    <p>Ingresá el número de seguimiento que figura en tu comprobante de envío (formato ENV-XXX) o el DNI del destinatario. El sistema te mostrará el estado actualizado del paquete.</p>
+                    <summary>Como funciona el seguimiento?</summary>
+                    <p>Ingresa el numero de seguimiento que figura en tu comprobante de envio (formato ENV-XXX) o el DNI del destinatario. El sistema te mostrara el estado actualizado del paquete.</p>
                 </details>
                 <details class="portal-faq-item">
-                    <summary>¿Qué significan los estados?</summary>
+                    <summary>Que significan los estados?</summary>
                     <ul>
-                        <li><strong>Confirmado / Pendiente:</strong> El envío fue registrado en el sistema.</li>
-                        <li><strong>En Tránsito:</strong> El paquete está en camino.</li>
-                        <li><strong>En Sucursal:</strong> El paquete llegó a un centro de distribución.</li>
+                        <li><strong>Confirmado / Pendiente:</strong> El envio fue registrado en el sistema.</li>
+                        <li><strong>En Transito:</strong> El paquete esta en camino.</li>
+                        <li><strong>En Sucursal:</strong> El paquete llego a un centro de distribucion.</li>
                         <li><strong>Entregado:</strong> El paquete fue recibido por el destinatario.</li>
                         <li><strong>Retrasado:</strong> Hay una demora en la entrega.</li>
                     </ul>
                 </details>
                 <details class="portal-faq-item">
-                    <summary>¿Dónde encuentro mi número de seguimiento?</summary>
-                    <p>El número figura en el comprobante que te entregó el remitente o en el email de confirmación. Tiene el formato <strong>ENV-001</strong>.</p>
+                    <summary>Donde encuentro mi numero de seguimiento?</summary>
+                    <p>El numero figura en el comprobante que te entrego el remitente o en el email de confirmacion. Tiene el formato <strong>ENV-001</strong>.</p>
                 </details>
                 <details class="portal-faq-item">
-                    <summary>¿Puedo buscar por DNI?</summary>
-                    <p>Sí, ingresá el número de documento del destinatario sin puntos ni guiones para ver todos los envíos asociados.</p>
+                    <summary>Puedo buscar por DNI?</summary>
+                    <p>Si, ingresa el numero de documento del destinatario sin puntos ni guiones para ver todos los envios asociados.</p>
                 </details>
             </div>
 
-            <div class="portal-faq-col portal-contact">
+            <div class="portal-faq-col portal-contact" id="portal-support-section">
                 <h2 class="portal-faq-title">Contacto y soporte</h2>
                 <div class="portal-contact-item">
                     <span class="material-symbols-outlined">support_agent</span>
                     <div>
-                        <strong>Atención al cliente</strong>
+                        <strong>Atencion al cliente</strong>
                         <span>Lunes a viernes, 9 a 18 hs</span>
                     </div>
                 </div>
@@ -339,15 +313,16 @@
                 <div class="portal-contact-item">
                     <span class="material-symbols-outlined">business</span>
                     <div>
-                        <strong>¿Sos empresa?</strong>
-                        <a href="/login">Accedé al panel empresarial</a>
+                        <strong>Sos empresa?</strong>
+                        <a href="/login">Accede al panel empresarial</a>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- FOOTER -->
+    <%- include('partials/portal-chatbot', { chatbotData }) %>
+
     <footer class="portal-footer">
         <div class="portal-footer-inner">
             <div class="portal-footer-brand">
@@ -356,15 +331,15 @@
             </div>
             <div class="portal-footer-links">
                 <a href="#">Aviso de privacidad</a>
-                <a href="#">Términos y condiciones</a>
+                <a href="#">Terminos y condiciones</a>
                 <a href="#">Sobre LogiTrack</a>
             </div>
             <p class="portal-footer-copy">© <%= new Date().getFullYear() %> LogiTrack. Todos los derechos reservados.</p>
         </div>
     </footer>
 
-
     <script src="/js/theme.js" defer></script>
+    <script src="/js/portal-chatbot.js" defer></script>
     <% if (typeof shipments !== 'undefined' && shipments && shipments.length) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -377,7 +352,7 @@
             const map = L.map(el).setView([item.stops[0].lat, item.stops[0].lng], 11);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
             const colors = { origin: '#16a34a', transit: '#2563eb', pod: '#dc2626', destination: '#94a3b8' };
-            const labels = { origin: 'Origen', transit: 'En tránsito', pod: 'Entregado', destination: 'Destino' };
+            const labels = { origin: 'Origen', transit: 'En transito', pod: 'Entregado', destination: 'Destino' };
             const latlngs = [];
             item.stops.forEach(s => {
                 L.circleMarker([s.lat, s.lng], { radius: 8, color: '#fff', weight: 2, fillColor: colors[s.type] || '#666', fillOpacity: 1 })
