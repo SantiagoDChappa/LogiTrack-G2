@@ -79,3 +79,38 @@ INSERT INTO "logitrack"."province" ("id", "description") VALUES
     (22, 'Tierra del Fuego'),
     (23, 'Tucumán'),
     (24, 'Ciudad Autónoma de Buenos Aires');
+
+INSERT INTO "logitrack"."notification_events" ("id", "code", "description") VALUES
+    (1, 'SHIPMENT_PENDING', 'notificacion de envio pendiente'),
+    (2, 'SHIPMENT_IN_TRANSIT', 'notificacion de envio en tránsito'),
+    (3, 'SHIPMENT_AT_BRANCH', 'notificacion de envio en sucursal'),
+    (4, 'SHIPMENT_DELIVERED', 'notificacion de envio entregado'),
+    (5, 'SHIPMENT_CANCELLED', 'notificacion de envio cancelado'),
+    (6, 'SHIPMENT_ASSIGNED', 'notificacion de envio asignado'),
+    (7, 'SHIPMENT_IN_PREPARATION', 'notificacion de envio en preparacion'),
+    (8, 'SHIPMENT_PACKAGE_FAILED', 'notificacion de paquete fallido'),
+    (9, 'SHIPMENT_FAILED_ATTEMPT', 'notificacion de intento de envio fallido');
+
+INSERT INTO "logitrack"."notification_config" ("id", "eventId", "enabled") VALUES
+    (1, 1, true),
+    (2, 2, true),
+    (3, 3, true),
+    (4, 4, true),
+    (5, 5, true),
+    (6, 6, true),
+    (7, 7, true),
+    (8, 8, true),
+    (9, 9, true);
+
+INSERT INTO "logitrack"."email_template" ("id", "eventId", "subject", "body") VALUES
+    (1, 1, 'Tu envío está pendiente', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} está pendiente.'),
+    (2, 2, 'Tu envío está en tránsito', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} está en tránsito.'),
+    (3, 3, 'Tu envío está en sucursal', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} está en sucursal.'),
+    (4, 4, 'Tu envío ha sido entregado', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} ha sido entregado.'),
+    (5, 5, 'Tu envío ha sido cancelado', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} ha sido cancelado.'),
+    (6, 6, 'Tu envío ha sido asignado', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} ha sido asignado a un repartidor.'),
+    (7, 7, 'Tu envío está en preparación', 'Hola {{fullName}}, tu envío con ID {{shipmentId}} está siendo preparado para su entrega.'),
+    (8, 8, 'Hubo un problema con tu paquete', 'Hola {{fullName}}, lamentamos informarte que hubo un problema con tu paquete con ID {{shipmentId}}. Por favor contacta a soporte para más información.'),
+    (9, 9, 'Intento de entrega fallido', 'Hola {{fullName}}, lamentamos informarte que el repartidor intentó entregar tu paquete con ID {{shipmentId}} pero no tuvo éxito. Por favor contacta a soporte para reprogramar la entrega.');
+
+

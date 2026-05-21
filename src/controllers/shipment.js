@@ -20,6 +20,9 @@ const shipmentImportModel  = require('../models/shipmentImport');
 const branchModel          = require('../models/branch');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
 const { resolveZone } = require('../services/zoneResolver.service');
+const { sendEmail } = require('../services/emailSender');
+const notificationConfigModel = require('../models/notificationConfig');
+const emailTemplateModel = require('../models/emailTemplate');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
 const stateMachine         = require('../services/shipmentStateMachine');
@@ -337,6 +340,23 @@ const createShipment = async (req, res) => {
             longitude:    creatorCoords.longitude,
         });
 
+
+        const notificationConfig = await notificationConfigModel.isNotificationEnabled(1); // 1 = SHIPMENT_PENDING
+
+        if (notificationConfig) {
+            const template = await emailTemplateModel.getTemplateByEventId(1);
+
+            if (template) {
+                const emailData = {
+                    to: recipient.email,
+                    subject: template.subject,
+                    body: template.body.replace('{{fullName}}', recipient.fullName)
+                        .replace('{{shipmentId}}', shipment.id)
+                };
+                await sendEmail(emailData);
+            }
+        }
+
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
@@ -556,6 +576,23 @@ const updateShipmentStatus = async (req, res) => {
         });
 
         await shipmentModel.updateStatus(id, Number(newStatusId));
+
+        const eventCode = await notificationEventModel.getCodeByStatusId(Number(newStatusId));
+        const notificationConfig = await notificationConfigModel.isNotificationEnabled(eventCode);
+
+        if (notificationConfig) {
+            const template = await emailTemplateModel.getTemplateByEventId(eventCode);
+            if (template) {
+                const recipient = await personModel.getById(shipment.recipientId);
+                const emailData = {
+                    to: recipient.email,
+                    subject: template.subject,
+                    body: template.body.replace('{{fullName}}', recipient.fullName)
+                        .replace('{{shipmentId}}', shipment.id)
+                };
+                await sendEmail(emailData);
+            }
+        }
 
         if (Number(newStatusId) === 4) {
             try {

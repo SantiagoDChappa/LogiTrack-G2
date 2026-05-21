@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
 
-const NotificationEvent = sequelize.define('notification_event', {
+const NotificationConfig = sequelize.define('notificationConfig', {
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
@@ -20,4 +20,9 @@ const NotificationEvent = sequelize.define('notification_event', {
         tableName: 'notification_config',
     });
 
-module.exports = { NotificationEvent };
+const isNotificationEnabled = async (eventId) => {
+    const config = await NotificationConfig.findOne({ where: { eventId } });
+    return config ? config.enabled : false;
+}
+
+module.exports = { NotificationConfig, isNotificationEnabled };
