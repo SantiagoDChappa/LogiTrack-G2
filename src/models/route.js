@@ -11,6 +11,11 @@ const Route = sequelize.define('route', {
     totalWeightKg:    { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0, field: 'total_weight_kg' },
     totalVolumeM3:    { type: DataTypes.DECIMAL(10, 3), allowNull: false, defaultValue: 0, field: 'total_volume_m3' },
     createdAt:        { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW, field: 'created_at' },
+    startedAt:        { type: DataTypes.DATE, allowNull: true,  field: 'started_at' },
+    finishedAt:       { type: DataTypes.DATE, allowNull: true,  field: 'finished_at' },
+    totalPauseSeconds:{ type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'total_pause_seconds' },
+    fuelLPer100Km:    { type: DataTypes.DECIMAL(5, 2),  allowNull: false, defaultValue: 10,   field: 'fuel_l_per_100km' },
+    fuelPricePerL:    { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 1200, field: 'fuel_price_per_l' },
 }, { tableName: 'route', timestamps: false });
 
 const RouteStatus = Object.freeze({
@@ -34,7 +39,7 @@ const getAllByBranch = (branchId) => {
     });
 };
 
-const getById = (id) => {
+const getById = async (id) => {
     const { Transport } = require('./transport');
     const { User } = require('./user');
     const { Branch } = require('./branch');
@@ -42,7 +47,9 @@ const getById = (id) => {
     const { Shipment } = require('./shipment');
     const { Address } = require('./address');
     const { Person } = require('./person');
-    return Route.findByPk(id, {
+    const { RoutePause } = require('./routePause');
+
+    const route = await Route.findByPk(id, {
         include: [
             { model: Transport, as: 'transport', include: [{ model: User, as: 'driver', required: false }] },
             { model: Branch,    as: 'originBranch' },
@@ -62,6 +69,10 @@ const getById = (id) => {
         ],
         order: [[{ model: require('./routeStop').RouteStop, as: 'stops' }, 'sequence', 'ASC']],
     });
+    if (!route) {return null;}
+    const pauses = await RoutePause.findAll({ where: { routeId: route.id }, order: [['startedAt', 'ASC']] });
+    route.dataValues.pauses = pauses.map(p => p.toJSON());
+    return route;
 };
 
 const getActiveByDriver = (driverUserId) => {
@@ -75,4 +86,18 @@ const getActiveByDriver = (driverUserId) => {
     });
 };
 
-module.exports = { Route, RouteStatus, getAllByBranch, getById, getActiveByDriver };
+const getAllByDriver = (driverUserId) => {
+    const { Transport } = require('./transport');
+    const { Branch } = require('./branch');
+    const { RouteStop } = require('./routeStop');
+    return Route.findAll({
+        include: [
+            { model: Transport, as: 'transport', where: { driverUserId }, required: true },
+            { model: Branch,    as: 'originBranch' },
+            { model: RouteStop, as: 'stops', required: false, attributes: ['id', 'completed', 'skipped', 'stopType', 'sequence'] },
+        ],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+module.exports = { Route, RouteStatus, getAllByBranch, getById, getActiveByDriver, getAllByDriver };

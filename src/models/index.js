@@ -16,6 +16,10 @@ const { Transport }       = require('./transport');
 const { TransportZone }   = require('./transportZone');
 const { Route }           = require('./route');
 const { RouteStop }       = require('./routeStop');
+const { RoutePause }      = require('./routePause');
+const { RouteIncident }   = require('./routeIncident');
+const { PanicEvent }      = require('./panicEvent');
+const { ReturnToBranchScan } = require('./returnToBranchScan');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -103,6 +107,25 @@ const safeAssociate = () => {
         RouteStop.belongsTo(Branch,   { as: 'branch',   foreignKey: 'branchId' });
         RouteStop.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' });
     }
+
+    if (RoutePause.belongsTo) {
+        RoutePause.belongsTo(Route, { as: 'route', foreignKey: 'routeId' });
+        RoutePause.belongsTo(User,  { as: 'user',  foreignKey: 'userId' });
+    }
+    if (RouteIncident.belongsTo) {
+        RouteIncident.belongsTo(Route, { as: 'route', foreignKey: 'routeId' });
+        RouteIncident.belongsTo(User,  { as: 'user',  foreignKey: 'userId' });
+    }
+    if (PanicEvent.belongsTo) {
+        PanicEvent.belongsTo(User,  { as: 'user',  foreignKey: 'userId' });
+        PanicEvent.belongsTo(Route, { as: 'route', foreignKey: 'routeId' });
+    }
+    if (ReturnToBranchScan.belongsTo) {
+        ReturnToBranchScan.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' });
+        ReturnToBranchScan.belongsTo(Branch,   { as: 'branch',   foreignKey: 'branchId' });
+        ReturnToBranchScan.belongsTo(User,     { as: 'user',     foreignKey: 'userId' });
+        ReturnToBranchScan.belongsTo(Route,    { as: 'route',    foreignKey: 'routeId' });
+    }
 };
 
 safeAssociate();
@@ -124,5 +147,9 @@ module.exports = {
     Transport,
     TransportZone,
     Route,
-    RouteStop
+    RouteStop,
+    RoutePause,
+    RouteIncident,
+    PanicEvent,
+    ReturnToBranchScan
 };

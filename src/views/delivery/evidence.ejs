@@ -33,7 +33,21 @@
             display: flex;
             align-items: center;
             gap: var(--space-3);
+            position: relative;
         }
+        .pod-back {
+            background: rgba(255,255,255,.18);
+            border: 1px solid rgba(255,255,255,.25);
+            color: #fff;
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; text-decoration: none !important;
+            transition: background .15s ease, transform .15s ease;
+            flex-shrink: 0;
+        }
+        .pod-back:hover { background: rgba(255,255,255,.28); transform: scale(1.05); }
+        .pod-back .material-symbols-outlined { font-size: 22px !important; color: #fff !important; }
 
         .pod-header .material-symbols-outlined {
             font-size: 2rem;
@@ -310,6 +324,9 @@
 
 <div class="pod-card">
     <div class="pod-header">
+        <a class="pod-back" href="javascript:history.length > 1 ? history.back() : (window.location.href = '/delivery')" title="Volver">
+            <span class="material-symbols-outlined">arrow_back</span>
+        </a>
         <span class="material-symbols-outlined">local_shipping</span>
         <div class="pod-header-text">
             <h1>Prueba de Entrega</h1>
