@@ -21,6 +21,7 @@ const ACTIONS_REQUIRING_SELECTION = new Set(Object.keys(ACTION_SELECTION_REASONS
 
 const ACTION_HANDLERS = {
     'request-lookup': (runtime) => generalHandlers.buildRequestLookupResponse(runtime),
+    'show-acknowledgement': (runtime) => generalHandlers.buildAcknowledgementResponse(runtime),
     'show-main-menu': (runtime) => generalHandlers.buildMainMenuResponse(runtime),
     'show-understand-menu': (runtime) => generalHandlers.buildUnderstandMenuResponse(runtime),
     'show-location-menu': (runtime) => generalHandlers.buildLocationMenuResponse(runtime),
@@ -69,6 +70,10 @@ function runAction(runtime, action, value, options = {}) {
         return handleFocusShipment(runtime, value);
     }
 
+    if (action === 'request-lookup') {
+        runtime.state.selectedShipmentId = null;
+    }
+
     if (!options.preservePending) {
         runtime.state.pendingAction = null;
     }
@@ -114,7 +119,10 @@ function handleFocusShipment(runtime, value) {
 function runText(runtime, text) {
     runtime.state.pendingAction = null;
 
-    const intent = resolveTextIntent(text);
+    const intent = resolveTextIntent(text, {
+        selectedShipment: getSelectedShipment(runtime),
+        shipmentCount: runtime.context.shipments.length,
+    });
     if (intent.kind === 'lookup') {
         return generalHandlers.buildLookupSubmitResponse(runtime, intent.query);
     }
@@ -123,7 +131,11 @@ function runText(runtime, text) {
         return runAction(runtime, intent.action, intent.value || '');
     }
 
-    return generalHandlers.buildFallbackResponse();
+    if (intent.kind === 'clarify') {
+        return generalHandlers.buildClarificationResponse(intent.actions || []);
+    }
+
+    return generalHandlers.buildFallbackResponse(getSelectedShipment(runtime));
 }
 
 function handleChatbotRequest(payload) {

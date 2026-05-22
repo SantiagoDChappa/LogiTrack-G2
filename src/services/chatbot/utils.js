@@ -1,11 +1,32 @@
 const { STATUS_ALIASES, STATUS_COPY } = require('./constants');
 
 function normalizeText(value) {
-    return String(value || '')
+    let normalized = String(value || '')
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s-]+/g, ' ')
+        .replace(/[^a-z0-9\s-]+/g, ' ');
+
+    const replacements = [
+        [/\bdnd\b/g, 'donde'],
+        [/\bcndo\b/g, 'cuando'],
+        [/\bcmo\b/g, 'como'],
+        [/\bxq\b/g, 'porque'],
+        [/\bpq\b/g, 'porque'],
+        [/\bq\b/g, 'que'],
+        [/\bk\b/g, 'que'],
+        [/\bsta\b/g, 'esta'],
+        [/\btoy\b/g, 'estoy'],
+        [/\bqro\b/g, 'quiero'],
+        [/\bmsj\b/g, 'mensaje'],
+    ];
+
+    replacements.forEach(([pattern, replacement]) => {
+        normalized = normalized.replace(pattern, replacement);
+    });
+
+    return normalized
+        .replace(/([a-z])\1{2,}/g, '$1')
         .replace(/\s+/g, ' ')
         .trim();
 }
@@ -72,11 +93,11 @@ function resolveLookupQuery(text) {
     const trimmed = String(text || '').trim();
     if (!trimmed) { return null; }
 
-    const trackingMatch = trimmed.toUpperCase().match(/\b[A-Z]{3,6}-\d{2,}\b/);
+    const trackingMatch = trimmed.toUpperCase().match(/\b([A-Z]{3,6})[-\s]?(\d{2,})\b/);
     if (trackingMatch) {
         return {
             isDocument: false,
-            query: trackingMatch[0],
+            query: trackingMatch[1] + '-' + trackingMatch[2],
         };
     }
 

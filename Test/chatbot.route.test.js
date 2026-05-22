@@ -29,7 +29,7 @@ describe('chatbot route', () => {
             });
 
         expect(response.status).toBe(200);
-        expect(response.body.messages[0].text).toContain('Si queres ayuda humana');
+        expect(response.body.messages[0].text).toContain('Si queres hablar con una persona');
         expect(response.body.state).toEqual(
             expect.objectContaining({
                 selectedShipmentId: null,
