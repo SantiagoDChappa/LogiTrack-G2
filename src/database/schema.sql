@@ -93,23 +93,35 @@ CREATE TABLE "logitrack"."settings" (
     "value" text
 );
 
+CREATE TYPE "logitrack"."type_notification_event" AS ENUM (
+    'SHIPMENT_PENDING',
+    'SHIPMENT_IN_TRANSIT',
+    'SHIPMENT_IN_BRANCH',
+    'SHIPMENT_DELIVERED',
+    'SHIPMENT_CANCELLED',
+    'SHIPMENT_ASSIGNED',
+    'SHIPMENT_IN_PREPARATION',
+    'SHIPMENT_PACKAGE_FAILED',
+    'SHIPMENT_FAILED_ATTEMPT'
+);
+
 CREATE TABLE "logitrack"."notification_config" (
     "id"             SERIAL,
-    "eventId"         int     NOT NULL,
+    "eventCode"    type_notification_event  UNIQUE NOT NULL,
     "enabled"      boolean DEFAULT false  NOT NULL,
     PRIMARY KEY ("id")
 );
 
 CREATE TABLE "logitrack"."notification_events" (
     "id"          int     NOT NULL,
-    "code"        varchar NOT NULL UNIQUE,
+    "code"        type_notification_event NOT NULL UNIQUE,
     "description" varchar NOT NULL,
     PRIMARY KEY ("id")
 );
 
 CREATE TABLE "logitrack"."email_template" (
     "id"          int    NOT NULL,
-    "eventId"     int     NOT NULL,
+    "eventCode"     type_notification_event UNIQUE NOT NULL,
     "subject"     varchar NOT NULL,
     "body"        text    NOT NULL,
     PRIMARY KEY ("id")
@@ -119,12 +131,12 @@ CREATE TABLE "logitrack"."email_template" (
 -- FK
 -- ============================================================
 ALTER TABLE "logitrack"."email_template"
-    ADD CONSTRAINT "fk_email_template_eventId"
-    FOREIGN KEY ("eventId") REFERENCES "logitrack"."notification_events" ("id");
+    ADD CONSTRAINT "fk_email_template_event_code"
+    FOREIGN KEY ("eventCode") REFERENCES "logitrack"."notification_events" ("code");
 
 ALTER TABLE "logitrack"."notification_config"
-    ADD CONSTRAINT "fk_notification_eventId"
-    FOREIGN KEY ("eventId") REFERENCES "logitrack"."notification_events" ("id");
+    ADD CONSTRAINT "fk_notification_event_code"
+    FOREIGN KEY ("eventCode") REFERENCES "logitrack"."notification_events" ("code");
     
 ALTER TABLE "logitrack"."address"
     ADD CONSTRAINT "fk_address_provinceId_province_id"

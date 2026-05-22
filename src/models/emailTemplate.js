@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
+const { NotificationEvent } = require('../constants/enums')
 
 const EmailTemplate = sequelize.define('emailTemplate', {
     id: {
@@ -7,8 +8,8 @@ const EmailTemplate = sequelize.define('emailTemplate', {
         primaryKey: true,
         autoIncrement: true,
     },
-    eventId: {
-        type: DataTypes.INTEGER,
+    eventCode: {
+        type: DataTypes.ENUM(...Object.values(NotificationEvent)),
         allowNull: false,
 
     },
@@ -25,8 +26,8 @@ const EmailTemplate = sequelize.define('emailTemplate', {
         tableName: 'email_template',
     });
 
-const getTemplateByEventId = async (eventId) => {
-    return await EmailTemplate.findOne({ where: { eventId } });
+const getTemplateByEventCode = async (eventCode) => {
+    return await EmailTemplate.findOne({ where: { eventCode } });
 }
 
-module.exports = { EmailTemplate, getTemplateByEventId };
+module.exports = { EmailTemplate, getTemplateByEventCode };

@@ -50,5 +50,6 @@ const search = ({ senderName, senderDocument, recipientName, recipientDocument }
 };
 
 const findByDocument = (document) => Person.findOne({ where: { document } });
+const findById = (id) => Person.findOne({ where: { id }});
 
-module.exports = { Person, getAll, create, search, findByDocument, createOrUpdate };
+module.exports = { Person, getAll, create, search, findByDocument, createOrUpdate, findById };

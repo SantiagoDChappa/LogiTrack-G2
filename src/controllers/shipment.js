@@ -12,7 +12,7 @@ const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
-const { RoleType, Status, ShipmentType, ShipmentPriority } = require('../constants/enums');
+const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
 const { validationResult }   = require('express-validator');
 const csvImport            = require('../services/csvImport');
 const csvExport            = require('../services/csvExport');
@@ -23,10 +23,12 @@ const { resolveZone } = require('../services/zoneResolver.service');
 const { sendEmail } = require('../services/emailSender');
 const notificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
+const notificationEventModel = require('../models/notificationEvents')
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
 const stateMachine         = require('../services/shipmentStateMachine');
 const routePlanner         = require('../services/routePlanner');
+const console = require('console');
 
 const renderStateMachineError = (err, res, redirectUrl) => {
     if (err && err.name === 'StateMachineError') {
@@ -341,19 +343,17 @@ const createShipment = async (req, res) => {
         });
 
 
-        const notificationConfig = await notificationConfigModel.isNotificationEnabled(1); // 1 = SHIPMENT_PENDING
+        const notificationConfig = await notificationConfigModel.isNotificationEnabled(NotificationEvent.SHIPMENT_PENDING); // 1 = SHIPMENT_PENDING
 
         if (notificationConfig) {
-            const template = await emailTemplateModel.getTemplateByEventId(1);
+            const template = await emailTemplateModel.getTemplateByEventCode(NotificationEvent.SHIPMENT_PENDING);
 
             if (template) {
-                const emailData = {
-                    to: recipient.email,
-                    subject: template.subject,
-                    body: template.body.replace('{{fullName}}', recipient.fullName)
-                        .replace('{{shipmentId}}', shipment.id)
-                };
-                await sendEmail(emailData);
+                const to = recipient.email;
+                const subject = template.subject;
+                const body = template.body.replace('{{fullName}}', recipient.fullName)
+                        .replace('{{trackingCode}}', shipment.id);
+                await sendEmail(to, subject, body);
             }
         }
 
@@ -523,6 +523,7 @@ const updateShipment = async (req, res) => {
 
                 await shipmentModel.updateStatus(id, Number(body.newStatusId));
                 if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+                
             }
         }
 
@@ -544,6 +545,7 @@ const updateShipment = async (req, res) => {
         }
 
         await shipmentModel.update(body);
+
         const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
         await shipmentModel.updatePriority(shipment.id, newPriority);
         res.redirect('/shipment?success=2');
@@ -577,22 +579,15 @@ const updateShipmentStatus = async (req, res) => {
 
         await shipmentModel.updateStatus(id, Number(newStatusId));
 
-        const eventCode = await notificationEventModel.getCodeByStatusId(Number(newStatusId));
-        const notificationConfig = await notificationConfigModel.isNotificationEnabled(eventCode);
+        const eventCode = await notificationEventModel.getEventCodeByShipmentStatus(Number(newStatusId));
+        const recipient = await personModel.findById(shipment.recipientId);
+        const data = {
+            recipientEmail: recipient.email,
+            shipmentTrackingCode: shipment.trackingId,
+            recipientFullName: recipient.fullName
+        };
 
-        if (notificationConfig) {
-            const template = await emailTemplateModel.getTemplateByEventId(eventCode);
-            if (template) {
-                const recipient = await personModel.getById(shipment.recipientId);
-                const emailData = {
-                    to: recipient.email,
-                    subject: template.subject,
-                    body: template.body.replace('{{fullName}}', recipient.fullName)
-                        .replace('{{shipmentId}}', shipment.id)
-                };
-                await sendEmail(emailData);
-            }
-        }
+        await notifyRecipient(NotificationEvent.SHIPMENT_ASSIGNED, data);
 
         if (Number(newStatusId) === 4) {
             try {
@@ -632,9 +627,15 @@ const assignDelivery = async (req, res) => {
             longitude:      supervisorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        const newStatus = await statusModel.getById(fresh.statusId);
-        if (newStatus) { notifyStatusChange(fresh, newStatus.description); }
+        const shipment = await shipmentModel.getById(id);
+        const recipient = await personModel.findById(shipment.recipientId);
+        const data = {
+            recipientEmail: recipient.email,
+            shipmentTrackingCode: shipment.trackingId,
+            recipientFullName: recipient.fullName
+        };
+
+        await notifyRecipient(NotificationEvent.SHIPMENT_ASSIGNED, data);
 
         res.redirect(`/shipment/update/${id}?success=3`);
     } catch (err) {
@@ -660,8 +661,15 @@ const prepareShipment = async (req, res) => {
             longitude:  actorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        notifyStatusChange(fresh, Status.IN_PREPARATION.description);
+        const shipment = await shipmentModel.getById(id);
+        const recipient = await personModel.findById(shipment.recipientId);
+        const data = {
+            recipientEmail: recipient.email,
+            shipmentTrackingCode: shipment.trackingId,
+            recipientFullName: recipient.fullName
+        };
+
+        await notifyRecipient(NotificationEvent.SHIPMENT_IN_PREPARATION, data);
 
         res.redirect(`/shipment/update/${id}?success=4`);
     } catch (err) {
@@ -689,8 +697,15 @@ const cancelShipment = async (req, res) => {
             longitude:  actorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        notifyStatusChange(fresh, Status.CANCELLED.description);
+        const shipment = await shipmentModel.getById(id);
+        const recipient = await personModel.findById(shipment.recipientId);
+        const data = {
+            recipientEmail: recipient.email,
+            shipmentTrackingCode: shipment.trackingId,
+            recipientFullName: recipient.fullName
+        };
+
+        await notifyRecipient(NotificationEvent.SHIPMENT_CANCELLED, data);
 
         res.redirect(`/shipment/update/${id}?success=5`);
     } catch (err) {
@@ -718,8 +733,15 @@ const markPackageFailed = async (req, res) => {
             longitude:  actorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        notifyStatusChange(fresh, Status.PACKAGE_FAILED.description);
+        const shipment = await shipmentModel.getById(id);
+        const recipient = await personModel.findById(shipment.recipientId);
+        const data = {
+            recipientEmail: recipient.email,
+            shipmentTrackingCode: shipment.trackingId,
+            recipientFullName: recipient.fullName
+        };
+
+        await notifyRecipient(NotificationEvent.SHIPMENT_PACKAGE_FAILED, data);
 
         res.redirect(`/shipment/update/${id}?success=6`);
     } catch (err) {
@@ -912,6 +934,19 @@ function calculateDistance(destinationUbication, originUbication) {
 
     return R * c;
 }
+
+async function notifyRecipient(eventCode, data) {
+    const isEventActive = await notificationConfigModel.isNotificationEnabled(eventCode);
+    if(isEventActive) {
+        const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
+        if(template) {
+            const to = data.recipientEmail;
+            const subject = template.subject;
+            const body = template.body.replace("{{trackingCode}}", data.shipmentTrackingCode).replace("{{fullName}}", data.recipientFullName);
+            await sendEmail(to, subject, body);
+        }
+    } 
+};
 
 const importPreviews = new Map();
 const importReports  = new Map();

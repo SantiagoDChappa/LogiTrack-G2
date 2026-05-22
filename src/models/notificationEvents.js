@@ -13,8 +13,8 @@ const NotificationEvent = sequelize.define('notificationEvent', {
 },
 { tableName: 'notification_events' });
 
-const getEventCodeByShipmentStatus = (status) => {
-    return mapperShipmentStatusToEvent[status] || null;
+const getEventCodeByShipmentStatus = (shipmentId) => {
+    return mapperShipmentStatusToEvent[shipmentId] || null;
 };
 
 module.exports = { NotificationEvent, getEventCodeByShipmentStatus };
