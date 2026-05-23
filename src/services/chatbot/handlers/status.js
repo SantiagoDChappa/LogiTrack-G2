@@ -118,7 +118,7 @@ function buildStatusGuideResponse(statusKey) {
                 createMessage({
                     text: copy.label + ': ' + copy.summary + (copy.next ? ' ' + copy.next : ''),
                     actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
+                        createAction('Buscar mi envio', 'request-lookup'),
                         createAction('Ver todos los estados', 'show-status-guide'),
                         createAction('Volver al menu', 'show-main-menu'),
                     ],
@@ -134,7 +134,7 @@ function buildStatusGuideResponse(statusKey) {
                 text: 'Aca tenes una guia simple de los estados del portal:',
                 html: buildStatusGuideHtml(),
                 actions: [
-                    createAction('Buscar un envio', 'request-lookup'),
+                    createAction('Buscar mi envio', 'request-lookup'),
                     createAction('Estado actual', 'show-status'),
                     createAction('Volver al menu', 'show-main-menu'),
                 ],

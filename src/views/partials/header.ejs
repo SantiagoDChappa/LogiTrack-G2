@@ -4,8 +4,8 @@
             <span class="material-symbols-outlined">close</span>
         </button>
         <a href="<%= currentUser.roleId === 3 ? '/delivery' : '/home' %>" class="logo">
-            <img src="/images/logo.png" alt="LogiTrack logo">
-            <h1>LogiTrack</h1>
+            <img src="/images/logo.png" alt="<%= nombreEmpresa %> logo">
+            <h1><%= nombreEmpresa %></h1>
         </a>
         <div class="nav">
             <li>
@@ -47,8 +47,8 @@
             <span class="material-symbols-outlined">menu</span>
         </button>
         <a href="<%= currentUser.roleId === 3 ? '/delivery' : '/home' %>" class="logo-mobile">
-            <img src="/images/logo.png" alt="LogiTrack">
-            <span>LogiTrack</span>
+            <img src="/images/logo.png" alt="<%= nombreEmpresa %>">
+            <span><%= nombreEmpresa %></span>
         </a>
         <i><span class="material-symbols-outlined">notifications</span></i>
         <div class="user">

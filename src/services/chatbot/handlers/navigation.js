@@ -25,7 +25,7 @@ function buildFocusShipmentResponse(runtime, shipmentId, options = {}) {
         };
     }
 
-    const announceText = options.announceText || 'Listo, tomo ' + shipment.trackingId + ' como envio activo.';
+    const announceText = options.announceText || 'Ya tengo ' + shipment.trackingId + ' como referencia.';
     const messages = options.announce === false
         ? []
         : [

@@ -1,0 +1,217 @@
+/* ============================================================
+   Scan — design tokens (operativo, mobile-first)
+   ============================================================ */
+:root {
+    --sc-bg:          #f0f2f5;
+    --sc-surface:     #ffffff;
+    --sc-surface-alt: #f8fafc;
+    --sc-blue:        #2563eb;
+    --sc-blue-soft:   #3b82f6;
+    --sc-green:       #16a34a;
+    --sc-green-soft:  #22c55e;
+    --sc-amber:       #f59e0b;
+    --sc-amber-dark:  #d97706;
+    --sc-red:         #dc2626;
+    --sc-red-dark:    #b91c1c;
+    --sc-purple:      #7c3aed;
+    --sc-text:        #0f172a;
+    --sc-text-strong: #1a3566;
+    --sc-muted:       #64748b;
+    --sc-border:      rgba(15, 23, 42, .08);
+    --sc-border-soft: rgba(15, 23, 42, .05);
+    --sc-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --sc-radius-sm:   8px;
+    --sc-radius-md:   12px;
+    --sc-radius-lg:   18px;
+    --sc-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+html[data-theme="dark"] {
+    --sc-bg:          #0b1220;
+    --sc-surface:     #111827;
+    --sc-surface-alt: #0f172a;
+    --sc-blue:        #60a5fa;
+    --sc-text:        #e2e8f0;
+    --sc-text-strong: #f1f5f9;
+    --sc-muted:       #94a3b8;
+    --sc-border:      rgba(148, 163, 184, .18);
+    --sc-border-soft: rgba(148, 163, 184, .10);
+    --sc-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --sc-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+}
+
+/* ============================================================
+   Wrapper centrado mobile-first
+   ============================================================ */
+.scan-wrapper {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 0 clamp(0.5rem, 2vw, 1rem);
+}
+
+/* ============================================================
+   Cards reutilizan update-card (route.css). Refuerzo título.
+   ============================================================ */
+.scan-wrapper .update-card {
+    background: var(--sc-surface);
+    border: 1px solid var(--sc-border);
+    border-radius: var(--sc-radius-lg);
+    padding: 1.4rem 1.5rem;
+    box-shadow: var(--sc-shadow-md);
+}
+
+.scan-wrapper .update-card h3 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--sc-text-strong);
+    letter-spacing: -.02em;
+    padding-bottom: .65rem;
+    border-bottom: 1px solid var(--sc-border-soft);
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+}
+
+.scan-wrapper .update-card h3 .material-symbols-outlined {
+    color: var(--sc-blue);
+    font-size: 1.2rem;
+}
+
+/* ============================================================
+   Detail fields del envío
+   ============================================================ */
+.scan-wrapper .detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    padding: .6rem 0;
+    border-bottom: 1px solid var(--sc-border-soft);
+}
+
+.scan-wrapper .detail-field:last-child { border-bottom: 0; }
+
+.scan-wrapper .detail-label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--sc-muted);
+}
+
+.scan-wrapper .detail-value {
+    font-size: .92rem;
+    color: var(--sc-text);
+    font-weight: 500;
+}
+
+/* ============================================================
+   Botones de acción de scan (estados)
+   ============================================================ */
+.scan-actions-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--sc-muted);
+    margin-bottom: .75rem;
+}
+
+.scan-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .55rem;
+    width: 100%;
+    padding: 1rem 1.1rem;
+    border: none;
+    border-radius: var(--sc-radius-md);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: #fff;
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.scan-btn:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+
+.scan-btn:active { transform: translateY(0); opacity: .85; }
+
+.scan-btn .material-symbols-outlined { font-size: 1.35rem; }
+
+.scan-btn--transit {
+    background: linear-gradient(135deg, var(--sc-blue), var(--sc-blue-soft));
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .3);
+}
+
+.scan-btn--branch {
+    background: linear-gradient(135deg, var(--sc-amber), var(--sc-amber-dark));
+    box-shadow: 0 4px 14px rgba(245, 158, 11, .3);
+}
+
+.scan-btn--deliver {
+    background: linear-gradient(135deg, var(--sc-green), var(--sc-green-soft));
+    box-shadow: 0 4px 14px rgba(22, 163, 74, .3);
+}
+
+/* ============================================================
+   Alertas (success/error/warning)
+   ============================================================ */
+.scan-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+    padding: .9rem 1.1rem;
+    border-radius: var(--sc-radius-md);
+    font-size: .9rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.scan-alert .material-symbols-outlined {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.scan-alert--error {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+}
+
+.scan-alert--success {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+
+/* ============================================================
+   Final state
+   ============================================================ */
+.scan-final {
+    text-align: center;
+    color: var(--sc-muted);
+    font-size: .9rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .65rem;
+    padding: 1.25rem 0;
+}
+
+.scan-final .material-symbols-outlined {
+    font-size: 2.5rem;
+    color: var(--sc-muted);
+    opacity: .6;
+}
+
+.scan-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}

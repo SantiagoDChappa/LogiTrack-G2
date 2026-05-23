@@ -4,29 +4,41 @@ const branchModel = require('../models/branch');
 const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 const NotificationConfigModel = require('../models/notificationConfig');
-const { NotificationEvent } = require('../constants/enums');
+const settingLogModel = require('../models/settingLog');
+const { expireShipments } = require('../utils/expireShipments');
 
 const getSettings = async (req, res) => {
-    const [settings, provinces, branches, users, routeOpt, notifConfig] = await Promise.all([
+    const [settings, provinces, branches, users, routeOpt, notifConfig, settingLogs] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
         userModel.getAll(),
         getRouteOptimizerSettings(),
-        NotificationConfigModel.getAllConfigs()
+        NotificationConfigModel.getAllConfigs(),
+        settingLogModel.getAll(),
     ]);
 
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
     res.render('setting/index', {
-        settings, notifConfig, provinces, branches, users, routeOpt,
+        settings, notifConfig, provinces, branches, users, routeOpt, settingLogs,
         params: {
-            max_intentos_fallidos: settings.max_intentos_fallidos || '3',
-            dias_expiracion_envio: settings.dias_expiracion_envio || '30',
-            notificaciones_activas: settings.notificaciones_activas || 'true',
-            horario_entrega_inicio: settings.horario_entrega_inicio || '08:00',
-            horario_entrega_fin: settings.horario_entrega_fin || '20:00',
+            max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
+            dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
+            notificaciones_activas:   settings.notificaciones_activas   || 'true',
+            horario_entrega_inicio:   settings.horario_entrega_inicio   || '08:00',
+            horario_entrega_fin:      settings.horario_entrega_fin      || '20:00',
+            peso_maximo_envio:        settings.peso_maximo_envio        || '50',
+            cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
+            costo_base_envio:         settings.costo_base_envio         || '500',
+            nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
+            telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
+            email_soporte:            settings.email_soporte            || 'soporte@logitrack.com',
+            proceso_revisar_expirados_hora:    settings.proceso_revisar_expirados_hora    || '02:00',
+            proceso_revisar_prioridades_hora:  settings.proceso_revisar_prioridades_hora  || '03:00',
+            proceso_generar_reportes_hora:     settings.proceso_generar_reportes_hora     || '04:00',
+            proceso_notificaciones_hora:       settings.proceso_notificaciones_hora       || '05:00',
         }
     });
 };
@@ -139,6 +151,16 @@ const saveParams = async (req, res) => {
             'notificaciones_activas',
             'horario_entrega_inicio',
             'horario_entrega_fin',
+            'peso_maximo_envio',
+            'cantidad_maxima_paquetes',
+            'costo_base_envio',
+            'nombre_empresa',
+            'telefono_soporte',
+            'email_soporte',
+            'proceso_revisar_expirados_hora',
+            'proceso_revisar_prioridades_hora',
+            'proceso_generar_reportes_hora',
+            'proceso_notificaciones_hora',
         ];
 
         // Validaciones
@@ -151,6 +173,20 @@ const saveParams = async (req, res) => {
         if (isNaN(diasExpiracion) || diasExpiracion < 1 || diasExpiracion > 365) {
             return res.redirect('/setting?error=dias_expiracion');
         }
+        const pesoMax = parseFloat(req.body.peso_maximo_envio);
+        if (isNaN(pesoMax) || pesoMax < 1 || pesoMax > 999) {
+            return res.redirect('/setting?error=peso_maximo');
+        }
+
+        const cantMax = parseInt(req.body.cantidad_maxima_paquetes);
+        if (isNaN(cantMax) || cantMax < 1 || cantMax > 999) {
+            return res.redirect('/setting?error=cantidad_maxima');
+        }
+
+        const costoBase = parseFloat(req.body.costo_base_envio);
+        if (isNaN(costoBase) || costoBase < 0) {
+            return res.redirect('/setting?error=costo_base');
+        }
 
         const horaInicio = req.body.horario_entrega_inicio;
         const horaFin = req.body.horario_entrega_fin;
@@ -158,32 +194,28 @@ const saveParams = async (req, res) => {
             return res.redirect('/setting?error=horario');
         }
 
-        await Promise.all(params.map(key => {
+        const currentSettings = await settingModel.getAll();
+
+        await Promise.all(params.map(async key => {
+            const oldValue = currentSettings[key] || null;
             let value;
             if (key === 'notificaciones_activas') {
                 value = req.body[key] === 'true' ? 'true' : 'false';
             } else {
                 value = req.body[key] || '';
             }
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
             return settingModel.set(key, value);
         }));
 
-        // 1. Obtenemos todas las configuraciones actuales
+        // Configuración de notificaciones por evento
         const notifyConfigs = await NotificationConfigModel.getAllConfigs();
-
-        // 2. Extraemos los códigos de los checkboxes que vienen en el body
-        // El body trae algo como { "cbox-SHIPMENT_PENDING": "on", ... }
         const body = req.body;
 
-        // 3. Iteramos las configuraciones de la base de datos
         for (const config of notifyConfigs) {
-            // Construimos el nombre del campo tal cual viene del formulario
             const checkboxName = `cbox_${config.eventCode}`;
-
-            // Determinamos si debería estar habilitado (si existe en el body y es 'on')
             const shouldBeEnabled = body[checkboxName] === 'on';
 
-            // 4. Solo actualizamos si el valor cambió para ahorrar recursos en la BD
             if (config.enabled !== shouldBeEnabled) {
                 await NotificationConfigModel.NotificationConfig.update(
                     { enabled: shouldBeEnabled },
@@ -192,7 +224,8 @@ const saveParams = async (req, res) => {
             }
         }
 
-
+        // Ejecutar proceso automático de expiración
+        expireShipments();
         res.redirect('/setting?success=4');
     } catch (err) {
         console.error(err);

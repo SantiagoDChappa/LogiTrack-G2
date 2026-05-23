@@ -46,6 +46,7 @@
             display: block;
         }
     </style>
+    <link rel="stylesheet" href="/css/shipments-restyle.css">
     <title>Detalle de Envío - LogiTrack</title>
 </head>
 
@@ -252,7 +253,12 @@
                     <% if (typeof costClient !== 'undefined' && costClient) { %>
                         <div style="margin-top:.75rem;padding:.75rem;border-radius:8px;background:var(--color-bg);border:1px solid var(--color-border);font-size:.85rem">
                             <strong style="display:block;margin-bottom:.35rem">Desglose de costo (cliente)</strong>
-                            <div style="display:flex;justify-content:space-between"><span>Tarifa zona</span><span><%= fmtMoney(costClient.base) %></span></div>
+                           <% if (costClient.costoBase > 0) { %>
+<div style="display:flex;justify-content:space-between"><span>Costo base sistema</span><span><%= fmtMoney(costClient.costoBase) %></span></div>
+<% } %>
+<% if (costClient.zoneBase > 0) { %>
+<div style="display:flex;justify-content:space-between"><span>Tarifa zona</span><span><%= fmtMoney(costClient.zoneBase) %></span></div>
+<% } %>
                             <div style="display:flex;justify-content:space-between"><span>Recargo peso</span><span><%= fmtMoney(costClient.wSurcharge) %></span></div>
                             <div style="display:flex;justify-content:space-between"><span>Recargo volumen</span><span><%= fmtMoney(costClient.vSurcharge) %></span></div>
                             <hr style="margin:.35rem 0;border-color:var(--color-border)">

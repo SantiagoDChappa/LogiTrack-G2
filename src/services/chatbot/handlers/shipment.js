@@ -4,7 +4,7 @@ const {
     createAction,
     createMessage,
 } = require('../responseBuilder');
-const { containsAny, normalizeText } = require('../utils');
+const { getShipmentStage, normalizeText } = require('../utils');
 
 function appendUniqueSentence(base, sentence) {
     const prefix = String(base || '').trim();
@@ -24,47 +24,92 @@ function appendUniqueSentence(base, sentence) {
     return [prefix, value].filter(Boolean).join(' ');
 }
 
+function buildLookupPromptResponse(text) {
+    return {
+        messages: [
+            createMessage({
+                text,
+                actions: [
+                    createAction('Buscar mi envio', 'request-lookup'),
+                    createAction('Volver al menu', 'show-main-menu'),
+                ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
 function buildLocationResponse(shipment) {
     if (!shipment) {
-        return {
-            messages: [
-                createMessage({
-                    text: 'Si me pasas un tracking o un DNI, te digo la ultima referencia visible y te muestro el recorrido general.',
-                    actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Volver al menu', 'show-main-menu'),
-                    ],
-                }),
-            ],
-            effects: [],
-        };
+        return buildLookupPromptResponse('Si me pasas un tracking o un DNI, te digo la ultima referencia visible y te muestro el recorrido general.');
     }
 
+    const stage = getShipmentStage(shipment.statusKey);
     const parts = [];
+    let actions = [
+        createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
+        createAction('Fecha estimada', 'show-eta'),
+        createAction('Historial', 'show-history'),
+    ];
 
-    parts.push('Te muestro la ubicacion segun los movimientos que fueron quedando registrados.');
-
-    if (shipment.currentBranchName) {
-        parts.push('Ultima referencia: ' + shipment.currentBranchName + '.');
-    } else if (shipment.destination && shipment.destination !== '-') {
-        parts.push('Zona de destino: ' + shipment.destination + '.');
+    if (stage === 'entregado') {
+        parts.push('Este envio ya figura entregado.');
+        if (shipment.currentBranchName) {
+            parts.push('La ultima referencia visible es ' + shipment.currentBranchName + '.');
+        }
+        parts.push('Si queres, te muestro el historial o el comprobante.');
+        actions = [
+            createAction('Historial', 'show-history'),
+            createAction('Comprobante de entrega', 'show-pod'),
+            createAction('No reconozco la entrega', 'show-delivery-issue'),
+        ];
+    } else if (stage === 'cancelado') {
+        parts.push('Este envio esta cancelado, asi que ya no tiene recorrido activo.');
+        if (shipment.lastMovementDateLabel) {
+            parts.push('La ultima actualizacion visible es ' + shipment.lastMovementDateLabel + '.');
+        }
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else if (stage === 'aun_no_salio') {
+        parts.push('Por ahora este envio todavia no salio a recorrido.');
+        if (shipment.currentBranchName) {
+            parts.push('La referencia visible hasta ahora es ' + shipment.currentBranchName + '.');
+        }
+        parts.push('Si queres, te muestro el estado actual o la fecha estimada.');
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Fecha estimada', 'show-eta'),
+            createAction('Que significa este estado', 'show-status-guide', shipment.statusKey),
+        ];
+    } else {
+        parts.push('Te muestro la ubicacion segun los movimientos que fueron quedando registrados.');
+        if (shipment.currentBranchName) {
+            parts.push('Ultima referencia: ' + shipment.currentBranchName + '.');
+        } else if (shipment.destination && shipment.destination !== '-') {
+            parts.push('Zona de destino: ' + shipment.destination + '.');
+        }
+        if (shipment.lastMovementDateLabel) {
+            parts.push('Ultimo movimiento: ' + shipment.lastMovementDateLabel + '.');
+        }
+        if (stage === 'en_sucursal') {
+            parts.push('Si queres, tambien puedo mostrarte lo que aparece sobre sucursal o retiro.');
+            actions[1] = createAction('Sucursal o retiro', 'show-branch');
+        } else if (stage === 'con_problema') {
+            parts.push('Como hubo una demora o un problema, conviene revisar tambien que paso con el envio.');
+            actions[1] = createAction('Que paso con mi envio', 'show-issues');
+        } else {
+            parts.push('Si queres, baja al mapa de la tarjeta para ver el recorrido general.');
+        }
     }
-
-    if (shipment.lastMovementDateLabel) {
-        parts.push('Ultimo movimiento: ' + shipment.lastMovementDateLabel + '.');
-    }
-
-    parts.push('Si queres, baja al mapa de la tarjeta para ver el recorrido general.');
 
     return {
         messages: [
             createMessage({
                 text: parts.join(' '),
-                actions: [
-                    createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
-                    createAction('Fecha estimada', 'show-eta'),
-                    createAction('Historial', 'show-history'),
-                ],
+                actions,
             }),
         ],
         effects: [],
@@ -73,49 +118,67 @@ function buildLocationResponse(shipment) {
 
 function buildEtaResponse(shipment) {
     if (!shipment) {
-        return {
-            messages: [
-                createMessage({
-                    text: 'Si me pasas un tracking o un DNI, te digo si ya hay una fecha estimada cargada.',
-                    actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Volver al menu', 'show-main-menu'),
-                    ],
-                }),
-            ],
-            effects: [],
-        };
+        return buildLookupPromptResponse('Si me pasas un tracking o un DNI, te digo si ya hay una fecha estimada cargada.');
     }
 
+    const stage = getShipmentStage(shipment.statusKey);
     let text = '';
+    let actions = [
+        createAction('Estado actual', 'show-status'),
+        createAction('Donde esta', 'show-location'),
+        createAction('Historial', 'show-history'),
+    ];
 
-    if (shipment.statusKey === 'entregado') {
+    if (stage === 'entregado') {
         text = shipment.lastMovementDateLabel
             ? 'Este envio ya fue entregado. La ultima actualizacion visible es ' + shipment.lastMovementDateLabel + '.'
             : 'Este envio ya fue entregado.';
-    } else if (shipment.statusKey === 'cancelado' || shipment.statusKey === 'cancelada') {
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Comprobante de entrega', 'show-pod'),
+            createAction('No reconozco la entrega', 'show-delivery-issue'),
+        ];
+    } else if (stage === 'cancelado') {
         text = 'Este envio esta cancelado, asi que ya no tiene una fecha estimada activa.';
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
     } else if (shipment.expectedDeliveryDateLabel && shipment.expectedDeliveryWindow) {
         text = 'Por ahora, la entrega esta prevista para ' + shipment.expectedDeliveryDateLabel + ' entre ' + shipment.expectedDeliveryWindow + '.';
     } else if (shipment.expectedDeliveryDateLabel) {
         text = 'Por ahora, la fecha estimada es ' + shipment.expectedDeliveryDateLabel + '.';
-    } else if (shipment.statusKey === 'retrasado' || shipment.statusKey === 'intento_fallido' || shipment.statusKey === 'paquete_fallido') {
+    } else if (stage === 'con_problema') {
         text = 'Por ahora no aparece una nueva fecha estimada. Como hubo una demora o un problema con el envio, puede actualizarse mas adelante.';
-    } else if (shipment.statusKey === 'en_transito' || shipment.statusKey === 'en_sucursal') {
-        text = 'El envio ya esta en camino, pero por ahora no aparece una fecha mas precisa.';
-    } else {
+        actions = [
+            createAction('Que paso con mi envio', 'show-issues'),
+            createAction('Sucursal o retiro', 'show-branch'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else if (stage === 'en_sucursal') {
+        text = 'El envio ya tiene una referencia en sucursal, pero por ahora no aparece una fecha mas precisa.';
+        actions = [
+            createAction('Sucursal o retiro', 'show-branch'),
+            createAction('Donde esta', 'show-location'),
+            createAction('Historial', 'show-history'),
+        ];
+    } else if (stage === 'aun_no_salio') {
         text = 'Por ahora no veo una fecha estimada publica para este envio.';
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Que significa este estado', 'show-status-guide', shipment.statusKey),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else {
+        text = 'El envio ya esta en camino, pero por ahora no aparece una fecha mas precisa.';
     }
 
     return {
         messages: [
             createMessage({
                 text,
-                actions: [
-                    createAction('Estado actual', 'show-status'),
-                    createAction('Incidencias', 'show-issues'),
-                    createAction('Hablar con soporte', 'show-support'),
-                ],
+                actions,
             }),
         ],
         effects: [],
@@ -124,18 +187,7 @@ function buildEtaResponse(shipment) {
 
 function buildHistoryResponse(shipment) {
     if (!shipment) {
-        return {
-            messages: [
-                createMessage({
-                    text: 'Si me pasas un tracking o un DNI, te muestro el historial del envio paso a paso.',
-                    actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Volver al menu', 'show-main-menu'),
-                    ],
-                }),
-            ],
-            effects: [],
-        };
+        return buildLookupPromptResponse('Si me pasas un tracking o un DNI, te muestro el historial del envio paso a paso.');
     }
 
     if (!Array.isArray(shipment.history) || shipment.history.length === 0) {
@@ -161,7 +213,7 @@ function buildHistoryResponse(shipment) {
                 actions: [
                     createAction('Estado actual', 'show-status'),
                     createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
-                    createAction('Incidencias', 'show-issues'),
+                    createAction('Que paso con mi envio', 'show-issues'),
                 ],
             }),
         ],
@@ -177,7 +229,7 @@ function buildIssuesResponse(shipment) {
                     text: 'Estas son las situaciones mas comunes que te puedo explicar desde el portal:',
                     html: buildIssuesHtml(),
                     actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
+                        createAction('Buscar mi envio', 'request-lookup'),
                         createAction('Significado de los estados', 'show-status-guide'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
@@ -187,7 +239,13 @@ function buildIssuesResponse(shipment) {
         };
     }
 
+    const stage = getShipmentStage(shipment.statusKey);
     let text = '';
+    let actions = [
+        createAction('Fecha estimada', 'show-eta'),
+        createAction('Sucursal o retiro', 'show-branch'),
+        createAction('Hablar con soporte', 'show-support'),
+    ];
 
     if (shipment.statusKey === 'retrasado') {
         text = 'Este envio viene con demora. La fecha de entrega puede correrse respecto de lo previsto.';
@@ -195,10 +253,27 @@ function buildIssuesResponse(shipment) {
         text = 'No se pudo completar la entrega en la ultima visita. Puede resolverse con un nuevo intento o con retiro por sucursal.';
     } else if (shipment.statusKey === 'paquete_fallido') {
         text = 'Hubo un problema con el envio y el equipo tiene que revisarlo antes de que siga avanzando.';
-    } else if (shipment.statusKey === 'cancelado' || shipment.statusKey === 'cancelada') {
+    } else if (stage === 'cancelado') {
         text = 'Este envio esta cancelado, asi que ya no deberia seguir moviendose.';
-    } else if (shipment.statusKey === 'entregado') {
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else if (stage === 'entregado') {
         text = 'No veo un problema activo con este envio. Si no reconoces la entrega, te conviene hablar con soporte.';
+        actions = [
+            createAction('No reconozco la entrega', 'show-delivery-issue'),
+            createAction('Comprobante de entrega', 'show-pod'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else if (stage === 'en_sucursal') {
+        text = 'Por ahora no veo un problema activo. Si queres retirarlo o revisar la referencia visible, puedo ayudarte con eso.';
+        actions = [
+            createAction('Sucursal o retiro', 'show-branch'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
     } else {
         text = 'Por ahora no veo un problema visible en este envio.';
     }
@@ -211,13 +286,7 @@ function buildIssuesResponse(shipment) {
         messages: [
             createMessage({
                 text,
-                actions: [
-                    ...(shipment.statusKey === 'entregado'
-                        ? [createAction('No reconozco la entrega', 'show-delivery-issue')]
-                        : [createAction('Fecha estimada', 'show-eta')]),
-                    createAction('Sucursal o retiro', 'show-branch'),
-                    createAction('Hablar con soporte', 'show-support'),
-                ],
+                actions,
             }),
         ],
         effects: [],
@@ -284,45 +353,53 @@ function buildDeliveryIssueResponse(shipment) {
 
 function buildBranchResponse(shipment) {
     if (!shipment) {
-        return {
-            messages: [
-                createMessage({
-                    text: 'Si me pasas un tracking o un DNI, te digo cual es la ultima referencia visible del envio.',
-                    actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Volver al menu', 'show-main-menu'),
-                    ],
-                }),
-            ],
-            effects: [],
-        };
+        return buildLookupPromptResponse('Si me pasas un tracking o un DNI, te digo cual es la ultima referencia visible del envio.');
     }
 
+    const stage = getShipmentStage(shipment.statusKey);
     const parts = [];
+    let actions = [
+        createAction('Que paso con mi envio', 'show-issues'),
+        createAction('Hablar con soporte', 'show-support'),
+        createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
+    ];
 
-    if (shipment.currentBranchName) {
-        parts.push('La ultima referencia visible es ' + shipment.currentBranchName + '.');
+    if (stage === 'entregado') {
+        parts.push('Este envio ya fue entregado, asi que no tiene retiro pendiente por sucursal.');
+        actions = [
+            createAction('Comprobante de entrega', 'show-pod'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else if (stage === 'cancelado') {
+        parts.push('Este envio esta cancelado, asi que no tiene retiro activo.');
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
     } else {
-        parts.push('Por ahora no aparece una sucursal visible para este envio.');
-    }
+        if (shipment.currentBranchName) {
+            parts.push('La ultima referencia visible es ' + shipment.currentBranchName + '.');
+        } else {
+            parts.push('Por ahora no aparece una sucursal visible para este envio.');
+        }
 
-    if (shipment.statusKey === 'en_sucursal') {
-        parts.push('Como ahora esta en sucursal, esa referencia es la mejor para consultar un posible retiro.');
-    } else if (shipment.statusKey === 'intento_fallido') {
-        parts.push('Si queres retirarlo, te conviene revisar esta referencia con soporte.');
-    } else {
-        parts.push('Si necesitas confirmar retiro, soporte puede orientarte segun el estado actual.');
+        if (stage === 'en_sucursal') {
+            parts.push('Como ahora esta en sucursal, esa referencia es la mejor para consultar un posible retiro.');
+            actions[0] = createAction('Donde esta', 'show-location');
+        } else if (shipment.statusKey === 'intento_fallido') {
+            parts.push('Si queres retirarlo, te conviene revisar esta referencia con soporte.');
+        } else {
+            parts.push('Si necesitas confirmar retiro, soporte puede orientarte segun el estado actual.');
+        }
     }
 
     return {
         messages: [
             createMessage({
                 text: parts.join(' '),
-                actions: [
-                    createAction('Incidencias', 'show-issues'),
-                    createAction('Hablar con soporte', 'show-support'),
-                    createAction('Ver tarjeta del envio', 'focus-shipment', shipment.id),
-                ],
+                actions,
             }),
         ],
         effects: [],
@@ -331,33 +408,40 @@ function buildBranchResponse(shipment) {
 
 function buildPodResponse(shipment) {
     if (!shipment) {
-        return {
-            messages: [
-                createMessage({
-                    text: 'El comprobante de entrega solo aplica a envios que ya fueron entregados. Si queres revisar uno puntual, pasame el tracking o el DNI.',
-                    actions: [
-                        createAction('Buscar un envio', 'request-lookup'),
-                        createAction('Volver al menu', 'show-main-menu'),
-                    ],
-                }),
-            ],
-            effects: [],
-        };
+        return buildLookupPromptResponse('El comprobante de entrega solo aplica a envios que ya fueron entregados. Si queres revisar uno puntual, pasame el tracking o el DNI.');
     }
 
-    const text = shipment.statusKey === 'entregado'
-        ? 'Este envio ya fue entregado. Desde este portal no se ve el comprobante completo, asi que si lo necesitas te conviene pedirlo a soporte.'
-        : 'Todavia no puedo mostrar un comprobante porque el envio aun no figura como entregado.';
+    const stage = getShipmentStage(shipment.statusKey);
+    let text = '';
+    let actions = [
+        createAction('Estado actual', 'show-status'),
+        createAction('Hablar con soporte', 'show-support'),
+        createAction('Acceso empresas', 'go-login'),
+    ];
+
+    if (stage === 'entregado') {
+        text = 'Este envio ya fue entregado. Desde este portal no se ve el comprobante completo, asi que si lo necesitas te conviene pedirlo a soporte.';
+        actions = [
+            createAction('No reconozco la entrega', 'show-delivery-issue'),
+            createAction('Hablar con soporte', 'show-support'),
+            createAction('Acceso empresas', 'go-login'),
+        ];
+    } else if (stage === 'cancelado') {
+        text = 'Este envio esta cancelado, asi que no tiene comprobante de entrega.';
+        actions = [
+            createAction('Estado actual', 'show-status'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    } else {
+        text = 'Todavia no puedo mostrar un comprobante porque el envio aun no figura como entregado.';
+    }
 
     return {
         messages: [
             createMessage({
                 text,
-                actions: [
-                    createAction('Estado actual', 'show-status'),
-                    createAction('Hablar con soporte', 'show-support'),
-                    createAction('Acceso empresas', 'go-login'),
-                ],
+                actions,
             }),
         ],
         effects: [],
@@ -381,15 +465,16 @@ function buildManagementResponse(shipment) {
         };
     }
 
+    const stage = getShipmentStage(shipment.statusKey);
     let text = 'Desde este portal no podes hacer cambios sobre este envio.';
 
-    if (containsAny(shipment.statusKey, ['pendiente', 'asignado', 'en_preparacion', 'inicial'])) {
-        text += ' Como todavia no esta cerrado, soporte puede revisar si todavia hay margen para ayudarte.';
-    } else if (containsAny(shipment.statusKey, ['en_transito', 'en_sucursal', 'retrasado', 'intento_fallido', 'paquete_fallido'])) {
-        text += ' Como ya esta en camino o en revision, los cambios suelen tener mas restricciones.';
-    } else if (shipment.statusKey === 'entregado') {
+    if (stage === 'aun_no_salio') {
+        text += ' Como todavia no salio a recorrido, soporte puede revisar si todavia hay margen para ayudarte.';
+    } else if (stage === 'en_camino' || stage === 'en_sucursal' || stage === 'con_problema') {
+        text += ' Como ya esta en movimiento o en revision, los cambios suelen tener mas restricciones.';
+    } else if (stage === 'entregado') {
         text += ' Como ya fue entregado, no admite reprogramaciones.';
-    } else if (shipment.statusKey === 'cancelado' || shipment.statusKey === 'cancelada') {
+    } else if (stage === 'cancelado') {
         text += ' Como ya fue cancelado, no tiene una gestion activa.';
     }
 
@@ -409,19 +494,36 @@ function buildManagementResponse(shipment) {
 }
 
 function buildNotificationsResponse(shipment) {
-    const text = shipment
+    const stage = getShipmentStage(shipment?.statusKey);
+    let text = shipment
         ? 'Por ahora no podes activar alertas para ' + shipment.trackingId + ' desde esta vista. La consulta sigue siendo manual desde esta pagina.'
         : 'Por ahora este portal no permite activar alertas por mail o SMS. La consulta sigue siendo manual desde esta pagina.';
+    let actions = [
+        createAction('Historial', 'show-history'),
+        createAction('Hablar con soporte', 'show-support'),
+        createAction('Estado actual', 'show-status'),
+    ];
+
+    if (!shipment) {
+        actions = [
+            createAction('Buscar mi envio', 'request-lookup'),
+            createAction('Hablar con soporte', 'show-support'),
+            createAction('Ver menu principal', 'show-main-menu'),
+        ];
+    } else if (stage === 'entregado') {
+        text = 'Este envio ya fue entregado. Si necesitabas una confirmacion extra, te conviene revisar el comprobante o hablar con soporte.';
+        actions = [
+            createAction('Comprobante de entrega', 'show-pod'),
+            createAction('Historial', 'show-history'),
+            createAction('Hablar con soporte', 'show-support'),
+        ];
+    }
 
     return {
         messages: [
             createMessage({
                 text,
-                actions: [
-                    createAction('Historial de movimientos', 'show-history'),
-                    createAction('Hablar con soporte', 'show-support'),
-                    createAction('Estado actual', 'show-status'),
-                ],
+                actions,
             }),
         ],
         effects: [],
