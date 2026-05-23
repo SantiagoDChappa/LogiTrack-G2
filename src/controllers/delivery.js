@@ -34,6 +34,7 @@ const saveFailedAttempt = async (req, res) => {
         const suggestedDate = getSuggestedDate(reason);
 
         await failedAttemptModel.create({
+            
             shipmentId:    shipment.id,
             reason,
             observation:   observation || null,
@@ -43,7 +44,24 @@ const saveFailedAttempt = async (req, res) => {
             suggestedDate,
             status:        'pendiente'
         });
+        // Verificar si superó el máximo de intentos fallidos
+        const settingModel = require('../models/setting');
+        const settings = await settingModel.getAll();
+        const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
 
+        const intentosPrevios = await failedAttemptModel.getByShipmentId(shipment.id);
+        console.log(`[Intentos fallidos] Envío ${shipment.id}: ${intentosPrevios.length} intentos, máximo: ${maxIntentos}`);
+        if (intentosPrevios.length > maxIntentos) {
+            await ShipmentModel.updateStatus(shipment.id, 5); // 5 = Cancelado
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: shipment.statusId,
+                toStatusId:   5,
+                comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
+                userId:       res.locals.currentUser?.id || null,
+                eventType:    'STATUS_CHANGE',
+            });
+        }
         await shipmentHistoryModel.create({
             shipmentId:   shipment.id,
             fromStatusId: shipment.statusId,

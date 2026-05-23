@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiTrack - Seguimiento de Envios</title>
+    <title><%= support.nombre %> - Seguimiento de Envios</title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -16,8 +16,8 @@
 
     <nav class="portal-nav">
         <a href="/" class="portal-brand">
-            <img src="/images/logo.png" alt="LogiTrack" class="portal-logo">
-            <span>LogiTrack</span>
+            <img src="/images/logo.png" alt="<%= support.nombre %>" class="portal-logo">
+            <span><%= support.nombre %></span>
         </a>
         <div class="portal-nav-right">
             <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
@@ -294,27 +294,36 @@
                 </details>
             </div>
 
-            <div class="portal-faq-col portal-contact" id="portal-support-section">
+<div class="portal-faq-col portal-contact" id="portal-support-section">
                 <h2 class="portal-faq-title">Contacto y soporte</h2>
                 <div class="portal-contact-item">
                     <span class="material-symbols-outlined">support_agent</span>
                     <div>
                         <strong>Atencion al cliente</strong>
-                        <span>Lunes a viernes, 9 a 18 hs</span>
+                        <span><%= support.hours %></span>
                     </div>
                 </div>
+                <% if (support.telefono) { %>
+                <div class="portal-contact-item">
+                    <span class="material-symbols-outlined">phone</span>
+                    <div>
+                        <strong>Teléfono</strong>
+                        <span><%= support.telefono %></span>
+                    </div>
+                </div>
+                <% } %>
                 <div class="portal-contact-item">
                     <span class="material-symbols-outlined">mail</span>
                     <div>
                         <strong>Email</strong>
-                        <span>soporte@logitrack.com</span>
+                        <span><%= support.email %></span>
                     </div>
                 </div>
                 <div class="portal-contact-item">
                     <span class="material-symbols-outlined">business</span>
                     <div>
-                        <strong>Sos empresa?</strong>
-                        <a href="/login">Accede al panel empresarial</a>
+                        <strong>¿Sos empresa?</strong>
+                        <a href="/login">Accedé al panel empresarial</a>
                     </div>
                 </div>
             </div>
@@ -326,15 +335,15 @@
     <footer class="portal-footer">
         <div class="portal-footer-inner">
             <div class="portal-footer-brand">
-                <img src="/images/logo.png" alt="LogiTrack" class="portal-logo">
-                <span>LogiTrack</span>
+                <img src="/images/logo.png" alt="<%= support.nombre %>" class="portal-logo">
+                <span><%= support.nombre %></span>
             </div>
             <div class="portal-footer-links">
                 <a href="#">Aviso de privacidad</a>
-                <a href="#">Terminos y condiciones</a>
-                <a href="#">Sobre LogiTrack</a>
+                <a href="#">Términos y condiciones</a>
+                <a href="#">Sobre <%= support.nombre %></a>
             </div>
-            <p class="portal-footer-copy">© <%= new Date().getFullYear() %> LogiTrack. Todos los derechos reservados.</p>
+            <p class="portal-footer-copy">© <%= new Date().getFullYear() %> <%= support.nombre %>. Todos los derechos reservados.</p>
         </div>
     </footer>
 

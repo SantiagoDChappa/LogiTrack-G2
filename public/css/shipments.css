@@ -692,7 +692,8 @@
 .status-badge.en-transito  { background-color: var(--badge-transit-bg);    color: var(--badge-transit-text);    }
 .status-badge.entregado    { background-color: var(--badge-delivered-bg);  color: var(--badge-delivered-text);  }
 .status-badge.retrasado    { background-color: var(--badge-delayed-bg);    color: var(--badge-delayed-text);    }
-.status-badge.cancelado,
+.status-badge.cancelado    { background-color: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text);  }
+.status-badge.expirado     { background: #92400e20; color: #92400e; border: 1px solid #92400e40; }
 .status-badge.cancelada    { background-color: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text);  }
 .status-badge.en_sucursal  { background-color: var(--badge-warehouse-bg);  color: var(--badge-warehouse-text);  }
 .status-badge.inicial      { background-color: var(--badge-initial-bg);    color: var(--badge-initial-text);    }

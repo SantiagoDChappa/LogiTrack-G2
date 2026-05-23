@@ -281,7 +281,24 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             suggestedDate:    getSuggestedDate(reason),
             status:           retrySameDay ? 'reintento_mismo_dia' : 'pendiente',
         });
-
+        // Verificar si superó el máximo de intentos fallidos
+        const settingModel = require('../models/setting');
+        const settings = await settingModel.getAll();
+        const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
+        const intentosPrevios = await failedAttemptModel.getByShipmentId(stop.shipmentId);
+        if (intentosPrevios.length >= maxIntentos) {
+            const shipmentHistoryModel = require('../models/shipmentHistory');
+            const { Shipment } = require('../models/shipment');
+            await Shipment.update({ statusId: 5 }, { where: { id: stop.shipmentId } });
+            await shipmentHistoryModel.create({
+                shipmentId:   stop.shipmentId,
+                fromStatusId: Status.FAILED_ATTEMPT.id,
+                toStatusId:   5,
+                comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
+                userId:       res.locals.currentUser?.id || null,
+                eventType:    'STATUS_CHANGE',
+            });
+        }
         if (retrySameDay) {
             // No transito de estado: shipment sigue IN_TRANSIT. El stop se marca como saltado
             // para revisitar al final. Se loguea evento en history.

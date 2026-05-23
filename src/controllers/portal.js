@@ -7,6 +7,7 @@ const { Province } = require('../models/province');
 const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
+const settingModel = require('../models/setting');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -125,12 +126,25 @@ const buildChatbotData = ({ searched, query, error = '', searchType = null, ship
 });
 
 const getPortal = async (req, res) => {
+    const [nombreEmpresa, telefonoSoporte, emailSoporte] = await Promise.all([
+        settingModel.get('nombre_empresa'),
+        settingModel.get('telefono_soporte'),
+        settingModel.get('email_soporte'),
+    ]);
+
+    const supportInfo = {
+        nombre: nombreEmpresa || 'LogiTrack',
+        telefono: telefonoSoporte || '0800-555-5678',
+        email: emailSoporte || 'soporte@logitrack.com',
+        hours: 'Lunes a viernes, 9 a 18 hs',
+    };
     const raw = req.query.q;
     const q = (Array.isArray(raw) ? raw.find((value) => value.trim() !== '') || '' : raw || '').trim();
     const searchType = /^\d+$/.test(q) ? 'dni' : 'codigo';
 
     if (!q) {
         return res.render('portal', {
+            support: supportInfo,
             searched: false,
             query: '',
             searchType: null,
@@ -181,6 +195,7 @@ const getPortal = async (req, res) => {
                 ? 'No se encontraron envios asociados a ese DNI.'
                 : 'No se encontro ningun envio con ese codigo de seguimiento.';
             return res.render('portal', {
+                support: supportInfo,
                 searched: true,
                 query: q,
                 error: errorMsg,
@@ -273,6 +288,7 @@ const getPortal = async (req, res) => {
         }));
 
         return res.render('portal', {
+            support: supportInfo,
             searched: true,
             query: q,
             searchType,
@@ -283,6 +299,7 @@ const getPortal = async (req, res) => {
         console.error('Portal search error:', err);
         const errorMsg = 'Ocurrio un error al realizar la busqueda. Por favor, intenta nuevamente.';
         return res.render('portal', {
+            support: supportInfo,
             searched: true,
             query: q,
             error: errorMsg,

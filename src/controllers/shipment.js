@@ -183,18 +183,40 @@ const getDetail = async (req, res) => {
     })();
 
     // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
-    const costClient = (() => {
-        if (!shipment.zone) { return null; }
-        const zone = shipment.zone;
+const costClient = await (async () => {
+        const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
         const w = Number(shipment.weightKg || 0);
         const v = Number(shipment.volumeM3 || 0);
-        const base = Number(zone.baseCost || 0);
+
+        if (!shipment.zone) {
+            return costoBase > 0 ? {
+                costoBase,
+                zoneBase: 0,
+                wSurcharge: 0,
+                vSurcharge: 0,
+                subtotal: costoBase,
+                penalty: 0,
+                final: costoBase
+            } : null;
+        }
+
+        const zone = shipment.zone;
+        const zoneBase = Number(zone.baseCost || 0);
         const wSurcharge = Number(zone.surchargePerKg || 0) * w;
         const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
-        const subtotal = base + wSurcharge + vSurcharge;
+        const subtotal = costoBase + zoneBase + wSurcharge + vSurcharge;
         const penalty = sla?.penaltyPct ? subtotal * (sla.penaltyPct / 100) : 0;
-        return { base, wSurcharge, vSurcharge, subtotal, penalty: Number(penalty.toFixed(2)), final: Number((subtotal - penalty).toFixed(2)) };
+        return {
+            costoBase,
+            zoneBase,
+            wSurcharge,
+            vSurcharge,
+            subtotal,
+            penalty: Number(penalty.toFixed(2)),
+            final: Number((subtotal - penalty).toFixed(2))
+        };
     })();
+    
 
     res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel, sla, costClient });
 };
@@ -222,6 +244,18 @@ const createShipment = async (req, res) => {
         const body = req.body;
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+
+        // Validar contra parámetros configurables del sistema
+        const settings = await settingModel.getAll();
+        const pesoMaximo = parseFloat(settings.peso_maximo_envio) || 50;
+        const cantMaxima = parseInt(settings.cantidad_maxima_paquetes) || 20;
+
+        if (parseFloat(body.weightKg) > pesoMaximo) {
+            throw new Error(`El peso no puede superar ${pesoMaximo} kg (configurado en Ajustes)`);
+        }
+        if (parseInt(body.packageQty) > cantMaxima) {
+            throw new Error(`La cantidad de paquetes no puede superar ${cantMaxima} (configurado en Ajustes)`);
+        }
 
         if (body.addressLat && body.addressLng && body.province) {
             const { isCoordInProvince, findProvinceByCoord } = require('../utils/provinceBbox');

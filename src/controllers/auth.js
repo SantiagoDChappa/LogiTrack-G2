@@ -3,7 +3,7 @@ const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 const branchModel = require('../models/branch');
 
-const getLogin = (req, res) => {
+const getLogin = async (req, res) => {
     if (req.cookies?.token) {
         try {
             require('jsonwebtoken').verify(req.cookies.token, process.env.JWT_SECRET);
@@ -12,26 +12,28 @@ const getLogin = (req, res) => {
             res.clearCookie('token');
         }
     }
+    const settingModel = require('../models/setting');
+    const nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
     const returnTo = req.query.returnTo || '';
-    return res.render('login', { returnTo });
+    return res.render('login', { returnTo, nombreEmpresa });
 };
 
 const login = async (req, res) => {
+    const settingModel = require('../models/setting');
+    const nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
     const {email, password} = req.body;
 
     const user = await userModel.findByEmail(email);
     if(!user){
-        return res.render('login', { error: 'Email o contraseña incorrectos'});
+        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if(!match){
-        return res.render('login', { error: 'Email o contraseña incorrectos'});
+        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa });
     }
 
     const branch = user.branchId ? await branchModel.getById(user.branchId) : null;
-
-
 
     const token = JWT.sign(
         {

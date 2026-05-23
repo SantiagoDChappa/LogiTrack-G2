@@ -3,7 +3,7 @@
 <head>
     <%- include('partials/head') %>
     <link rel="stylesheet" href="/css/login.css">
-    <title>LogiTrack — Iniciar sesión</title>
+    <title><%= nombreEmpresa %> — Iniciar sesión</title>
 </head>
 <body>
 
@@ -18,8 +18,8 @@
 
             <!-- Logo -->
             <div class="login-brand">
-                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
-                <h1>LogiTrack</h1>
+                <img src="/images/logo.png" alt="<%= nombreEmpresa %>" class="login-logo">
+                <h1><%= nombreEmpresa %></h1>
                 <p>Sistema de gestión de envíos</p>
             </div>
 
