@@ -223,6 +223,18 @@ const createShipment = async (req, res) => {
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
 
+        // Validar contra parámetros configurables del sistema
+        const settings = await settingModel.getAll();
+        const pesoMaximo = parseFloat(settings.peso_maximo_envio) || 50;
+        const cantMaxima = parseInt(settings.cantidad_maxima_paquetes) || 20;
+
+        if (parseFloat(body.weightKg) > pesoMaximo) {
+            throw new Error(`El peso no puede superar ${pesoMaximo} kg (configurado en Ajustes)`);
+        }
+        if (parseInt(body.packageQty) > cantMaxima) {
+            throw new Error(`La cantidad de paquetes no puede superar ${cantMaxima} (configurado en Ajustes)`);
+        }
+
         if (body.addressLat && body.addressLng && body.province) {
             const { isCoordInProvince, findProvinceByCoord } = require('../utils/provinceBbox');
             const lat = parseFloat(body.addressLat);

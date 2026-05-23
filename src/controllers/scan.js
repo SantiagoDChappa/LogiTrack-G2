@@ -118,6 +118,25 @@ const postFailedAttempt = async (req, res) => {
             operatorId:    currentUser.id,
         });
 
+        // Verificar si superó el máximo de intentos fallidos
+        const settingModel = require('../models/setting');
+        const settings = await settingModel.getAll();
+        const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
+        const intentosPrevios = await failedAttemptModel.getByShipmentId(shipment.id);
+        console.log(`[Intentos fallidos] Envío ${shipment.id}: ${intentosPrevios.length} intentos, máximo: ${maxIntentos}`);
+        if (intentosPrevios.length >= maxIntentos) {
+            const shipmentHistoryModel = require('../models/shipmentHistory');
+            await shipmentModel.updateStatus(shipment.id, 5);
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: Status.FAILED_ATTEMPT.id,
+                toStatusId:   5,
+                comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
+                userId:       currentUser?.id || null,
+                eventType:    'STATUS_CHANGE',
+            });
+        }
+
         const newStatus = await statusModel.getById(Status.FAILED_ATTEMPT.id);
         if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
 
