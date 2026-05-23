@@ -207,6 +207,18 @@
                             <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
                                 Programá los procesos en horarios de baja actividad para reducir costos de infraestructura en AWS.
                             </small>
+                            <div style="margin-top:var(--space-3);padding:12px 16px;background:rgba(37,99,235,0.06);border-left:3px solid var(--color-primary);border-radius:6px;font-size:0.82rem;color:var(--color-text-secondary);line-height:1.6">
+                                <strong style="color:var(--color-text);display:block;margin-bottom:4px">
+                                    <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">cloud</span>
+                                    ¿Por qué configurar el horario?
+                                </strong>
+                                En infraestructura cloud (AWS Lambda, EC2, etc.) el costo se calcula por uso. 
+                                Programar procesos pesados como reportes automáticos, notificaciones masivas y revisión de prioridades 
+                                en horarios de <strong>baja actividad</strong> (ej: 02:00 a 05:00 hs) permite reducir significativamente 
+                                los costos operativos, ya que estos procesos no compiten con el tráfico de usuarios activos. 
+                                Por ejemplo, si el sistema corre en una instancia EC2 bajo demanda, ejecutar tareas en horario pico 
+                                puede costar hasta <strong>3 veces más</strong> que en horario nocturno.
+                            </div>
                         </div>
 
                         <div class="field">
