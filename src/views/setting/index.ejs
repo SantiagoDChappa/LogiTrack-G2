@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
@@ -40,6 +41,40 @@
             margin-bottom: var(--space-5);
             line-height: 1.5;
         }
+        #form-notification-config {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            margin-top: var(--space-4);
+        }
+        .notification-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 16px;
+            border: 1px solid #dcdcdc;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .notification-item:hover {
+            background-color: #f1f3f5;
+            border-color: #bdbdbd;
+        }
+        .notification-item span {
+            color: #333;
+        }
+        .notification-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
         .settings-actions {
             display: flex;
             justify-content: flex-end;
@@ -70,6 +105,7 @@
     </style>
     <link rel="stylesheet" href="/css/settings.css">
 </head>
+
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
@@ -213,11 +249,11 @@
                                     <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">cloud</span>
                                     ¿Por qué configurar el horario?
                                 </strong>
-                                En infraestructura cloud (AWS Lambda, EC2, etc.) el costo se calcula por uso. 
-                                Programar procesos pesados como reportes automáticos, notificaciones masivas y revisión de prioridades 
-                                en horarios de <strong>baja actividad</strong> (ej: 02:00 a 05:00 hs) permite reducir significativamente 
-                                los costos operativos, ya que estos procesos no compiten con el tráfico de usuarios activos. 
-                                Por ejemplo, si el sistema corre en una instancia EC2 bajo demanda, ejecutar tareas en horario pico 
+                                En infraestructura cloud (AWS Lambda, EC2, etc.) el costo se calcula por uso.
+                                Programar procesos pesados como reportes automáticos, notificaciones masivas y revisión de prioridades
+                                en horarios de <strong>baja actividad</strong> (ej: 02:00 a 05:00 hs) permite reducir significativamente
+                                los costos operativos, ya que estos procesos no compiten con el tráfico de usuarios activos.
+                                Por ejemplo, si el sistema corre en una instancia EC2 bajo demanda, ejecutar tareas en horario pico
                                 puede costar hasta <strong>3 veces más</strong> que en horario nocturno.
                             </div>
                         </div>
@@ -247,6 +283,19 @@
                         </div>
 
                     </div>
+
+                    <!-- Configuración de notificaciones por evento -->
+                    <div id="form-notification-config">
+                        <span>Notificaciones via email de estados a los destinatarios del envío</span>
+                        <% notifConfig.forEach(config => { %>
+                            <label for="cbox_<%= config.eventCode %>" class="notification-item">
+                                <span><%= config.description %></span>
+                                <input type="checkbox" name="cbox_<%= config.eventCode %>"
+                                    id="cbox_<%= config.eventCode %>" <%= config.enabled ? 'checked' : '' %>>
+                            </label>
+                        <% }) %>
+                    </div>
+
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">
                             <span class="material-symbols-outlined">save</span>
@@ -405,13 +454,10 @@
                 </div>
                 <% } %>
             </div>
-
         </div>
     </main>
 
-    <%
-        const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
-    %>
+    <% const _currentProv = provinces.find(p => p.id == settings.origin_province_id); %>
     <script id="setting-addr-data" type="application/json"><%- JSON.stringify({
         street: settings.origin_street || null,
         number: settings.origin_number || null,
@@ -461,4 +507,5 @@
         }
     </script>
 </body>
+
 </html>

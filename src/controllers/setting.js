@@ -1,24 +1,28 @@
-const settingModel  = require('../models/setting');
+const settingModel = require('../models/setting');
 const provinceModel = require('../models/province');
-const branchModel   = require('../models/branch');
-const userModel     = require('../models/user');
+const branchModel = require('../models/branch');
+const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
+const NotificationConfigModel = require('../models/notificationConfig');
 const settingLogModel = require('../models/settingLog');
 const { expireShipments } = require('../utils/expireShipments');
 
 const getSettings = async (req, res) => {
-    const [settings, provinces, branches, users, routeOpt, settingLogs] = await Promise.all([
+    const [settings, provinces, branches, users, routeOpt, notifConfig, settingLogs] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
         userModel.getAll(),
         getRouteOptimizerSettings(),
+        NotificationConfigModel.getAllConfigs(),
         settingLogModel.getAll(),
     ]);
 
+
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
-    res.render('setting/index', { settings, provinces, branches, users, routeOpt, settingLogs,
+    res.render('setting/index', {
+        settings, notifConfig, provinces, branches, users, routeOpt, settingLogs,
         params: {
             max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
             dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
@@ -44,10 +48,10 @@ const GEOREF = 'https://apis.datos.gob.ar/georef/api';
 async function geocodeOrigin(street, number, province) {
     try {
         const query = `${street} ${number}`;
-        const url   = `${GEOREF}/direcciones?direccion=${encodeURIComponent(query)}&provincia=${province.indec}&max=1&campos=estandar`;
-        const resp  = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        const data  = await resp.json();
-        const item  = (data.direcciones || [])[0];
+        const url = `${GEOREF}/direcciones?direccion=${encodeURIComponent(query)}&provincia=${province.indec}&max=1&campos=estandar`;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        const data = await resp.json();
+        const item = (data.direcciones || [])[0];
         if (item?.ubicacion?.lat) {
             return { lat: item.ubicacion.lat, lng: item.ubicacion.lon };
         }
@@ -58,7 +62,7 @@ async function geocodeOrigin(street, number, province) {
 const saveSettings = async (req, res) => {
     const { origin_province_id, origin_street, origin_number, origin_postal_code } = req.body;
     const provinceId = parseInt(origin_province_id);
-    const province   = PROVINCES[provinceId];
+    const province = PROVINCES[provinceId];
 
     if (!province) { return res.redirect('/setting'); }
 
@@ -75,26 +79,26 @@ const saveSettings = async (req, res) => {
     }
 
     await Promise.all([
-        settingModel.set('origin_province_id',  String(provinceId)),
-        settingModel.set('origin_province_ml',  province.ml),
-        settingModel.set('origin_lat',          String(lat)),
-        settingModel.set('origin_lng',          String(lng)),
-        settingModel.set('origin_street',       street),
-        settingModel.set('origin_number',       number),
-        settingModel.set('origin_postal_code',  (origin_postal_code || '').trim()),
+        settingModel.set('origin_province_id', String(provinceId)),
+        settingModel.set('origin_province_ml', province.ml),
+        settingModel.set('origin_lat', String(lat)),
+        settingModel.set('origin_lng', String(lng)),
+        settingModel.set('origin_street', street),
+        settingModel.set('origin_number', number),
+        settingModel.set('origin_postal_code', (origin_postal_code || '').trim()),
     ]);
 
     res.redirect('/setting?success=1');
 };
 
 const ROUTE_SETTINGS = {
-    piggyback_enabled:           { default: 'false', parse: v => v === 'true' || v === 'on' || v === '1' },
-    piggyback_max_extra_pct:     { default: '15',    parse: v => Math.max(0, Number(v) || 0) },
-    piggyback_max_extra_km:      { default: '30',    parse: v => Math.max(0, Number(v) || 0) },
-    piggyback_max_extra_cost_pct:{ default: '20',    parse: v => Math.max(0, Number(v) || 0) },
-    urgent_combine_enabled:      { default: 'true',  parse: v => v === 'true' || v === 'on' || v === '1' },
-    urgent_combine_max_km:       { default: '15',    parse: v => Math.max(0, Number(v) || 0) },
-    cluster_merge_radius_km:     { default: '60',    parse: v => Math.max(0, Number(v) || 0) },
+    piggyback_enabled: { default: 'false', parse: v => v === 'true' || v === 'on' || v === '1' },
+    piggyback_max_extra_pct: { default: '15', parse: v => Math.max(0, Number(v) || 0) },
+    piggyback_max_extra_km: { default: '30', parse: v => Math.max(0, Number(v) || 0) },
+    piggyback_max_extra_cost_pct: { default: '20', parse: v => Math.max(0, Number(v) || 0) },
+    urgent_combine_enabled: { default: 'true', parse: v => v === 'true' || v === 'on' || v === '1' },
+    urgent_combine_max_km: { default: '15', parse: v => Math.max(0, Number(v) || 0) },
+    cluster_merge_radius_km: { default: '60', parse: v => Math.max(0, Number(v) || 0) },
 };
 
 const getRouteOptimizerSettings = async () => {
@@ -108,29 +112,29 @@ const getRouteOptimizerSettings = async () => {
 
 const saveRouteOptimizerSettings = async (req, res) => {
     const body = req.body || {};
-    const piggyEnabled  = body.piggyback_enabled === 'on'      || body.piggyback_enabled === 'true'      || body.piggyback_enabled === '1';
+    const piggyEnabled = body.piggyback_enabled === 'on' || body.piggyback_enabled === 'true' || body.piggyback_enabled === '1';
     const urgentEnabled = body.urgent_combine_enabled === 'on' || body.urgent_combine_enabled === 'true' || body.urgent_combine_enabled === '1';
     await Promise.all([
-        settingModel.set('piggyback_enabled',            piggyEnabled ? 'true' : 'false'),
-        settingModel.set('piggyback_max_extra_pct',      String(Math.max(0, Number(body.piggyback_max_extra_pct) || 0))),
-        settingModel.set('piggyback_max_extra_km',       String(Math.max(0, Number(body.piggyback_max_extra_km) || 0))),
+        settingModel.set('piggyback_enabled', piggyEnabled ? 'true' : 'false'),
+        settingModel.set('piggyback_max_extra_pct', String(Math.max(0, Number(body.piggyback_max_extra_pct) || 0))),
+        settingModel.set('piggyback_max_extra_km', String(Math.max(0, Number(body.piggyback_max_extra_km) || 0))),
         settingModel.set('piggyback_max_extra_cost_pct', String(Math.max(0, Number(body.piggyback_max_extra_cost_pct) || 0))),
-        settingModel.set('urgent_combine_enabled',       urgentEnabled ? 'true' : 'false'),
-        settingModel.set('urgent_combine_max_km',        String(Math.max(0, Number(body.urgent_combine_max_km) || 0))),
-        settingModel.set('cluster_merge_radius_km',      String(Math.max(0, Number(body.cluster_merge_radius_km) || 0))),
+        settingModel.set('urgent_combine_enabled', urgentEnabled ? 'true' : 'false'),
+        settingModel.set('urgent_combine_max_km', String(Math.max(0, Number(body.urgent_combine_max_km) || 0))),
+        settingModel.set('cluster_merge_radius_km', String(Math.max(0, Number(body.cluster_merge_radius_km) || 0))),
     ]);
     res.redirect('/setting?success=3');
 };
 
 const assignBranch = async (req, res) => {
-    const userIds   = [].concat(req.body['userId[]']   || req.body.userId   || []);
+    const userIds = [].concat(req.body['userId[]'] || req.body.userId || []);
     const branchIds = [].concat(req.body['branchId[]'] || req.body.branchId || []);
 
     if (userIds.length === 0) { return res.redirect('/setting'); }
 
     await Promise.all(
         userIds.map((uid, i) => {
-            const userId   = parseInt(uid);
+            const userId = parseInt(uid);
             const branchId = branchIds[i] ? parseInt(branchIds[i]) : null;
             return userModel.update(userId, { branchId });
         })
@@ -185,7 +189,7 @@ const saveParams = async (req, res) => {
         }
 
         const horaInicio = req.body.horario_entrega_inicio;
-        const horaFin    = req.body.horario_entrega_fin;
+        const horaFin = req.body.horario_entrega_fin;
         if (horaInicio >= horaFin) {
             return res.redirect('/setting?error=horario');
         }
@@ -203,7 +207,23 @@ const saveParams = async (req, res) => {
             await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
             return settingModel.set(key, value);
         }));
-           
+
+        // Configuración de notificaciones por evento
+        const notifyConfigs = await NotificationConfigModel.getAllConfigs();
+        const body = req.body;
+
+        for (const config of notifyConfigs) {
+            const checkboxName = `cbox_${config.eventCode}`;
+            const shouldBeEnabled = body[checkboxName] === 'on';
+
+            if (config.enabled !== shouldBeEnabled) {
+                await NotificationConfigModel.NotificationConfig.update(
+                    { enabled: shouldBeEnabled },
+                    { where: { id: config.id } }
+                );
+            }
+        }
+
         // Ejecutar proceso automático de expiración
         expireShipments();
         res.redirect('/setting?success=4');
