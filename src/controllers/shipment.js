@@ -183,18 +183,40 @@ const getDetail = async (req, res) => {
     })();
 
     // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
-    const costClient = (() => {
-        if (!shipment.zone) { return null; }
-        const zone = shipment.zone;
+const costClient = await (async () => {
+        const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
         const w = Number(shipment.weightKg || 0);
         const v = Number(shipment.volumeM3 || 0);
-        const base = Number(zone.baseCost || 0);
+
+        if (!shipment.zone) {
+            return costoBase > 0 ? {
+                costoBase,
+                zoneBase: 0,
+                wSurcharge: 0,
+                vSurcharge: 0,
+                subtotal: costoBase,
+                penalty: 0,
+                final: costoBase
+            } : null;
+        }
+
+        const zone = shipment.zone;
+        const zoneBase = Number(zone.baseCost || 0);
         const wSurcharge = Number(zone.surchargePerKg || 0) * w;
         const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
-        const subtotal = base + wSurcharge + vSurcharge;
+        const subtotal = costoBase + zoneBase + wSurcharge + vSurcharge;
         const penalty = sla?.penaltyPct ? subtotal * (sla.penaltyPct / 100) : 0;
-        return { base, wSurcharge, vSurcharge, subtotal, penalty: Number(penalty.toFixed(2)), final: Number((subtotal - penalty).toFixed(2)) };
+        return {
+            costoBase,
+            zoneBase,
+            wSurcharge,
+            vSurcharge,
+            subtotal,
+            penalty: Number(penalty.toFixed(2)),
+            final: Number((subtotal - penalty).toFixed(2))
+        };
     })();
+    
 
     res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel, sla, costClient });
 };

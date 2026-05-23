@@ -1,16 +1,16 @@
 const jwt = require('jsonwebtoken');
 
-const requireAuth = (req, res, next) => {
+const requireAuth = async (req, res, next) => {
     const token = req.cookies.token;
-
     if (!token) {
         const returnTo = req.originalUrl;
         return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
-
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         res.locals.currentUser = decoded;
+        const settingModel = require('../models/setting');
+        res.locals.nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
         next();
     } catch {
         const returnTo = req.originalUrl;
