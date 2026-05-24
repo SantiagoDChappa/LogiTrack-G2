@@ -20,6 +20,7 @@
         selectedShipmentId: 'portalChatbotSelectedShipmentId',
         restorePending: 'portalChatbotRestorePending',
         thread: 'portalChatbotThread',
+        incidentDraft: 'portalChatbotIncidentDraft',
     };
     const INIT_GREETING = 'Hola. Te ayudo a seguir tu envio y entender que esta pasando.';
 
@@ -27,6 +28,7 @@
     const state = {
         pendingAction: null,
         selectedShipmentId: readStorage(STORAGE_KEYS.selectedShipmentId) || null,
+        incidentDraft: readJsonStorage(STORAGE_KEYS.incidentDraft) || null,
     };
     let thread = [];
 
@@ -141,6 +143,7 @@
                     state: {
                         pendingAction: state.pendingAction,
                         selectedShipmentId: state.selectedShipmentId,
+                        incidentDraft: state.incidentDraft,
                     },
                     input,
                 }),
@@ -182,6 +185,13 @@
     function syncState(nextState) {
         state.selectedShipmentId = nextState.selectedShipmentId || null;
         state.pendingAction = nextState.pendingAction || null;
+        state.incidentDraft = nextState.incidentDraft || null;
+
+        if (state.incidentDraft) {
+            writeJsonStorage(STORAGE_KEYS.incidentDraft, state.incidentDraft);
+        } else {
+            removeStorage(STORAGE_KEYS.incidentDraft);
+        }
 
         if (state.selectedShipmentId) {
             writeStorage(STORAGE_KEYS.selectedShipmentId, state.selectedShipmentId);
@@ -475,6 +485,24 @@
             window.sessionStorage.removeItem(key);
         } catch (error) {
             // ignore storage errors
+        }
+    }
+
+    function writeJsonStorage(key, value) {
+        try {
+            window.sessionStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            // ignore storage errors
+        }
+    }
+
+    function readJsonStorage(key) {
+        try {
+            const raw = window.sessionStorage.getItem(key);
+            if (!raw) { return null; }
+            return JSON.parse(raw);
+        } catch (error) {
+            return null;
         }
     }
 })();
