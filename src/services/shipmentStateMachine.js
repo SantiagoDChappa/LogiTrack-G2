@@ -53,7 +53,7 @@ const buildAutoComment = ({ fromStatusId, toStatusId }) => {
 
 const TRANSITIONS = {
     [S.PENDING.id]:        [S.ASSIGNED.id, S.CANCELLED.id],
-    [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.IN_TRANSIT.id, S.CANCELLED.id],
+    [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.IN_TRANSIT.id, S.DELIVERED.id, S.CANCELLED.id],
     [S.IN_PREPARATION.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.IN_TRANSIT.id]:     [S.AT_BRANCH.id, S.DELIVERED.id, S.FAILED_ATTEMPT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.AT_BRANCH.id]:      [S.ASSIGNED.id, S.PACKAGE_FAILED.id],
@@ -69,6 +69,7 @@ const RULES_TARGETED = {
     [`${S.ASSIGNED.id}->${S.IN_PREPARATION.id}`]:        { roles: [R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Iniciar preparacion',    endpoint: '/shipment/update/:id/prepare' },
     [`${S.IN_PREPARATION.id}->${S.IN_TRANSIT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'PICKUP_CONFIRMED',  label: 'Confirmar retiro',       endpoint: '/scan/:trackingId/pickup' },
     [`${S.ASSIGNED.id}->${S.IN_TRANSIT.id}`]:            { roles: [R.DELIVERY.id, R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'ROUTE_DISPATCHED', label: 'Salida de ruta',         endpoint: '/route/scan/:id/dispatch' },
+    [`${S.ASSIGNED.id}->${S.DELIVERED.id}`]:              { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'DELIVERED',         label: 'Confirmar entrega',      endpoint: '/delivery/evidence/:id/pod' },
     [`${S.IN_TRANSIT.id}->${S.DELIVERED.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'DELIVERED',         label: 'Confirmar entrega',      endpoint: '/delivery/evidence/:id/pod' },
     [`${S.IN_TRANSIT.id}->${S.AT_BRANCH.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Marcar en sucursal',     endpoint: '/scan/:trackingId/at-branch' },
     [`${S.IN_TRANSIT.id}->${S.FAILED_ATTEMPT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: true,  eventType: 'FAILED_ATTEMPT',    label: 'Reportar intento fallido', endpoint: '/scan/:trackingId/failed-attempt' },
