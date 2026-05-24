@@ -551,13 +551,6 @@ function buildInitResponse(runtime) {
         return { messages, effects };
     }
 
-    messages.push(createMessage({
-        text: 'Para arrancar, pasame un numero de seguimiento como ENV-001 o el DNI del destinatario.',
-        actions: [
-            createAction('Buscar mi envio', 'request-lookup'),
-            createAction('Ver preguntas frecuentes', 'scroll-faq'),
-        ],
-    }));
     messages.push(buildMainMenuMessage(true));
 
     return { messages, effects };
