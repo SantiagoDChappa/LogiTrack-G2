@@ -528,3 +528,270 @@ html[data-theme="dark"] {
     gap: .55rem;
     flex-wrap: wrap;
 }
+
+/* ============================================================
+   Route detail — KPIs
+   ============================================================ */
+.route-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .75rem;
+    margin-bottom: 1.25rem;
+}
+
+.route-kpi {
+    background: var(--rt-surface);
+    border: 1px solid var(--rt-border);
+    border-radius: var(--rt-radius-lg);
+    padding: 1rem 1.1rem;
+    box-shadow: var(--rt-shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    border-left: 4px solid var(--rt-blue);
+    transition: transform .12s ease, box-shadow .15s ease;
+}
+
+.route-kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--rt-shadow-md);
+}
+
+.route-kpi__label {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--rt-muted);
+}
+
+.route-kpi__value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: var(--rt-text-strong);
+    line-height: 1;
+    letter-spacing: -.02em;
+}
+
+.route-kpi--green { border-left-color: var(--rt-green); }
+.route-kpi--green .route-kpi__value { color: var(--rt-green); }
+
+.route-kpi--red   { border-left-color: var(--rt-red); }
+.route-kpi--red   .route-kpi__value { color: var(--rt-red); }
+
+.route-kpi--amber { border-left-color: var(--rt-amber); }
+.route-kpi--amber .route-kpi__value { color: var(--rt-amber-dark); }
+
+.route-kpi--blue  { border-left-color: var(--rt-blue); }
+
+@media (max-width: 600px) {
+    .route-kpis {
+        grid-template-columns: repeat(2, 1fr);
+        gap: .55rem;
+    }
+    .route-kpi__value { font-size: 1.3rem; }
+    .route-kpi { padding: .75rem .85rem; }
+}
+
+/* ============================================================
+   Route detail — tabla de envíos
+   ============================================================ */
+.route-shipments-card { margin-bottom: 1.25rem; }
+
+.route-shipments-table-wrap {
+    overflow-x: auto;
+    border-radius: var(--rt-radius-md);
+}
+
+.route-shipments-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 720px;
+}
+
+.route-shipments-table thead th {
+    text-align: left;
+    padding: .65rem .85rem;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--rt-muted);
+    background: var(--rt-surface-alt);
+    border-bottom: 1px solid var(--rt-border);
+    white-space: nowrap;
+}
+
+.route-shipments-table tbody td {
+    padding: .75rem .85rem;
+    border-bottom: 1px solid var(--rt-border-soft);
+    font-size: .88rem;
+    color: var(--rt-text);
+    vertical-align: middle;
+}
+
+.route-shipments-table tbody tr:last-child td { border-bottom: 0; }
+.route-shipments-table tbody tr:hover { background: var(--rt-surface-alt); }
+
+.route-shipments-table .col-actions { width: 1%; text-align: right; white-space: nowrap; }
+
+.route-ship-addr {
+    color: var(--rt-muted);
+    font-size: .82rem;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.route-ship-row[data-status="entregado"]       { background: linear-gradient(90deg, rgba(22,163,74,.05), transparent 70%); }
+.route-ship-row[data-status="intento_fallido"] { background: linear-gradient(90deg, rgba(220,38,38,.05), transparent 70%); }
+.route-ship-row[data-status="paquete_fallido"] { background: linear-gradient(90deg, rgba(124,58,237,.05), transparent 70%); }
+.route-ship-row[data-status="cancelado"]       { background: linear-gradient(90deg, rgba(107,114,128,.05), transparent 70%); }
+
+/* En mobile: ocultar columna dirección para que la tabla quepa mejor */
+@media (max-width: 720px) {
+    .route-shipments-table {
+        min-width: 540px;
+    }
+    .route-shipments-table .route-ship-addr,
+    .route-shipments-table thead th:nth-child(4),
+    .route-shipments-table tbody td:nth-child(4) {
+        display: none;
+    }
+}
+
+/* ============================================================
+   Route detail — grid inferior (paradas + timeline)
+   ============================================================ */
+.route-detail-bottom-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.25rem;
+}
+
+@media (max-width: 960px) {
+    .route-detail-bottom-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Línea de tiempo de eventos (timeline global)
+   ============================================================ */
+.route-events {
+    list-style: none;
+    margin: .5rem 0 0;
+    padding: 0 0 0 1.5rem;
+    border-left: 2px solid var(--rt-border);
+}
+
+.route-event {
+    position: relative;
+    padding: .5rem 0 1rem 1.25rem;
+}
+
+.route-event:last-child { padding-bottom: .25rem; }
+
+.route-event__dot {
+    position: absolute;
+    left: -1.85rem;
+    top: .5rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--rt-blue);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--rt-surface);
+    box-shadow: 0 0 0 1px var(--rt-blue);
+}
+
+.route-event__dot .material-symbols-outlined { font-size: .95rem; }
+
+.route-event--green .route-event__dot { background: var(--rt-green); box-shadow: 0 0 0 1px var(--rt-green); }
+.route-event--red   .route-event__dot { background: var(--rt-red);   box-shadow: 0 0 0 1px var(--rt-red); }
+.route-event--amber .route-event__dot { background: var(--rt-amber-dark); box-shadow: 0 0 0 1px var(--rt-amber-dark); }
+.route-event--blue  .route-event__dot { background: var(--rt-blue);  box-shadow: 0 0 0 1px var(--rt-blue); }
+.route-event--gray  .route-event__dot { background: #6b7280;        box-shadow: 0 0 0 1px #6b7280; }
+
+.route-event__body {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+.route-event__head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.route-event__label {
+    font-size: .92rem;
+    color: var(--rt-text-strong);
+    font-weight: 700;
+}
+
+.route-event__tracking {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: .78rem;
+    color: var(--rt-blue);
+    background: rgba(37, 99, 235, .08);
+    padding: .12rem .5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    border: 1px solid rgba(37, 99, 235, .15);
+}
+
+.route-event__time {
+    margin-left: auto;
+    font-size: .75rem;
+    color: var(--rt-muted);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.route-event__detail {
+    font-size: .85rem;
+    color: var(--rt-text);
+    line-height: 1.45;
+    background: var(--rt-surface-alt);
+    border-left: 3px solid var(--rt-border);
+    border-radius: 0 var(--rt-radius-sm) var(--rt-radius-sm) 0;
+    padding: .4rem .65rem;
+    margin-top: .15rem;
+}
+
+.route-event__actor {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .75rem;
+    color: var(--rt-muted);
+    margin-top: .15rem;
+}
+
+.route-event__actor .material-symbols-outlined { font-size: .95rem; }
+
+@media (max-width: 600px) {
+    .route-events { padding-left: 1.1rem; }
+    .route-event__dot { left: -1.55rem; width: 24px; height: 24px; }
+    .route-event__dot .material-symbols-outlined { font-size: .85rem; }
+    .route-event__time {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
+/* ============================================================
+   Map responsive: bajar altura en mobile
+   ============================================================ */
+@media (max-width: 600px) {
+    .update-map-card #map {
+        height: 240px !important;
+    }
+    .detail-tracking-id { font-size: 1.1rem; }
+    .detail-top { padding: .85rem 1rem; }
+}

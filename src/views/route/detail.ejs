@@ -127,55 +127,177 @@
                 </div>
             </div>
 
-            <!-- Paradas -->
-            <div class="update-card">
-                <h3><span class="material-symbols-outlined">pin_drop</span> Paradas (<%= (route.stops || []).length %>)</h3>
-                <% if (!route.stops || route.stops.length === 0) { %>
-                    <p class="historial-empty">Sin paradas registradas.</p>
-                <% } else { %>
-                <ol class="shipment-timeline" style="margin-top:var(--space-4)">
-                    <% route.stops.forEach(function(s) { %>
-                        <li class="shipment-timeline-item">
-                            <%
-                                const _stopIcon  = s.stopType === 'pickup' ? 'warehouse' : (s.stopType === 'service' ? 'local_gas_station' : 'home');
-                                const _stopLabel = s.stopType === 'pickup' ? 'Pickup' : (s.stopType === 'service' ? 'Servicio (combustible/descanso)' : 'Entrega');
-                                const _stopCls   = s.completed ? 'entregado' : (s.stopType === 'pickup' ? 'en_sucursal' : (s.stopType === 'service' ? 'retrasado' : 'pendiente'));
-                                const _detailIco = s.stopType === 'pickup' ? 'store' : (s.stopType === 'service' ? 'local_gas_station' : 'package_2');
+            <!-- KPIs de la ruta -->
+            <% if (kpis && kpis.deliveries > 0) { %>
+            <div class="route-kpis">
+                <div class="route-kpi">
+                    <span class="route-kpi__label">Entregas</span>
+                    <span class="route-kpi__value"><%= kpis.deliveries %></span>
+                </div>
+                <div class="route-kpi route-kpi--green">
+                    <span class="route-kpi__label">Entregados</span>
+                    <span class="route-kpi__value"><%= kpis.delivered %></span>
+                </div>
+                <div class="route-kpi route-kpi--red">
+                    <span class="route-kpi__label">Fallidos</span>
+                    <span class="route-kpi__value"><%= kpis.failed %></span>
+                </div>
+                <div class="route-kpi route-kpi--blue">
+                    <span class="route-kpi__label">Devueltos sucursal</span>
+                    <span class="route-kpi__value"><%= kpis.returned %></span>
+                </div>
+                <div class="route-kpi route-kpi--amber">
+                    <span class="route-kpi__label">Pendientes</span>
+                    <span class="route-kpi__value"><%= kpis.pending %></span>
+                </div>
+                <div class="route-kpi">
+                    <span class="route-kpi__label">Paradas hechas</span>
+                    <span class="route-kpi__value"><%= kpis.stopsDone %> / <%= kpis.stopsTotal %></span>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Envíos de la ruta -->
+            <% if (shipmentsSummary && shipmentsSummary.length > 0) { %>
+            <div class="update-card route-shipments-card">
+                <h3><span class="material-symbols-outlined">inventory_2</span> Envíos de la ruta (<%= shipmentsSummary.length %>)</h3>
+                <div class="route-shipments-table-wrap">
+                    <table class="route-shipments-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Tracking</th>
+                                <th>Destinatario</th>
+                                <th>Dirección</th>
+                                <th>Estado final</th>
+                                <th>Parada</th>
+                                <th class="col-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% shipmentsSummary.forEach(s => {
+                                const _skey = STATUS_KEY(s.statusId);
+                                let stopState = 'Pendiente';
+                                let stopCls = 'pendiente';
+                                if (s.stopCompleted) { stopState = 'Completada'; stopCls = 'entregado'; }
+                                else if (s.stopSkipped) { stopState = 'Postergada'; stopCls = 'retrasado'; }
                             %>
-                            <span class="shipment-timeline-dot <%= _stopCls %>">
-                                <span class="material-symbols-outlined"><%= _stopIcon %></span>
-                            </span>
-                            <div class="shipment-timeline-content">
-                                <div class="shipment-timeline-header">
-                                    <strong style="font-size:var(--font-size-sm)">
-                                        #<%= s.sequence %> — <%= _stopLabel %>
-                                    </strong>
-                                    <% if (s.completed) { %>
-                                        <span class="status-badge status-badge--sm entregado">Completada</span>
-                                    <% } else { %>
-                                        <span class="status-badge status-badge--sm pendiente">Pendiente</span>
-                                    <% } %>
-                                </div>
-                                <div class="shipment-timeline-meta">
-                                    <span class="material-symbols-outlined shipment-timeline-meta-ico"><%= _detailIco %></span>
-                                    <% if (s.stopType === 'pickup' || s.stopType === 'service') { %>
-                                        <%= s.branch ? s.branch.name : 'Sucursal #' + s.branchId %>
-                                    <% } else { %>
-                                        Envío: <strong><%= s.shipment ? s.shipment.trackingId : '#' + s.shipmentId %></strong>
-                                        <% if (s.shipment && s.shipment.address) { %>
-                                            — <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                                <tr class="route-ship-row" data-status="<%= _skey %>">
+                                    <td><%= s.stopSequence %></td>
+                                    <td class="tracking-id"><%= s.trackingId %></td>
+                                    <td><%= s.recipientName %></td>
+                                    <td class="route-ship-addr"><%= s.addressLine %></td>
+                                    <td>
+                                        <span class="status-badge <%= _skey %>"><%= s.statusLabel %></span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-badge--sm <%= stopCls %>"><%= stopState %></span>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/shipment/detail/<%= s.shipmentId %>?from=/route/<%= route.id %>&fromLabel=Ruta%20%23<%= route.id %>" class="action-btn" data-tooltip="Ver envío">
+                                            <span class="material-symbols-outlined">info</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Grid 2 cols: paradas y timeline -->
+            <div class="route-detail-bottom-grid">
+
+                <!-- Paradas (orden de visita) -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">pin_drop</span> Paradas (<%= (route.stops || []).length %>)</h3>
+                    <% if (!route.stops || route.stops.length === 0) { %>
+                        <p class="historial-empty">Sin paradas registradas.</p>
+                    <% } else { %>
+                    <ol class="shipment-timeline" style="margin-top:.75rem">
+                        <% route.stops.forEach(function(s) { %>
+                            <li class="shipment-timeline-item">
+                                <%
+                                    const _stopIcon  = s.stopType === 'pickup' ? 'warehouse' : (s.stopType === 'service' ? 'local_gas_station' : 'home');
+                                    const _stopLabel = s.stopType === 'pickup' ? 'Pickup' : (s.stopType === 'service' ? 'Servicio (combustible/descanso)' : 'Entrega');
+                                    const _stopCls   = s.completed ? 'entregado' : (s.skipped ? 'retrasado' : (s.stopType === 'pickup' ? 'en_sucursal' : 'pendiente'));
+                                    const _detailIco = s.stopType === 'pickup' ? 'store' : (s.stopType === 'service' ? 'local_gas_station' : 'package_2');
+                                %>
+                                <span class="shipment-timeline-dot <%= _stopCls %>">
+                                    <span class="material-symbols-outlined"><%= _stopIcon %></span>
+                                </span>
+                                <div class="shipment-timeline-content">
+                                    <div class="shipment-timeline-header">
+                                        <strong style="font-size:.92rem">#<%= s.sequence %> — <%= _stopLabel %></strong>
+                                        <% if (s.completed) { %>
+                                            <span class="status-badge status-badge--sm entregado">Completada</span>
+                                        <% } else if (s.skipped) { %>
+                                            <span class="status-badge status-badge--sm retrasado">Postergada</span>
+                                        <% } else { %>
+                                            <span class="status-badge status-badge--sm pendiente">Pendiente</span>
                                         <% } %>
+                                    </div>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico"><%= _detailIco %></span>
+                                        <% if (s.stopType === 'pickup' || s.stopType === 'service') { %>
+                                            <%= s.branch ? s.branch.name : 'Sucursal #' + s.branchId %>
+                                        <% } else { %>
+                                            <strong><%= s.shipment ? s.shipment.trackingId : '#' + s.shipmentId %></strong>
+                                            <% if (s.shipment && s.shipment.address) { %>
+                                                · <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                                            <% } %>
+                                        <% } %>
+                                    </div>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico">straighten</span>
+                                        +<%= s.distanceFromPrevKm %> km
+                                        <% if (s.completedAt) { %>
+                                            · <span style="color:var(--rt-muted)">Cerrada <%= new Date(s.completedAt).toLocaleString('es-AR', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short' }) %></span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ol>
+                    <% } %>
+                </div>
+
+                <!-- Timeline de eventos -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo (<%= (timeline || []).length %>)</h3>
+                    <% if (!timeline || timeline.length === 0) { %>
+                        <p class="historial-empty">Sin eventos registrados todavía.</p>
+                    <% } else { %>
+                    <ol class="route-events">
+                        <% timeline.forEach(function(ev) { %>
+                            <li class="route-event route-event--<%= ev.tone || 'gray' %>">
+                                <span class="route-event__dot">
+                                    <span class="material-symbols-outlined"><%= ev.icon || 'circle' %></span>
+                                </span>
+                                <div class="route-event__body">
+                                    <div class="route-event__head">
+                                        <strong class="route-event__label"><%= ev.label %></strong>
+                                        <% if (ev.tracking) { %>
+                                            <span class="route-event__tracking"><%= ev.tracking %></span>
+                                        <% } %>
+                                        <span class="route-event__time"><%= ev.at ? new Date(ev.at).toLocaleString('es-AR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '' %></span>
+                                    </div>
+                                    <% if (ev.detail) { %>
+                                        <div class="route-event__detail"><%= ev.detail %></div>
+                                    <% } %>
+                                    <% if (ev.actor) { %>
+                                        <div class="route-event__actor">
+                                            <span class="material-symbols-outlined">person</span><%= ev.actor %>
+                                        </div>
                                     <% } %>
                                 </div>
-                                <div class="shipment-timeline-meta">
-                                    <span class="material-symbols-outlined shipment-timeline-meta-ico">straighten</span>
-                                    +<%= s.distanceFromPrevKm %> km desde parada anterior
-                                </div>
-                            </div>
-                        </li>
-                    <% }) %>
-                </ol>
-                <% } %>
+                            </li>
+                        <% }) %>
+                    </ol>
+                    <% } %>
+                </div>
+
             </div>
 
         </div>
