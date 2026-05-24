@@ -30,9 +30,18 @@
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
-                    <a href="/report/shipments-by-period"><ul><span class="material-symbols-outlined">bar_chart</span>Volumen de Envíos</ul></a>
-                    <a href="/report/on-time-deliveries"><ul><span class="material-symbols-outlined">schedule</span>Entregas a Tiempo</ul></a>
-                    <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
+                    <div class="nav-group" id="nav-group-reportes">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-reportes')" aria-expanded="false">
+                            <span class="material-symbols-outlined">bar_chart</span>
+                            Reportes
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/report/shipments-by-period"><ul><span class="material-symbols-outlined">show_chart</span>Volumen de Envíos</ul></a>
+                            <a href="/report/on-time-deliveries"><ul><span class="material-symbols-outlined">schedule</span>Entregas a Tiempo</ul></a>
+                            <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
+                        </div>
+                    </div>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>
                     <a href="/setting"><ul><span class="material-symbols-outlined">settings</span>Ajustes</ul></a>

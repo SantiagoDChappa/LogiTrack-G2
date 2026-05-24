@@ -52,6 +52,60 @@ html[data-theme="dark"] {
 }
 
 /* ============================================================
+   Buttons
+   ============================================================ */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    background-color: var(--color-primary);
+    color: #ffffff;
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--transition), transform var(--transition);
+}
+
+.btn-primary:hover {
+    background-color: var(--color-primary-dark);
+    color: #ffffff;
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.btn-primary .material-symbols-outlined { font-size: 1.1rem; }
+
+.btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    background-color: transparent;
+    color: var(--color-text);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color var(--transition), color var(--transition), background-color var(--transition);
+}
+
+.btn-outline:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    text-decoration: none;
+    background-color: var(--color-primary-light);
+}
+
+.btn-outline .material-symbols-outlined { font-size: 1.1rem; }
+
+/* ============================================================
    Filter form
    ============================================================ */
 .filter-card {
