@@ -61,6 +61,7 @@ function buildFinalResponse(runtime, response) {
         state: {
             selectedShipmentId: runtime.state.selectedShipmentId,
             pendingAction: runtime.state.pendingAction,
+            incidentDraft: runtime.state.incidentDraft || null,
         },
     };
 }
