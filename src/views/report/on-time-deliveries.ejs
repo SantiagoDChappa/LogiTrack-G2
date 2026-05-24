@@ -45,6 +45,16 @@
                                     Limpiar
                                 </a>
                             <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/on-time-deliveries/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="btn-outline">
+                                    <span class="material-symbols-outlined">download</span>
+                                    Exportar CSV
+                                </a>
+                                <a href="/report/on-time-deliveries/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="btn-outline">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                    Exportar PDF
+                                </a>
+                            <% } %>
                         </div>
                     </div>
 

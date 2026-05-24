@@ -150,6 +150,7 @@ html[data-theme="dark"] {
 
 .filter-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: .5rem;
     padding-bottom: .05rem;
 }
