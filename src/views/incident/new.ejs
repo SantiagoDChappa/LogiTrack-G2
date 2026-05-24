@@ -19,16 +19,156 @@
 
         <form method="POST" action="/incident" class="incident-form">
             <div class="form-group">
-                <label for="shipmentId">Envío (ID interno)</label>
-                <input type="number" id="shipmentId" name="shipmentId"
-                       value="<%= shipment ? shipment.id : (form.shipmentId || '') %>"
-                       required <%= shipment ? 'readonly' : '' %>>
+                <label for="shipmentSearch">Envío</label>
+                <input type="hidden" id="shipmentId" name="shipmentId"
+                       value="<%= shipment ? shipment.id : (form.shipmentId || '') %>" required>
                 <% if (shipment) { %>
-                    <small>Tracking: <strong><%= shipment.trackingId %></strong></small>
+                    <div class="ship-chip" id="ship-chip">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                        <strong><%= shipment.trackingId %></strong>
+                        <% if (shipment.recipient && shipment.recipient.fullName) { %>· <%= shipment.recipient.fullName %><% } %>
+                    </div>
                 <% } else { %>
-                    <small>Pegue el ID del envío. Para abrir desde el detalle del envío, use el botón "Reportar incidencia".</small>
+                    <div class="ship-search-wrapper" style="position:relative">
+                        <input id="shipmentSearch" type="text" autocomplete="off"
+                               placeholder="Escribí tracking, ID o nombre del destinatario..."
+                               value="">
+                        <div id="shipment-dropdown" class="ship-dropdown" style="display:none;"></div>
+                    </div>
+                    <div class="ship-selected-row" id="ship-selected-row" style="display:none;">
+                        <div class="ship-chip" id="ship-chip"></div>
+                        <button type="button" id="shipment-clear" class="btn-secondary btn-sm">
+                            <span class="material-symbols-outlined">close</span>Cambiar
+                        </button>
+                    </div>
+                    <small>Buscá por tracking (ej: ENV-001), ID numérico o nombre del destinatario.</small>
                 <% } %>
             </div>
+
+            <style>
+            .ship-search-wrapper input {
+                width: 100%; padding: .65rem .85rem;
+                border: 1px solid var(--color-border); border-radius: 10px;
+                font-size: .95rem; background: var(--color-surface); color: var(--color-text);
+            }
+            .ship-dropdown {
+                position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+                background: var(--color-surface); border: 1px solid var(--color-border);
+                border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.12);
+                max-height: 280px; overflow-y: auto; z-index: 100;
+            }
+            .ship-dropdown .item {
+                padding: .65rem .85rem; cursor: pointer; border-bottom: 1px solid var(--color-border);
+                display: flex; flex-direction: column; gap: 2px;
+            }
+            .ship-dropdown .item:last-child { border-bottom: none; }
+            .ship-dropdown .item:hover, .ship-dropdown .item.active { background: rgba(37,99,235,.08); }
+            .ship-dropdown .tracking { font-weight: 700; font-size: .9rem; color: var(--color-text); }
+            .ship-dropdown .meta { font-size: .78rem; color: var(--color-text-secondary); }
+            .ship-dropdown .empty { padding: .8rem; color: var(--color-text-secondary); font-size: .85rem; text-align: center; }
+            .ship-chip {
+                display: inline-flex; align-items: center; gap: 6px;
+                padding: .5rem .8rem; background: rgba(37,99,235,.08);
+                border: 1px solid rgba(37,99,235,.2); border-radius: 999px;
+                font-size: .9rem; color: var(--color-text);
+            }
+            .ship-selected-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+            </style>
+
+            <div class="form-group">
+                <label>Sucursal asignada <span class="req">*</span></label>
+                <input type="hidden" id="branchId" name="branchId" value="<%= form.branchId || '' %>" required>
+                <div class="branch-picker" id="branch-picker">
+                    <% branches.forEach(b => {
+                        const branchUserCount = users.filter(u => u.branchId === b.id).length;
+                        const isSelected = String(form.branchId) === String(b.id);
+                    %>
+                        <button type="button"
+                                class="branch-card<%= isSelected ? ' is-selected' : '' %><%= branchUserCount === 0 ? ' is-empty' : '' %>"
+                                data-branch-id="<%= b.id %>"
+                                data-user-count="<%= branchUserCount %>">
+                            <span class="branch-card__icon material-symbols-outlined">store</span>
+                            <span class="branch-card__name"><%= b.name %></span>
+                            <span class="branch-card__count"><%= branchUserCount %> usuario<%= branchUserCount === 1 ? '' : 's' %></span>
+                        </button>
+                    <% }) %>
+                </div>
+                <small class="branch-picker__hint" id="branch-picker-hint">Tocá una sucursal para ver sus usuarios.</small>
+            </div>
+
+            <div class="form-group">
+                <label>Usuario asignado <span class="req">*</span></label>
+                <input type="hidden" id="assignedToUserId" name="assignedToUserId" value="<%= form.assignedToUserId || '' %>" required>
+                <div class="user-picker" id="user-picker" data-empty="Elegí una sucursal primero.">
+                    <p class="user-picker__empty">Elegí una sucursal primero.</p>
+                </div>
+                <small>Se listan únicamente los usuarios pertenecientes a la sucursal elegida, con su rol.</small>
+            </div>
+
+            <script id="users-data" type="application/json"><%- JSON.stringify(users) %></script>
+            <script>
+            (function () {
+                const branchPicker = document.getElementById('branch-picker');
+                const userPicker   = document.getElementById('user-picker');
+                const hiddenBranch = document.getElementById('branchId');
+                const hiddenUser   = document.getElementById('assignedToUserId');
+                const hint         = document.getElementById('branch-picker-hint');
+                const allUsers     = JSON.parse(document.getElementById('users-data').textContent || '[]');
+                const preselectedUserId = <%- JSON.stringify(form.assignedToUserId || '') %>;
+
+                const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+                function renderUsers(branchId) {
+                    const filtered = allUsers.filter(u => u.branchId === branchId);
+                    userPicker.innerHTML = '';
+                    if (filtered.length === 0) {
+                        userPicker.innerHTML = '<p class="user-picker__empty">Esta sucursal no tiene usuarios asignados todavía.</p>';
+                        return;
+                    }
+                    filtered.forEach(u => {
+                        const isSel = String(preselectedUserId) === String(u.id);
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'user-card' + (isSel ? ' is-selected' : '');
+                        btn.dataset.userId = String(u.id);
+                        btn.innerHTML = ''
+                            + '<span class="user-card__avatar material-symbols-outlined">person</span>'
+                            + '<span class="user-card__body">'
+                            + '<span class="user-card__name">' + escapeHtml(u.fullName) + '</span>'
+                            + '<span class="user-card__role">' + escapeHtml(u.roleDescription || 'Sin rol') + '</span>'
+                            + '</span>'
+                            + '<span class="user-card__check material-symbols-outlined">check_circle</span>';
+                        btn.addEventListener('click', () => selectUser(u.id, btn));
+                        userPicker.appendChild(btn);
+                    });
+                }
+
+                function selectBranch(branchId, cardEl) {
+                    hiddenBranch.value = String(branchId);
+                    hiddenUser.value = '';
+                    branchPicker.querySelectorAll('.branch-card').forEach(c => c.classList.remove('is-selected'));
+                    cardEl.classList.add('is-selected');
+                    renderUsers(branchId);
+                    hint.textContent = 'Sucursal: ' + cardEl.querySelector('.branch-card__name').textContent + '. Elegí el usuario asignado.';
+                }
+
+                function selectUser(userId, btnEl) {
+                    hiddenUser.value = String(userId);
+                    userPicker.querySelectorAll('.user-card').forEach(c => c.classList.remove('is-selected'));
+                    btnEl.classList.add('is-selected');
+                }
+
+                branchPicker.querySelectorAll('.branch-card').forEach(card => {
+                    card.addEventListener('click', () => selectBranch(Number(card.dataset.branchId), card));
+                });
+
+                // Auto-select si viene preseleccionado (re-render después de error de validación)
+                if (hiddenBranch.value) {
+                    const initialBranch = branchPicker.querySelector('.branch-card[data-branch-id="' + hiddenBranch.value + '"]');
+                    if (initialBranch) { selectBranch(Number(hiddenBranch.value), initialBranch); }
+                }
+            })();
+            </script>
 
             <div class="form-group">
                 <label for="incidentTypeId">Tipo</label>
@@ -62,5 +202,100 @@
         </form>
     </main>
     <script src="/js/header.js" defer></script>
+    <% if (!shipment) { %>
+    <script>
+    (function () {
+        const input    = document.getElementById('shipmentSearch');
+        const hidden   = document.getElementById('shipmentId');
+        const dropdown = document.getElementById('shipment-dropdown');
+        const selRow   = document.getElementById('ship-selected-row');
+        const chip     = document.getElementById('ship-chip');
+        const clearBtn = document.getElementById('shipment-clear');
+        if (!input) return;
+
+        let timer = null;
+        let activeIdx = -1;
+        let items = [];
+
+        function render(list) {
+            items = list;
+            activeIdx = -1;
+            if (!list.length) {
+                dropdown.innerHTML = '<div class="empty">Sin resultados</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+            dropdown.innerHTML = list.map((s, i) => `
+                <div class="item" data-idx="${i}" data-id="${s.id}">
+                    <div class="tracking">${s.trackingId}${s.statusLabel ? ' · <span class="meta">' + s.statusLabel + '</span>' : ''}</div>
+                    <div class="meta">${s.recipientName || '(sin destinatario)'}${s.addressLine ? ' — ' + s.addressLine : ''}</div>
+                </div>
+            `).join('');
+            dropdown.style.display = 'block';
+        }
+
+        function pick(idx) {
+            const s = items[idx];
+            if (!s) return;
+            hidden.value = s.id;
+            chip.innerHTML = `<span class="material-symbols-outlined">inventory_2</span><strong>${s.trackingId}</strong>${s.recipientName ? ' · ' + s.recipientName : ''}`;
+            selRow.style.display = 'flex';
+            input.value = '';
+            input.style.display = 'none';
+            dropdown.style.display = 'none';
+        }
+
+        function search(q) {
+            fetch('/incident/search-shipments?q=' + encodeURIComponent(q))
+                .then(r => r.ok ? r.json() : [])
+                .then(render)
+                .catch(() => render([]));
+        }
+
+        input.addEventListener('input', () => {
+            const q = input.value.trim();
+            clearTimeout(timer);
+            if (q.length < 1) { dropdown.style.display = 'none'; return; }
+            timer = setTimeout(() => search(q), 200);
+        });
+        input.addEventListener('keydown', (ev) => {
+            if (dropdown.style.display === 'none') return;
+            const itemsEl = dropdown.querySelectorAll('.item');
+            if (ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                activeIdx = Math.min(itemsEl.length - 1, activeIdx + 1);
+                itemsEl.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+            } else if (ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                activeIdx = Math.max(0, activeIdx - 1);
+                itemsEl.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+            } else if (ev.key === 'Enter') {
+                if (activeIdx >= 0) { ev.preventDefault(); pick(activeIdx); }
+            } else if (ev.key === 'Escape') {
+                dropdown.style.display = 'none';
+            }
+        });
+        dropdown.addEventListener('click', (ev) => {
+            const item = ev.target.closest('.item');
+            if (item) { pick(Number(item.dataset.idx)); }
+        });
+        document.addEventListener('click', (ev) => {
+            if (!input.contains(ev.target) && !dropdown.contains(ev.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                hidden.value = '';
+                selRow.style.display = 'none';
+                input.style.display = '';
+                input.value = '';
+                input.focus();
+            });
+        }
+    })();
+    </script>
+    <% } %>
 </body>
 </html>

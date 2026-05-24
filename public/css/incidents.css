@@ -707,3 +707,183 @@ html[data-theme="dark"] {
     box-shadow: 0 4px 12px rgba(245, 158, 11, .25);
     transform: translateY(-1px);
 }
+
+/* ============================================================
+   Pickers para alta de incidencia (branch + user)
+   ============================================================ */
+.branch-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: .6rem;
+    margin-top: .35rem;
+}
+
+@media (max-width: 600px) {
+    .branch-picker { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
+.branch-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .25rem;
+    padding: .75rem .85rem;
+    background: var(--inc-surface);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-md);
+    color: var(--inc-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease, background .15s ease;
+}
+
+.branch-card:hover {
+    border-color: var(--inc-blue-soft);
+    background: var(--inc-surface-alt);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+}
+
+.branch-card:focus-visible {
+    outline: none;
+    border-color: var(--inc-blue);
+    box-shadow: var(--inc-ring);
+}
+
+.branch-card.is-selected {
+    border-color: var(--inc-blue);
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    box-shadow: 0 0 0 1px var(--inc-blue);
+}
+
+.branch-card.is-empty { opacity: .55; }
+.branch-card.is-empty .branch-card__count { color: var(--inc-red); }
+
+.branch-card__icon {
+    font-size: 1.2rem !important;
+    color: var(--inc-blue);
+}
+
+.branch-card.is-selected .branch-card__icon { color: var(--inc-blue-dark); }
+
+.branch-card__name {
+    font-weight: 700;
+    font-size: .9rem;
+    color: var(--inc-text-strong);
+    line-height: 1.25;
+}
+
+.branch-card__count {
+    font-size: .72rem;
+    color: var(--inc-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+}
+
+.branch-picker__hint {
+    display: block;
+    margin-top: .55rem;
+    color: var(--inc-muted);
+    font-size: .8rem;
+}
+
+/* ── User picker ────────────────────────────────────── */
+.user-picker {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+    margin-top: .35rem;
+    padding: .85rem;
+    background: var(--inc-surface-alt);
+    border: 1px dashed var(--inc-border);
+    border-radius: var(--inc-radius-md);
+    min-height: 64px;
+}
+
+.user-picker__empty {
+    margin: 0;
+    color: var(--inc-muted);
+    font-size: .85rem;
+    text-align: center;
+    padding: .5rem;
+}
+
+.user-card {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .65rem .85rem;
+    background: var(--inc-surface);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-md);
+    color: var(--inc-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .12s ease;
+}
+
+.user-card:hover {
+    border-color: var(--inc-blue-soft);
+    background: var(--inc-surface-alt);
+    transform: translateY(-1px);
+}
+
+.user-card:focus-visible {
+    outline: none;
+    border-color: var(--inc-blue);
+    box-shadow: var(--inc-ring);
+}
+
+.user-card.is-selected {
+    border-color: var(--inc-blue);
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    box-shadow: 0 0 0 1px var(--inc-blue);
+}
+
+.user-card__avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--inc-blue), var(--inc-blue-soft));
+    color: #fff !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem !important;
+    flex-shrink: 0;
+}
+
+.user-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    flex: 1;
+}
+
+.user-card__name {
+    font-weight: 700;
+    font-size: .92rem;
+    color: var(--inc-text-strong);
+    line-height: 1.25;
+}
+
+.user-card__role {
+    font-size: .75rem;
+    color: var(--inc-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+}
+
+.user-card__check {
+    color: var(--inc-green);
+    font-size: 1.3rem !important;
+    opacity: 0;
+    transition: opacity .15s ease;
+    flex-shrink: 0;
+}
+
+.user-card.is-selected .user-card__check { opacity: 1; }
