@@ -420,6 +420,30 @@ const INTENT_CATALOG = [
         ],
         keywords: ['notificacion', 'notificaciones', 'mail', 'email', 'sms', 'avisos'],
     },
+    {
+        action: 'report-incident-start',
+        phrases: [
+            'reportar incidencia',
+            'abrir incidencia',
+            'crear incidencia',
+            'hacer un reclamo',
+            'quiero hacer un reclamo',
+            'quiero reportar un problema',
+            'quiero abrir una incidencia',
+            'tengo un reclamo',
+            'reclamar',
+            'quiero reclamar',
+            'iniciar un reclamo',
+        ],
+        keywordGroups: [
+            ['reportar', 'incidencia'],
+            ['abrir', 'incidencia'],
+            ['hacer', 'reclamo'],
+            ['quiero', 'reclamar'],
+            ['quiero', 'reportar'],
+        ],
+        keywords: ['reportar', 'reclamo', 'reclamar', 'abrir', 'crear'],
+    },
 ];
 
 module.exports = {

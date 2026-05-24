@@ -239,7 +239,7 @@ function buildProblemMenuResponse(runtime) {
                     text: 'Si hubo un problema con tu envio, primero pasame el tracking o el DNI. Despues te ayudo a revisar demoras, intentos fallidos o un reclamo.',
                     actions: [
                         createAction('Buscar mi envio', 'request-lookup'),
-                        createAction('Problemas comunes', 'show-issues'),
+                        createAction('Reportar incidencia', 'report-incident-start'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
                 }),
@@ -255,7 +255,7 @@ function buildProblemMenuResponse(runtime) {
                     text: buildTrackedText(shipment, 'Si el problema con {trackingId} es la entrega, te puedo ayudar con el comprobante o con el caso de entrega no reconocida.'),
                     actions: [
                         createAction('No reconozco la entrega', 'show-delivery-issue'),
-                        createAction('Comprobante de entrega', 'show-pod'),
+                        createAction('Reportar incidencia', 'report-incident-start'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
                 }),
@@ -304,7 +304,7 @@ function buildProblemMenuResponse(runtime) {
                     : buildTrackedText(shipment, 'Si hubo un problema con {trackingId}, revisemos que paso y que opciones tenes ahora.'),
                 actions: [
                     createAction('Que paso con mi envio', 'show-issues'),
-                    createAction('Fecha estimada', 'show-eta'),
+                    createAction('Reportar incidencia', 'report-incident-start'),
                     createAction('Sucursal o retiro', 'show-branch'),
                     createAction('Hablar con soporte', 'show-support'),
                 ],
