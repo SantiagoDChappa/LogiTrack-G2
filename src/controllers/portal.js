@@ -447,4 +447,4 @@ const publicSuccess = (req, res) => {
     });
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, getIncidentTypesApi, publicSuccess };
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, getIncidentTypesApi, publicSuccess, createIncidentFromPortal };
