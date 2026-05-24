@@ -57,7 +57,7 @@ const TRANSITIONS = {
     [S.IN_PREPARATION.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.IN_TRANSIT.id]:     [S.AT_BRANCH.id, S.DELIVERED.id, S.FAILED_ATTEMPT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.AT_BRANCH.id]:      [S.ASSIGNED.id, S.PACKAGE_FAILED.id],
-    [S.FAILED_ATTEMPT.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id],
+    [S.FAILED_ATTEMPT.id]: [S.IN_TRANSIT.id, S.AT_BRANCH.id, S.PACKAGE_FAILED.id],
     [S.DELIVERED.id]:      [],
     [S.CANCELLED.id]:      [],
     [S.PACKAGE_FAILED.id]: [],
@@ -73,6 +73,7 @@ const RULES_TARGETED = {
     [`${S.IN_TRANSIT.id}->${S.AT_BRANCH.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Marcar en sucursal',     endpoint: '/scan/:trackingId/at-branch' },
     [`${S.IN_TRANSIT.id}->${S.FAILED_ATTEMPT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: true,  eventType: 'FAILED_ATTEMPT',    label: 'Reportar intento fallido', endpoint: '/scan/:trackingId/failed-attempt' },
     [`${S.FAILED_ATTEMPT.id}->${S.IN_TRANSIT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'RETRY',             label: 'Reintentar entrega',     endpoint: '/scan/:trackingId/retry' },
+    [`${S.FAILED_ATTEMPT.id}->${S.AT_BRANCH.id}`]:       { roles: [R.DELIVERY.id, R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'RETURNED_TO_BRANCH', label: 'Devolver a sucursal',    endpoint: '/delivery/route/:id/return-scan' },
 };
 
 const RULE_PACKAGE_FAILED = {

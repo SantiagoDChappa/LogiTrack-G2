@@ -1,13 +1,73 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const { requireAuth, requireDelivery } = require('../middlewares/auth');
 const shipmentModel = require('../models/shipment');
 const deliveryController = require('../controllers/delivery');
 const routeModel = require('../models/route');
+const { Route, RouteStatus } = require('../models/route');
 const { RouteStop } = require('../models/routeStop');
+const { RoutePause } = require('../models/routePause');
 const stateMachine = require('../services/shipmentStateMachine');
 const { Status } = require('../constants/enums');
 const { deliveryValidation, handleCreateValidationErrors } = require('../middlewares/delivery');
+const sequelize = require('../database/connection');
+
+// Mientras haya una pausa activa, el repartidor no puede ejecutar acciones operativas
+// (pickup, entregado, fallido, skip, etc). Reanudar la ruta es el único paso permitido.
+function getActivePause(routeId) {
+    return RoutePause.findOne({ where: { routeId, endedAt: null } });
+}
+async function ensureNotPaused(routeId) {
+    const pause = await getActivePause(routeId);
+    if (pause) {
+        return { ok: false, error: 'La ruta está pausada. Reanudala antes de continuar.', pauseId: pause.id };
+    }
+    return { ok: true };
+}
+
+// Crea (o reutiliza) una incidencia tipo PACKAGE_BROKEN para un envío.
+// Reutiliza si ya hay una incidencia OPEN/IN_REVIEW del mismo tipo para evitar duplicados.
+async function createDamageIncident({ shipmentId, description, userId }) {
+    const incidentTypeModel = require('../models/incidentType');
+    const { Incident } = require('../models/incident');
+    const incidentHistoryModel = require('../models/incidentHistory');
+    const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
+
+    const type = await incidentTypeModel.IncidentType.findOne({ where: { code: 'PACKAGE_BROKEN', active: true } });
+    if (!type) { throw new Error('Tipo de incidencia PACKAGE_BROKEN no configurado'); }
+
+    const existing = await Incident.findOne({
+        where: {
+            shipmentId,
+            incidentTypeId: type.id,
+            status: { [Op.in]: [IncidentStatus.OPEN, IncidentStatus.IN_REVIEW] },
+        },
+    });
+    if (existing) { return existing; }
+
+    return sequelize.transaction(async (t) => {
+        const inc = await Incident.create({
+            shipmentId,
+            incidentTypeId: type.id,
+            status:         IncidentStatus.OPEN,
+            priority:       3, // Alta: paquete dañado merece atención prioritaria
+            escalated:      false,
+            description:    description.slice(0, 2000),
+            openedChannel:  IncidentChannel.INTERNAL,
+            openedByUserId: userId,
+        }, { transaction: t });
+        await incidentHistoryModel.create({
+            incidentId:  inc.id,
+            eventType:   IncidentEventType.CREATED,
+            toValue:     IncidentStatus.OPEN,
+            comment:     'Incidencia creada automáticamente desde intento fallido (motivo: paquete dañado).',
+            userId,
+            transaction: t,
+        });
+        return inc;
+    });
+}
 
 // Verifica que todos los stops anteriores estén completados o postergados ("volver luego").
 // Las postergadas NO bloquean — el repartidor las atenderá al final.
@@ -126,12 +186,27 @@ router.post('/failed/:id',
 // Vista del repartidor con su ruta optimizada
 router.get('/route/:id', requireDelivery, async (req, res) => {
     try {
+        // Limpieza defensiva del banner "Ruta en pausa" fantasma:
+        //   1) cerramos pausas huérfanas (>30 min sin reanudar) — almuerzos olvidados
+        //   2) si la ruta no está IN_ROUTE, cualquier pause abierta es inconsistente → cerrar
+        const routeIdNum = Number(req.params.id);
+        if (Number.isInteger(routeIdNum) && routeIdNum > 0) {
+            // Necesitamos saber el estado de la ruta para decidir el barrido total.
+            const peek = await Route.findByPk(routeIdNum, { attributes: ['statusId'] }).catch(() => null);
+            const isInRoute = peek && peek.statusId === RouteStatus.IN_ROUTE;
+            const where = { routeId: routeIdNum, endedAt: null };
+            if (isInRoute) {
+                where.startedAt = { [Op.lt]: new Date(Date.now() - 30 * 60 * 1000) };
+            }
+            await RoutePause.update({ endedAt: new Date() }, { where })
+                .catch(err => console.error('stale-pause cleanup err:', err.message));
+        }
+
         const route = await routeModel.getById(req.params.id);
         if (!route) { return res.status(404).send('Ruta no encontrada'); }
         if (route.transport?.driverUserId !== res.locals.currentUser.id) {
             return res.status(403).send('Esta ruta no te pertenece');
         }
-        const { RouteStatus } = require('../models/route');
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
         res.render('delivery/route', { route, readOnly });
     } catch (err) {
@@ -158,6 +233,8 @@ router.post('/route/:id/stop/:stopId/arrive', requireDelivery, async (req, res) 
     if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
         return res.status(403).json({ error: 'No autorizado' });
     }
+    const pauseCheck = await ensureNotPaused(route.id);
+    if (!pauseCheck.ok) { return res.status(409).json(pauseCheck); }
     const gate = checkStopOrder(route, req.params.stopId);
     if (!gate.ok) { return res.status(409).json({ error: gate.error, blockingStop: gate.blockingStop }); }
     const stop = gate.target;
@@ -178,77 +255,76 @@ router.post('/route/:id/stop/:stopId/arrive', requireDelivery, async (req, res) 
     res.json({ ok: true });
 });
 
-// Pickup confirmado: transita IN_PREPARATION -> IN_TRANSIT para todos los envios del pickup
+// Pickup confirmado: transita IN_PREPARATION -> IN_TRANSIT para todos los envios del pickup.
+// Atomicidad: si algún shipment falla la transición, abortamos toda la confirmación
+// para no quedar con estado inconsistente (algunos IN_TRANSIT y otros no).
 router.post('/route/:id/stop/:stopId/pickup-confirmed', requireDelivery, async (req, res) => {
     const route = await routeModel.getById(req.params.id);
     if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
         return res.status(403).json({ error: 'No autorizado' });
     }
+    const pauseCheck = await ensureNotPaused(route.id);
+    if (!pauseCheck.ok) { return res.status(409).json(pauseCheck); }
     const gateP = checkStopOrder(route, req.params.stopId);
     if (!gateP.ok) { return res.status(409).json({ error: gateP.error, blockingStop: gateP.blockingStop }); }
-    // Pickup stop puede no tener shipmentId; tomar todos los shipments del route con status IN_PREPARATION o ASSIGNED
     const stops = route.stops || [];
     const shipmentIds = stops
         .filter(s => s.stopType === 'delivery' && s.shipmentId)
         .map(s => s.shipmentId);
-    let ok = 0, failed = 0;
-    for (const sid of shipmentIds) {
-        try {
-            // ASSIGNED -> IN_PREPARATION -> IN_TRANSIT en cadena
+
+    try {
+        // El repartidor sólo tiene permitido ASSIGNED→IN_TRANSIT o IN_PREPARATION→IN_TRANSIT
+        // (la stateMachine rechaza ASSIGNED→IN_PREPARATION para rol DELIVERY).
+        // Por eso transitamos directo al destino final IN_TRANSIT sin pasar por IN_PREPARATION.
+        // Si una transición falla, abortamos sin marcar el stop — el repartidor reintenta.
+        let ok = 0;
+        for (const sid of shipmentIds) {
             const shipment = await shipmentModel.getById(sid);
-            if (!shipment) { failed++; continue; }
-            if (shipment.statusId === Status.ASSIGNED.id) {
-                await stateMachine.transition({
-                    shipmentId: sid, toStatusId: Status.IN_PREPARATION.id, actor: res.locals.currentUser, branchId: route.originBranchId,
-                });
+            if (!shipment) {
+                throw new Error(`Envío ${sid} no encontrado`);
+            }
+            if (shipment.statusId === Status.IN_TRANSIT.id) {
+                ok++;
+                continue; // ya está en tránsito, no re-transitamos
             }
             await stateMachine.transition({
-                shipmentId: sid, toStatusId: Status.IN_TRANSIT.id, actor: res.locals.currentUser, branchId: route.originBranchId,
+                shipmentId: sid,
+                toStatusId: Status.IN_TRANSIT.id,
+                actor:      res.locals.currentUser,
+                branchId:   route.originBranchId,
             });
             ok++;
-        } catch (e) {
-            console.error('pickup-confirmed err', sid, e.message);
-            failed++;
         }
-    }
-    await RouteStop.update(
-        { completed: true, completedAt: new Date() },
-        { where: { id: req.params.stopId, routeId: req.params.id } }
-    );
-    res.json({ ok: true, transitioned: ok, failed });
-});
-
-// Marcar entregado rapido (sin formulario de evidencia completa)
-router.post('/route/:id/stop/:stopId/delivered', requireDelivery, async (req, res) => {
-    const route = await routeModel.getById(req.params.id);
-    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
-        return res.status(403).json({ error: 'No autorizado' });
-    }
-    const gateD = checkStopOrder(route, req.params.stopId);
-    if (!gateD.ok) { return res.status(409).json({ error: gateD.error, blockingStop: gateD.blockingStop }); }
-    const stop = gateD.target;
-    if (!stop || !stop.shipmentId) { return res.status(404).json({ error: 'Stop no es entrega' }); }
-    try {
-        await stateMachine.transition({
-            shipmentId: stop.shipmentId,
-            toStatusId: Status.DELIVERED.id,
-            actor: res.locals.currentUser,
-            latitude: req.body.latitude || null,
-            longitude: req.body.longitude || null,
-        });
-        await RouteStop.update({ completed: true, completedAt: new Date() }, { where: { id: stop.id } });
-        res.json({ ok: true });
+        await RouteStop.update(
+            { completed: true, completedAt: new Date() },
+            { where: { id: req.params.stopId, routeId: req.params.id } }
+        );
+        res.json({ ok: true, transitioned: ok });
     } catch (e) {
-        res.status(422).json({ error: e.message });
+        console.error('pickup-confirmed err', e.message);
+        res.status(422).json({ error: `No se pudo confirmar el pickup: ${e.message}. Revisá los envíos y reintentá.` });
     }
 });
 
-// Marcar intento fallido (con motivo codificado, vecino opcional y retry mismo día)
+// Endpoint legacy de entrega rápida: ELIMINADO.
+// La entrega ahora requiere POD obligatorio (foto + firma + receptor) vía /delivery/evidence/:trackingId/pod.
+// Responde 410 Gone para clientes viejos.
+router.post('/route/:id/stop/:stopId/delivered', requireDelivery, (req, res) => {
+    res.status(410).json({
+        error: 'La entrega rápida fue removida. Capturá el POD (foto + firma + datos del receptor) en /delivery/evidence/:trackingId/pod.',
+        deprecated: true,
+    });
+});
+
+// Marcar intento fallido (con motivo codificado, vecino opcional y retry mismo día).
+// Si el motivo es 'paquete_dañado', crea automáticamente una incidencia tipo PACKAGE_BROKEN.
 router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) => {
     const route = await routeModel.getById(req.params.id);
     if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
         return res.status(403).json({ error: 'No autorizado' });
     }
+    const pauseCheck = await ensureNotPaused(route.id);
+    if (!pauseCheck.ok) { return res.status(409).json(pauseCheck); }
     const gateF = checkStopOrder(route, req.params.stopId);
     if (!gateF.ok) { return res.status(409).json({ error: gateF.error, blockingStop: gateF.blockingStop }); }
     const stop = gateF.target;
@@ -281,7 +357,8 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             suggestedDate:    getSuggestedDate(reason),
             status:           retrySameDay ? 'reintento_mismo_dia' : 'pendiente',
         });
-        // Verificar si superó el máximo de intentos fallidos
+        // Verificar si superó el máximo de intentos fallidos.
+        // El intento recién creado YA cuenta; se cancela al alcanzar el tope, no después.
         const settingModel = require('../models/setting');
         const settings = await settingModel.getAll();
         const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
@@ -289,16 +366,34 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
         if (intentosPrevios.length >= maxIntentos) {
             const shipmentHistoryModel = require('../models/shipmentHistory');
             const { Shipment } = require('../models/shipment');
-            await Shipment.update({ statusId: 5 }, { where: { id: stop.shipmentId } });
+            // Lee estado real antes de cancelar para que el history tenga el fromStatusId correcto.
+            const current = await Shipment.findOne({ where: { id: stop.shipmentId }, attributes: ['statusId'] });
+            const fromStatusId = current?.statusId || Status.FAILED_ATTEMPT.id;
+            await Shipment.update({ statusId: Status.CANCELLED.id }, { where: { id: stop.shipmentId } });
             await shipmentHistoryModel.create({
                 shipmentId:   stop.shipmentId,
-                fromStatusId: Status.FAILED_ATTEMPT.id,
-                toStatusId:   5,
+                fromStatusId,
+                toStatusId:   Status.CANCELLED.id,
                 comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
                 userId:       res.locals.currentUser?.id || null,
                 eventType:    'STATUS_CHANGE',
             });
         }
+
+        // Si el motivo fue paquete dañado, crear incidencia automática asociada al envío.
+        if (reasonCode === 'paquete_dañado' || reasonCode === 'paquete_danado') {
+            try {
+                await createDamageIncident({
+                    shipmentId: stop.shipmentId,
+                    description: `Paquete reportado como dañado durante intento de entrega. Motivo: ${reason}.${comment ? ' Detalle: ' + comment : ''}`,
+                    userId: res.locals.currentUser?.id || null,
+                });
+            } catch (incErr) {
+                // No bloqueamos el fallido si falla la creación de incidencia; sólo logueamos.
+                console.error('auto-incident PACKAGE_BROKEN err:', incErr.message);
+            }
+        }
+
         if (retrySameDay) {
             // No transito de estado: shipment sigue IN_TRANSIT. El stop se marca como saltado
             // para revisitar al final. Se loguea evento en history.
@@ -344,6 +439,8 @@ router.post('/route/:id/stop/:stopId/skip', requireDelivery, async (req, res) =>
     if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
         return res.status(403).json({ error: 'No autorizado' });
     }
+    const pauseCheck = await ensureNotPaused(route.id);
+    if (!pauseCheck.ok) { return res.status(409).json(pauseCheck); }
     const reason = (req.body.reason || '').trim() || 'Saltada por el repartidor';
     await RouteStop.update(
         { skipped: true, skipReason: reason, skippedAt: new Date() },
@@ -367,12 +464,35 @@ router.post('/route/:id/stop/:stopId/unskip', requireDelivery, async (req, res) 
 
 // === Iniciar ruta (marca started_at, status IN_ROUTE) ===
 router.post('/route/:id/start', requireDelivery, async (req, res) => {
-    const { Route, RouteStatus } = require('../models/route');
     const route = await routeModel.getById(req.params.id);
     if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
         return res.status(403).json({ error: 'No autorizado' });
     }
-    if (route.startedAt) {return res.json({ ok: true, alreadyStarted: true });}
+    if (route.startedAt) { return res.json({ ok: true, alreadyStarted: true }); }
+    // Sólo se puede iniciar una ruta en estado PLANNED.
+    if (route.statusId !== RouteStatus.PLANNED) {
+        return res.status(409).json({ error: `No se puede iniciar una ruta en estado ${route.statusId}. Sólo rutas planificadas.` });
+    }
+    // 1 ruta activa por repartidor: si ya hay otra IN_ROUTE de este driver, bloquear.
+    const { Transport } = require('../models/transport');
+    const driverTransports = await Transport.findAll({
+        where: { driverUserId: res.locals.currentUser.id },
+        attributes: ['id'],
+    });
+    const driverTxIds = driverTransports.map(t => t.id);
+    if (driverTxIds.length > 0) {
+        const otherActive = await Route.findOne({
+            where: {
+                transportId: { [Op.in]: driverTxIds },
+                statusId:    RouteStatus.IN_ROUTE,
+                id:          { [Op.ne]: route.id },
+            },
+            attributes: ['id'],
+        });
+        if (otherActive) {
+            return res.status(409).json({ error: `Ya tenés otra ruta en curso (#${otherActive.id}). Finalizala antes de iniciar esta.` });
+        }
+    }
     await Route.update(
         { startedAt: new Date(), statusId: RouteStatus.IN_ROUTE },
         { where: { id: req.params.id } }
@@ -381,17 +501,64 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
 });
 
 // === Finalizar ruta ===
+// Resolución de stops skipped pendientes: se transicionan a FAILED_ATTEMPT (no atendidos)
+// y se devuelven al repartidor como envíos a reprogramar. Stops delivery pendientes (no
+// skipped y no completed) bloquean la finalización — el repartidor debe entregarlos o
+// marcarlos como fallidos.
 router.post('/route/:id/finish', requireDelivery, async (req, res) => {
-    const { Route, RouteStatus } = require('../models/route');
     const route = await routeModel.getById(req.params.id);
     if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
         return res.status(403).json({ error: 'No autorizado' });
     }
+    if (route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED) {
+        return res.status(409).json({ error: 'La ruta ya está cerrada.' });
+    }
+
+    const stops = route.stops || [];
+    const unresolved = stops.filter(s => !s.completed && !s.skipped);
+    if (unresolved.length > 0) {
+        return res.status(409).json({
+            error: `Hay ${unresolved.length} parada(s) sin resolver. Confirmá la entrega o marcalas como fallido antes de finalizar.`,
+            unresolvedStopIds: unresolved.map(s => s.id),
+        });
+    }
+
+    const skippedDeliveries = stops.filter(s => s.skipped && !s.completed && s.stopType === 'delivery' && s.shipmentId);
+    const failedAttemptModel = require('../models/failedAttempt');
+    const { getSuggestedDate } = require('../utils/failedAttempt');
+    let autoFailed = 0;
+    for (const s of skippedDeliveries) {
+        try {
+            const reason = `No atendido en ruta${s.skipReason ? ': ' + s.skipReason : ''}`;
+            await failedAttemptModel.create({
+                shipmentId:    s.shipmentId,
+                reason,
+                reasonCode:    'no_atendido_en_ruta',
+                observation:   s.skipReason || null,
+                suggestedDate: getSuggestedDate(reason),
+                status:        'pendiente',
+            });
+            await stateMachine.transition({
+                shipmentId: s.shipmentId,
+                toStatusId: Status.FAILED_ATTEMPT.id,
+                actor:      res.locals.currentUser,
+                comment:    reason,
+            });
+            await RouteStop.update(
+                { completed: true, completedAt: new Date() },
+                { where: { id: s.id, routeId: route.id } }
+            );
+            autoFailed++;
+        } catch (e) {
+            console.error('finish auto-failed err', s.id, e.message);
+        }
+    }
+
     await Route.update(
         { finishedAt: new Date(), statusId: RouteStatus.FINISHED },
         { where: { id: req.params.id } }
     );
-    res.json({ ok: true });
+    res.json({ ok: true, autoFailedSkipped: autoFailed });
 });
 
 // === Pausar ruta (almuerzo, recarga combustible) ===
@@ -551,7 +718,11 @@ router.post('/route/:id/return-scan', requireDelivery, async (req, res) => {
                 branchId:   route.originBranchId,
                 comment:    'Devuelto a sucursal (escaneo post-ruta)',
             });
-        } catch { /* ignora si la transición no aplica */ }
+        } catch (transitionErr) {
+            // No bloqueamos el scan (la fila ReturnToBranchScan ya existe),
+            // pero logueamos para detectar reglas faltantes en state machine.
+            console.error('return-scan transition err:', transitionErr.code || '', transitionErr.message);
+        }
     }
     res.json({ ok: true });
 });
