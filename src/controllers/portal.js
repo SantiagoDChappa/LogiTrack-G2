@@ -26,6 +26,7 @@ const publicIncludes = [
     },
     { model: TypeShipment, as: 'shipmentType', attributes: ['description'] },
     { model: Branch, as: 'currentBranch', attributes: ['name', 'latitude', 'longitude'], required: false },
+    { model: Branch, as: 'pickupBranch',  attributes: ['name', 'address', 'phone', 'latitude', 'longitude'], required: false },
 ];
 
 const normalizeStatusKey = (value) => String(value || '')
@@ -178,6 +179,7 @@ const getPortal = async (req, res) => {
                     },
                     { model: TypeShipment, as: 'shipmentType', attributes: ['description'] },
                     { model: Branch, as: 'currentBranch', attributes: ['name', 'latitude', 'longitude'], required: false },
+                    { model: Branch, as: 'pickupBranch',  attributes: ['name', 'address', 'phone', 'latitude', 'longitude'], required: false },
                 ],
                 order: [['createdAt', 'DESC']],
             }),
@@ -351,29 +353,20 @@ const getPublicCreateForm = async (req, res) => {
     });
 };
 
-const createPublic = async (req, res) => {
-    const trackingId = (req.body.trackingId || '').trim().toUpperCase();
-    const { incidentTypeId, description, reporterName, reporterEmail, reporterDocument } = req.body;
+// Logica compartida entre createPublic (form) y createPublicApi (JSON / bot).
+// Retorna { ok: true, incident, shipment } o { ok: false, status, message }.
+const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument }) => {
+    const tracking = (trackingId || '').trim().toUpperCase();
+    if (!tracking)                                                        { return { ok: false, status: 400, message: 'Código de seguimiento requerido.' }; }
+    if (!incidentTypeId)                                                  { return { ok: false, status: 400, message: 'Seleccione un tipo de incidencia.' }; }
+    if (!description || String(description).trim().length === 0)          { return { ok: false, status: 400, message: 'La descripción es obligatoria.' }; }
+    if (!reporterName || String(reporterName).trim().length === 0)        { return { ok: false, status: 400, message: 'Su nombre es obligatorio.' }; }
 
-    const types = await incidentTypeModel.getActive();
-    const renderError = async (msg, status = 400) => res.status(status).render('portal/incidentNew', {
-        shipment: await findShipmentByTracking(trackingId),
-        trackingId,
-        types,
-        error: msg,
-        form: req.body
-    });
-
-    if (!trackingId)                                  { return renderError('Código de seguimiento requerido.'); }
-    if (!incidentTypeId)                              { return renderError('Seleccione un tipo de incidencia.'); }
-    if (!description || description.trim().length === 0) { return renderError('La descripción es obligatoria.'); }
-    if (!reporterName || reporterName.trim().length === 0) { return renderError('Su nombre es obligatorio.'); }
-
-    const shipment = await findShipmentByTracking(trackingId);
-    if (!shipment) { return renderError('No se encontró un envío con ese código de seguimiento.', 404); }
+    const shipment = await findShipmentByTracking(tracking);
+    if (!shipment) { return { ok: false, status: 404, message: 'No se encontró un envío con ese código de seguimiento.' }; }
 
     const type = await incidentTypeModel.getById(Number(incidentTypeId));
-    if (!type || !type.active) { return renderError('Tipo de incidencia inválido.'); }
+    if (!type || !type.active) { return { ok: false, status: 400, message: 'Tipo de incidencia inválido.' }; }
 
     let openedByPersonId = null;
     const docNumber = reporterDocument ? Number(String(reporterDocument).replace(/\D/g, '')) : null;
@@ -389,11 +382,11 @@ const createPublic = async (req, res) => {
             status:           IncidentStatus.OPEN,
             priority:         2,
             escalated:        false,
-            description:      description.trim().slice(0, 2000),
+            description:      String(description).trim().slice(0, 2000),
             openedChannel:    IncidentChannel.PORTAL,
             openedByPersonId,
-            reporterName:     reporterName.trim().slice(0, 120),
-            reporterEmail:    reporterEmail ? reporterEmail.trim().slice(0, 160) : null
+            reporterName:     String(reporterName).trim().slice(0, 120),
+            reporterEmail:    reporterEmail ? String(reporterEmail).trim().slice(0, 160) : null
         }, { transaction: t });
 
         await incidentHistoryModel.create({
@@ -408,7 +401,43 @@ const createPublic = async (req, res) => {
         return created;
     });
 
-    res.redirect(`/portal/incident/success?id=${incident.id}&trackingId=${encodeURIComponent(shipment.trackingId)}`);
+    return { ok: true, incident, shipment, type };
+};
+
+const createPublic = async (req, res) => {
+    const result = await createIncidentFromPortal(req.body);
+    if (!result.ok) {
+        const types = await incidentTypeModel.getActive();
+        return res.status(result.status).render('portal/incidentNew', {
+            shipment: await findShipmentByTracking((req.body.trackingId || '').trim().toUpperCase()),
+            trackingId: (req.body.trackingId || '').trim().toUpperCase(),
+            types,
+            error: result.message,
+            form: req.body
+        });
+    }
+    res.redirect(`/portal/incident/success?id=${result.incident.id}&trackingId=${encodeURIComponent(result.shipment.trackingId)}`);
+};
+
+// API JSON para el chatbot (wizard inline). Mismas validaciones que createPublic.
+const createPublicApi = async (req, res) => {
+    const result = await createIncidentFromPortal(req.body || {});
+    if (!result.ok) {
+        return res.status(result.status).json({ ok: false, error: result.message });
+    }
+    res.json({
+        ok: true,
+        incidentId: result.incident.id,
+        trackingId: result.shipment.trackingId,
+        typeCode: result.type.code,
+        typeDescription: result.type.description,
+    });
+};
+
+// API JSON para que el bot liste tipos activos en su wizard.
+const getIncidentTypesApi = async (req, res) => {
+    const types = await incidentTypeModel.getActive();
+    res.json(types.map(t => ({ id: t.id, code: t.code, description: t.description })));
 };
 
 const publicSuccess = (req, res) => {
@@ -418,4 +447,4 @@ const publicSuccess = (req, res) => {
     });
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, publicSuccess };
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, getIncidentTypesApi, publicSuccess };
