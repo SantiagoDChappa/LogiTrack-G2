@@ -25,6 +25,7 @@ const REPORT_TYPES = {
     SHIPMENTS_BY_PERIOD: 'volumen_envios',
     ON_TIME_DELIVERIES: 'entregas_a_tiempo',
     DELIVERY_PERFORMANCE: 'rendimiento_repartidores',
+    INCIDENTS_BY_PERIOD: 'fallas_por_periodo',
 };
 
 const escapeCsv = (value) => {
@@ -625,6 +626,51 @@ const buildDeliveryPerformanceExport = ({ dateFrom, dateTo, rows: performanceRow
     };
 };
 
+const buildIncidentsByPeriodExport = ({ dateFrom, dateTo, rows: incidentRows, totalIncidents }) => {
+    const columns = ['fecha_desde', 'fecha_hasta', 'tipo_incidencia', 'total', 'abiertas', 'resueltas', 'porcentaje'];
+    const rows = incidentRows.map((row) => ({
+        fecha_desde: dateFrom,
+        fecha_hasta: dateTo,
+        tipo_incidencia: row.incident_type,
+        total: row.total,
+        abiertas: row.open,
+        resueltas: row.resolved,
+        porcentaje: totalIncidents > 0 ? toPercent(row.total / totalIncidents * 100) : '0.0',
+    }));
+
+    return {
+        type: REPORT_TYPES.INCIDENTS_BY_PERIOD,
+        title: 'Reporte - Fallas de Envios por Periodo',
+        columns,
+        rows,
+        pdfDefinition: {
+            subtitle: 'Distribucion de incidencias por tipo en el periodo seleccionado',
+            summaryItems: [
+                { label: 'Periodo', value: `${dateFrom} a ${dateTo}` },
+                { label: 'Total de incidencias', value: String(totalIncidents) },
+            ],
+            table: {
+                title: 'Detalle por tipo de incidencia',
+                emptyMessage: 'No hay incidencias para el periodo seleccionado.',
+                columns: [
+                    { key: 'tipo_incidencia', label: 'Tipo', width: 0.40, font: 'F2' },
+                    { key: 'total', label: 'Total', width: 0.15 },
+                    { key: 'abiertas', label: 'Abiertas', width: 0.15 },
+                    { key: 'resueltas', label: 'Resueltas', width: 0.15 },
+                    { key: 'porcentaje', label: '%', width: 0.15 },
+                ],
+                rows: rows.map((row) => ({
+                    tipo_incidencia: row.tipo_incidencia,
+                    total: String(row.total),
+                    abiertas: String(row.abiertas),
+                    resueltas: String(row.resueltas),
+                    porcentaje: `${row.porcentaje}%`,
+                })),
+            },
+        },
+    };
+};
+
 const renderReportExport = (definition, format) => {
     const normalizedFormat = String(format || '').toLowerCase();
     if (normalizedFormat === 'csv') {
@@ -651,6 +697,7 @@ const renderReportExport = (definition, format) => {
 module.exports = {
     REPORT_TYPES,
     buildDeliveryPerformanceExport,
+    buildIncidentsByPeriodExport,
     buildOnTimeDeliveriesExport,
     buildPdf,
     buildReportFilename,

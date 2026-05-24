@@ -192,10 +192,48 @@ const getDeliveryPerformanceData = async (query = {}, deps = { sequelize, QueryT
     return viewModel;
 };
 
+const getIncidentsByPeriodData = async (query = {}, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+
+    const viewModel = {
+        dateFrom,
+        dateTo,
+        error: null,
+        rows: [],
+        totalIncidents: 0,
+        hasQuery,
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+    };
+
+    if (dateFrom > dateTo) {
+        viewModel.error = 'La fecha de inicio no puede ser mayor a la fecha de fin.';
+        return viewModel;
+    }
+
+    viewModel.rows = await deps.sequelize.query(
+        `SELECT
+            it.id            AS incident_type_id,
+            it.description   AS incident_type,
+            COUNT(i.id)::int AS total,
+            COUNT(CASE WHEN i.status IN ('OPEN', 'IN_REVIEW') THEN 1 END)::int AS open,
+            COUNT(CASE WHEN i.status NOT IN ('OPEN', 'IN_REVIEW') THEN 1 END)::int AS resolved
+         FROM logitrack.incident i
+         JOIN logitrack.incident_type it ON it.id = i."incidentTypeId"
+         WHERE i."createdAt"::date >= :from AND i."createdAt"::date <= :to
+         GROUP BY it.id, it.description
+         ORDER BY total DESC`,
+        { type: deps.QueryTypes.SELECT, replacements: { from: dateFrom, to: dateTo } }
+    );
+
+    viewModel.totalIncidents = viewModel.rows.reduce((sum, row) => sum + row.total, 0);
+    return viewModel;
+};
+
 module.exports = {
     buildExportQuery,
     formatIsoDate,
     getDeliveryPerformanceData,
+    getIncidentsByPeriodData,
     getOnTimeDeliveriesData,
     getShipmentsByPeriodData,
     resolveDateRange,

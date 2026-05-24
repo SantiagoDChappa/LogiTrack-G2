@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Fallas de Envíos por Período</title>
+    <link rel="stylesheet" href="/css/report.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Fallas de Envíos por Período</h1>
+            </div>
+
+            <!-- Formulario de rango de fechas -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/incidents-by-period" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="btn-primary">
+                                <span class="material-symbols-outlined">search</span>
+                                Consultar
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/incidents-by-period" class="btn-outline">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                    Limpiar
+                                </a>
+                            <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/incidents-by-period/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="btn-outline">
+                                    <span class="material-symbols-outlined">download</span>
+                                    Exportar CSV
+                                </a>
+                                <a href="/report/incidents-by-period/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="btn-outline">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                    Exportar PDF
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+                <% if (hasQuery && totalIncidents === 0) { %>
+                    <!-- Sin datos -->
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">inventory_2</span>
+                            <p>No se registraron incidencias entre <strong><%= dateFrom %></strong> y <strong><%= dateTo %></strong>.</p>
+                        </div>
+                    </div>
+                <% } else if (totalIncidents > 0) { %>
+                    <!-- Banner resumen -->
+                    <div class="report-summary-banner">
+                        <span class="material-symbols-outlined">warning</span>
+                        <span>Total de incidencias en el período: <strong><%= totalIncidents %></strong></span>
+                        <span class="period-label"><%= dateFrom %> → <%= dateTo %></span>
+                    </div>
+
+                    <div class="report-content-grid">
+                        <!-- Tabla -->
+                        <div class="report-card">
+                            <h2>Distribución por tipo de falla</h2>
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo de falla</th>
+                                        <th class="text-right">Total</th>
+                                        <th class="text-right">Abiertas</th>
+                                        <th class="text-right">Resueltas</th>
+                                        <th class="text-right">Porcentaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% rows.forEach(row => { %>
+                                        <% const pct = totalIncidents > 0 ? (row.total / totalIncidents * 100).toFixed(1) : '0.0'; %>
+                                        <tr>
+                                            <td><%= row.incident_type %></td>
+                                            <td class="text-right count-cell"><strong><%= row.total %></strong></td>
+                                            <td class="text-right">
+                                                <% if (row.open > 0) { %>
+                                                    <span class="ot-badge ot-badge--red"><%= row.open %></span>
+                                                <% } else { %>
+                                                    <span class="dp-na">0</span>
+                                                <% } %>
+                                            </td>
+                                            <td class="text-right">
+                                                <% if (row.resolved > 0) { %>
+                                                    <span class="ot-badge ot-badge--green"><%= row.resolved %></span>
+                                                <% } else { %>
+                                                    <span class="dp-na">0</span>
+                                                <% } %>
+                                            </td>
+                                            <td class="text-right pct-cell">
+                                                <div class="pct-bar-wrapper">
+                                                    <div class="pct-bar" style="width: <%= pct %>%"></div>
+                                                    <span><%= pct %>%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td><strong>Total</strong></td>
+                                        <td class="text-right"><strong><%= totalIncidents %></strong></td>
+                                        <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.open, 0) %></strong></td>
+                                        <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.resolved, 0) %></strong></td>
+                                        <td class="text-right"><strong>100%</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Gráfico -->
+                        <div class="report-card chart-card">
+                            <h2>Frecuencia por tipo de falla</h2>
+                            <canvas id="chart-incidents" height="260"></canvas>
+                        </div>
+                    </div>
+
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <script>
+                    (function () {
+                        const rows    = <%- JSON.stringify(rows) %>;
+                        const labels  = rows.map(r => r.incident_type);
+                        const totals  = rows.map(r => r.total);
+                        const opened  = rows.map(r => r.open);
+                        const resolved = rows.map(r => r.resolved);
+
+                        new Chart(document.getElementById('chart-incidents').getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [
+                                    {
+                                        label: 'Abiertas',
+                                        data: opened,
+                                        backgroundColor: 'rgba(239,68,68,0.75)',
+                                        borderRadius: 4,
+                                        borderSkipped: false,
+                                    },
+                                    {
+                                        label: 'Resueltas',
+                                        data: resolved,
+                                        backgroundColor: 'rgba(34,197,94,0.75)',
+                                        borderRadius: 4,
+                                        borderSkipped: false,
+                                    },
+                                ]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'bottom',
+                                        labels: { color: '#94a3b8', padding: 12, boxWidth: 14 }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        stacked: true,
+                                        ticks: { color: '#94a3b8', stepSize: 1 },
+                                        grid: { color: 'rgba(148,163,184,0.12)' }
+                                    },
+                                    y: {
+                                        stacked: true,
+                                        ticks: { color: '#94a3b8' },
+                                        grid: { display: false }
+                                    }
+                                }
+                            }
+                        });
+                    })();
+                    </script>
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
