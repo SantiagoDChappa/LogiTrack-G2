@@ -74,12 +74,24 @@
                 </select>
             </div>
             <div class="incident-filter">
+                <label for="incident-id-input">ID de incidencia</label>
+                <input type="text" id="incident-id-input" name="id"
+                       value="<%= filters.id || '' %>"
+                       placeholder="Ej: INC-200 o 200"
+                       pattern="^\s*(?:INC[-\s]?)?\d+\s*$"
+                       title="Ingresá el número o el código INC-XXX">
+            </div>
+            <div class="incident-filter">
                 <label for="shipmentId">Envío (ID)</label>
                 <input type="number" id="shipmentId" name="shipmentId" value="<%= filters.shipmentId || '' %>">
             </div>
             <button type="submit" class="btn-primary">Filtrar</button>
             <a href="/incident" class="btn-secondary">Limpiar</a>
         </form>
+
+        <% if (typeof idInputInvalid !== 'undefined' && idInputInvalid) { %>
+            <div class="alert alert-error">El ID de incidencia ingresado no es válido. Usá un número (ej. <code>200</code>) o el código <code>INC-200</code>.</div>
+        <% } %>
 
         <div class="incident-table-wrapper">
             <table class="incident-table" data-paginate="incidents">
@@ -130,6 +142,7 @@
             </table>
         </div>
     </main>
-    <script src="/js/header.js" defer></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
 </body>
 </html>

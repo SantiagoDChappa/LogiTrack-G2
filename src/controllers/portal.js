@@ -313,9 +313,11 @@ const getPortal = async (req, res) => {
 
 // ===== Incidencias publicas (sin login) =====
 const sequelize           = require('../database/connection');
-const { Incident }        = require('../models/incident');
-const incidentTypeModel   = require('../models/incidentType');
+const incidentModel        = require('../models/incident');
+const { Incident }         = incidentModel;
+const incidentTypeModel    = require('../models/incidentType');
 const incidentHistoryModel = require('../models/incidentHistory');
+const incidentRules        = require('../services/incidentRules');
 const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
 
 const findShipmentByTracking = (trackingId) => {
@@ -367,6 +369,10 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
 
     const type = await incidentTypeModel.getById(Number(incidentTypeId));
     if (!type || !type.active) { return { ok: false, status: 400, message: 'Tipo de incidencia inválido.' }; }
+
+    const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
+    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
+    if (eligibilityError) { return { ok: false, status: 400, message: eligibilityError }; }
 
     let openedByPersonId = null;
     const docNumber = reporterDocument ? Number(String(reporterDocument).replace(/\D/g, '')) : null;
