@@ -284,18 +284,6 @@
 
                     </div>
 
-                    <!-- Configuración de notificaciones por evento -->
-                    <div id="form-notification-config">
-                        <span>Notificaciones via email de estados a los destinatarios del envío</span>
-                        <% notifConfig.forEach(config => { %>
-                            <label for="cbox_<%= config.eventCode %>" class="notification-item">
-                                <span><%= config.description %></span>
-                                <input type="checkbox" name="cbox_<%= config.eventCode %>"
-                                    id="cbox_<%= config.eventCode %>" <%= config.enabled ? 'checked' : '' %>>
-                            </label>
-                        <% }) %>
-                    </div>
-
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">
                             <span class="material-symbols-outlined">save</span>
@@ -304,6 +292,147 @@
                     </div>
                 </form>
             </div>
+
+            <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">mark_email_read</span>
+                    Notificaciones por evento
+                </h2>
+                <p class="settings-subtitle">
+                    Por cada evento podés elegir si se notifica, a quién (destinatario / remitente / ambos / un email personalizado) y editar el texto del email.
+                </p>
+                <form method="POST" action="/setting/notification-config">
+                    <div style="display:flex;flex-direction:column;gap:.6rem">
+                        <% notifConfig.forEach(config => { %>
+                            <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                                    <input type="checkbox" name="enabled_<%= config.eventCode %>"
+                                        <%= config.enabled ? 'checked' : '' %>>
+                                    <%= config.description %>
+                                </label>
+
+                                <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
+                                    <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
+                                    <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
+                                    <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
+                                    <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
+                                </select>
+
+                                <input type="email" name="custom_<%= config.eventCode %>"
+                                    placeholder="email@dominio.com"
+                                    value="<%= config.customEmail || '' %>"
+                                    data-event="<%= config.eventCode %>"
+                                    class="notif-custom-input"
+                                    <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
+
+                                <button type="button" class="btn-secondary notif-edit-tpl-btn"
+                                    data-event="<%= config.eventCode %>"
+                                    data-description="<%= config.description %>"
+                                    data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
+                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>">
+                                    <span class="material-symbols-outlined">edit_note</span>
+                                    Editar mail
+                                </button>
+                            </div>
+                        <% }) %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar notificaciones
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Email de prueba (override) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">science</span>
+                    Email de prueba (override)
+                </h2>
+                <p class="settings-subtitle">
+                    Si se configura un email aquí, <strong>todos</strong> los mails del sistema se redirigen a esta dirección (en vez de ir al destinatario/remitente real). Útil para testeo. Dejar vacío para operar normal.
+                </p>
+                <form method="POST" action="/setting/test-email-override">
+                    <div class="field" style="max-width:520px">
+                        <label for="test_email_override">Email override (vacío = desactivado)</label>
+                        <input type="email" id="test_email_override" name="test_email_override"
+                            value="<%= params.test_email_override %>" placeholder="ej: dev@tudominio.com">
+                        <small style="color:var(--color-text-secondary)">El asunto recibirá un prefijo <code>[TEST → destinatarios reales]</code>.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar override
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Modal: Editar template de email -->
+            <div id="tpl-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center">
+                <form id="tpl-modal-form" method="POST" action=""
+                    style="background:var(--color-bg,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);width:min(640px,92vw);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+                    <h3 style="margin:0">Editar email — <span id="tpl-modal-event"></span></h3>
+                    <div class="field">
+                        <label for="tpl-modal-subject">Asunto</label>
+                        <input type="text" id="tpl-modal-subject" name="subject" required>
+                    </div>
+                    <div class="field">
+                        <label for="tpl-modal-body">Cuerpo del mensaje</label>
+                        <textarea id="tpl-modal-body" name="body" rows="8" required style="font-family:inherit;resize:vertical"></textarea>
+                        <small style="color:var(--color-text-secondary)">
+                            Placeholders disponibles: <code>{{fullName}}</code>, <code>{{trackingCode}}</code>
+                        </small>
+                    </div>
+                    <div class="settings-actions" style="justify-content:flex-end;gap:.6rem">
+                        <button type="button" class="btn-secondary" id="tpl-modal-cancel">Cancelar</button>
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar mail
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <script>
+                (function setupNotifConfig() {
+                    document.querySelectorAll('.notif-mode-select').forEach(sel => {
+                        sel.addEventListener('change', e => {
+                            const ev = e.target.dataset.event;
+                            const input = document.querySelector('.notif-custom-input[data-event="' + ev + '"]');
+                            if (!input) return;
+                            input.disabled = e.target.value !== 'custom';
+                            if (input.disabled) input.value = '';
+                        });
+                    });
+
+                    const backdrop = document.getElementById('tpl-modal-backdrop');
+                    const form     = document.getElementById('tpl-modal-form');
+                    const eventLbl = document.getElementById('tpl-modal-event');
+                    const subject  = document.getElementById('tpl-modal-subject');
+                    const body     = document.getElementById('tpl-modal-body');
+
+                    document.querySelectorAll('.notif-edit-tpl-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            form.action = '/setting/email-template/' + btn.dataset.event;
+                            eventLbl.textContent = btn.dataset.description;
+                            subject.value = btn.dataset.subject || '';
+                            body.value    = btn.dataset.body    || '';
+                            backdrop.style.display = 'flex';
+                        });
+                    });
+
+                    document.getElementById('tpl-modal-cancel').addEventListener('click', () => {
+                        backdrop.style.display = 'none';
+                    });
+                    backdrop.addEventListener('click', e => {
+                        if (e.target === backdrop) backdrop.style.display = 'none';
+                    });
+                })();
+            </script>
 
             <!-- Card 3: Optimización de ruteo -->
             <div class="settings-card">
@@ -414,6 +543,141 @@
                 </div>
                 </form>
                 <% } %>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">cancel</span>
+                    Motivos de intento fallido
+                </h2>
+                <p class="settings-subtitle">Catálogo editable de motivos que ve el repartidor al marcar entrega fallida. <code>creates_incident=on</code> abre incidencia automática; <code>max_attempts_override</code> reemplaza el tope global solo para ese motivo.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Código</th><th>Etiqueta</th><th>Días reintento</th><th>Activo</th><th>Crea incidencia</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        <% (failedReasons || []).forEach(r => { %>
+                        <tr>
+                            <form method="POST" action="/setting/failed-reason/<%= r.id %>">
+                                <td><code><%= r.code %></code></td>
+                                <td><input type="text" name="label" value="<%= r.label %>" required></td>
+                                <td><input type="number" name="retryDays" min="0" max="30" value="<%= r.retryDays %>" style="width:70px"></td>
+                                <td><input type="checkbox" name="active" <%= r.active ? 'checked' : '' %>></td>
+                                <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="btn-primary" type="submit">Guardar</button>
+                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')">Borrar</button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/failed-reason">
+                                <td><input type="text" name="code" placeholder="codigo_snake" required></td>
+                                <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
+                                <td><input type="number" name="retryDays" min="0" max="30" value="1" style="width:70px"></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><input type="checkbox" name="createsIncident"></td>
+                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Tipos de incidencia configurables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">report</span>
+                    Tipos de incidencia
+                </h2>
+                <p class="settings-subtitle">Categorías que ve el usuario al reportar una incidencia desde el portal o el chatbot.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Código</th><th>Etiqueta</th><th>Activo</th><th></th></tr></thead>
+                    <tbody>
+                        <% (incidentTypes || []).forEach(t => { %>
+                        <tr>
+                            <form method="POST" action="/setting/incident-type/<%= t.id %>">
+                                <td><code><%= t.code %></code></td>
+                                <td><input type="text" name="label" value="<%= t.description %>" required></td>
+                                <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="btn-primary" type="submit">Guardar</button>
+                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')">Desactivar</button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/incident-type">
+                                <td><input type="text" name="code" placeholder="CODIGO" required></td>
+                                <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Franjas horarias habilitadas globalmente -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Franjas horarias de entrega
+                </h2>
+                <p class="settings-subtitle">Bloques horarios que el destinatario puede elegir en autogestión del portal y que se muestran en alta de envío.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Etiqueta</th><th>Desde</th><th>Hasta</th><th>Activo</th><th></th></tr></thead>
+                    <tbody>
+                        <% (timeWindows || []).forEach(w => { %>
+                        <tr>
+                            <form method="POST" action="/setting/time-window/<%= w.id %>">
+                                <td><input type="text" name="label" value="<%= w.label %>" required></td>
+                                <td><input type="time" name="fromTime" value="<%= String(w.fromTime).slice(0,5) %>" required></td>
+                                <td><input type="time" name="toTime" value="<%= String(w.toTime).slice(0,5) %>" required></td>
+                                <td><input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="btn-primary" type="submit">Guardar</button>
+                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')">Borrar</button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/time-window">
+                                <td><input type="text" name="label" placeholder="Ej: Mañana" required></td>
+                                <td><input type="time" name="fromTime" required></td>
+                                <td><input type="time" name="toTime" required></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Mensajes estándar parametrizables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">edit_note</span>
+                    Mensajes estándar
+                </h2>
+                <p class="settings-subtitle">Textos reutilizables (reprogramación, próxima entrega, devuelto). Soportan placeholders <code>{{date}}</code>, <code>{{branch}}</code>, <code>{{eta}}</code>.</p>
+                <% (stdMessages || []).forEach(m => { %>
+                <form method="POST" action="/setting/standard-message/<%= m.code %>" style="margin-bottom:1rem">
+                    <label style="font-weight:600"><%= m.label %> <code style="font-size:.75rem;color:#64748b">(<%= m.code %>)</code></label>
+                    <textarea name="body" rows="2" style="width:100%;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px"><%= m.body %></textarea>
+                    <button class="btn-primary" type="submit" style="margin-top:.25rem">Guardar</button>
+                </form>
+                <% }) %>
             </div>
 
             <!-- Card 5: Historial de cambios -->

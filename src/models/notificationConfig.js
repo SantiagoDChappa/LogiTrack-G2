@@ -10,12 +10,23 @@ const NotificationConfig = sequelize.define('notificationConfig', {
         autoIncrement: true,
     },
     eventCode: {
-        type: DataTypes.ENUM(...Object.values(NotificationEvent)),
+        type: DataTypes.STRING(60),
         allowNull: false,
     },
     enabled: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
+    },
+    recipientMode: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'recipient',
+        field: 'recipient_mode',
+    },
+    customEmail: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        field: 'custom_email',
     },
 },
     {
@@ -35,7 +46,7 @@ const isNotificationEnabled = async (eventCode) => {
 
 const getAllConfigs = async () => {
     const config = await NotificationConfig.findAll({
-        attributes: ['id', 'eventCode', 'enabled'],
+        attributes: ['id', 'eventCode', 'enabled', 'recipientMode', 'customEmail'],
         include: [{
             model: NotificationEventsModel,
             as: 'eventDetails',
@@ -49,8 +60,14 @@ const getAllConfigs = async () => {
         id: item.id,
         eventCode: item.eventCode,
         description: item.eventDetails?.description || "Sin descripción",
-        enabled: item.enabled
+        enabled: item.enabled,
+        recipientMode: item.recipientMode || 'recipient',
+        customEmail: item.customEmail || '',
     }));
 };
 
-module.exports = { NotificationConfig, isNotificationEnabled, getAllConfigs };
+const getConfigByEvent = async (eventCode) => {
+    return NotificationConfig.findOne({ where: { eventCode } });
+};
+
+module.exports = { NotificationConfig, isNotificationEnabled, getAllConfigs, getConfigByEvent };

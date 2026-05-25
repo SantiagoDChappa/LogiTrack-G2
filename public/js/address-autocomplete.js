@@ -17,6 +17,8 @@
             addressSelected = false;
             clearChip();
             clearHidden();
+            const isPickup = document.querySelector('input[name="deliveryMode"]:checked')?.value === 'branch_pickup';
+            searchBox.required = !isPickup;
             schedule(this.value);
         });
 
@@ -36,6 +38,8 @@
                 clearChip();
                 clearHidden();
                 addressSelected = false;
+                const isPickup = document.querySelector('input[name="deliveryMode"]:checked')?.value === 'branch_pickup';
+                searchBox.required = !isPickup;
                 setValidationState('empty', 'Ingresá una dirección para buscar sugerencias.');
                 searchBox.focus();
                 window.addrValid = false;
@@ -130,7 +134,9 @@
         showChip(mainLine, subLine);
 
         // Limpia el input y cierra el dropdown
-        el('address-search').value = '';
+        const searchBox = el('address-search');
+        searchBox.value = '';
+        searchBox.required = false;
         hideDropdown();
 
         // Marca la validación como correcta

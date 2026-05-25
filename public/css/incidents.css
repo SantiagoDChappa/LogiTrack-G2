@@ -196,10 +196,56 @@ html[data-theme="dark"] {
     box-shadow: 0 0 0 1px rgba(185, 28, 28, .15);
 }
 
+.incident-origin {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border: 1px solid transparent;
+}
+.incident-origin--externo { background: #ede9fe; color: #5b21b6; border-color: rgba(91, 33, 182, .18); }
+.incident-origin--interno { background: #e0f2fe; color: #075985; border-color: rgba(7, 89, 133, .18); }
+
+.incident-resolution {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .55rem;
+    border-radius: var(--inc-radius-sm);
+    font-size: .72rem;
+    font-weight: 700;
+}
+.incident-resolution.is-procedente    { background: #d1fae5; color: #065f46; }
+.incident-resolution.is-no-procedente { background: #fee2e2; color: #991b1b; }
+.incident-resolution.is-pending       { background: transparent; color: var(--inc-muted); font-weight: 500; }
+
 /* ============================================================
    Form (new + detail action forms)
    ============================================================ */
-.incident-form,
+.incident-form {
+    max-width: none;
+    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+    padding: 1.75rem clamp(1.25rem, 2.5vw, 2.25rem) 1.5rem;
+    background: var(--inc-surface);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-lg);
+    box-shadow: var(--inc-shadow-md);
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1.1rem 1.25rem;
+}
+
+.incident-form > .form-group { grid-column: span 12; margin-bottom: 0; }
+.incident-form > .form-actions { grid-column: span 12; }
+
+@media (min-width: 960px) {
+    .incident-form > .form-group[data-col="6"]  { grid-column: span 6; }
+    .incident-form > .form-group[data-col="4"]  { grid-column: span 4; }
+    .incident-form > .form-group[data-col="8"]  { grid-column: span 8; }
+}
+
 .portal-incident-form {
     max-width: 720px;
     margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
@@ -707,3 +753,184 @@ html[data-theme="dark"] {
     box-shadow: 0 4px 12px rgba(245, 158, 11, .25);
     transform: translateY(-1px);
 }
+
+/* ============================================================
+   Pickers para alta de incidencia (branch + user)
+   ============================================================ */
+.branch-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: .6rem;
+    margin-top: .35rem;
+}
+
+@media (max-width: 600px) {
+    .branch-picker { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
+.branch-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .25rem;
+    padding: .75rem .85rem;
+    background: var(--inc-surface);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-md);
+    color: var(--inc-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease, background .15s ease;
+}
+
+.branch-card:hover {
+    border-color: var(--inc-blue-soft);
+    background: var(--inc-surface-alt);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+}
+
+.branch-card:focus-visible {
+    outline: none;
+    border-color: var(--inc-blue);
+    box-shadow: var(--inc-ring);
+}
+
+.branch-card.is-selected {
+    border-color: var(--inc-blue);
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    box-shadow: 0 0 0 1px var(--inc-blue);
+}
+
+.branch-card.is-empty { opacity: .55; }
+.branch-card.is-empty .branch-card__count { color: var(--inc-red); }
+
+.branch-card__icon {
+    font-size: 1.2rem !important;
+    color: var(--inc-blue);
+}
+
+.branch-card.is-selected .branch-card__icon { color: var(--inc-blue-dark); }
+
+.branch-card__name {
+    font-weight: 700;
+    font-size: .9rem;
+    color: var(--inc-text-strong);
+    line-height: 1.25;
+}
+
+.branch-card__count {
+    font-size: .72rem;
+    color: var(--inc-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+}
+
+.branch-picker__hint {
+    display: block;
+    margin-top: .55rem;
+    color: var(--inc-muted);
+    font-size: .8rem;
+}
+
+/* ── User picker ────────────────────────────────────── */
+.user-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: .55rem;
+    margin-top: .35rem;
+    padding: .85rem;
+    background: var(--inc-surface-alt);
+    border: 1px dashed var(--inc-border);
+    border-radius: var(--inc-radius-md);
+    min-height: 64px;
+}
+
+.user-picker__empty {
+    margin: 0;
+    color: var(--inc-muted);
+    font-size: .85rem;
+    text-align: center;
+    padding: .5rem;
+    grid-column: 1 / -1;
+}
+
+.user-card {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .65rem .85rem;
+    background: var(--inc-surface);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-md);
+    color: var(--inc-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .12s ease;
+}
+
+.user-card:hover {
+    border-color: var(--inc-blue-soft);
+    background: var(--inc-surface-alt);
+    transform: translateY(-1px);
+}
+
+.user-card:focus-visible {
+    outline: none;
+    border-color: var(--inc-blue);
+    box-shadow: var(--inc-ring);
+}
+
+.user-card.is-selected {
+    border-color: var(--inc-blue);
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    box-shadow: 0 0 0 1px var(--inc-blue);
+}
+
+.user-card__avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--inc-blue), var(--inc-blue-soft));
+    color: #fff !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem !important;
+    flex-shrink: 0;
+}
+
+.user-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    flex: 1;
+}
+
+.user-card__name {
+    font-weight: 700;
+    font-size: .92rem;
+    color: var(--inc-text-strong);
+    line-height: 1.25;
+}
+
+.user-card__role {
+    font-size: .75rem;
+    color: var(--inc-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 600;
+}
+
+.user-card__check {
+    color: var(--inc-green);
+    font-size: 1.3rem !important;
+    opacity: 0;
+    transition: opacity .15s ease;
+    flex-shrink: 0;
+}
+
+.user-card.is-selected .user-card__check { opacity: 1; }

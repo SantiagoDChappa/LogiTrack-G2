@@ -1,3 +1,16 @@
+function toggleNavGroup(id) {
+    const group = document.getElementById(id);
+    if (group) group.classList.toggle('open');
+}
+
+// Auto-abrir grupo de reportes si la URL actual es /report/...
+(function () {
+    if (window.location.pathname.startsWith('/report/')) {
+        const group = document.getElementById('nav-group-reportes');
+        if (group) group.classList.add('open');
+    }
+})();
+
 const userSection  = document.querySelector('.top-header .user');
 const userDropdown = document.getElementById('user-dropdown');
 

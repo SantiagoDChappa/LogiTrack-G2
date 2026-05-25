@@ -337,6 +337,12 @@
 
     <div class="pod-body">
         <form method="POST" action="/delivery/evidence/<%= shipmentId %>/pod" novalidate>
+            <% if (typeof routeId !== 'undefined' && routeId) { %>
+                <input type="hidden" name="routeId" value="<%= routeId %>">
+            <% } %>
+            <% if (typeof stopId !== 'undefined' && stopId) { %>
+                <input type="hidden" name="stopId" value="<%= stopId %>">
+            <% } %>
 
             <div class="pod-section">
                 <div class="pod-section-title">
@@ -399,6 +405,20 @@
                 </button>
                 <input type="hidden" name="signatureBase64" id="signatureBase64">
             </div>
+
+            <% if (typeof secretRequired !== 'undefined' && secretRequired) { %>
+                <div class="pod-section">
+                    <div class="pod-section-title">
+                        <span class="material-symbols-outlined">key</span>
+                        Código clave de entrega
+                    </div>
+                    <p style="font-size:.85rem;color:#64748b;margin:0 0 .5rem">Pedíle al destinatario el código que recibió por mail (6 caracteres).</p>
+                    <input type="text" name="deliverySecretCode" maxlength="10" required
+                        placeholder="Ej: H7P3KQ"
+                        style="text-transform:uppercase;letter-spacing:.3em;font-weight:700;font-size:1.1rem;text-align:center;width:100%;padding:.7rem;border:1.5px solid #2563eb;border-radius:10px"
+                        oninput="this.value=this.value.toUpperCase()">
+                </div>
+            <% } %>
 
             <button type="submit" class="submit-btn">
                 <span class="material-symbols-outlined">check_circle</span>
@@ -525,7 +545,8 @@
     });
 
     // Validación al submit
-    document.querySelector('form').addEventListener('submit', function(e) {
+    document.querySelector('form').addEventListener('submit', async function(e) {
+        e.preventDefault();
         const name = nameInput.value.trim();
         const lastname = lastnameInput.value.trim();
         const dniRaw = dniInput.value.replace(/\D/g, '');
@@ -551,7 +572,6 @@
         if (!signatureDrawn) missing.push('Firma del receptor');
 
         if (missing.length || invalid.length) {
-            e.preventDefault();
             const parts = [];
             if (missing.length) parts.push('Faltan completar: ' + missing.join(', ') + '.');
             if (invalid.length) parts.push(invalid.join('. ') + '.');
@@ -559,8 +579,31 @@
             return;
         }
 
-        // Enviar DNI limpio al server
         dniInput.value = dniRaw;
+
+        const form = e.target;
+        const params = new URLSearchParams();
+        Array.from(form.elements).forEach(el => {
+            if (!el.name) return;
+            if (el.type === 'file') return;
+            params.append(el.name, el.value);
+        });
+
+        try {
+            const resp = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString(),
+            });
+            if (resp.ok || resp.redirected) {
+                window.location = resp.url;
+                return;
+            }
+            const msg = (await resp.text()) || 'Error al confirmar entrega.';
+            showValidation(msg);
+        } catch (err) {
+            showValidation('Error de red al confirmar entrega.');
+        }
     });
 
     function showValidation(msg) {

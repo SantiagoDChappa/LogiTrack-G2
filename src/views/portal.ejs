@@ -203,9 +203,26 @@
                             <span class="portal-card-value"><%= s.shipmentType ? s.shipmentType.description : '-' %></span>
                         </div>
                         <div class="portal-card-field">
+                            <span class="portal-card-label">Modalidad</span>
+                            <span class="portal-card-value">
+                                <%= s.deliveryMode === 'branch_pickup' ? 'Retiro por sucursal' : 'Envío a domicilio' %>
+                            </span>
+                        </div>
+                        <% if (s.deliveryMode === 'branch_pickup' && s.pickupBranch) { %>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Sucursal de retiro</span>
+                            <span class="portal-card-value">
+                                <strong><%= s.pickupBranch.name %></strong><br>
+                                <%= s.pickupBranch.address %>
+                                <% if (s.pickupBranch.phone) { %> · <%= s.pickupBranch.phone %><% } %>
+                            </span>
+                        </div>
+                        <% } else { %>
+                        <div class="portal-card-field">
                             <span class="portal-card-label">Destino</span>
                             <span class="portal-card-value"><%= s.address.province ? s.address.province.description : '-' %></span>
                         </div>
+                        <% } %>
                         <div class="portal-card-field">
                             <span class="portal-card-label">Peso / Bultos</span>
                             <span class="portal-card-value">

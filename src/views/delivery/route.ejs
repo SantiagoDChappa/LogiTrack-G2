@@ -123,7 +123,7 @@
     }
 
     .map-actions {
-        position: absolute; right: 16px; z-index: 600;
+        position: absolute; left: 16px; z-index: 600;
         display: flex; flex-direction: column; gap: 8px;
     }
     /* Top-left floating: back + menú — esquina superior izquierda, mínimo intrusivo */
@@ -262,6 +262,21 @@
     }
 
     .stop-head { display: flex; align-items: center; gap: .65rem; }
+    .stop-info-btn {
+        flex-shrink: 0;
+        width: 34px; height: 34px;
+        border-radius: 10px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: rgba(37,99,235,.08);
+        border: 1px solid rgba(37,99,235,.18);
+        color: var(--lt-blue) !important;
+        text-decoration: none !important;
+        cursor: pointer;
+        transition: transform .12s ease, background .15s ease;
+    }
+    .stop-info-btn:hover { background: rgba(37,99,235,.15); transform: scale(1.05); }
+    .stop-info-btn .material-symbols-outlined { font-size: 20px; }
+    html[data-theme="dark"] .stop-info-btn { background: rgba(96,165,250,.12); border-color: rgba(96,165,250,.22); color: #93c5fd !important; }
     .stop-bubble {
         display: inline-flex; align-items: center; justify-content: center;
         width: 32px; height: 32px; border-radius: 10px;
@@ -336,6 +351,10 @@
     }
     .status-badge.green { background: #dcfce7; color: #166534; }
     .status-badge.gray  { background: #f1f5f9; color: #475569; }
+    .status-badge.red   { background: rgba(220,38,38,.15); color: #b91c1c; }
+    .status-badge.blue  { background: #dbeafe; color: #1e40af; }
+    html[data-theme="dark"] .status-badge.red  { background: rgba(239,68,68,.18); color: #fca5a5; }
+    html[data-theme="dark"] .status-badge.blue { background: rgba(59,130,246,.2);  color: #93c5fd; }
     @keyframes pulse-dot {
         0%,100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, .25); }
         50%     { box-shadow: 0 0 0 5px rgba(245, 158, 11, .05); }
@@ -482,7 +501,7 @@
         .sheet-grab { display: none; }
         .bottom-sheet.collapsed { max-height: none !important; }
         .bottom-sheet.collapsed .stops-list { opacity: 1; pointer-events: auto; }
-        .map-actions { top: 16px; bottom: auto; right: 16px; }
+        .map-actions { top: 16px; bottom: auto; left: 16px; right: auto; }
         .map-actions { top: auto; bottom: 24px; }
     }
 
@@ -492,7 +511,7 @@
         .route-toolbar { padding: .55rem .8rem; top: 70px; }
         .route-toolbar h1 { font-size: .85rem; }
         .route-map-wrap { position: absolute; inset: 0; }
-        .map-actions { bottom: calc(var(--sheet-visible, 50vh) + 16px); right: 14px; transition: bottom .35s cubic-bezier(.22,1,.36,1); }
+        .map-actions { bottom: calc(var(--sheet-visible, 50vh) + 16px); left: 14px; right: auto; transition: bottom .35s cubic-bezier(.22,1,.36,1); }
         .bottom-sheet {
             position: absolute; left: 0; right: 0; bottom: 0;
             height: 90vh; max-height: none;
@@ -574,15 +593,17 @@
             </div>
         </div>
 
-        <% const activePause = !readOnly && (route.pauses || []).find(p => !p.endedAt && p.startedAt); %>
-        <div class="pause-banner" id="pause-banner" <%= activePause ? '' : 'hidden' %>>
-            <span class="material-symbols-outlined">pause_circle</span>
-            <div>
-                Ruta en pausa <small id="pause-reason"><%= activePause ? '· ' + activePause.reason : '' %></small>
-                <div style="font-size:.72rem;font-weight:500;opacity:.85" id="pause-elapsed">—</div>
+        <% const activePause = !readOnly && route.statusId === 2 && route.startedAt && (route.pauses || []).find(p => !p.endedAt && p.startedAt); %>
+        <% if (activePause) { %>
+            <div class="pause-banner" id="pause-banner">
+                <span class="material-symbols-outlined">pause_circle</span>
+                <div>
+                    Ruta en pausa <small id="pause-reason">· <%= activePause.reason %></small>
+                    <div style="font-size:.72rem;font-weight:500;opacity:.85" id="pause-elapsed">—</div>
+                </div>
+                <button id="btn-resume">Reanudar</button>
             </div>
-            <button id="btn-resume">Reanudar</button>
-        </div>
+        <% } %>
 
         <div class="route-toolbar">
             <div style="flex:1;min-width:0">
@@ -612,6 +633,8 @@
                     const trackingId = s.shipment ? s.shipment.trackingId : null;
                     const sh = s.shipment || {};
                 %>
+                    <% const shipStatusId = s.shipment ? s.shipment.statusId : null; %>
+                    <% const wasFailed = !isPickup && s.completed && shipStatusId === 9; %>
                     <li class="stop-row <%= s.completed ? 'completed' : '' %> <%= (s.skipped && !s.completed) ? 'skipped' : '' %>"
                         data-stop-id="<%= s.id %>"
                         data-stop-seq="<%= s.sequence %>"
@@ -619,10 +642,11 @@
                         data-skipped="<%= s.skipped ? '1' : '0' %>"
                         data-est-min="<%= s.estimatedMinutes || 5 %>"
                         data-lat="<%= s.lat %>"
-                        data-lng="<%= s.lng %>">
+                        data-lng="<%= s.lng %>"
+                        data-ship-status="<%= shipStatusId || '' %>">
 
                         <div class="stop-head">
-                            <span class="stop-bubble <%= s.completed ? (isPickup ? 'pickup' : 'delivered') : 'pending' %>"><%= s.sequence %></span>
+                            <span class="stop-bubble <%= s.completed ? (isPickup ? 'pickup' : (wasFailed ? 'failed' : 'delivered')) : 'pending' %>"><%= s.sequence %></span>
                             <div class="stop-title-wrap">
                                 <% if (isPickup) { %>
                                     <div class="stop-tracking">Pickup</div>
@@ -636,6 +660,13 @@
                                 <% } %>
                                 <div class="stop-eta js-stop-eta"></div>
                             </div>
+                            <% if (!isPickup && s.shipment) { %>
+                                <a class="stop-info-btn"
+                                   href="/shipment/detail/<%= s.shipment.id %>?from=/delivery/route/<%= route.id %>&fromLabel=Mi%20Ruta"
+                                   title="Ver detalle del envío (entrega/motivo/historial)">
+                                    <span class="material-symbols-outlined">info</span>
+                                </a>
+                            <% } %>
                         </div>
 
                         <% if (!isPickup && (sh.fragile || sh.refrigerated || sh.oversized || sh.weightKg || sh.codAmount)) { %>
@@ -687,9 +718,11 @@
                                         <span class="material-symbols-outlined">inventory_2</span>Confirmar pickup
                                     </button>
                                 <% } else { %>
-                                    <button class="btn-ui btn-cta" data-action="delivered" data-stop-id="<%= s.id %>" style="width:100%">
-                                        <span class="material-symbols-outlined">check_circle</span>Confirmar Entrega
-                                    </button>
+                                    <% if (s.shipment) { %>
+                                        <a class="btn-ui btn-cta" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod?routeId=<%= route.id %>&stopId=<%= s.id %>" style="width:100%">
+                                            <span class="material-symbols-outlined">photo_camera</span>Confirmar Entrega (POD)
+                                        </a>
+                                    <% } %>
                                     <div class="secondary-row" style="display:flex;gap:.5rem;width:100%;margin-top:.55rem">
                                         <a class="btn-ui btn-secondary-ui" target="_blank" style="flex:1"
                                            href="https://www.google.com/maps/dir/?api=1&destination=<%= s.lat %>,<%= s.lng %>">
@@ -715,11 +748,6 @@
                                             <span class="material-symbols-outlined">close</span>Fallido
                                         </button>
                                     </div>
-                                    <% if (s.shipment) { %>
-                                        <a class="btn-ui btn-secondary-ui" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod" style="width:100%;margin-top:.55rem">
-                                            <span class="material-symbols-outlined">photo_camera</span>Capturar POD (foto + firma)
-                                        </a>
-                                    <% } %>
                                 <% } %>
                             </div>
                             <div class="lock-msg" hidden>
@@ -925,10 +953,12 @@
     const grab  = document.getElementById('sheet-grab');
     const isMobile = () => window.innerWidth <= 768;
 
-    // Snap points en px (translateY desde la posición full)
+    // Snap points en px (translateY desde la posición full).
+    // tucked = el handle queda flush en el borde inferior (~36px visible) y el mapa ocupa todo
+    // el resto. No dejamos hueco entre el sheet y el mapa.
     function snapPoints() {
         const vh = window.innerHeight;
-        const tucked = vh - 44;              // sólo handle visible (~44px) → mapa full
+        const tucked = vh - 36;               // sólo handle pegado abajo
         const mid    = Math.round(vh * 0.42); // ~58% visible
         const full   = 0;                     // sheet abierto al máximo (~95% visible)
         return { tucked, mid, full };
@@ -1126,7 +1156,38 @@
             const estMin = Number(r.dataset.estMin || 5);
 
             if (r.classList.contains('completed')) {
-                if (badge) { badge.classList.remove('amber','gray'); badge.classList.add('green'); badge.textContent = 'Entregado'; }
+                // Distinguir estados terminales por shipment.statusId.
+                // 4=DELIVERED, 9=FAILED_ATTEMPT, 3=AT_BRANCH, 5=CANCELLED, 8=PACKAGE_FAILED.
+                const shipStatus = Number(r.dataset.shipStatus || 0);
+                const isPickup = r.dataset.stopType === 'pickup';
+                if (badge) {
+                    badge.classList.remove('amber','gray','green','red','blue');
+                    // Limpiar inline styles previos (cuando antes seteabamos style.background/color directo)
+                    badge.style.background = '';
+                    badge.style.color = '';
+                    if (isPickup) {
+                        badge.classList.add('green'); badge.textContent = 'Retirado';
+                    } else if (shipStatus === 4) {
+                        badge.classList.add('green'); badge.textContent = 'Entregado';
+                    } else if (shipStatus === 9) {
+                        badge.classList.add('red'); badge.textContent = 'Intento fallido';
+                    } else if (shipStatus === 3) {
+                        badge.classList.add('blue'); badge.textContent = 'Devuelto a sucursal';
+                    } else if (shipStatus === 5) {
+                        badge.classList.add('red'); badge.textContent = 'Cancelado';
+                    } else if (shipStatus === 8) {
+                        badge.classList.add('red'); badge.textContent = 'Paquete fallido';
+                    } else {
+                        badge.classList.add('gray'); badge.textContent = 'Completado';
+                    }
+                }
+                if (bubble) {
+                    bubble.classList.remove('pending','current','locked','skipped','delivered','failed','pickup');
+                    if (isPickup) bubble.classList.add('pickup');
+                    else if (shipStatus === 4) bubble.classList.add('delivered');
+                    else if (shipStatus === 9 || shipStatus === 5 || shipStatus === 8) bubble.classList.add('failed');
+                    else bubble.classList.add('delivered'); // AT_BRANCH y otros: visualmente "ok"
+                }
                 if (etaEl) etaEl.textContent = '';
                 if (stop) kmDone += stop.distanceFromPrevKm;
                 kmAcc += (stop ? stop.distanceFromPrevKm : 0);
@@ -1137,6 +1198,13 @@
                 r.classList.add('skipped');
                 if (bubble) { bubble.classList.remove('pending'); bubble.classList.add('skipped'); }
                 if (etaEl) etaEl.textContent = 'Postergada';
+                if (badge) {
+                    badge.classList.remove('gray','green');
+                    badge.classList.add('amber');
+                    badge.style.background = '';
+                    badge.style.color = '';
+                    badge.textContent = 'Postergada';
+                }
                 return;
             }
 
@@ -1203,6 +1271,8 @@
         if (!row) return;
         row.classList.add('completed');
         row.dataset.skipped = '0';
+        if (kind === 'failed') row.dataset.shipStatus = '9';
+        else if (kind === 'delivered') row.dataset.shipStatus = '4';
         const actions = row.querySelector('.stop-actions'); if (actions) actions.remove();
         const lock = row.querySelector('.lock-msg'); if (lock) lock.remove();
         const bubble = row.querySelector('.stop-bubble');
@@ -1382,19 +1452,41 @@
     });
 
     // === Pausa ===
-    const pauseBanner   = document.getElementById('pause-banner');
-    const pauseElapsedE = document.getElementById('pause-elapsed');
-    const pauseReasonE  = document.getElementById('pause-reason');
+    // Los elementos pueden no existir si el banner no se renderizó (no hay pausa activa).
+    let pauseBanner   = document.getElementById('pause-banner');
+    let pauseElapsedE = document.getElementById('pause-elapsed');
+    let pauseReasonE  = document.getElementById('pause-reason');
     let pauseTimer = null;
     function startPauseTimer() {
         if (pauseTimer) clearInterval(pauseTimer);
         const tick = () => {
             if (!activePauseStart) return;
             const sec = Math.floor((Date.now() - new Date(activePauseStart).getTime()) / 1000);
-            pauseElapsedE.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
+            if (pauseElapsedE) pauseElapsedE.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
         };
         tick();
         pauseTimer = setInterval(tick, 1000);
+    }
+    function ensurePauseBanner() {
+        // Inyectamos el banner sólo si todavía no existe (cuando el usuario pausa desde una sesión limpia).
+        if (document.getElementById('pause-banner')) return;
+        const html = `
+            <div class="pause-banner" id="pause-banner">
+                <span class="material-symbols-outlined">pause_circle</span>
+                <div>
+                    Ruta en pausa <small id="pause-reason"></small>
+                    <div style="font-size:.72rem;font-weight:500;opacity:.85" id="pause-elapsed">—</div>
+                </div>
+                <button id="btn-resume">Reanudar</button>
+            </div>`;
+        const main = document.querySelector('main.main-content');
+        if (main) {
+            main.insertAdjacentHTML('afterbegin', html);
+            pauseBanner   = document.getElementById('pause-banner');
+            pauseElapsedE = document.getElementById('pause-elapsed');
+            pauseReasonE  = document.getElementById('pause-reason');
+            document.getElementById('btn-resume').addEventListener('click', resumeHandler);
+        }
     }
     if (activePauseId) startPauseTimer();
 
@@ -1413,17 +1505,18 @@
         const r = await post(`/delivery/route/${routeId}/pause`, { reason });
         if (r) {
             activePauseId = r.pauseId; activePauseStart = r.startedAt;
-            pauseReasonE.textContent = '· ' + reason;
-            pauseBanner.hidden = false;
+            ensurePauseBanner();
+            if (pauseReasonE) pauseReasonE.textContent = '· ' + reason;
+            if (pauseBanner) pauseBanner.hidden = false;
             startPauseTimer();
         }
     });
     function clearPauseUI() {
         activePauseId = null; activePauseStart = null;
         if (pauseTimer) { clearInterval(pauseTimer); pauseTimer = null; }
-        pauseBanner.hidden = true;
+        if (pauseBanner) { pauseBanner.remove(); pauseBanner = null; }
     }
-    document.getElementById('btn-resume')?.addEventListener('click', async () => {
+    async function resumeHandler() {
         // Fuerza hide UI aún si backend no encuentra pausa (estado inconsistente)
         try {
             const res = await fetch(`/delivery/route/${routeId}/resume`, {
@@ -1432,7 +1525,10 @@
             await res.json().catch(() => ({}));
         } catch (_) { /* ignora red */ }
         clearPauseUI();
-    });
+        // Recargamos para reflejar el estado limpio del servidor (evita banner zombi en futuras navegaciones).
+        setTimeout(() => window.location.reload(), 200);
+    }
+    document.getElementById('btn-resume')?.addEventListener('click', resumeHandler);
 
     // === Incidente ===
     document.getElementById('btn-incident')?.addEventListener('click', async () => {

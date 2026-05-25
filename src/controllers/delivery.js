@@ -3,6 +3,9 @@ const stateMachine = require('../services/shipmentStateMachine');
 const { Status } = require('../constants/enums');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const ShipmentModel = require('../models/shipment');
+const sequelize = require('../database/connection');
+const { RouteStop } = require('../models/routeStop');
+const { RoutePause } = require('../models/routePause');
 
 
 const { getSuggestedDate } = require('../utils/failedAttempt');
@@ -99,9 +102,16 @@ const showEvidenceForm = async (req, res) => {
             return res.status(404).send('Envío no encontrado');
         }
 
+        // Sprint 3 - 4.1: si el envío tiene código clave configurado, lo pedimos en el POD
+        const settingModel = require('../models/setting');
+        const settings = await settingModel.getAll().catch(() => ({}));
+        const secretRequired = !!shipment.deliverySecretCode && settings.delivery_secret_enabled !== 'false';
         res.render('delivery/evidence', {
             shipmentId: shipment.trackingId,
-            errors: {}
+            errors: {},
+            routeId: req.query.routeId || null,
+            stopId:  req.query.stopId  || null,
+            secretRequired,
         });
 
     } catch (error) {
@@ -138,6 +148,32 @@ const saveEvidence = async (req, res) => {
             signatureBase64
         } = req.body;
 
+        // routeId + stopId opcionales (vienen del flujo "Confirmar Entrega" desde la vista de ruta).
+        // Si están presentes, validamos que el stop pertenezca a la ruta y que no haya pausa activa
+        // ni stops anteriores sin resolver, y luego marcamos el stop completado.
+        const routeIdRaw = req.body.routeId || req.query.routeId;
+        const stopIdRaw  = req.body.stopId  || req.query.stopId;
+        const routeId = Number.isInteger(Number(routeIdRaw)) ? Number(routeIdRaw) : null;
+        const stopId  = Number.isInteger(Number(stopIdRaw))  ? Number(stopIdRaw)  : null;
+
+        if (routeId && stopId) {
+            const routeModel = require('../models/route');
+            const route = await routeModel.getById(routeId);
+            if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+                return res.status(403).send('Esta ruta no te pertenece.');
+            }
+            const activePause = await RoutePause.findOne({ where: { routeId, endedAt: null } });
+            if (activePause) {
+                return res.status(409).send('La ruta está pausada. Reanudala antes de confirmar la entrega.');
+            }
+            const stops = (route.stops || []).slice().sort((a, b) => a.sequence - b.sequence);
+            const target = stops.find(s => s.id === stopId);
+            if (!target) { return res.status(404).send('Parada no encontrada en esta ruta.'); }
+            const blocker = stops.find(s => s.sequence < target.sequence && !s.completed && !s.skipped);
+            if (blocker) {
+                return res.status(409).send(`Tenés que completar la parada #${blocker.sequence} antes de confirmar esta entrega.`);
+            }
+        }
 
         if (!stateMachine.canTransition({
             fromStatusId: shipment.statusId,
@@ -147,33 +183,60 @@ const saveEvidence = async (req, res) => {
             return res.status(422).send('No se puede confirmar entrega desde el estado actual.');
         }
 
-        await DeliveryEvidence.create({
-            shipmentId: shipment.id,
-            receiverName,
-            receiverLastname,
-            receiverDni,
-            latitude:    latitude    || null,
-            longitude:   longitude   || null,
-            photoBase64: photoBase64 || null,
-            signatureBase64: signatureBase64 || null
-        });
-
-
-        await ShipmentModel.updateStatus(shipment.id, Status.DELIVERED.id);
+        // Sprint 3 - 4.1: validar código clave si el envío lo tiene configurado.
+        // Permitir override con bandera 'delivery_secret_enabled=false' en settings.
+        const settingModel2 = require('../models/setting');
+        const set2 = await settingModel2.getAll().catch(() => ({}));
+        if (shipment.deliverySecretCode && set2.delivery_secret_enabled !== 'false') {
+            const provided = String(req.body.deliverySecretCode || '').trim().toUpperCase();
+            if (!provided) {
+                return res.status(422).send('Código clave de entrega obligatorio (lo tiene el destinatario).');
+            }
+            if (provided !== String(shipment.deliverySecretCode).toUpperCase()) {
+                return res.status(422).send('Código clave incorrecto. Pedíselo al destinatario.');
+            }
+        }
 
         const podLat = latitude  !== null && latitude  !== undefined && latitude  !== '' ? Number(latitude)  : null;
         const podLng = longitude !== null && longitude !== undefined && longitude !== '' ? Number(longitude) : null;
-        await shipmentHistoryModel.create({
-            shipmentId:   shipment.id,
-            fromStatusId: shipment.statusId,
-            toStatusId:   Status.DELIVERED.id,
-            comment:      'Entrega confirmada por repartidor',
-            userId:       res.locals.currentUser?.id || null,
-            eventType:    'POD',
-            latitude:     Number.isFinite(podLat) ? podLat : null,
-            longitude:    Number.isFinite(podLng) ? podLng : null,
+
+        await sequelize.transaction(async (t) => {
+            await DeliveryEvidence.create({
+                shipmentId: shipment.id,
+                receiverName,
+                receiverLastname,
+                receiverDni,
+                latitude:    latitude    || null,
+                longitude:   longitude   || null,
+                photoBase64: photoBase64 || null,
+                signatureBase64: signatureBase64 || null
+            }, { transaction: t });
+
+            await ShipmentModel.updateStatus(shipment.id, Status.DELIVERED.id, { transaction: t });
+
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: shipment.statusId,
+                toStatusId:   Status.DELIVERED.id,
+                comment:      'Entrega confirmada por repartidor',
+                userId:       res.locals.currentUser?.id || null,
+                eventType:    'POD',
+                latitude:     Number.isFinite(podLat) ? podLat : null,
+                longitude:    Number.isFinite(podLng) ? podLng : null,
+                transaction:  t,
+            });
+
+            if (routeId && stopId) {
+                await RouteStop.update(
+                    { completed: true, completedAt: new Date() },
+                    { where: { id: stopId, routeId }, transaction: t }
+                );
+            }
         });
 
+        if (routeId) {
+            return res.redirect(`/delivery/route/${routeId}?delivered=true`);
+        }
         res.redirect('/delivery?delivered=true');
 
     } catch (error) {

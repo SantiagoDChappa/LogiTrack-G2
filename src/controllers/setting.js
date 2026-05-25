@@ -4,26 +4,46 @@ const branchModel = require('../models/branch');
 const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 const NotificationConfigModel = require('../models/notificationConfig');
+const emailTemplateModel = require('../models/emailTemplate');
 const settingLogModel = require('../models/settingLog');
 const { expireShipments } = require('../utils/expireShipments');
+// Sprint 3 - 2.5 parámetros configurables
+const failedReasonModel = require('../models/failedAttemptReason');
+const standardMessageModel = require('../models/standardMessage');
+const deliveryWindowModel = require('../models/deliveryTimeWindow');
+const incidentTypeModel = require('../models/incidentType');
 
 const getSettings = async (req, res) => {
-    const [settings, provinces, branches, users, routeOpt, notifConfig, settingLogs] = await Promise.all([
+    const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
+           failedReasons, stdMessages, timeWindows, incidentTypes] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
         userModel.getAll(),
         getRouteOptimizerSettings(),
         NotificationConfigModel.getAllConfigs(),
+        emailTemplateModel.getAll(),
         settingLogModel.getAll(),
+        failedReasonModel.getAll().catch(() => []),
+        standardMessageModel.getAll().catch(() => []),
+        deliveryWindowModel.getAll().catch(() => []),
+        incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
     ]);
 
+    const templatesByEvent = {};
+    for (const t of emailTemplates) {
+        templatesByEvent[t.eventCode] = { subject: t.subject, body: t.body };
+    }
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
     res.render('setting/index', {
-        settings, notifConfig, provinces, branches, users, routeOpt, settingLogs,
+        settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
+        failedReasons, stdMessages, timeWindows, incidentTypes,
         params: {
+            // Sprint 3 - 2.5: reglas de reprogramación parametrizables
+            reschedule_default_days:  settings.reschedule_default_days  || '1',
+            reschedule_max_per_envio: settings.reschedule_max_per_envio || '3',
             max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
             dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
             notificaciones_activas:   settings.notificaciones_activas   || 'true',
@@ -39,8 +59,71 @@ const getSettings = async (req, res) => {
             proceso_revisar_prioridades_hora:  settings.proceso_revisar_prioridades_hora  || '03:00',
             proceso_generar_reportes_hora:     settings.proceso_generar_reportes_hora     || '04:00',
             proceso_notificaciones_hora:       settings.proceso_notificaciones_hora       || '05:00',
+            test_email_override:               settings.test_email_override               || '',
         }
     });
+};
+
+const VALID_RECIPIENT_MODES = ['recipient', 'sender', 'both', 'custom'];
+const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
+const saveNotificationConfig = async (req, res) => {
+    try {
+        const configs = await NotificationConfigModel.getAllConfigs();
+        for (const cfg of configs) {
+            const enabled = req.body[`enabled_${cfg.eventCode}`] === 'on';
+            let mode      = req.body[`mode_${cfg.eventCode}`] || 'recipient';
+            let custom    = (req.body[`custom_${cfg.eventCode}`] || '').trim();
+
+            if (!VALID_RECIPIENT_MODES.includes(mode)) { mode = 'recipient'; }
+            if (mode === 'custom' && !isValidEmail(custom)) {
+                return res.redirect('/setting?error=custom_email_invalid');
+            }
+            if (mode !== 'custom') { custom = null; }
+
+            await NotificationConfigModel.NotificationConfig.update(
+                { enabled, recipientMode: mode, customEmail: custom },
+                { where: { id: cfg.id } }
+            );
+        }
+        res.redirect('/setting?success=notif');
+    } catch (err) {
+        console.error('saveNotificationConfig:', err.message);
+        res.status(500).redirect('/setting?error=notif_save');
+    }
+};
+
+const saveEmailTemplate = async (req, res) => {
+    try {
+        const { eventCode } = req.params;
+        const subject = (req.body.subject || '').trim();
+        const body    = (req.body.body    || '').trim();
+        if (!subject || !body) {
+            return res.redirect('/setting?error=template_empty');
+        }
+        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body });
+        if (!updated) { return res.redirect('/setting?error=template_not_found'); }
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('saveEmailTemplate:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const saveTestEmailOverride = async (req, res) => {
+    try {
+        const value = (req.body.test_email_override || '').trim();
+        if (value && !isValidEmail(value)) {
+            return res.redirect('/setting?error=override_invalid');
+        }
+        const oldValue = await settingModel.get('test_email_override');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'test_email_override', oldValue, value);
+        await settingModel.set('test_email_override', value);
+        res.redirect('/setting?success=override');
+    } catch (err) {
+        console.error('saveTestEmailOverride:', err.message);
+        res.status(500).redirect('/setting?error=override_save');
+    }
 };
 
 const GEOREF = 'https://apis.datos.gob.ar/georef/api';
@@ -161,6 +244,9 @@ const saveParams = async (req, res) => {
             'proceso_revisar_prioridades_hora',
             'proceso_generar_reportes_hora',
             'proceso_notificaciones_hora',
+            // Sprint 3 - 2.5 reglas de reprogramación
+            'reschedule_default_days',
+            'reschedule_max_per_envio',
         ];
 
         // Validaciones
@@ -208,21 +294,7 @@ const saveParams = async (req, res) => {
             return settingModel.set(key, value);
         }));
 
-        // Configuración de notificaciones por evento
-        const notifyConfigs = await NotificationConfigModel.getAllConfigs();
-        const body = req.body;
-
-        for (const config of notifyConfigs) {
-            const checkboxName = `cbox_${config.eventCode}`;
-            const shouldBeEnabled = body[checkboxName] === 'on';
-
-            if (config.enabled !== shouldBeEnabled) {
-                await NotificationConfigModel.NotificationConfig.update(
-                    { enabled: shouldBeEnabled },
-                    { where: { id: config.id } }
-                );
-            }
-        }
+        // Notificaciones por evento se gestionan en /setting/notification-config (card aparte)
 
         // Ejecutar proceso automático de expiración
         expireShipments();
@@ -233,4 +305,110 @@ const saveParams = async (req, res) => {
     }
 };
 
-module.exports = { getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings, saveParams };
+// =========================================================================
+// Sprint 3 - 2.5 Parámetros editables: motivos fallidos, mensajes, franjas, motivos incidencia
+// =========================================================================
+const saveFailedReason = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (req.body._action === 'create') {
+            const { FailedAttemptReason } = require('../models/failedAttemptReason');
+            await FailedAttemptReason.create({
+                code: (req.body.code || '').trim().toLowerCase().replace(/\s+/g, '_'),
+                label: (req.body.label || '').trim(),
+                retryDays: parseInt(req.body.retryDays) || 1,
+                active: req.body.active === 'on',
+                createsIncident: req.body.createsIncident === 'on',
+            });
+        } else if (req.body._action === 'delete' && id) {
+            const { FailedAttemptReason } = require('../models/failedAttemptReason');
+            await FailedAttemptReason.destroy({ where: { id } });
+        } else if (id) {
+            const { FailedAttemptReason } = require('../models/failedAttemptReason');
+            await FailedAttemptReason.update({
+                label: (req.body.label || '').trim(),
+                retryDays: parseInt(req.body.retryDays) || 1,
+                active: req.body.active === 'on',
+                createsIncident: req.body.createsIncident === 'on',
+            }, { where: { id } });
+        }
+        res.redirect('/setting?success=failed_reason');
+    } catch (err) {
+        console.error('saveFailedReason:', err.message);
+        res.redirect('/setting?error=failed_reason');
+    }
+};
+
+const saveStandardMessage = async (req, res) => {
+    try {
+        const { code } = req.params;
+        const body = (req.body.body || '').trim();
+        if (!code || !body) { return res.redirect('/setting?error=std_msg_empty'); }
+        const updated = await standardMessageModel.updateByCode(code, body);
+        if (!updated) { return res.redirect('/setting?error=std_msg_not_found'); }
+        res.redirect('/setting?success=std_msg');
+    } catch (err) {
+        console.error('saveStandardMessage:', err.message);
+        res.redirect('/setting?error=std_msg');
+    }
+};
+
+const saveTimeWindow = async (req, res) => {
+    try {
+        const { DeliveryTimeWindow } = require('../models/deliveryTimeWindow');
+        const { id } = req.params;
+        if (req.body._action === 'create') {
+            await DeliveryTimeWindow.create({
+                label: (req.body.label || '').trim(),
+                fromTime: req.body.fromTime,
+                toTime: req.body.toTime,
+                active: req.body.active === 'on',
+            });
+        } else if (req.body._action === 'delete' && id) {
+            await DeliveryTimeWindow.destroy({ where: { id } });
+        } else if (id) {
+            await DeliveryTimeWindow.update({
+                label: (req.body.label || '').trim(),
+                fromTime: req.body.fromTime,
+                toTime: req.body.toTime,
+                active: req.body.active === 'on',
+            }, { where: { id } });
+        }
+        res.redirect('/setting?success=time_window');
+    } catch (err) {
+        console.error('saveTimeWindow:', err.message);
+        res.redirect('/setting?error=time_window');
+    }
+};
+
+const saveIncidentType = async (req, res) => {
+    try {
+        const { IncidentType } = require('../models/incidentType');
+        const { id } = req.params;
+        if (!IncidentType) { return res.redirect('/setting?error=inc_type_model'); }
+        if (req.body._action === 'create') {
+            await IncidentType.create({
+                code: (req.body.code || '').trim().toUpperCase().replace(/\s+/g, '_'),
+                description: (req.body.label || '').trim(),
+                active: req.body.active === 'on',
+            });
+        } else if (req.body._action === 'delete' && id) {
+            await IncidentType.update({ active: false }, { where: { id } });
+        } else if (id) {
+            await IncidentType.update({
+                description: (req.body.label || '').trim(),
+                active: req.body.active === 'on',
+            }, { where: { id } });
+        }
+        res.redirect('/setting?success=inc_type');
+    } catch (err) {
+        console.error('saveIncidentType:', err.message);
+        res.redirect('/setting?error=inc_type');
+    }
+};
+
+module.exports = {
+    getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
+    saveParams, saveNotificationConfig, saveEmailTemplate, saveTestEmailOverride,
+    saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
+};

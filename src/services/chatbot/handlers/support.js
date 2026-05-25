@@ -20,6 +20,7 @@ function buildSupportResponseWithShipment(support, shipment) {
                 html: buildSupportHtml(support),
                 actions: [
                     createAction('Ir a soporte en la pagina', 'go-support'),
+                    createAction('Reportar incidencia', 'report-incident-start'),
                     createAction(shipment ? 'Estado actual' : 'Preguntas frecuentes', shipment ? 'show-status' : 'scroll-faq'),
                     createAction('Acceso empresas', 'go-login'),
                 ],

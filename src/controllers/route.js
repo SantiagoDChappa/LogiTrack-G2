@@ -138,6 +138,31 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
     if (!transport) { throw new Error('Transporte no encontrado'); }
     if (!transport.driverUserId) { throw new Error('El transporte no tiene conductor asignado. Asigná un conductor antes de confirmar la ruta.'); }
 
+    // Un repartidor sólo puede tener UNA ruta activa (PLANNED o IN_ROUTE) a la vez,
+    // sin importar cuántos transports tenga asignados. Bloquea si ya tiene otra ruta abierta.
+    const { Transport } = require('../models/transport');
+    const driverTransports = await Transport.findAll({
+        where: { driverUserId: transport.driverUserId },
+        attributes: ['id'],
+        transaction: t,
+    });
+    const driverTransportIds = driverTransports.map(dt => dt.id);
+    if (driverTransportIds.length > 0) {
+        const existingActive = await Route.findOne({
+            where: {
+                transportId: { [Op.in]: driverTransportIds },
+                statusId:    { [Op.in]: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
+            },
+            attributes: ['id', 'statusId'],
+            transaction: t,
+        });
+        if (existingActive) {
+            const lbl = existingActive.statusId === RouteStatus.IN_ROUTE ? 'En curso' : 'Planificada';
+            const driverName = transport.driver?.fullName || `#${transport.driverUserId}`;
+            throw new Error(`El repartidor ${driverName} ya tiene una ruta activa (#${existingActive.id} · ${lbl}). Sólo se permite una ruta activa por repartidor.`);
+        }
+    }
+
     const route = await Route.create({
         transportId:     p.transportId,
         originBranchId:  branchId,
@@ -278,7 +303,125 @@ const list = async (req, res) => {
 const detail = async (req, res) => {
     const route = await routeModel.getById(req.params.id);
     if (!route) { return res.status(404).send('Ruta no encontrada'); }
-    res.render('route/detail', { route });
+
+    // Cargar historia de cada envio de la ruta (para construir timeline + status final)
+    const { ShipmentHistory } = require('../models/shipmentHistory');
+    const shipmentIds = (route.stops || [])
+        .filter(s => s.stopType === 'delivery' && s.shipmentId)
+        .map(s => s.shipmentId);
+
+    let historyByShipment = new Map();
+    if (shipmentIds.length > 0) {
+        const { Status } = require('../models/status');
+        const { User } = require('../models/user');
+        const rows = await ShipmentHistory.findAll({
+            where: { shipmentId: { [Op.in]: shipmentIds } },
+            include: [
+                { model: Status, as: 'toStatus',   required: false },
+                { model: Status, as: 'fromStatus', required: false },
+                { model: User,   as: 'user',       attributes: ['id', 'fullName'], required: false },
+            ],
+            order: [['changedAt', 'ASC']],
+        }).catch(() => []);
+        for (const h of rows) {
+            const arr = historyByShipment.get(h.shipmentId) || [];
+            arr.push(h);
+            historyByShipment.set(h.shipmentId, arr);
+        }
+    }
+
+    // Construir lista de envios con su estado final + datos clave para tabla
+    const shipmentsSummary = (route.stops || [])
+        .filter(s => s.stopType === 'delivery' && s.shipmentId)
+        .map(s => {
+            const sh = s.shipment || {};
+            const hist = historyByShipment.get(s.shipmentId) || [];
+            const lastStatusEvent = [...hist].reverse().find(h => h.toStatus);
+            return {
+                shipmentId:    s.shipmentId,
+                trackingId:    sh.trackingId || ('#' + s.shipmentId),
+                recipientName: sh.recipient?.fullName || '—',
+                addressLine:   sh.address ? `${sh.address.street || ''} ${sh.address.number || ''}`.trim() : '—',
+                statusId:      sh.statusId,
+                statusLabel:   lastStatusEvent?.toStatus?.description || '—',
+                stopId:        s.id,
+                stopSequence:  s.sequence,
+                stopCompleted: !!s.completed,
+                stopSkipped:   !!s.skipped,
+                completedAt:   s.completedAt || null,
+            };
+        });
+
+    // Timeline global de la ruta: eventos relevantes ordenados
+    const STATUS_KEY = (id) => ({1:'pendiente',2:'en_transito',3:'en_sucursal',4:'entregado',5:'cancelado',6:'asignado',7:'en_preparacion',8:'paquete_fallido',9:'intento_fallido'})[id] || 'inicial';
+    const STATUS_LABEL = (id) => ({1:'Pendiente',2:'En Tránsito',3:'En Sucursal',4:'Entregado',5:'Cancelado',6:'Asignado',7:'En Preparación',8:'Paquete fallido',9:'Intento fallido'})[id] || `Estado ${id}`;
+
+    const timeline = [];
+    // Ruta creada
+    timeline.push({ at: route.createdAt, kind: 'route', icon: 'add_circle', label: 'Ruta creada', detail: `Optimización inicial · ${shipmentIds.length} envío(s)`, tone: 'blue' });
+    if (route.startedAt) {
+        timeline.push({ at: route.startedAt, kind: 'route', icon: 'play_arrow', label: 'Ruta iniciada', detail: 'El repartidor escaneó el QR de salida', tone: 'amber' });
+    }
+    // Pausas
+    for (const p of (route.pauses || [])) {
+        if (p.startedAt) {
+            timeline.push({ at: p.startedAt, kind: 'pause', icon: 'pause_circle', label: 'Pausa iniciada', detail: p.reason || 'Sin motivo', tone: 'gray' });
+        }
+        if (p.endedAt) {
+            timeline.push({ at: p.endedAt, kind: 'pause', icon: 'play_circle', label: 'Pausa reanudada', detail: '', tone: 'gray' });
+        }
+    }
+    // Eventos por envío
+    for (const [shipmentId, rows] of historyByShipment.entries()) {
+        const tracking = shipmentsSummary.find(s => s.shipmentId === shipmentId)?.trackingId || `#${shipmentId}`;
+        for (const h of rows) {
+            // Solo eventos relevantes durante la ruta (descartar CREATED inicial muy antiguo)
+            if (h.eventType === 'CREATED') { continue; }
+            const isFinal = [4,9,8,5,3].includes(h.toStatusId);
+            const tone = h.toStatusId === 4 ? 'green'
+                : h.toStatusId === 9 || h.toStatusId === 8 ? 'red'
+                : h.toStatusId === 3 ? 'blue'
+                : h.toStatusId === 5 ? 'red'
+                : h.toStatusId === 2 ? 'amber' : 'gray';
+            const icon = h.toStatusId === 4 ? 'check_circle'
+                : h.toStatusId === 9 ? 'cancel'
+                : h.toStatusId === 8 ? 'broken_image'
+                : h.toStatusId === 5 ? 'block'
+                : h.toStatusId === 3 ? 'warehouse'
+                : h.toStatusId === 2 ? 'local_shipping' : 'autorenew';
+            timeline.push({
+                at: h.changedAt,
+                kind: 'shipment',
+                shipmentId,
+                tracking,
+                icon,
+                tone,
+                label: STATUS_LABEL(h.toStatusId),
+                detail: h.comment || '',
+                actor: h.user?.fullName || null,
+                eventType: h.eventType,
+            });
+        }
+    }
+    if (route.finishedAt) {
+        timeline.push({ at: route.finishedAt, kind: 'route', icon: 'flag', label: 'Ruta finalizada', detail: '', tone: 'green' });
+    }
+    timeline.sort((a, b) => new Date(a.at) - new Date(b.at));
+
+    // KPIs
+    const kpis = {
+        deliveries:    shipmentsSummary.length,
+        delivered:     shipmentsSummary.filter(s => s.statusId === 4).length,
+        failed:        shipmentsSummary.filter(s => s.statusId === 9 || s.statusId === 8).length,
+        returned:      shipmentsSummary.filter(s => s.statusId === 3).length,
+        cancelled:     shipmentsSummary.filter(s => s.statusId === 5).length,
+        pending:       shipmentsSummary.filter(s => [1,2,6,7].includes(s.statusId)).length,
+        stopsTotal:    (route.stops || []).length,
+        stopsDone:     (route.stops || []).filter(s => s.completed).length,
+        stopsSkipped:  (route.stops || []).filter(s => s.skipped && !s.completed).length,
+    };
+
+    res.render('route/detail', { route, shipmentsSummary, timeline, kpis, STATUS_KEY, STATUS_LABEL });
 };
 
 const getQR = async (req, res) => {
@@ -432,18 +575,35 @@ const appendToRoute = async (req, res) => {
         };
 
         const sortedStops = (route.stops || []).sort((a, b) => a.sequence - b.sequence);
-        const lastStop = sortedStops[sortedStops.length - 1];
 
-        // Pre-cálculo del detour total antes de tocar BD, para validar umbrales
-        let plannedExtraKm = 0;
-        {
-            let lp = { lat: num(lastStop.lat), lng: num(lastStop.lng) };
-            for (const s of newShipments) {
-                const pt = { lat: num(s.address.lat), lng: num(s.address.lng) };
-                plannedExtraKm += haversineKm(lp, pt);
-                lp = pt;
+        // Mejor inserción (misma estrategia que routeOptimizer.evaluatePiggyback) — minimizar detour.
+        // Devuelve { extraKm, insertIdx } donde insertIdx es la posición en el array virtual
+        // (igual a stops.length = append al final).
+        const computeBestInsertion = (stops, pt) => {
+            let bestExtra = Infinity, bestIdx = -1;
+            for (let i = 1; i < stops.length; i++) {
+                const a = stops[i - 1], b = stops[i];
+                const detour = haversineKm(a, pt) + haversineKm(pt, b) - haversineKm(a, b);
+                if (detour < bestExtra) { bestExtra = detour; bestIdx = i; }
             }
+            const last = stops[stops.length - 1];
+            const tailDetour = haversineKm(last, pt);
+            if (tailDetour < bestExtra) { bestExtra = tailDetour; bestIdx = stops.length; }
+            return { extraKm: bestExtra, insertIdx: bestIdx };
+        };
+
+        // Pre-cálculo: planificar inserciones sobre stops virtuales y acumular detour.
+        const virtualStops = sortedStops.map(s => ({ lat: num(s.lat), lng: num(s.lng) }));
+        const plannedInsertions = []; // { shipment, insertIdx, extraKm }
+        let plannedExtraKm = 0;
+        for (const s of newShipments) {
+            const pt = { lat: num(s.address.lat), lng: num(s.address.lng) };
+            const { extraKm: legKm, insertIdx } = computeBestInsertion(virtualStops, pt);
+            plannedExtraKm += legKm;
+            plannedInsertions.push({ shipment: s, insertIdx, extraKm: legKm, pt });
+            virtualStops.splice(insertIdx, 0, pt);
         }
+
         const baseKm = num(route.totalDistanceKm);
         const baseCost = num(route.totalCost);
         const plannedExtraCost = plannedExtraKm * num(transport.costPerKm);
@@ -460,22 +620,47 @@ const appendToRoute = async (req, res) => {
             return res.status(422).json({ error: `Costo extra (+$${plannedExtraCost.toFixed(0)} = ${pctExtraCost.toFixed(1)}%) supera el umbral de ${maxExtraCostPct}% sobre el costo actual ($${baseCost.toFixed(0)}).` });
         }
 
-        let extraKm = 0;
+        let extraKm = plannedExtraKm;
         const transaction = await sequelize.transaction();
         try {
-            let lastPoint = { lat: num(lastStop.lat), lng: num(lastStop.lng) };
-            let nextSeq = (lastStop.sequence || sortedStops.length) + 1;
-            for (const s of newShipments) {
-                const pt = { lat: num(s.address.lat), lng: num(s.address.lng) };
-                const legKm = haversineKm(lastPoint, pt);
-                extraKm += legKm;
-                await RouteStop.create({
-                    routeId, sequence: nextSeq++, stopType: 'delivery',
-                    branchId: null, shipmentId: s.id,
-                    lat: pt.lat, lng: pt.lng,
-                    distanceFromPrevKm: Number(legKm.toFixed(2)),
+            // Mapa sequence → row id para shift en BD. Insertamos en orden de mayor a menor insertIdx
+            // para evitar conflictos de unicidad si hubiera índice (sequence, routeId).
+            const liveStops = [...sortedStops];
+            for (const ins of plannedInsertions) {
+                // Sequence destino: si insertIdx === liveStops.length, append; sino, ocupa la sequence del stop en esa posición y desplaza posteriores.
+                const targetSeq = ins.insertIdx >= liveStops.length
+                    ? (liveStops[liveStops.length - 1].sequence || liveStops.length) + 1
+                    : liveStops[ins.insertIdx].sequence;
+
+                if (ins.insertIdx < liveStops.length) {
+                    // Shift: aumentar +1 todas las sequences >= targetSeq (workaround: pasar a negativas y luego al valor final, para evitar colisiones si hay UNIQUE).
+                    const toShift = liveStops.slice(ins.insertIdx);
+                    for (const st of toShift) {
+                        await RouteStop.update(
+                            { sequence: -(st.sequence + 1) },
+                            { where: { id: st.id }, transaction }
+                        );
+                    }
+                    for (const st of toShift) {
+                        await RouteStop.update(
+                            { sequence: st.sequence + 1 },
+                            { where: { id: st.id }, transaction }
+                        );
+                        st.sequence += 1;
+                    }
+                }
+
+                const created = await RouteStop.create({
+                    routeId, sequence: targetSeq, stopType: 'delivery',
+                    branchId: null, shipmentId: ins.shipment.id,
+                    lat: ins.pt.lat, lng: ins.pt.lng,
+                    distanceFromPrevKm: Number(ins.extraKm.toFixed(2)),
                 }, { transaction });
-                lastPoint = pt;
+
+                liveStops.splice(ins.insertIdx, 0, {
+                    id: created.id, sequence: targetSeq,
+                    lat: ins.pt.lat, lng: ins.pt.lng,
+                });
             }
             const newTotalKm = num(route.totalDistanceKm) + extraKm;
             const newTotalCost = num(route.totalCost) + extraKm * num(transport.costPerKm);

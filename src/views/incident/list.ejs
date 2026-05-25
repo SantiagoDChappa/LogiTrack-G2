@@ -58,6 +58,22 @@
             </div>
             <% } %>
             <div class="incident-filter">
+                <label for="origin">Origen</label>
+                <select id="origin" name="origin">
+                    <option value="">Todos</option>
+                    <option value="EXTERNO" <%= filters.origin === 'EXTERNO' ? 'selected' : '' %>>Externo (portal/chatbot)</option>
+                    <option value="INTERNO" <%= filters.origin === 'INTERNO' ? 'selected' : '' %>>Interno (empresa)</option>
+                </select>
+            </div>
+            <div class="incident-filter">
+                <label for="resolution">Resolución</label>
+                <select id="resolution" name="resolution">
+                    <option value="">Todas</option>
+                    <option value="PROCEDENTE"    <%= filters.resolution === 'PROCEDENTE'    ? 'selected' : '' %>>Procedente</option>
+                    <option value="NO_PROCEDENTE" <%= filters.resolution === 'NO_PROCEDENTE' ? 'selected' : '' %>>No procedente</option>
+                </select>
+            </div>
+            <div class="incident-filter">
                 <label for="shipmentId">Envío (ID)</label>
                 <input type="number" id="shipmentId" name="shipmentId" value="<%= filters.shipmentId || '' %>">
             </div>
@@ -72,7 +88,9 @@
                         <th>#</th>
                         <th>Tracking</th>
                         <th>Tipo</th>
+                        <th>Origen</th>
                         <th>Estado</th>
+                        <th>Resolución</th>
                         <th>Prioridad</th>
                         <th>Escalado</th>
                         <th>Asignado</th>
@@ -82,14 +100,25 @@
                 </thead>
                 <tbody>
                     <% if (incidents.length === 0) { %>
-                        <tr><td colspan="9" class="incident-empty">No hay incidencias para mostrar.</td></tr>
+                        <tr><td colspan="11" class="incident-empty">No hay incidencias para mostrar.</td></tr>
                     <% } %>
-                    <% incidents.forEach(i => { %>
+                    <% incidents.forEach(i => {
+                        const isExterno = i.openedChannel === 'PORTAL';
+                        const originLabel = isExterno ? 'EXTERNO' : 'INTERNO';
+                        const resLabel = i.resolution === 'PROCEDENTE' ? 'Procedente'
+                                       : i.resolution === 'NO_PROCEDENTE' ? 'No procedente'
+                                       : '—';
+                        const resCls = i.resolution === 'PROCEDENTE' ? 'is-procedente'
+                                     : i.resolution === 'NO_PROCEDENTE' ? 'is-no-procedente'
+                                     : 'is-pending';
+                    %>
                         <tr class="<%= i.escalated ? 'is-escalated' : '' %>">
                             <td>#<%= i.id %></td>
                             <td><%= i.shipment ? i.shipment.trackingId : '-' %></td>
                             <td><%= i.type ? i.type.description : '-' %></td>
+                            <td><span class="incident-origin incident-origin--<%= isExterno ? 'externo' : 'interno' %>"><%= originLabel %></span></td>
                             <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= i.status %></span></td>
+                            <td><span class="incident-resolution <%= resCls %>"><%= resLabel %></span></td>
                             <td><span class="incident-priority incident-priority--<%= i.priority %>">P<%= i.priority %></span></td>
                             <td><%= i.escalated ? '🔥' : '—' %></td>
                             <td><%= i.assignedTo ? i.assignedTo.fullName : '—' %></td>

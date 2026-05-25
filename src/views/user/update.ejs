@@ -50,6 +50,39 @@
                             <% }); %>
                         </select>
                     </div>
+                    <!-- Sprint 3 - 4.2: Ventana operativa del repartidor (turno + disponibilidad).
+                         El optimizador respeta driverShiftStart/End como inicio/máximo de jornada
+                         y excluye al chofer si driverAvailable=false. -->
+                    <div id="driver-shift-section" style="display:<%= user.roleId == 3 ? 'block' : 'none' %>;border:1px dashed #cbd5e1;border-radius:8px;padding:.75rem;margin:.75rem 0">
+                        <strong style="display:block;margin-bottom:.5rem">Turno operativo (chofer)</strong>
+                        <div class="field" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+                            <div>
+                                <label for="driverShiftStart">Inicio turno</label>
+                                <input id="driverShiftStart" type="time" name="driverShiftStart" value="<%= user.driverShiftStart ? String(user.driverShiftStart).slice(0,5) : '' %>">
+                            </div>
+                            <div>
+                                <label for="driverShiftEnd">Fin turno</label>
+                                <input id="driverShiftEnd" type="time" name="driverShiftEnd" value="<%= user.driverShiftEnd ? String(user.driverShiftEnd).slice(0,5) : '' %>">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>
+                                <input type="checkbox" name="driverAvailable" value="true" <%= user.driverAvailable !== false ? 'checked' : '' %>>
+                                Disponible para asignación
+                            </label>
+                        </div>
+                        <div class="field" style="display:grid;grid-template-columns:2fr 1fr;gap:.5rem">
+                            <div>
+                                <label for="driverUnavailableReason">Motivo de no disponibilidad</label>
+                                <input id="driverUnavailableReason" type="text" name="driverUnavailableReason" value="<%= user.driverUnavailableReason || '' %>" maxlength="120" placeholder="Ej: licencia médica">
+                            </div>
+                            <div>
+                                <label for="driverUnavailableUntil">Disponible desde</label>
+                                <input id="driverUnavailableUntil" type="date" name="driverUnavailableUntil" value="<%= user.driverUnavailableUntil ? String(user.driverUnavailableUntil).slice(0,10) : '' %>">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="field">
                         <label for="active">Estado</label>
                         <select id="active" name="active">
@@ -77,7 +110,7 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/document-format.js" defer></script>
-    <script>function toggleBranchField(v){document.getElementById('branch-field').style.display=v==3?'block':'none';}</script>
+    <script>function toggleBranchField(v){document.getElementById('branch-field').style.display=v==3?'block':'none';var ds=document.getElementById('driver-shift-section');if(ds){ds.style.display=v==3?'block':'none';}}</script>
     <% if (user.active) { %>
     <script>
         document.getElementById('btn-baja').addEventListener('click', function() {

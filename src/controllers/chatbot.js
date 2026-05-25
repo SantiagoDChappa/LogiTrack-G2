@@ -1,8 +1,8 @@
 const { handleChatbotRequest } = require('../services/chatbot/chatbotService');
 
-function postMessage(req, res) {
+async function postMessage(req, res) {
     try {
-        const response = handleChatbotRequest(req.body || {});
+        const response = await handleChatbotRequest(req.body || {});
         return res.json(response);
     } catch (error) {
         console.error('Chatbot error:', error);

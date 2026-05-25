@@ -12,6 +12,12 @@ const User = sequelize.define('user', {
     roleId:   { type: DataTypes.INTEGER, allowNull: false },
     active:   { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     branchId: { type: DataTypes.INTEGER, allowNull: true  },
+    // Sprint 3 - 4.2 Ventanas operativas chofer (turno)
+    driverShiftStart: { type: DataTypes.TIME,    allowNull: true, field: 'driver_shift_start' },
+    driverShiftEnd:   { type: DataTypes.TIME,    allowNull: true, field: 'driver_shift_end' },
+    driverAvailable:  { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'driver_available' },
+    driverUnavailableReason: { type: DataTypes.STRING(120), allowNull: true, field: 'driver_unavailable_reason' },
+    driverUnavailableUntil:  { type: DataTypes.DATEONLY,    allowNull: true, field: 'driver_unavailable_until' },
 }, { tableName: 'user', timestamps: false });
 
 const getAll = () => User.findAll();

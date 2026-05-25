@@ -107,13 +107,30 @@ const loadShipments = (shipmentIds, supervisorBranchId) => {
     });
 };
 
-const loadEnabledTransportsForBranch = (branchId) => {
-    return Transport.findAll({
-        where: { enabled: true, branchId },
+const loadEnabledTransportsForBranch = async (branchId) => {
+    // Sprint 3 - 2.4 / 4.2: descarta vehículos fuera de servicio y choferes no disponibles.
+    // Choferes con turno definido se conservan; el turno se aplica como restricción en
+    // buildProposal (parseTimeToSec + SHIFT_MAX_SEC dinámico).
+    const all = await Transport.findAll({
+        where: { enabled: true, branchId, outOfService: false },
         include: [
             { model: User, as: 'driver', required: false },
             { model: Zone, as: 'zones',  required: false, through: { attributes: [] } },
         ],
+    });
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return all.filter(t => {
+        if (!t.driver) { return true; } // sin chofer asignado: lo decide el supervisor
+        if (t.driver.driverAvailable === false) {
+            const until = t.driver.driverUnavailableUntil ? new Date(t.driver.driverUnavailableUntil) : null;
+            if (!until || until >= today) { return false; }
+        }
+        // Si vehículo tiene fecha out-of-service futura, descartar
+        if (t.outOfServiceUntil) {
+            const u = new Date(t.outOfServiceUntil);
+            if (u >= today) { return false; }
+        }
+        return true;
     });
 };
 
@@ -568,10 +585,19 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         }
     }
 
-    // ETA por stop: arrancamos turno a SHIFT_START_HOUR del dia siguiente al departure
+    // ETA por stop: Sprint 3 - 4.2: si el chofer tiene turno definido, arrancamos
+    // a esa hora; si no, default SHIFT_START_HOUR. Mismo criterio para fin de turno
+    // (driver_shift_end => override de SHIFT_MAX_SEC).
+    const driverShiftStartSec = t.driver ? parseTimeToSec(t.driver.driverShiftStart) : null;
+    const driverShiftEndSec   = t.driver ? parseTimeToSec(t.driver.driverShiftEnd)   : null;
+    const shiftStartHour = driverShiftStartSec !== null ? Math.floor(driverShiftStartSec / 3600) : SHIFT_START_HOUR;
+    const shiftStartMin  = driverShiftStartSec !== null ? Math.floor((driverShiftStartSec % 3600) / 60) : 0;
+    const driverShiftMaxSec = (driverShiftStartSec !== null && driverShiftEndSec !== null && driverShiftEndSec > driverShiftStartSec)
+        ? (driverShiftEndSec - driverShiftStartSec)
+        : SHIFT_MAX_SEC;
     const departure = new Date();
     departure.setDate(departure.getDate() + 1);
-    departure.setHours(SHIFT_START_HOUR, 0, 0, 0);
+    departure.setHours(shiftStartHour, shiftStartMin, 0, 0);
     let cumSec = 0;
     stops[0].etaIso = departure.toISOString();
     const windowViolations = [];
@@ -600,7 +626,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
     const serviceStopsCount = stops.filter(s => s.stopType === 'service').length;
     const deliveryAndPickupCount = Math.max(0, stops.length - 1 - serviceStopsCount);
     const totalRideSec = totalDurationSec + deliveryAndPickupCount * SERVICE_MIN_PER_STOP * 60 + serviceStopsCount * SERVICE_STOP_MIN * 60;
-    const exceedsShift = totalRideSec > SHIFT_MAX_SEC;
+    const exceedsShift = totalRideSec > driverShiftMaxSec;
     const zoneCostSum = bucket.shipments.reduce((acc, s) => acc + num(s.zone?.baseCost), 0);
     const weightSurcharge = bucket.shipments.reduce((acc, s) => acc + num(s.zone?.surchargePerKg) * num(s.weightKg), 0);
     const volumeSurcharge = bucket.shipments.reduce((acc, s) => acc + num(s.zone?.surchargePerM3) * num(s.volumeM3), 0);
@@ -700,7 +726,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         totalDurationMin: Number((totalRideSec / 60).toFixed(0)),
         exceedsShift,
         warnings: [
-            ...(exceedsShift ? [`Excede turno conductor de ${SHIFT_MAX_HOURS}h (estimado ${(totalRideSec/3600).toFixed(1)}h). Considerar dividir la ruta o conductor adicional.`] : []),
+            ...(exceedsShift ? [`Excede turno conductor de ${(driverShiftMaxSec/3600).toFixed(1)}h (estimado ${(totalRideSec/3600).toFixed(1)}h)${t.driver?.driverShiftStart ? ` — turno chofer ${String(t.driver.driverShiftStart).slice(0,5)}–${String(t.driver.driverShiftEnd||'').slice(0,5)}` : ''}. Considerar dividir la ruta o conductor adicional.`] : []),
             ...windowViolations.map(w => `Ventana fuera de tiempo: ${w}`),
             ...serviceWarnings,
         ],

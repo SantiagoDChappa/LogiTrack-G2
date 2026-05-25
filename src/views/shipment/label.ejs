@@ -64,6 +64,15 @@
                 <span class="label-key">Destinatario</span>
                 <span class="label-val"><%= shipment.recipient.fullName %></span>
             </div>
+            <% if (shipment.deliveryMode === 'branch_pickup' && shipment.pickupBranch) { %>
+            <div class="label-row" style="background:#fef3c7;padding:6px;border-radius:4px;">
+                <span class="label-key">RETIRO</span>
+                <span class="label-val">
+                    <strong><%= shipment.pickupBranch.name %></strong><br>
+                    <%= shipment.pickupBranch.address %>
+                </span>
+            </div>
+            <% } else { %>
             <div class="label-row">
                 <span class="label-key">Destino</span>
                 <span class="label-val">
@@ -72,6 +81,7 @@
                     <% if (shipment.address.province) { %> — <%= shipment.address.province.description %><% } %>
                 </span>
             </div>
+            <% } %>
             <% if (shipment.shipmentType) { %>
             <div class="label-row">
                 <span class="label-key">Tipo</span>
@@ -86,6 +96,14 @@
                 <span class="label-key">Bultos</span>
                 <span class="label-val"><%= shipment.packageQty != null ? shipment.packageQty : '-' %></span>
             </div>
+            <% if (shipment.deliverySecretCode) { %>
+            <hr class="label-divider">
+            <div class="label-row" style="background:#fef9c3;padding:8px;border-radius:4px">
+                <span class="label-key">CÓDIGO</span>
+                <span class="label-val" style="font-family:monospace;font-size:1.3rem;font-weight:800;letter-spacing:.25em"><%= shipment.deliverySecretCode %></span>
+            </div>
+            <div style="font-size:.7rem;color:#64748b;margin-top:4px">Pedile este código al destinatario antes de entregar.</div>
+            <% } %>
         </div>
     </div>
 </body>

@@ -5,6 +5,9 @@ const navigationHandlers = require('./handlers/navigation');
 const shipmentHandlers = require('./handlers/shipment');
 const statusHandlers = require('./handlers/status');
 const supportHandlers = require('./handlers/support');
+const incidentReportHandler = require('./handlers/incidentReport');
+const incidentTypeModel = require('../../models/incidentType');
+const { createIncidentFromPortal } = require('../../controllers/portal');
 
 const ACTION_SELECTION_REASONS = {
     'show-status': 'ver el estado actual',
@@ -44,7 +47,31 @@ const ACTION_HANDLERS = {
     'go-support': () => navigationHandlers.buildSupportSectionResponse(),
     'go-results': () => navigationHandlers.buildResultsResponse(),
     'go-login': () => navigationHandlers.buildLoginRedirectResponse(),
+    'report-incident-start':   async (runtime) => incidentReportHandler.buildStart(runtime, await fetchActiveTypes()),
+    'report-incident-type':    async (runtime, value) => incidentReportHandler.handleTypeSelect(runtime, value, await fetchTypesById()),
+    'report-incident-skip-email': (runtime) => incidentReportHandler.handleSkipEmail(runtime),
+    'report-incident-confirm': (runtime) => incidentReportHandler.handleConfirm(runtime, createIncidentFromPortal),
+    'report-incident-cancel':  (runtime) => incidentReportHandler.handleCancel(runtime),
 };
+
+// Cache de tipos por request. Evita varias queries en una misma vuelta.
+let typesCache = null;
+let typesCacheAt = 0;
+const TYPES_TTL_MS = 60 * 1000; // 1 minuto
+
+async function fetchActiveTypes() {
+    const now = Date.now();
+    if (typesCache && (now - typesCacheAt) < TYPES_TTL_MS) { return typesCache; }
+    const rows = await incidentTypeModel.getActive();
+    typesCache = rows.map(t => ({ id: t.id, code: t.code, description: t.description }));
+    typesCacheAt = now;
+    return typesCache;
+}
+
+async function fetchTypesById() {
+    const list = await fetchActiveTypes();
+    return new Map(list.map(t => [t.id, t]));
+}
 
 function mergeResponses(...responses) {
     return responses.reduce((acc, response) => {
@@ -61,11 +88,12 @@ function buildFinalResponse(runtime, response) {
         state: {
             selectedShipmentId: runtime.state.selectedShipmentId,
             pendingAction: runtime.state.pendingAction,
+            incidentDraft: runtime.state.incidentDraft || null,
         },
     };
 }
 
-function runAction(runtime, action, value, options = {}) {
+async function runAction(runtime, action, value, options = {}) {
     if (action === 'focus-shipment') {
         return handleFocusShipment(runtime, value);
     }
@@ -95,7 +123,7 @@ function runAction(runtime, action, value, options = {}) {
     return handler(runtime, value);
 }
 
-function handleFocusShipment(runtime, value) {
+async function handleFocusShipment(runtime, value) {
     const focusResponse = navigationHandlers.buildFocusShipmentResponse(runtime, value, {
         announce: true,
         scroll: true,
@@ -109,14 +137,27 @@ function handleFocusShipment(runtime, value) {
     if (runtime.state.pendingAction) {
         const pendingAction = runtime.state.pendingAction;
         runtime.state.pendingAction = null;
-        const followUp = runAction(runtime, pendingAction, '', { preservePending: true });
+        const followUp = await runAction(runtime, pendingAction, '', { preservePending: true });
         return mergeResponses(focusResponse, followUp);
     }
 
     return focusResponse;
 }
 
-function runText(runtime, text) {
+async function runText(runtime, text) {
+    // Si hay un wizard de incidencia activo, capturamos el texto como input del step.
+    if (incidentReportHandler.isActive(runtime)) {
+        const step = runtime.state.incidentDraft.step;
+        if (step === 'tracking') {
+            return incidentReportHandler.handleTrackingInput(runtime, text, await fetchActiveTypes());
+        }
+        const result = incidentReportHandler.handleStepInput(runtime, text);
+        if (result && result.kind === 'tracking') {
+            return incidentReportHandler.handleTrackingInput(runtime, result.text, await fetchActiveTypes());
+        }
+        return result;
+    }
+
     runtime.state.pendingAction = null;
 
     const intent = resolveTextIntent(text, {
@@ -138,7 +179,7 @@ function runText(runtime, text) {
     return generalHandlers.buildFallbackResponse(getSelectedShipment(runtime));
 }
 
-function handleChatbotRequest(payload) {
+async function handleChatbotRequest(payload) {
     const runtime = createRuntime(payload);
     const input = payload?.input || {};
     const type = String(input.type || 'message');
@@ -148,10 +189,10 @@ function handleChatbotRequest(payload) {
     }
 
     if (type === 'action') {
-        return buildFinalResponse(runtime, runAction(runtime, String(input.action || ''), input.value || ''));
+        return buildFinalResponse(runtime, await runAction(runtime, String(input.action || ''), input.value || ''));
     }
 
-    return buildFinalResponse(runtime, runText(runtime, input.text || ''));
+    return buildFinalResponse(runtime, await runText(runtime, input.text || ''));
 }
 
 module.exports = {

@@ -111,7 +111,7 @@ function buildShipmentContextActions(shipment) {
     if (stage === 'con_problema') {
         return [
             createAction('Que paso con mi envio', 'show-issues'),
-            createAction('Fecha estimada', 'show-eta'),
+            createAction('Reportar incidencia', 'report-incident-start'),
             createAction('Sucursal o retiro', 'show-branch'),
             createAction('Hablar con soporte', 'show-support'),
         ];
@@ -121,8 +121,8 @@ function buildShipmentContextActions(shipment) {
         return [
             createAction('Estado actual', 'show-status'),
             createAction('Comprobante de entrega', 'show-pod'),
-            createAction('Historial', 'show-history'),
             createAction('No reconozco la entrega', 'show-delivery-issue'),
+            createAction('Reportar incidencia', 'report-incident-start'),
         ];
     }
 
