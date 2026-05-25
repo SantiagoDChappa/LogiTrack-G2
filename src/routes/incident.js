@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const {
     list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen
+    assign, changeStatus, escalate, close, reopen, searchShipments
 } = require('../controllers/incident.js');
 const { requireSupervisorOrAdmin } = require('../middlewares/auth.js');
 
-router.get('/',          list);
-router.get('/new',       getCreateForm);
-router.post('/',         create);
+router.get('/',                   list);
+router.get('/search-shipments',   searchShipments);
+router.get('/new',                getCreateForm);
+router.post('/',                  create);
 router.get('/:id',       getDetail);
 router.post('/:id/comment',  addComment);
 router.post('/:id/assign',   requireSupervisorOrAdmin, assign);

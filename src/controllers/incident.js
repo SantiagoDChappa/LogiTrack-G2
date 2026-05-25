@@ -5,9 +5,15 @@ const incidentHistoryModel = require('../models/incidentHistory');
 const { Incident }         = incidentModel;
 const shipmentModel        = require('../models/shipment');
 const { User }             = require('../models/user');
+const branchModel          = require('../models/branch');
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType
 } = require('../constants/enums');
+
+const roleDescriptionById = Object.values(RoleType).reduce((acc, r) => {
+    acc[r.id] = r.description;
+    return acc;
+}, {});
 
 const STAFF_ROLES = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id];
 const isStaff      = (u) => STAFF_ROLES.includes(u?.roleId);
@@ -80,22 +86,71 @@ const getCreateForm = async (req, res) => {
         }
     }
 
-    const types = await incidentTypeModel.getActive();
-    res.render('incident/new', { shipment, types, error: null, form: {} });
+    const [types, branches, users] = await Promise.all([
+        incidentTypeModel.getActive(),
+        branchModel.getAll(),
+        User.findAll({
+            where: { active: true },
+            attributes: ['id', 'fullName', 'roleId', 'branchId'],
+            order: [['fullName', 'ASC']]
+        })
+    ]);
+    const usersPayload = users.map(u => ({
+        id:       u.id,
+        fullName: u.fullName,
+        roleId:   u.roleId,
+        roleDescription: roleDescriptionById[u.roleId] || '',
+        branchId: u.branchId
+    }));
+    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: {} });
 };
 
 const create = async (req, res) => {
     const user = res.locals.currentUser;
-    const { shipmentId, incidentTypeId, description, priority } = req.body;
+    const { shipmentId, incidentTypeId, description, priority, branchId, assignedToUserId } = req.body;
 
-    if (!shipmentId || !incidentTypeId || !description || description.trim().length === 0) {
-        const types = await incidentTypeModel.getActive();
+    const renderFormError = async (errorMessage) => {
+        const [types, branches, users] = await Promise.all([
+            incidentTypeModel.getActive(),
+            branchModel.getAll(),
+            User.findAll({
+                where: { active: true },
+                attributes: ['id', 'fullName', 'roleId', 'branchId'],
+                order: [['fullName', 'ASC']]
+            })
+        ]);
+        const usersPayload = users.map(u => ({
+            id: u.id, fullName: u.fullName, roleId: u.roleId,
+            roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
+        }));
         return res.status(400).render('incident/new', {
             shipment: shipmentId ? await shipmentModel.getById(Number(shipmentId)) : null,
-            types,
-            error: 'shipmentId, tipo y descripción son obligatorios',
+            types, branches, users: usersPayload,
+            error: errorMessage,
             form: req.body
         });
+    };
+
+    if (!shipmentId || !incidentTypeId || !description || description.trim().length === 0) {
+        return renderFormError('shipmentId, tipo y descripción son obligatorios');
+    }
+    if (!branchId) {
+        return renderFormError('La sucursal es obligatoria');
+    }
+    if (!assignedToUserId) {
+        return renderFormError('Debe seleccionar un usuario asignado');
+    }
+
+    const branch = await branchModel.getById(Number(branchId));
+    if (!branch) {
+        return renderFormError('Sucursal inválida');
+    }
+    const assignee = await User.findOne({ where: { id: Number(assignedToUserId), active: true } });
+    if (!assignee) {
+        return renderFormError('Usuario asignado inválido');
+    }
+    if (assignee.branchId !== branch.id) {
+        return renderFormError('El usuario asignado no pertenece a la sucursal seleccionada');
     }
 
     const shipment = await shipmentModel.getById(Number(shipmentId));
@@ -113,15 +168,25 @@ const create = async (req, res) => {
 
     const incident = await sequelize.transaction(async (t) => {
         const created = await Incident.create({
-            shipmentId:     shipment.id,
-            incidentTypeId: type.id,
-            status:         IncidentStatus.OPEN,
-            priority:       priority ? Math.min(4, Math.max(1, Number(priority))) : 2,
-            escalated:      false,
-            description:    description.trim().slice(0, 2000),
-            openedChannel:  IncidentChannel.INTERNAL,
-            openedByUserId: user.id
+            shipmentId:       shipment.id,
+            incidentTypeId:   type.id,
+            status:           IncidentStatus.OPEN,
+            priority:         priority ? Math.min(4, Math.max(1, Number(priority))) : 2,
+            escalated:        false,
+            description:      description.trim().slice(0, 2000),
+            openedChannel:    IncidentChannel.INTERNAL,
+            openedByUserId:   user.id,
+            assignedToUserId: assignee.id
         }, { transaction: t });
+
+        await incidentHistoryModel.create({
+            incidentId: created.id,
+            eventType:  IncidentEventType.ASSIGNED,
+            toValue:    String(assignee.id),
+            comment:    `Asignada a ${assignee.fullName} (${roleDescriptionById[assignee.roleId] || ''})`,
+            userId:     user.id,
+            transaction: t
+        });
 
         await incidentHistoryModel.create({
             incidentId: created.id,
@@ -372,7 +437,76 @@ const reopen = async (req, res) => {
     res.redirect(`/incident/${id}`);
 };
 
+// Autocomplete de envíos para el form de alta de incidencia.
+// Acepta `q` (tracking parcial, nombre destinatario, o ID exacto).
+// Respeta RBAC: el repartidor sólo ve envíos asignados a él.
+const searchShipments = async (req, res) => {
+    const { Op } = require('sequelize');
+    const { Shipment } = require('../models/shipment');
+    const { Person }   = require('../models/person');
+    const { Address }  = require('../models/address');
+    const { Status }   = require('../models/status');
+    const user = res.locals.currentUser;
+
+    const q = String(req.query.q || '').trim();
+    if (q.length < 1) { return res.json([]); }
+
+    const where = {};
+    const asNum = Number(q);
+    if (Number.isInteger(asNum) && asNum > 0) {
+        where[Op.or] = [
+            { id: asNum },
+            { trackingId: { [Op.iLike]: `%${q}%` } },
+        ];
+    } else {
+        where.trackingId = { [Op.iLike]: `%${q}%` };
+    }
+    if (isDelivery(user)) {
+        where.deliveryUserId = user.id;
+    }
+
+    const recipientWhere = q && !Number.isInteger(asNum) ? { fullName: { [Op.iLike]: `%${q}%` } } : null;
+
+    const baseRows = await Shipment.findAll({
+        where,
+        include: [
+            { model: Person,  as: 'recipient' },
+            { model: Address, as: 'address' },
+            { model: Status,  as: 'status', attributes: ['id', 'description'] },
+        ],
+        limit: 10,
+        order: [['createdAt', 'DESC']],
+    });
+
+    // Si el query parece nombre y no encontramos por tracking, hacemos un segundo lookup por destinatario.
+    let extraRows = [];
+    if (recipientWhere && baseRows.length < 10) {
+        const baseIds = baseRows.map(r => r.id);
+        const extraWhere = baseIds.length > 0 ? { id: { [Op.notIn]: baseIds } } : {};
+        if (isDelivery(user)) { extraWhere.deliveryUserId = user.id; }
+        extraRows = await Shipment.findAll({
+            where: extraWhere,
+            include: [
+                { model: Person,  as: 'recipient', where: recipientWhere, required: true },
+                { model: Address, as: 'address' },
+                { model: Status,  as: 'status', attributes: ['id', 'description'] },
+            ],
+            limit: 10 - baseRows.length,
+            order: [['createdAt', 'DESC']],
+        });
+    }
+
+    const rows = [...baseRows, ...extraRows].slice(0, 10);
+    res.json(rows.map(s => ({
+        id:             s.id,
+        trackingId:     s.trackingId,
+        recipientName:  s.recipient ? s.recipient.fullName : '',
+        addressLine:    s.address ? `${s.address.street || ''} ${s.address.number || ''}`.trim() : '',
+        statusLabel:    s.status ? s.status.description : '',
+    })));
+};
+
 module.exports = {
     list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen
+    assign, changeStatus, escalate, close, reopen, searchShipments
 };
