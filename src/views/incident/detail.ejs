@@ -221,25 +221,26 @@
 
                 <% if (flags.canClose) { %>
                     <form method="POST" action="/incident/<%= incident.id %>/close" class="incident-action-form incident-close-form">
-                        <label>Cerrar como
-                            <select name="resolution" required>
-                                <option value="">Seleccionar resolución...</option>
-                                <option value="PROCEDENTE">Procedente</option>
-                                <option value="NO_PROCEDENTE">No procedente</option>
-                            </select>
-                        </label>
                         <label>Acción sobre el envío
                             <select name="shipmentAction">
                                 <option value="none">Sin cambio</option>
                                 <option value="cancel">Cancelar envío (devolución)</option>
                             </select>
                         </label>
-                        <input type="text" name="comment" placeholder="Comentario de cierre">
                         <label class="incident-close-comment">Comentario de cierre <span class="incident-required" aria-hidden="true">*</span>
                             <textarea name="comment" rows="2" required minlength="1"
                                       placeholder="Describí brevemente cómo se resolvió la incidencia (obligatorio)"></textarea>
                         </label>
-                        <button type="submit" class="btn-primary">Cerrar incidencia</button>
+                        <div class="incident-close-buttons">
+                            <button type="submit" name="resolution" value="PROCEDENTE" class="btn-success">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Cerrar como procedente
+                            </button>
+                            <button type="submit" name="resolution" value="NO_PROCEDENTE" class="btn-danger">
+                                <span class="material-symbols-outlined">cancel</span>
+                                Cerrar como no procedente
+                            </button>
+                        </div>
                     </form>
                 <% } %>
 
