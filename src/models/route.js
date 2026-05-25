@@ -16,13 +16,22 @@ const Route = sequelize.define('route', {
     totalPauseSeconds:{ type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'total_pause_seconds' },
     fuelLPer100Km:    { type: DataTypes.DECIMAL(5, 2),  allowNull: false, defaultValue: 10,   field: 'fuel_l_per_100km' },
     fuelPricePerL:    { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 1200, field: 'fuel_price_per_l' },
+    // Sprint 3 - 2.4 Gestión ruteos con falla
+    cancelReason:      { type: DataTypes.STRING(60),  allowNull: true, field: 'cancel_reason' },
+    cancelDetail:      { type: DataTypes.TEXT,        allowNull: true, field: 'cancel_detail' },
+    cancelledAt:       { type: DataTypes.DATE,        allowNull: true, field: 'cancelled_at' },
+    cancelledByUserId: { type: DataTypes.INTEGER,     allowNull: true, field: 'cancelled_by_user_id' },
+    interruptedAt:     { type: DataTypes.DATE,        allowNull: true, field: 'interrupted_at' },
+    interruptReason:   { type: DataTypes.STRING(60),  allowNull: true, field: 'interrupt_reason' },
+    returnedToBranch:  { type: DataTypes.BOOLEAN,     allowNull: false, defaultValue: false, field: 'returned_to_branch' },
 }, { tableName: 'route', timestamps: false });
 
 const RouteStatus = Object.freeze({
-    PLANNED:   1,
-    IN_ROUTE:  2,
-    FINISHED:  3,
-    CANCELLED: 4,
+    PLANNED:     1,
+    IN_ROUTE:    2,
+    FINISHED:    3,
+    CANCELLED:   4,
+    INTERRUPTED: 5, // Sprint 3 - ruta interrumpida (entregas vuelven a sucursal)
 });
 
 const getAllByBranch = (branchId) => {

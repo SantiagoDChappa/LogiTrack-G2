@@ -247,10 +247,14 @@ router.post('/route/:id/stop/:stopId/arrive', requireDelivery, async (req, res) 
             toStatusId: stop.shipment?.statusId || Status.IN_TRANSIT.id,
             comment: 'El repartidor llegó al domicilio.',
             userId: res.locals.currentUser.id,
-            eventType: 'ARRIVED',
+            eventType: 'ARRIVED_DESTINATION',
             latitude: req.body.latitude || null,
             longitude: req.body.longitude || null,
         });
+        // Sprint 3 - 2.3 notif SHIPMENT_ARRIVED_DESTINATION
+        const { NotificationEvent: NE3 } = require('../constants/enums');
+        require('../controllers/shipment').notifyShipmentEvent(NE3.SHIPMENT_ARRIVED_DESTINATION, stop.shipmentId)
+            .catch(e => console.error('notif ARRIVED_DESTINATION', stop.shipmentId, e.message));
     }
     res.json({ ok: true });
 });
@@ -358,10 +362,17 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             status:           retrySameDay ? 'reintento_mismo_dia' : 'pendiente',
         });
         // Verificar si superó el máximo de intentos fallidos.
+        // Sprint 3 - 2.5: si el motivo configurado tiene maxAttemptsOverride, usar ese.
         // El intento recién creado YA cuenta; se cancela al alcanzar el tope, no después.
         const settingModel = require('../models/setting');
         const settings = await settingModel.getAll();
-        const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
+        let maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
+        try {
+            if (reasonCode) {
+                const fr = await require('../models/failedAttemptReason').getByCode(reasonCode);
+                if (fr && fr.maxAttemptsOverride) { maxIntentos = fr.maxAttemptsOverride; }
+            }
+        } catch (_) { /* fallback default */ }
         const intentosPrevios = await failedAttemptModel.getByShipmentId(stop.shipmentId);
         if (intentosPrevios.length >= maxIntentos) {
             const shipmentHistoryModel = require('../models/shipmentHistory');
@@ -380,17 +391,28 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             });
         }
 
-        // Si el motivo fue paquete dañado, crear incidencia automática asociada al envío.
-        if (reasonCode === 'paquete_dañado' || reasonCode === 'paquete_danado') {
+        // Sprint 3 - 2.5: si el motivo fue paquete dañado O el motivo configurable tiene
+        // createsIncident=true, crear incidencia automática asociada al envío.
+        let shouldCreateIncident = (reasonCode === 'paquete_dañado' || reasonCode === 'paquete_danado');
+        try {
+            if (!shouldCreateIncident && reasonCode) {
+                const fr = await require('../models/failedAttemptReason').getByCode(reasonCode);
+                if (fr && fr.createsIncident) { shouldCreateIncident = true; }
+            }
+        } catch (_) { /* fallback */ }
+        if (shouldCreateIncident) {
             try {
                 await createDamageIncident({
                     shipmentId: stop.shipmentId,
-                    description: `Paquete reportado como dañado durante intento de entrega. Motivo: ${reason}.${comment ? ' Detalle: ' + comment : ''}`,
+                    description: `Incidencia automática desde intento fallido. Motivo: ${reason}.${comment ? ' Detalle: ' + comment : ''}`,
                     userId: res.locals.currentUser?.id || null,
                 });
+                // Sprint 3 - 2.3 notif SHIPMENT_INCIDENT
+                const { NotificationEvent: NE2 } = require('../constants/enums');
+                require('../controllers/shipment').notifyShipmentEvent(NE2.SHIPMENT_INCIDENT, stop.shipmentId)
+                    .catch(e => console.error('notif INCIDENT', stop.shipmentId, e.message));
             } catch (incErr) {
-                // No bloqueamos el fallido si falla la creación de incidencia; sólo logueamos.
-                console.error('auto-incident PACKAGE_BROKEN err:', incErr.message);
+                console.error('auto-incident err:', incErr.message);
             }
         }
 
@@ -412,9 +434,16 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 latitude:     latitude  || null,
                 longitude:    longitude || null,
             });
+            // Sprint 3 - 2.3 notif SHIPMENT_RESCHEDULED (reintento mismo día también es reprogramación)
+            const { NotificationEvent: NE } = require('../constants/enums');
+            const shipmentCtrl = require('../controllers/shipment');
+            shipmentCtrl.notifyShipmentEvent(NE.SHIPMENT_RESCHEDULED, stop.shipmentId)
+                .catch(e => console.error('notif RESCHEDULED retry', stop.shipmentId, e.message));
             return res.json({ ok: true, retrySameDay: true });
         }
 
+        // Sprint 3 - 2.3 notif SHIPMENT_FAILED_ATTEMPT ya emitida por stateMachine via mapper;
+        // mantenemos transition. Si reasonCode → motivo configurable, sumar también notif INCIDENT.
         await stateMachine.transition({
             shipmentId: stop.shipmentId,
             toStatusId: Status.FAILED_ATTEMPT.id,
@@ -497,6 +526,27 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
         { startedAt: new Date(), statusId: RouteStatus.IN_ROUTE },
         { where: { id: req.params.id } }
     );
+    // Sprint 3 - 2.1 / 2.3: por cada envío en la ruta emitir evento OUT_FOR_DELIVERY
+    // en el timeline y disparar notificación SHIPMENT_OUT_FOR_DELIVERY.
+    try {
+        const shipmentHistoryModel = require('../models/shipmentHistory');
+        const { NotificationEvent, ShipmentHistoryEvent } = require('../constants/enums');
+        const shipmentCtrl = require('../controllers/shipment');
+        for (const stop of (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId)) {
+            await shipmentHistoryModel.create({
+                shipmentId:   stop.shipmentId,
+                fromStatusId: stop.shipment?.statusId || Status.IN_TRANSIT.id,
+                toStatusId:   stop.shipment?.statusId || Status.IN_TRANSIT.id,
+                comment:      `Salida a reparto — Ruta #${route.id}`,
+                userId:       res.locals.currentUser.id,
+                eventType:    ShipmentHistoryEvent.OUT_FOR_DELIVERY,
+            });
+            shipmentCtrl.notifyShipmentEvent(NotificationEvent.SHIPMENT_OUT_FOR_DELIVERY, stop.shipmentId)
+                .catch(e => console.error('notif OUT_FOR_DELIVERY', stop.shipmentId, e.message));
+        }
+    } catch (e) {
+        console.error('start route history/notify err:', e.message);
+    }
     res.json({ ok: true });
 });
 
@@ -638,6 +688,93 @@ router.post('/panic', requireDelivery, async (req, res) => {
     res.json({ ok: true, panicId: ev.id });
 });
 
+// === Sprint 3 - 2.4 Cancelar ruta (antes de iniciarla o durante) ===
+// Reasons formales: DRIVER_UNAVAILABLE, VEHICLE_OUT_SERVICE, WEATHER, INCIDENT, OPERATIONAL, OTHER.
+// Todas las entregas pendientes vuelven a AT_BRANCH y se desasignan del driver.
+router.post('/route/:id/cancel', requireDelivery, async (req, res) => {
+    const { RouteFailureReason } = require('../constants/enums');
+    const route = await routeModel.getById(req.params.id);
+    if (!route) { return res.status(404).json({ error: 'Ruta no encontrada' }); }
+    const isOwner = route.transport?.driverUserId === res.locals.currentUser.id;
+    const isAdmin = res.locals.currentUser?.roleId === 1 || res.locals.currentUser?.roleId === 4;
+    if (!isOwner && !isAdmin) { return res.status(403).json({ error: 'No autorizado' }); }
+    if (route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED) {
+        return res.status(409).json({ error: 'La ruta ya está cerrada.' });
+    }
+    const reason = String(req.body.reason || '').trim();
+    const detail = String(req.body.detail || '').trim();
+    if (!Object.values(RouteFailureReason).includes(reason)) {
+        return res.status(400).json({ error: 'Motivo obligatorio (DRIVER_UNAVAILABLE / VEHICLE_OUT_SERVICE / WEATHER / INCIDENT / OPERATIONAL / OTHER).' });
+    }
+
+    const stops = (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId && !s.completed);
+    let returned = 0;
+    await sequelize.transaction(async (t) => {
+        for (const s of stops) {
+            await stateMachine.transition({
+                shipmentId: s.shipmentId,
+                toStatusId: Status.AT_BRANCH.id,
+                actor:      res.locals.currentUser,
+                branchId:   route.originBranchId,
+                comment:    `Ruta #${route.id} cancelada (${reason}). ${detail || ''}`.trim(),
+                eventType:  'RETURNED_TO_BRANCH',
+                transaction: t,
+            }).catch(e => console.error('cancel route shipment transition', s.shipmentId, e.message));
+            returned++;
+        }
+        await Route.update({
+            statusId:        RouteStatus.CANCELLED,
+            cancelReason:    reason,
+            cancelDetail:    detail || null,
+            cancelledAt:     new Date(),
+            cancelledByUserId: res.locals.currentUser.id,
+            returnedToBranch: true,
+        }, { where: { id: route.id }, transaction: t });
+    });
+    res.json({ ok: true, returnedShipments: returned });
+});
+
+// === Sprint 3 - 2.4 Interrumpir ruta (estado intermedio entre activa y cancelada)
+// Mantiene las paradas completadas pero marca al resto para regreso a sucursal.
+router.post('/route/:id/interrupt', requireDelivery, async (req, res) => {
+    const { RouteFailureReason } = require('../constants/enums');
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+    if (route.statusId !== RouteStatus.IN_ROUTE) {
+        return res.status(409).json({ error: 'Sólo rutas en curso se pueden interrumpir.' });
+    }
+    const reason = String(req.body.reason || '').trim();
+    const detail = String(req.body.detail || '').trim();
+    if (!Object.values(RouteFailureReason).includes(reason)) {
+        return res.status(400).json({ error: 'Motivo obligatorio.' });
+    }
+
+    const pending = (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId && !s.completed);
+    await sequelize.transaction(async (t) => {
+        await Route.update({
+            statusId:        RouteStatus.INTERRUPTED,
+            interruptedAt:   new Date(),
+            interruptReason: reason,
+            cancelDetail:    detail || null,
+            returnedToBranch: true,
+        }, { where: { id: route.id }, transaction: t });
+        for (const s of pending) {
+            await stateMachine.transition({
+                shipmentId: s.shipmentId,
+                toStatusId: Status.AT_BRANCH.id,
+                actor:      res.locals.currentUser,
+                branchId:   route.originBranchId,
+                comment:    `Ruta #${route.id} interrumpida (${reason}). ${detail || ''}`.trim(),
+                eventType:  'RETURNED_TO_BRANCH',
+                transaction: t,
+            }).catch(e => console.error('interrupt shipment transition', s.shipmentId, e.message));
+        }
+    });
+    res.json({ ok: true, pendingReturned: pending.length });
+});
+
 // === Resumen post-ruta (vista HTML) ===
 router.get('/route/:id/summary', requireDelivery, async (req, res) => {
     try {
@@ -717,7 +854,13 @@ router.post('/route/:id/return-scan', requireDelivery, async (req, res) => {
                 actor:      res.locals.currentUser,
                 branchId:   route.originBranchId,
                 comment:    'Devuelto a sucursal (escaneo post-ruta)',
+                eventType:  'RETURNED_TO_BRANCH',
             });
+            // Sprint 3 - 2.3 notif SHIPMENT_RETURNED_BRANCH
+            const { NotificationEvent } = require('../constants/enums');
+            const shipmentCtrl = require('../controllers/shipment');
+            shipmentCtrl.notifyShipmentEvent(NotificationEvent.SHIPMENT_RETURNED_BRANCH, shipment.id)
+                .catch(e => console.error('notif RETURNED_BRANCH', shipment.id, e.message));
         } catch (transitionErr) {
             // No bloqueamos el scan (la fila ReturnToBranchScan ya existe),
             // pero logueamos para detectar reglas faltantes en state machine.
@@ -785,6 +928,13 @@ router.post('/reschedule-failed', requireDelivery, async (req, res) => {
             rescheduled++;
         }
     });
+    // Sprint 3 - 2.3 notif SHIPMENT_RESCHEDULED a destinatario
+    const { NotificationEvent } = require('../constants/enums');
+    const shipmentCtrl = require('../controllers/shipment');
+    for (const s of failed) {
+        shipmentCtrl.notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, s.id)
+            .catch(e => console.error('notif RESCHEDULED', s.id, e.message));
+    }
     res.json({ ok: true, rescheduled });
 });
 

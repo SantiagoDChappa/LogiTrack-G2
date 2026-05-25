@@ -337,6 +337,12 @@
 
     <div class="pod-body">
         <form method="POST" action="/delivery/evidence/<%= shipmentId %>/pod" novalidate>
+            <% if (typeof routeId !== 'undefined' && routeId) { %>
+                <input type="hidden" name="routeId" value="<%= routeId %>">
+            <% } %>
+            <% if (typeof stopId !== 'undefined' && stopId) { %>
+                <input type="hidden" name="stopId" value="<%= stopId %>">
+            <% } %>
 
             <div class="pod-section">
                 <div class="pod-section-title">
@@ -399,6 +405,20 @@
                 </button>
                 <input type="hidden" name="signatureBase64" id="signatureBase64">
             </div>
+
+            <% if (typeof secretRequired !== 'undefined' && secretRequired) { %>
+                <div class="pod-section">
+                    <div class="pod-section-title">
+                        <span class="material-symbols-outlined">key</span>
+                        Código clave de entrega
+                    </div>
+                    <p style="font-size:.85rem;color:#64748b;margin:0 0 .5rem">Pedíle al destinatario el código que recibió por mail (6 caracteres).</p>
+                    <input type="text" name="deliverySecretCode" maxlength="10" required
+                        placeholder="Ej: H7P3KQ"
+                        style="text-transform:uppercase;letter-spacing:.3em;font-weight:700;font-size:1.1rem;text-align:center;width:100%;padding:.7rem;border:1.5px solid #2563eb;border-radius:10px"
+                        oninput="this.value=this.value.toUpperCase()">
+                </div>
+            <% } %>
 
             <button type="submit" class="submit-btn">
                 <span class="material-symbols-outlined">check_circle</span>
