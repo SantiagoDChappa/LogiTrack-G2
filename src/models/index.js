@@ -23,6 +23,10 @@ const { ReturnToBranchScan } = require('./returnToBranchScan');
 const { IncidentType }    = require('./incidentType');
 const { Incident }        = require('./incident');
 const { IncidentHistory } = require('./incidentHistory');
+// Sprint 3 - nuevos modelos parametrizables
+const { FailedAttemptReason } = require('./failedAttemptReason');
+const { StandardMessage }     = require('./standardMessage');
+const { DeliveryTimeWindow }  = require('./deliveryTimeWindow');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -79,7 +83,10 @@ const safeAssociate = () => {
 
     if (Shipment.belongsTo) {
         if (Zone)   { Shipment.belongsTo(Zone,   { as: 'zone',          foreignKey: 'zoneId' }); }
-        if (Branch) { Shipment.belongsTo(Branch, { as: 'currentBranch', foreignKey: 'currentBranchId' }); }
+        if (Branch) {
+            Shipment.belongsTo(Branch, { as: 'currentBranch', foreignKey: 'currentBranchId' });
+            Shipment.belongsTo(Branch, { as: 'pickupBranch',  foreignKey: 'pickupBranchId'  });
+        }
     }
 
     if (Transport.belongsTo) {
@@ -176,5 +183,8 @@ module.exports = {
     ReturnToBranchScan,
     IncidentType,
     Incident,
-    IncidentHistory
+    IncidentHistory,
+    FailedAttemptReason,
+    StandardMessage,
+    DeliveryTimeWindow,
 };

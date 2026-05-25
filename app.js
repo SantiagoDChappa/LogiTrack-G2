@@ -25,6 +25,7 @@ const apiSuggestDeliveryRoutes = require('./src/routes/api/suggest-delivery');
 const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const apiRouteRoutes           = require('./src/routes/api/route');
+const apiBranchesRoutes        = require('./src/routes/api/branches');
 const authRoutes        = require('./src/routes/auth');
 const deliveryRoutes = require('./src/routes/delivery');
 const scanRoutes     = require('./src/routes/scan');
@@ -86,6 +87,7 @@ app.use('/api/suggest-delivery', requireAuth, apiSuggestDeliveryRoutes);
 app.use('/api/validate-address',  requireAuth, apiValidateAddressRoutes);
 app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api/route',             requireAuth, apiRouteRoutes);
+app.use('/api/branches',          requireAuth, apiBranchesRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/delivery', requireAuth, deliveryRoutes);
 app.use('/scan',     requireAuth, scanRoutes);
@@ -116,6 +118,8 @@ app.use('/api/persons',personRoutes);
 if (process.env.NODE_ENV !== 'test') {
     app.listen(port, () => {
         console.warn(`LogiTrack running at http://localhost:${port}`);
+        // Sprint 3 - 4.1 / 3.2: backfill async (no bloquea boot)
+        require('./src/utils/backfillShipmentTokens').run().catch(() => {});
     });
 }
 
