@@ -28,7 +28,7 @@
         <% if (recent.length === 0) { %>
             <p style="color:var(--color-text-muted)">Sin rutas registradas.</p>
         <% } else { %>
-            <table class="recent-table">
+            <table class="recent-table" data-paginate="transport-stats">
                 <thead><tr><th>#Ruta</th><th>Distancia</th><th>Costo</th><th>Peso</th><th>Estado</th><th>Fecha</th></tr></thead>
                 <tbody>
                 <% recent.forEach(r => { %>
