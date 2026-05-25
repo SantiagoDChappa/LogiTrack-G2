@@ -16,9 +16,18 @@
             </div>
         </div>
 
-        <% const err = (typeof query !== 'undefined' && query.error) || null; %>
-        <% if (err) { %>
-            <div class="alert alert-error"><%= err %></div>
+        <% const errCode = (typeof query !== 'undefined' && query.error) || null; %>
+        <% const errMessages = {
+            resolution_required: 'Debés seleccionar una resolución (Procedente / No procedente) para cerrar la incidencia.',
+            comment_required:    'El comentario de cierre es obligatorio.',
+            already_closed:      'La incidencia ya estaba cerrada.',
+            not_closed:          'Solo se pueden reabrir incidencias cerradas.',
+            closed:              'La incidencia está cerrada; no se puede modificar.',
+            invalid_status:      'Estado inválido para la transición solicitada.',
+            invalid_user:        'El usuario asignado no es válido.'
+        }; %>
+        <% if (errCode) { %>
+            <div class="alert alert-error"><%= errMessages[errCode] || errCode %></div>
         <% } %>
 
         <section class="incident-detail-grid">
@@ -112,7 +121,10 @@
                                 <option value="NO_PROCEDENTE">No procedente</option>
                             </select>
                         </label>
-                        <input type="text" name="comment" placeholder="Comentario de cierre">
+                        <label class="incident-close-comment">Comentario de cierre <span class="incident-required" aria-hidden="true">*</span>
+                            <textarea name="comment" rows="2" required minlength="1"
+                                      placeholder="Describí brevemente cómo se resolvió la incidencia (obligatorio)"></textarea>
+                        </label>
                         <button type="submit" class="btn-primary">Cerrar incidencia</button>
                     </form>
                 <% } %>

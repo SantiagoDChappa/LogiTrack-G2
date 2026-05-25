@@ -40,9 +40,17 @@ const computeActionFlags = (incident, user) => ({
     canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED
 });
 
+// Acepta '200', 'INC-200', 'INC200', ' 200 '. Devuelve el numero o null si no se reconoce.
+const parseIncidentIdInput = (raw) => {
+    if (raw === undefined || raw === null) { return null; }
+    const m = String(raw).trim().match(/^(?:INC[-\s]?)?(\d+)$/i);
+    return m ? Number(m[1]) : null;
+};
+
 const list = async (req, res) => {
     const user = res.locals.currentUser;
     const filters = {
+        id:                parseIncidentIdInput(req.query.id),
         status:            req.query.status   || null,
         priority:          req.query.priority ? Number(req.query.priority) : null,
         assignedToUserId:  req.query.assignedToUserId ? Number(req.query.assignedToUserId) : null,
@@ -52,6 +60,8 @@ const list = async (req, res) => {
                           : null,
         resolution:        req.query.resolution || null,
     };
+    const rawIdInput = (req.query.id !== undefined && req.query.id !== null) ? String(req.query.id).trim() : '';
+    const idInputInvalid = rawIdInput.length > 0 && filters.id === null;
     if (req.query.escalated === '1' || req.query.escalated === 'true')  { filters.escalated = true;  }
     if (req.query.escalated === '0' || req.query.escalated === 'false') { filters.escalated = false; }
 
@@ -72,7 +82,8 @@ const list = async (req, res) => {
         incidents,
         filters: req.query,
         assignableUsers,
-        canCreate: true
+        canCreate: true,
+        idInputInvalid
     });
 };
 
@@ -394,6 +405,9 @@ const close = async (req, res) => {
     if (![IncidentResolution.PROCEDENTE, IncidentResolution.NO_PROCEDENTE].includes(resolution)) {
         return res.status(400).redirect(`/incident/${id}?error=resolution_required`);
     }
+    if (!comment || String(comment).trim().length === 0) {
+        return res.status(400).redirect(`/incident/${id}?error=comment_required`);
+    }
     const incident = await Incident.findByPk(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (incident.status === IncidentStatus.CLOSED) {
@@ -413,7 +427,7 @@ const close = async (req, res) => {
             eventType:  IncidentEventType.CLOSED,
             fromValue:  from,
             toValue:    resolution,
-            comment:    comment || null,
+            comment:    String(comment).trim(),
             userId:     user.id,
             transaction: t
         });
