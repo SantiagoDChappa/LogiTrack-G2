@@ -45,6 +45,73 @@
         .route-stop-badge:focus .route-seg-tooltip {
             display: block;
         }
+
+        /* ── Modal historial ── */
+        .history-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .history-modal-backdrop.open { display: flex; }
+        .history-modal {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg, 12px);
+            box-shadow: 0 20px 60px rgba(0,0,0,.3);
+            width: 100%;
+            max-width: 560px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            animation: histModalIn .18s ease;
+        }
+        @keyframes histModalIn {
+            from { opacity: 0; transform: translateY(-12px) scale(.97); }
+            to   { opacity: 1; transform: none; }
+        }
+        .history-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--color-border);
+            flex-shrink: 0;
+        }
+        .history-modal-header h2 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+        }
+        .history-modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--color-text-secondary);
+            padding: .25rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            transition: background .15s;
+        }
+        .history-modal-close:hover { background: var(--color-bg); }
+        .history-modal-body {
+            overflow-y: auto;
+            padding: 1.25rem;
+            flex: 1;
+        }
+        .history-modal-meta {
+            font-size: .78rem;
+            color: var(--color-text-secondary);
+            margin-bottom: 1.25rem;
+        }
     </style>
     <link rel="stylesheet" href="/css/shipments-restyle.css">
     <link rel="stylesheet" href="/css/shipment-detail.css">
@@ -59,7 +126,8 @@
             <h1>Detalle de Envío</h1>
             <div style="display:flex;gap:var(--space-3)">
                 <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
-                <a href="/incident/new?shipmentId=<%= shipment.id %>" class="btn-secondary">
+
+<a href="/incident/new?shipmentId=<%= shipment.id %>" class="btn-secondary">
                     <span class="material-symbols-outlined">report</span>Reportar incidencia
                 </a>
                 <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
@@ -95,25 +163,33 @@
                 </div>
             </div>
 
-            <!-- ── Línea de tiempo (card independiente) ── -->
+            <!-- ── Línea de tiempo compacta ── -->
             <div class="update-card" style="margin-bottom: 1.5rem;">
-                <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo</h3>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+                    <h3 style="margin:0"><span class="material-symbols-outlined">timeline</span> Últimos eventos</h3>
+                    <% if (history.length > 0) { %>
+                        <button type="button" class="btn-secondary" style="padding:.3rem .7rem;font-size:.8rem;" onclick="document.getElementById('history-modal-backdrop').classList.add('open')">
+                            <span class="material-symbols-outlined" style="font-size:1rem;">history</span>
+                            Ver historial completo
+                            <% if (history.length > 3) { %><span style="opacity:.65;">(+<%= history.length - 3 %>)</span><% } %>
+                        </button>
+                    <% } %>
+                </div>
                 <% if (history.length === 0) { %>
                     <p class="historial-empty">Sin eventos registrados.</p>
                 <% } else { %>
                     <%
                         const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                         function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
-                        const _refLocation = [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || null;
+                        const _last3 = [...history].reverse().slice(0, 3);
                     %>
                     <ol class="shipment-timeline">
-                        <% history.forEach(function(h) { %>
+                        <% _last3.forEach(function(h, idx) { %>
                             <%
                                 const _isCreated = h.eventType === 'CREATED';
                                 const _tk = _sk2(h.toStatus.description);
                                 const _tl = _sl2[_tk] || h.toStatus.description;
                                 const _icon = _isCreated ? 'add_circle' : 'swap_horiz';
-                                const _author = h.user ? h.user.fullName : null;
                             %>
                             <li class="shipment-timeline-item">
                                 <span class="shipment-timeline-dot <%= _tk %>">
@@ -122,55 +198,18 @@
                                 <div class="shipment-timeline-content">
                                     <div class="shipment-timeline-header">
                                         <span class="status-badge status-badge--sm <%= _tk %>"><%= _tl %></span>
-                                        <% if (_isCreated) { %>
-                                            <span class="shipment-timeline-tag">Creación del envío</span>
-                                        <% } else if (h.fromStatus) { %>
-                                            <%
-                                                const _fk = _sk2(h.fromStatus.description);
-                                                const _fl = _sl2[_fk] || h.fromStatus.description;
-                                            %>
-                                            <span class="shipment-timeline-tag">Desde <%= _fl %></span>
+                                        <% if (idx === 0) { %>
+                                            <span class="shipment-timeline-tag" style="background:rgba(37,99,235,.1);color:#2563eb;">Actual</span>
+                                        <% } else if (_isCreated) { %>
+                                            <span class="shipment-timeline-tag">Creación</span>
                                         <% } %>
                                     </div>
                                     <div class="shipment-timeline-meta">
                                         <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
                                         <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
                                         <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        <% if (h.user) { %>&nbsp;·&nbsp;<%= h.user.fullName %><% } %>
                                     </div>
-                                    <% if (_author) { %>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">person</span>
-                                            <%= _author %>
-                                        </div>
-                                    <% } %>
-                                    <% if (h.branch) { %>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
-                                            <%= h.branch.name.toUpperCase().startsWith('SUCURSAL') ? h.branch.name.toUpperCase() : 'SUCURSAL ' + h.branch.name.toUpperCase() %>
-                                        </div>
-                                    <% } else if (_isCreated) { %>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
-                                            <%= mapData.origin.label.toUpperCase() %>
-                                        </div>
-                                    <% } else if (_refLocation) { %>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">location_on</span>
-                                            <%= _refLocation.toUpperCase() %>
-                                        </div>
-                                    <% } %>
-                                    <% if (h.latitude != null && h.longitude != null) { %>
-                                        <div class="shipment-timeline-meta">
-                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">my_location</span>
-                                            <%= Number(h.latitude).toFixed(5) %>, <%= Number(h.longitude).toFixed(5) %>
-                                            <% if (_hasMap) { %>
-                                                <a href="#shipment-map" class="timeline-map-link" data-lat="<%= h.latitude %>" data-lng="<%= h.longitude %>" style="margin-left:.5rem;">Ver en mapa</a>
-                                            <% } %>
-                                        </div>
-                                    <% } %>
-                                    <% if (h.comment) { %>
-                                        <div class="shipment-timeline-comment">"<%= h.comment %>"</div>
-                                    <% } %>
                                 </div>
                             </li>
                         <% }) %>
@@ -520,6 +559,94 @@
         </div>
     </main>
 
+    <!-- ── Modal historial ── -->
+    <div id="history-modal-backdrop" class="history-modal-backdrop" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="history-modal" role="dialog" aria-modal="true" aria-label="Historial del envío">
+            <div class="history-modal-header">
+                <h2>
+                    <span class="material-symbols-outlined">timeline</span>
+                    Historial del envío
+                </h2>
+                <button type="button" class="history-modal-close" onclick="document.getElementById('history-modal-backdrop').classList.remove('open')" aria-label="Cerrar">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="history-modal-body">
+                <div class="history-modal-meta">
+                    <%= shipment.trackingId %> &nbsp;·&nbsp; <%= history.length %> evento<%= history.length !== 1 ? 's' : '' %> &nbsp;·&nbsp; más reciente primero
+                </div>
+
+                <%
+                    const _histDesc = [...history].reverse();
+                    const _sl3 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
+                    function _sk3(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
+                    function _sl3L(desc) { const k = _sk3(desc); return _sl3[k] || desc; }
+                %>
+
+                <% if (_histDesc.length === 0) { %>
+                    <div style="text-align:center;padding:2rem;color:var(--color-text-secondary);">
+                        <span class="material-symbols-outlined" style="font-size:2.5rem;display:block;margin-bottom:.5rem">inbox</span>
+                        Sin eventos registrados.
+                    </div>
+                <% } else { %>
+                    <ol class="shipment-timeline">
+                        <% _histDesc.forEach(function(h, idx) { %>
+                            <%
+                                const _isCreated = h.eventType === 'CREATED';
+                                const _tk3 = _sk3(h.toStatus.description);
+                                const _icon3 = _isCreated ? 'add_circle' : 'swap_horiz';
+                                const _author3 = h.user ? h.user.fullName : null;
+                            %>
+                            <li class="shipment-timeline-item">
+                                <span class="shipment-timeline-dot <%= _tk3 %>">
+                                    <span class="material-symbols-outlined"><%= _icon3 %></span>
+                                </span>
+                                <div class="shipment-timeline-content">
+                                    <div class="shipment-timeline-header">
+                                        <span class="status-badge status-badge--sm <%= _tk3 %>"><%= _sl3L(h.toStatus.description) %></span>
+                                        <% if (idx === 0) { %>
+                                            <span class="shipment-timeline-tag" style="background:rgba(37,99,235,.1);color:#2563eb;">Más reciente</span>
+                                        <% } else if (_isCreated) { %>
+                                            <span class="shipment-timeline-tag">Creación</span>
+                                        <% } else if (h.fromStatus) { %>
+                                            <span class="shipment-timeline-tag">Desde <%= _sl3L(h.fromStatus.description) %></span>
+                                        <% } %>
+                                    </div>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
+                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
+                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                    </div>
+                                    <% if (_author3) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">person</span>
+                                            <%= _author3 %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.branch) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">store</span>
+                                            <%= h.branch.name.toUpperCase().startsWith('SUCURSAL') ? h.branch.name.toUpperCase() : 'SUCURSAL ' + h.branch.name.toUpperCase() %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.latitude != null && h.longitude != null) { %>
+                                        <div class="shipment-timeline-meta">
+                                            <span class="material-symbols-outlined shipment-timeline-meta-ico">my_location</span>
+                                            <%= Number(h.latitude).toFixed(5) %>, <%= Number(h.longitude).toFixed(5) %>
+                                        </div>
+                                    <% } %>
+                                    <% if (h.comment) { %>
+                                        <div class="shipment-timeline-comment">"<%= h.comment %>"</div>
+                                    <% } %>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ol>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
@@ -653,6 +780,10 @@
     </script>
     <% } %>
     <script>
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') document.getElementById('history-modal-backdrop').classList.remove('open');
+    });
+
     (function () {
         if (new URLSearchParams(window.location.search).get('created') !== 'true') return;
         const id = '<%= shipment.id %>';

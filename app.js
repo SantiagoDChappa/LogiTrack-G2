@@ -36,6 +36,7 @@ const routeRoutes      = require('./src/routes/route');
 const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
+const reportRoutes     = require('./src/routes/report');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -98,6 +99,7 @@ app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
 app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
 app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
+app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
 
 ;
 app.use('/api/persons',personRoutes);
