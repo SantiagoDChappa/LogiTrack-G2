@@ -4,10 +4,13 @@ const incidentTypeModel    = require('../models/incidentType');
 const incidentHistoryModel = require('../models/incidentHistory');
 const { Incident }         = incidentModel;
 const shipmentModel        = require('../models/shipment');
+const shipmentHistoryModel = require('../models/shipmentHistory');
 const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
+const { sendEmail }        = require('../services/emailSender');
 const {
-    RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType
+    RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
+    ShipmentHistoryEvent, NotificationEvent, Status
 } = require('../constants/enums');
 
 const roleDescriptionById = Object.values(RoleType).reduce((acc, r) => {
@@ -201,10 +204,49 @@ const create = async (req, res) => {
             transaction: t
         });
 
+        await shipmentHistoryModel.create({
+            shipmentId:   shipment.id,
+            fromStatusId: shipment.statusId,
+            toStatusId:   shipment.statusId,
+            eventType:    ShipmentHistoryEvent.INCIDENT_OPENED,
+            comment:      `Incidencia #${created.id} (${type.code}) — ${description.trim().slice(0, 200)}`,
+            userId:       user.id,
+            transaction:  t
+        });
+
         return created;
     });
 
+    notifyIncidentToSupervisors(incident.id, shipment, type, assignee, user)
+        .catch(e => console.error('[incident] notif supervisor:', e.message));
+
+    require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
+        .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
+
     res.redirect(`/incident/${incident.id}`);
+};
+
+const notifyIncidentToSupervisors = async (incidentId, shipment, type, assignee, openedBy) => {
+    const supervisors = await User.findAll({
+        where: {
+            roleId:   RoleType.SUPERVISOR.id,
+            branchId: assignee.branchId,
+            active:   true
+        },
+        attributes: ['id', 'email', 'fullName']
+    });
+    const emails = supervisors.map(s => s.email).filter(Boolean);
+    if (emails.length === 0) { return; }
+
+    const subject = `[LogiTrack] Nueva incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
+    const body =
+        `Se registró una nueva incidencia.\n\n` +
+        `Incidencia: #${incidentId} (${type.code} - ${type.description})\n` +
+        `Envío: ${shipment.trackingId || shipment.id}\n` +
+        `Asignada a: ${assignee.fullName}\n` +
+        `Reportada por: ${openedBy.fullName || openedBy.email || 'usuario interno'}\n\n` +
+        `Acceder al detalle: /incident/${incidentId}`;
+    await sendEmail(emails.join(','), subject, body);
 };
 
 const getDetail = async (req, res) => {
@@ -382,15 +424,27 @@ const escalate = async (req, res) => {
 const close = async (req, res) => {
     const user = res.locals.currentUser;
     const id = Number(req.params.id);
-    const { resolution, comment } = req.body;
+    const { resolution, comment, shipmentAction } = req.body;
 
     if (![IncidentResolution.PROCEDENTE, IncidentResolution.NO_PROCEDENTE].includes(resolution)) {
         return res.status(400).redirect(`/incident/${id}?error=resolution_required`);
     }
+    const VALID_ACTIONS = ['none', 'cancel'];
+    const action = VALID_ACTIONS.includes(shipmentAction) ? shipmentAction : 'none';
+    if (action !== 'none' && resolution !== IncidentResolution.PROCEDENTE) {
+        return res.status(400).redirect(`/incident/${id}?error=action_requires_procedente`);
+    }
+
     const incident = await Incident.findByPk(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (incident.status === IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=already_closed`);
+    }
+
+    const shipment = await shipmentModel.getById(incident.shipmentId);
+    const TERMINAL = [Status.DELIVERED.id, Status.CANCELLED.id];
+    if (action === 'cancel' && shipment && TERMINAL.includes(shipment.statusId)) {
+        return res.status(400).redirect(`/incident/${id}?error=shipment_already_terminal`);
     }
 
     const from = incident.status;
@@ -410,7 +464,27 @@ const close = async (req, res) => {
             userId:     user.id,
             transaction: t
         });
+
+        if (action === 'cancel' && shipment) {
+            const prevStatusId = shipment.statusId;
+            await shipmentModel.updateStatus(shipment.id, Status.CANCELLED.id, { transaction: t });
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: prevStatusId,
+                toStatusId:   Status.CANCELLED.id,
+                eventType:    ShipmentHistoryEvent.STATUS_CHANGE,
+                comment:      `Cancelado por resolución de incidencia #${id} (devolución)`,
+                userId:       user.id,
+                transaction:  t
+            });
+        }
     });
+
+    if (action === 'cancel') {
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, incident.shipmentId)
+            .catch(e => console.error('[incident] notif CANCELLED:', e.message));
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
