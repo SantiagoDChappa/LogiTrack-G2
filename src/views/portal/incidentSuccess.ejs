@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Incidencia recibida — LogiTrack</title>
+    <title>Incidencia recibida - LogiTrack</title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/portal.css">
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
 </head>
 <body>
     <nav class="portal-nav">
@@ -17,21 +18,53 @@
             <img src="/images/logo.png" alt="LogiTrack" class="portal-logo">
             <span>LogiTrack</span>
         </a>
+        <div class="portal-nav-right">
+            <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
+                <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
+                <span id="theme-label">Modo claro</span>
+            </button>
+            <a href="/" class="portal-nav-login">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Volver al portal
+            </a>
+        </div>
     </nav>
 
     <section class="portal-incident-section">
         <div class="portal-incident-wrapper portal-incident-success">
-            <span class="material-symbols-outlined portal-incident-success-icon">check_circle</span>
-            <h1>Incidencia registrada</h1>
-            <% if (incidentId) { %>
-                <p>Tu incidencia fue registrada con el número <strong>#<%= incidentId %></strong>.</p>
-            <% } %>
-            <% if (trackingId) { %>
-                <p>Envío asociado: <strong><%= trackingId %></strong></p>
-            <% } %>
-            <p>Un supervisor la revisará a la brevedad. Guardá el número de incidencia para futuras consultas.</p>
-            <a href="/" class="btn-primary">Volver al portal</a>
+            <div class="portal-incident-success-body">
+                <span class="portal-incident-eyebrow">Solicitud recibida</span>
+                <span class="material-symbols-outlined portal-incident-success-icon">check_circle</span>
+                <h1>Incidencia registrada</h1>
+
+                <% if (incidentId) { %>
+                    <p class="portal-incident-success-lead">Tu incidencia fue registrada correctamente en el sistema.</p>
+                <% } else { %>
+                    <p class="portal-incident-success-lead">Tu incidencia fue registrada correctamente.</p>
+                <% } %>
+
+                <% if (incidentId || trackingId) { %>
+                    <div class="portal-incident-success-meta">
+                        <% if (incidentId) { %>
+                            <div class="portal-incident-success-pill">
+                                <span>Numero de incidencia</span>
+                                <strong>#<%= incidentId %></strong>
+                            </div>
+                        <% } %>
+                        <% if (trackingId) { %>
+                            <div class="portal-incident-success-pill">
+                                <span>Envio asociado</span>
+                                <strong><%= trackingId %></strong>
+                            </div>
+                        <% } %>
+                    </div>
+                <% } %>
+
+                <p class="portal-incident-success-copy">Un supervisor la revisara a la brevedad. Guarda el numero de incidencia para futuras consultas.</p>
+                <a href="/" class="btn-primary">Volver al portal</a>
+            </div>
         </div>
     </section>
+    <script src="/js/theme.js" defer></script>
 </body>
 </html>

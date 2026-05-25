@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reportar incidencia — LogiTrack</title>
+    <title>Reportar una incidencia - LogiTrack</title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -19,6 +19,10 @@
             <span>LogiTrack</span>
         </a>
         <div class="portal-nav-right">
+            <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
+                <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
+                <span id="theme-label">Modo claro</span>
+            </button>
             <a href="/" class="portal-nav-login">
                 <span class="material-symbols-outlined">arrow_back</span>
                 Volver al portal
@@ -27,73 +31,134 @@
     </nav>
 
     <section class="portal-incident-section">
-        <div class="portal-incident-wrapper">
-            <h1>Reportar una incidencia</h1>
-            <p class="portal-incident-help">
-                Si el envío sufrió demoras, daños o cualquier otro inconveniente, podés abrir una incidencia.
-                Un supervisor la revisará y le dará seguimiento.
-            </p>
-
-            <% if (error) { %>
-                <div class="alert alert-error"><%= error %></div>
-            <% } %>
-
-            <form method="POST" action="/portal/incident" class="portal-incident-form">
-                <div class="form-group">
-                    <label for="trackingId">Número de seguimiento</label>
-                    <input type="text" id="trackingId" name="trackingId"
-                           value="<%= form.trackingId || trackingId || '' %>"
-                           placeholder="Ej: ENV-001" required>
+        <div class="portal-incident-layout portal-incident-layout--single">
+            <div class="portal-incident-wrapper">
+                <div class="portal-incident-card-head">
+                    <span class="portal-incident-eyebrow">Centro de soporte</span>
+                    <h1>Reportar una incidencia</h1>
+                    <p>Complete la informacion del envio, el tipo de problema y sus datos para que podamos darle seguimiento.</p>
                 </div>
 
-                <% if (shipment) { %>
-                    <div class="portal-incident-shipment">
-                        <strong>Envío encontrado:</strong> <%= shipment.trackingId %><br>
-                        Destinatario: <%= shipment.recipient ? shipment.recipient.fullName : '—' %>
-                    </div>
+                <% if (error) { %>
+                    <div class="alert alert-error"><%= error %></div>
                 <% } %>
 
-                <div class="form-group">
-                    <label for="incidentTypeId">Tipo de incidencia</label>
-                    <select id="incidentTypeId" name="incidentTypeId" required>
-                        <option value="">Seleccione un tipo...</option>
-                        <% types.forEach(t => { %>
-                            <option value="<%= t.id %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
-                        <% }) %>
-                    </select>
-                </div>
+                <form method="POST" action="/portal/incident" class="portal-incident-form">
+                    <section class="portal-incident-block">
+                        <% const currentTrackingId = String(form.trackingId || trackingId || (shipment ? shipment.trackingId : '') || '').trim(); %>
+                        <% const trackingLocked = Boolean(currentTrackingId); %>
+                        <div class="portal-incident-block-header">
+                            <div class="portal-incident-block-icon">
+                                <span class="material-symbols-outlined">inventory_2</span>
+                            </div>
+                            <div>
+                                <h3>Informacion del envio</h3>
+                                <p>Ingrese el codigo de seguimiento del paquete sobre el que desea reportar la incidencia.</p>
+                            </div>
+                        </div>
 
-                <div class="form-group">
-                    <label for="description">Descripción del problema</label>
-                    <textarea id="description" name="description" rows="5" maxlength="2000" required><%= form.description || '' %></textarea>
-                </div>
+                        <div class="portal-incident-fields">
+                            <div class="form-group">
+                                <label for="trackingId">Numero de seguimiento</label>
+                                <input type="text" id="trackingId" name="trackingId"
+                                       value="<%= currentTrackingId %>"
+                                       placeholder="Ej: ENV-001" <%= trackingLocked ? 'readonly aria-readonly=\"true\"' : '' %> required>
+                                <small><%= trackingLocked ? 'Este dato corresponde al envio seleccionado y no puede modificarse.' : 'Si llegaste desde el portal de seguimiento, este dato ya queda precargado.' %></small>
+                            </div>
+                        </div>
 
-                <fieldset class="portal-incident-reporter">
-                    <legend>Sus datos</legend>
-                    <div class="form-group">
-                        <label for="reporterName">Nombre y apellido</label>
-                        <input type="text" id="reporterName" name="reporterName"
-                               value="<%= form.reporterName || '' %>" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="reporterEmail">Email (opcional)</label>
-                        <input type="email" id="reporterEmail" name="reporterEmail"
-                               value="<%= form.reporterEmail || '' %>">
-                    </div>
-                    <div class="form-group">
-                        <label for="reporterDocument">DNI (opcional)</label>
-                        <input type="text" id="reporterDocument" name="reporterDocument"
-                               value="<%= form.reporterDocument || '' %>"
-                               placeholder="Si coincide con remitente/destinatario, se vincula automáticamente">
-                    </div>
-                </fieldset>
+                        <% if (shipment) { %>
+                            <div class="portal-incident-shipment">
+                                <span class="material-symbols-outlined portal-incident-shipment-icon">check_circle</span>
+                                <div class="portal-incident-shipment-body">
+                                    <span class="portal-incident-shipment-label">Envio encontrado</span>
+                                    <strong class="portal-incident-shipment-title"><%= shipment.trackingId %></strong>
+                                    <p>Destinatario: <strong><%= shipment.recipient ? shipment.recipient.fullName : '-' %></strong></p>
+                                </div>
+                            </div>
+                        <% } else { %>
+                            <div class="portal-incident-hint">
+                                <span class="material-symbols-outlined">info</span>
+                                <p>Use el codigo del comprobante o del email de confirmacion para vincular la incidencia al envio correcto.</p>
+                            </div>
+                        <% } %>
+                    </section>
 
-                <div class="form-actions">
-                    <a href="/" class="btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn-primary">Enviar incidencia</button>
-                </div>
-            </form>
+                    <section class="portal-incident-block">
+                        <div class="portal-incident-block-header">
+                            <div class="portal-incident-block-icon">
+                                <span class="material-symbols-outlined">report_problem</span>
+                            </div>
+                            <div>
+                                <h3>Detalle de la incidencia</h3>
+                                <p>Seleccione el tipo de problema y describa que ocurrio con el mayor detalle posible.</p>
+                            </div>
+                        </div>
+
+                        <div class="portal-incident-fields">
+                            <div class="form-group">
+                                <label for="incidentTypeId">Tipo de incidencia</label>
+                                <select id="incidentTypeId" name="incidentTypeId" required>
+                                    <option value="">Seleccione un tipo...</option>
+                                    <% types.forEach(t => { %>
+                                        <option value="<%= t.id %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description">Descripcion del problema</label>
+                                <textarea id="description" name="description" rows="5" maxlength="2000" required placeholder="Ej: el envio llego con demora, el paquete estaba danado o la direccion no fue encontrada."><%= form.description || '' %></textarea>
+                                <small>Puede incluir fechas, observaciones y cualquier dato util para la revision.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="portal-incident-block portal-incident-reporter">
+                        <div class="portal-incident-block-header">
+                            <div class="portal-incident-block-icon">
+                                <span class="material-symbols-outlined">badge</span>
+                            </div>
+                            <div>
+                                <h3>Sus datos</h3>
+                                <p>Estos datos nos ayudan a contactarlo y a validar si el reclamo corresponde al remitente o destinatario.</p>
+                            </div>
+                        </div>
+
+                        <div class="portal-incident-fields portal-incident-fields--two">
+                            <div class="form-group">
+                                <label for="reporterName">Nombre y apellido</label>
+                                <input type="text" id="reporterName" name="reporterName"
+                                       value="<%= form.reporterName || '' %>" placeholder="Ej: Juan Perez" autocomplete="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="reporterEmail">Email (opcional)</label>
+                                <input type="email" id="reporterEmail" name="reporterEmail"
+                                       value="<%= form.reporterEmail || '' %>" placeholder="ejemplo@correo.com" autocomplete="email">
+                            </div>
+                            <div class="form-group portal-incident-field--full">
+                                <label for="reporterDocument">DNI (opcional)</label>
+                                <input type="text" id="reporterDocument" name="reporterDocument"
+                                       value="<%= form.reporterDocument || '' %>"
+                                       placeholder="Si coincide con remitente o destinatario, se vincula automaticamente">
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="form-actions">
+                        <p class="portal-incident-actions-help">
+                            <span class="material-symbols-outlined">shield</span>
+                            El reclamo se registrara en el sistema para revision del equipo de soporte.
+                        </p>
+                        <div class="portal-incident-actions-buttons">
+                            <a href="/" class="btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn-primary">Enviar incidencia</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </section>
+    <script src="/js/theme.js" defer></script>
 </body>
 </html>
