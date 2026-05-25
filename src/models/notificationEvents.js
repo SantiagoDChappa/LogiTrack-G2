@@ -8,7 +8,7 @@ const NotificationEvent = sequelize.define('notificationEvent', {
         primaryKey: true,
         autoIncrement: true,
     },
-    code:        { type: DataTypes.ENUM(...Object.values(NotificationEventCodes)) },
+    code:        { type: DataTypes.STRING(60) },
     description: { type: DataTypes.STRING },
 },
 { tableName: 'notification_events' });

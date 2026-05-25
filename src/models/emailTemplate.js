@@ -9,9 +9,8 @@ const EmailTemplate = sequelize.define('emailTemplate', {
         autoIncrement: true,
     },
     eventCode: {
-        type: DataTypes.ENUM(...Object.values(NotificationEvent)),
+        type: DataTypes.STRING(60),
         allowNull: false,
-
     },
     subject: {
         type: DataTypes.STRING,
@@ -28,6 +27,19 @@ const EmailTemplate = sequelize.define('emailTemplate', {
 
 const getTemplateByEventCode = async (eventCode) => {
     return await EmailTemplate.findOne({ where: { eventCode } });
-}
+};
 
-module.exports = { EmailTemplate, getTemplateByEventCode };
+const getAll = async () => {
+    return EmailTemplate.findAll({ order: [['id', 'ASC']] });
+};
+
+const updateTemplate = async (eventCode, { subject, body }) => {
+    const tpl = await EmailTemplate.findOne({ where: { eventCode } });
+    if (!tpl) { return null; }
+    if (subject !== undefined) { tpl.subject = subject; }
+    if (body    !== undefined) { tpl.body    = body;    }
+    await tpl.save();
+    return tpl;
+};
+
+module.exports = { EmailTemplate, getTemplateByEventCode, getAll, updateTemplate };
