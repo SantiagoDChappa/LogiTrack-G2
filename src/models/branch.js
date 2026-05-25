@@ -12,9 +12,16 @@ const Branch = sequelize.define('branch', {
     phone:      { type: DataTypes.STRING(20),  allowNull: true  },
     statusId:   { type: DataTypes.INTEGER,     allowNull: false, defaultValue: 1, field: 'status_id' },
     closed:     { type: DataTypes.BOOLEAN,     allowNull: false, defaultValue: false },
+    pickupEnabled: { type: DataTypes.BOOLEAN,  allowNull: false, defaultValue: true, field: 'pickup_enabled' },
 }, { tableName: 'branch', timestamps: false });
 
 const getAll  = ()   => Branch.findAll({ order: [['name', 'ASC']] });
 const getById = (id) => Branch.findByPk(id);
 
-module.exports = { Branch, getAll, getById };
+const getPickupEnabled = ({ provinceId } = {}) => {
+    const where = { pickupEnabled: true, closed: false };
+    if (provinceId) { where.provinceId = Number(provinceId); }
+    return Branch.findAll({ where, order: [['name', 'ASC']] });
+};
+
+module.exports = { Branch, getAll, getById, getPickupEnabled };

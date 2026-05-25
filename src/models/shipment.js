@@ -33,6 +33,12 @@ const Shipment = sequelize.define('shipment', {
     refrigerated:         { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'refrigerated' },
     oversized:            { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'oversized' },
     estimatedMinutes:     { type: DataTypes.INTEGER,        allowNull: false, defaultValue: 5,     field: 'estimated_minutes' },
+    deliveryMode:         { type: DataTypes.STRING(20),     allowNull: false, defaultValue: 'home', field: 'delivery_mode' },
+    pickupBranchId:       { type: DataTypes.INTEGER,        allowNull: true,  field: 'pickup_branch_id' },
+    // Sprint 3 - 4.1 Código clave de entrega
+    deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
+    // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
+    portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -44,15 +50,18 @@ const getAll = () => {
     const { TypeShipment } = require('./typeShipment');
     const { User } = require('./user');
     
-    return Shipment.findAll({ 
+    const { Branch } = require('./branch');
+
+    return Shipment.findAll({
         include: [
             { model: Person, as: 'sender' },
             { model: Person, as: 'recipient' },
             { model: Status, as: 'status' },
-            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
-            { model: User, as: 'deliveryUser', required: false }
-        ] 
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'pickupBranch', required: false }
+        ]
     });
 };
 
@@ -72,10 +81,11 @@ const getById = (id) => {
             { model: Person, as: 'sender' },
             { model: Person, as: 'recipient' },
             { model: Status, as: 'status' },
-            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
             { model: User, as: 'deliveryUser', required: false },
             { model: Branch, as: 'currentBranch', required: false },
+            { model: Branch, as: 'pickupBranch',  required: false },
             { model: Zone, as: 'zone', required: false }
         ]
     });
@@ -93,12 +103,17 @@ const generateTrackingId = async (prefix = 'ENV') => {
 
 const create = async (data) => {
     const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
+    const { generateSecretCode, generatePortalToken } = require('../utils/shipmentTokens');
     return Shipment.create({
         trackingId,
+        deliverySecretCode: data.deliverySecretCode || generateSecretCode(),
+        portalToken:        data.portalToken        || generatePortalToken(),
         statusId:         data.statusId || 1,
         senderId:         data.senderId,
         recipientId:      data.recipientId,
         addressId:        data.addressId,
+        deliveryMode:     data.deliveryMode    || 'home',
+        pickupBranchId:   data.pickupBranchId  || null,
         shipmentTypeId:   data.shipmentTypeId || null,
         weightKg:         data.weightKg       || null,
         volumeM3:         data.volumeM3        || null,
@@ -273,15 +288,17 @@ const getByTrackingId = (trackingId) => {
     const { TypeShipment } = require('./typeShipment');
     const { User }         = require('./user');
 
+    const { Branch } = require('./branch');
     return Shipment.findOne({
         where: { trackingId },
         include: [
             { model: Person, as: 'sender' },
             { model: Person, as: 'recipient' },
             { model: Status, as: 'status' },
-            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
-            { model: User, as: 'deliveryUser', required: false }
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'pickupBranch', required: false }
         ]
     });
 };

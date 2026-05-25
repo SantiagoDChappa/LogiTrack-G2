@@ -57,12 +57,25 @@ const validateShipment = [
             return true;
         }),
 
+    body('deliveryMode')
+        .optional({ checkFalsy: true })
+        .isIn(['home', 'branch_pickup']).withMessage('Modalidad de entrega inválida'),
+    body('pickupBranchId')
+        .if((value, { req }) => req.body.deliveryMode === 'branch_pickup')
+        .notEmpty().withMessage('Debe seleccionar una sucursal de retiro')
+        .bail()
+        .isInt({ min: 1 }).withMessage('Sucursal de retiro inválida'),
     body('street')
+        .if((value, { req }) => req.body.deliveryMode !== 'branch_pickup')
         .notEmpty().withMessage('La calle es obligatoria')
         .bail()
         .isLength({ max: 200 }).withMessage('La calle no puede superar 200 caracteres'),
-    body('number').isInt({ min: 1 }).withMessage('La numeración debe ser un número positivo'),
-    body('province').isInt().withMessage('Provincia inválida'),
+    body('number')
+        .if((value, { req }) => req.body.deliveryMode !== 'branch_pickup')
+        .isInt({ min: 1 }).withMessage('La numeración debe ser un número positivo'),
+    body('province')
+        .if((value, { req }) => req.body.deliveryMode !== 'branch_pickup')
+        .isInt().withMessage('Provincia inválida'),
     body('floorApartment')
         .optional({ checkFalsy: true })
         .isLength({ max: 20 }).withMessage('Piso/Depto no puede superar 20 caracteres'),

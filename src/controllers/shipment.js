@@ -40,9 +40,10 @@ const renderStateMachineError = (err, res, redirectUrl) => {
         };
         const status = map[err.code] || 400;
         const qs = `smError=${encodeURIComponent(err.code)}&smMsg=${encodeURIComponent(err.message)}`;
-        return res.status(status).redirect(`${redirectUrl}?${qs}`);
+        res.status(status).redirect(`${redirectUrl}?${qs}`);
+        return true;
     }
-    return null;
+    return false;
 };
 
 const home = async (req, res) => {
@@ -227,28 +228,46 @@ const costClient = await (async () => {
 };
 
 const getNewShipmentForm = async (req, res) => {
-    const provinces = await provinceModel.getAll();
-    const typesShipment = await typeShipmentModel.getAll();
-    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment });
+    const [provinces, typesShipment, pickupBranches] = await Promise.all([
+        provinceModel.getAll(),
+        typeShipmentModel.getAll(),
+        branchModel.getPickupEnabled(),
+    ]);
+    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches });
 };
 
 const createShipment = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const provinces = await provinceModel.getAll();
-        const typesShipment = await typeShipmentModel.getAll();
+        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+            provinceModel.getAll(),
+            typeShipmentModel.getAll(),
+            branchModel.getPickupEnabled(),
+        ]);
         return res.render('shipment/new', {
             errors: errors.array().map(e => e.msg),
             body: req.body,
             provinces,
-            typesShipment
+            typesShipment,
+            pickupBranches
         });
     }
 
     try {
         const body = req.body;
+        const deliveryMode = body.deliveryMode === 'branch_pickup' ? 'branch_pickup' : 'home';
+        const isPickup = deliveryMode === 'branch_pickup';
+
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+
+        let pickupBranch = null;
+        if (isPickup) {
+            if (!body.pickupBranchId) { throw new Error('Debe seleccionar una sucursal de retiro'); }
+            pickupBranch = await branchModel.getById(Number(body.pickupBranchId));
+            if (!pickupBranch) { throw new Error('Sucursal de retiro no encontrada'); }
+            if (!pickupBranch.pickupEnabled) { throw new Error('La sucursal seleccionada no está habilitada para retiro'); }
+        }
 
         // Validar contra parámetros configurables del sistema
         const settings = await settingModel.getAll();
@@ -262,7 +281,7 @@ const createShipment = async (req, res) => {
             throw new Error(`La cantidad de paquetes no puede superar ${cantMaxima} (configurado en Ajustes)`);
         }
 
-        if (body.addressLat && body.addressLng && body.province) {
+        if (!isPickup && body.addressLat && body.addressLng && body.province) {
             const { isCoordInProvince, findProvinceByCoord } = require('../utils/provinceBbox');
             const lat = parseFloat(body.addressLat);
             const lng = parseFloat(body.addressLng);
@@ -275,13 +294,13 @@ const createShipment = async (req, res) => {
         }
 
         const { normalizePostalCode } = require('../utils/postalCode');
-        if (body.postalCode && body.province) {
+        if (!isPickup && body.postalCode && body.province) {
             const norm = normalizePostalCode(body.postalCode, body.province);
             if (!norm.ok) { throw new Error(norm.reason); }
             body.postalCode = norm.value;
         }
 
-        if (body.skipDuplicateCheck !== 'true') {
+        if (!isPickup && body.skipDuplicateCheck !== 'true') {
             const dup = await shipmentModel.findPotentialDuplicate({
                 senderDocument:    body.senderDocument,
                 recipientDocument: body.recipientDocument,
@@ -309,8 +328,17 @@ const createShipment = async (req, res) => {
             email: body.recipientEmail
         });
 
-        const [address, creatorCoordsForCreate] = await Promise.all([
-            addressModel.create({
+        const addressPayload = isPickup
+            ? {
+                street:         pickupBranch.address || pickupBranch.name,
+                number:         0,
+                provinceId:     pickupBranch.provinceId,
+                postalCode:     pickupBranch.postalCode,
+                floorApartment: null,
+                lat:            pickupBranch.latitude  ? Number(pickupBranch.latitude)  : null,
+                lng:            pickupBranch.longitude ? Number(pickupBranch.longitude) : null,
+            }
+            : {
                 street:         body.street,
                 number:         body.number,
                 provinceId:     body.province,
@@ -318,17 +346,20 @@ const createShipment = async (req, res) => {
                 floorApartment: body.floorApartment,
                 lat:            body.addressLat ? parseFloat(body.addressLat) : null,
                 lng:            body.addressLng ? parseFloat(body.addressLng) : null,
-            }),
+            };
+
+        const [address, creatorCoordsForCreate] = await Promise.all([
+            addressModel.create(addressPayload),
             resolveUserBranchCoords(res.locals.currentUser?.id),
         ]);
+
+        const destLatForPriority = isPickup ? Number(pickupBranch.latitude)  : (body.addressLat ? parseFloat(body.addressLat) : null);
+        const destLngForPriority = isPickup ? Number(pickupBranch.longitude) : (body.addressLng ? parseFloat(body.addressLng) : null);
 
         const initialPriority = calInitialPriority({
             weight: body.weightKg || null,
             type:   body.shipmentTypeId || null,
-            destinationUbication: {
-                lat: body.addressLat ? parseFloat(body.addressLat) : null,
-                lng: body.addressLng ? parseFloat(body.addressLng) : null,
-            },
+            destinationUbication: { lat: destLatForPriority, lng: destLngForPriority },
             originUbication: {
                 lat: res.locals.currentUser?.branch?.latitude,
                 lng: res.locals.currentUser?.branch?.longitude,
@@ -336,8 +367,8 @@ const createShipment = async (req, res) => {
         });
 
         const resolvedZone = await resolveZone({
-            postalCode: body.postalCode,
-            provinceId: body.province,
+            postalCode: isPickup ? pickupBranch.postalCode : body.postalCode,
+            provinceId: isPickup ? pickupBranch.provinceId : body.province,
         });
 
         const normalizeTime = (t) => {
@@ -351,6 +382,8 @@ const createShipment = async (req, res) => {
             senderId:        sender.id,
             recipientId:     recipient.id,
             addressId:       address.id,
+            deliveryMode:    deliveryMode,
+            pickupBranchId:  isPickup ? pickupBranch.id : null,
             shipmentTypeId:  body.shipmentTypeId || null,
             weightKg:        body.weightKg       || null,
             packageQty:      body.packageQty     || null,
@@ -377,30 +410,23 @@ const createShipment = async (req, res) => {
         });
 
 
-        const notificationConfig = await notificationConfigModel.isNotificationEnabled(NotificationEvent.SHIPMENT_PENDING); // 1 = SHIPMENT_PENDING
-
-        if (notificationConfig) {
-            const template = await emailTemplateModel.getTemplateByEventCode(NotificationEvent.SHIPMENT_PENDING);
-
-            if (template) {
-                const to = recipient.email;
-                const subject = template.subject;
-                const body = template.body.replace('{{fullName}}', recipient.fullName)
-                        .replace('{{trackingCode}}', shipment.id);
-                await sendEmail(to, subject, body);
-            }
-        }
+        const freshShipment = await shipmentModel.getById(shipment.id);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
 
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
-        const provinces = await provinceModel.getAll();
-        const typesShipment = await typeShipmentModel.getAll();
+        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+            provinceModel.getAll(),
+            typeShipmentModel.getAll(),
+            branchModel.getPickupEnabled(),
+        ]);
         res.render('shipment/new', {
             errors: [err.message],
             body: req.body,
             provinces,
-            typesShipment
+            typesShipment,
+            pickupBranches
         });
     }
 };
@@ -614,14 +640,8 @@ const updateShipmentStatus = async (req, res) => {
         await shipmentModel.updateStatus(id, Number(newStatusId));
 
         const eventCode = await notificationEventModel.getEventCodeByShipmentStatus(Number(newStatusId));
-        const recipient = await personModel.findById(shipment.recipientId);
-        const data = {
-            recipientEmail: recipient.email,
-            shipmentTrackingCode: shipment.trackingId,
-            recipientFullName: recipient.fullName
-        };
-
-        await notifyRecipient(NotificationEvent.SHIPMENT_ASSIGNED, data);
+        const freshShipment = await shipmentModel.getById(id);
+        await notifyShipmentEvent(eventCode || NotificationEvent.SHIPMENT_ASSIGNED, freshShipment);
 
         if (Number(newStatusId) === 4) {
             try {
@@ -662,14 +682,7 @@ const assignDelivery = async (req, res) => {
         });
 
         const shipment = await shipmentModel.getById(id);
-        const recipient = await personModel.findById(shipment.recipientId);
-        const data = {
-            recipientEmail: recipient.email,
-            shipmentTrackingCode: shipment.trackingId,
-            recipientFullName: recipient.fullName
-        };
-
-        await notifyRecipient(NotificationEvent.SHIPMENT_ASSIGNED, data);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_ASSIGNED, shipment);
 
         res.redirect(`/shipment/update/${id}?success=3`);
     } catch (err) {
@@ -696,14 +709,7 @@ const prepareShipment = async (req, res) => {
         });
 
         const shipment = await shipmentModel.getById(id);
-        const recipient = await personModel.findById(shipment.recipientId);
-        const data = {
-            recipientEmail: recipient.email,
-            shipmentTrackingCode: shipment.trackingId,
-            recipientFullName: recipient.fullName
-        };
-
-        await notifyRecipient(NotificationEvent.SHIPMENT_IN_PREPARATION, data);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_IN_PREPARATION, shipment);
 
         res.redirect(`/shipment/update/${id}?success=4`);
     } catch (err) {
@@ -732,14 +738,7 @@ const cancelShipment = async (req, res) => {
         });
 
         const shipment = await shipmentModel.getById(id);
-        const recipient = await personModel.findById(shipment.recipientId);
-        const data = {
-            recipientEmail: recipient.email,
-            shipmentTrackingCode: shipment.trackingId,
-            recipientFullName: recipient.fullName
-        };
-
-        await notifyRecipient(NotificationEvent.SHIPMENT_CANCELLED, data);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipment);
 
         res.redirect(`/shipment/update/${id}?success=5`);
     } catch (err) {
@@ -768,14 +767,7 @@ const markPackageFailed = async (req, res) => {
         });
 
         const shipment = await shipmentModel.getById(id);
-        const recipient = await personModel.findById(shipment.recipientId);
-        const data = {
-            recipientEmail: recipient.email,
-            shipmentTrackingCode: shipment.trackingId,
-            recipientFullName: recipient.fullName
-        };
-
-        await notifyRecipient(NotificationEvent.SHIPMENT_PACKAGE_FAILED, data);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_PACKAGE_FAILED, shipment);
 
         res.redirect(`/shipment/update/${id}?success=6`);
     } catch (err) {
@@ -969,18 +961,63 @@ function calculateDistance(destinationUbication, originUbication) {
     return R * c;
 }
 
-async function notifyRecipient(eventCode, data) {
-    const isEventActive = await notificationConfigModel.isNotificationEnabled(eventCode);
-    if(isEventActive) {
+async function resolveShipmentForNotification(shipmentOrId) {
+    if (shipmentOrId && typeof shipmentOrId === 'object' && shipmentOrId.sender && shipmentOrId.recipient) {
+        return shipmentOrId;
+    }
+    const id = typeof shipmentOrId === 'object' ? shipmentOrId.id : shipmentOrId;
+    return shipmentModel.getById(id);
+}
+
+async function notifyShipmentEvent(eventCode, shipmentOrId) {
+    try {
+        const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
+        if (!cfg || !cfg.enabled) { return; }
+
         const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
-        if(template) {
-            const to = data.recipientEmail;
-            const subject = template.subject;
-            const body = template.body.replace("{{trackingCode}}", data.shipmentTrackingCode).replace("{{fullName}}", data.recipientFullName);
-            await sendEmail(to, subject, body);
+        if (!template) { return; }
+
+        const shipment = await resolveShipmentForNotification(shipmentOrId);
+        if (!shipment) { return; }
+
+        const mode = cfg.recipientMode || 'recipient';
+        const recipients = [];
+        if ((mode === 'recipient' || mode === 'both') && shipment.recipient?.email) { recipients.push(shipment.recipient.email); }
+        if ((mode === 'sender'    || mode === 'both') && shipment.sender?.email)    { recipients.push(shipment.sender.email);    }
+        if (mode === 'custom' && cfg.customEmail)                                   { recipients.push(cfg.customEmail);           }
+
+        if (recipients.length === 0) {
+            console.warn(`notifyShipmentEvent: ${eventCode} sin destinatarios (mode=${mode})`);
+            return;
         }
-    } 
-};
+
+        const fullName = shipment.recipient?.fullName || '';
+        const trackingCode = shipment.trackingId || '';
+        const fill = (s) => String(s || '')
+            .replace(/\{\{fullName\}\}/g,     fullName)
+            .replace(/\{\{trackingCode\}\}/g, trackingCode);
+
+        await sendEmail(recipients.join(','), fill(template.subject), fill(template.body));
+    } catch (err) {
+        console.error('notifyShipmentEvent error:', err.message);
+    }
+}
+
+// Wrapper legacy — algunos llamadores usaban data={recipientEmail,...}
+async function notifyRecipient(eventCode, dataOrShipment) {
+    if (dataOrShipment && (dataOrShipment.sender || dataOrShipment.recipient || dataOrShipment.id)) {
+        return notifyShipmentEvent(eventCode, dataOrShipment);
+    }
+    // Compatibilidad mínima: si solo viene email suelto, mandar usando template sin recipient_mode
+    const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
+    if (!cfg || !cfg.enabled) { return; }
+    const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
+    if (!template || !dataOrShipment?.recipientEmail) { return; }
+    const fill = (s) => String(s || '')
+        .replace(/\{\{fullName\}\}/g,     dataOrShipment.recipientFullName || '')
+        .replace(/\{\{trackingCode\}\}/g, dataOrShipment.shipmentTrackingCode || '');
+    await sendEmail(dataOrShipment.recipientEmail, fill(template.subject), fill(template.body));
+}
 
 const importPreviews = new Map();
 const importReports  = new Map();
@@ -1103,4 +1140,4 @@ const exportShipments = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority };
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority, notifyShipmentEvent };

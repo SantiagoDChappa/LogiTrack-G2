@@ -47,6 +47,7 @@
         }
     </style>
     <link rel="stylesheet" href="/css/shipments-restyle.css">
+    <link rel="stylesheet" href="/css/shipment-detail.css">
     <title>Detalle de Envío - LogiTrack</title>
 </head>
 
@@ -409,6 +410,31 @@
                 </div>
 
                 <div class="update-card">
+                    <h3>Modalidad de entrega</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Modalidad</span>
+                        <span class="detail-value">
+                            <%= shipment.deliveryMode === 'branch_pickup' ? 'Retiro por sucursal' : 'Envío a domicilio' %>
+                        </span>
+                    </div>
+                    <% if (shipment.deliveryMode === 'branch_pickup' && shipment.pickupBranch) { %>
+                        <div class="detail-field">
+                            <span class="detail-label">Sucursal de retiro</span>
+                            <span class="detail-value"><%= shipment.pickupBranch.name %></span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-label">Dirección sucursal</span>
+                            <span class="detail-value"><%= shipment.pickupBranch.address %></span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-label">Teléfono</span>
+                            <span class="detail-value"><%= shipment.pickupBranch.phone || '-' %></span>
+                        </div>
+                    <% } %>
+                </div>
+
+                <% if (shipment.deliveryMode !== 'branch_pickup') { %>
+                <div class="update-card">
                     <h3>Dirección de entrega</h3>
                     <div class="detail-field">
                         <span class="detail-label">Calle y número</span>
@@ -422,7 +448,42 @@
                         <span class="detail-label">Código postal</span>
                         <span class="detail-value"><%= shipment.address.postalCode || '-' %></span>
                     </div>
+                    <% /* Sprint 3 - 3.3 comentarios estructurados sobre domicilio */ %>
+                    <% if (shipment.address.ringLabel || shipment.address.floorApt || shipment.address.referencesTxt || shipment.address.porterNote || shipment.address.restrictions) { %>
+                        <div class="detail-field">
+                            <span class="detail-label">Referencias del domicilio</span>
+                            <span class="detail-value">
+                                <% if (shipment.address.ringLabel) { %><br><strong>Timbre:</strong> <%= shipment.address.ringLabel %><% } %>
+                                <% if (shipment.address.floorApt)  { %><br><strong>Piso/Depto:</strong> <%= shipment.address.floorApt %><% } %>
+                                <% if (shipment.address.referencesTxt) { %><br><strong>Cómo llegar:</strong> <%= shipment.address.referencesTxt %><% } %>
+                                <% if (shipment.address.porterNote) { %><br><strong>Portería:</strong> <%= shipment.address.porterNote %><% } %>
+                                <% if (shipment.address.restrictions) { %><br><strong>Restricciones:</strong> <%= shipment.address.restrictions %><% } %>
+                            </span>
+                        </div>
+                    <% } %>
                 </div>
+                <% } %>
+
+                <% /* Sprint 3 - 4.1 código clave y 3.2 link autogestión */ %>
+                <% if (shipment.deliverySecretCode || shipment.portalToken) { %>
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">vpn_key</span> Acceso seguro del destinatario</h3>
+                    <% if (shipment.deliverySecretCode) { %>
+                        <div class="detail-field">
+                            <span class="detail-label">Código clave de entrega</span>
+                            <span class="detail-value" style="font-family:monospace;font-size:1.2rem;letter-spacing:.25em;font-weight:700"><%= shipment.deliverySecretCode %></span>
+                        </div>
+                        <p style="font-size:.8rem;color:#64748b;margin:.25rem 0 .75rem">El destinatario debe presentarlo al recibir el paquete (POD).</p>
+                    <% } %>
+                    <% if (shipment.portalToken) { %>
+                        <div class="detail-field">
+                            <span class="detail-label">Link autogestión</span>
+                            <span class="detail-value" style="font-size:.85rem"><code>/portal/self/<%= shipment.portalToken %></code></span>
+                        </div>
+                        <p style="font-size:.8rem;color:#64748b;margin:.25rem 0">Permite al destinatario cambiar franja horaria y modalidad sin login.</p>
+                    <% } %>
+                </div>
+                <% } %>
 
                 <div class="update-card">
                     <h3>Información del paquete</h3>
