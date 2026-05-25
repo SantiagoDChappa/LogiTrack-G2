@@ -58,7 +58,8 @@ const home = async (req, res) => {
 };
 
 const searchShipments = async (req, res) => {
-    const isAdmin = isAdminUser(res.locals.currentUser);
+    const user = res.locals.currentUser;
+    const isAdmin = isAdminUser(user);
     const { trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, currentBranchId } = req.query;
     const query = {
         trackingId,
