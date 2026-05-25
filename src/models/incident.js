@@ -77,4 +77,9 @@ const countOpenByShipment = (shipmentId) => Incident.count({
     where: { shipmentId, status: ['OPEN', 'IN_REVIEW'] }
 });
 
-module.exports = { Incident, findByIdFull, list, countOpenByShipment };
+const findOpenByShipment = (shipmentId) => Incident.findAll({
+    where: { shipmentId, status: ['OPEN', 'IN_REVIEW'] },
+    attributes: ['id', 'incidentTypeId', 'status']
+});
+
+module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment };

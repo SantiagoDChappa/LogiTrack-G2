@@ -6,6 +6,7 @@ const { Incident }         = incidentModel;
 const shipmentModel        = require('../models/shipment');
 const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
+const incidentRules        = require('../services/incidentRules');
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType
 } = require('../constants/enums');
@@ -168,6 +169,12 @@ const create = async (req, res) => {
     const type = await incidentTypeModel.getById(Number(incidentTypeId));
     if (!type || !type.active) {
         return res.status(400).render('error', { message: 'Tipo de incidencia inválido' });
+    }
+
+    const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
+    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
+    if (eligibilityError) {
+        return renderFormError(eligibilityError);
     }
 
     const incident = await sequelize.transaction(async (t) => {
