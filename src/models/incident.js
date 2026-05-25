@@ -39,8 +39,9 @@ const includesFull = () => {
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, openedChannel, resolution, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, openedChannel, resolution, limit = 200 } = {}) => {
     const where = {};
+    if (id)                { where.id = id; }
     if (status)            { where.status = status; }
     if (typeof escalated === 'boolean') { where.escalated = escalated; }
     if (priority)          { where.priority = priority; }
