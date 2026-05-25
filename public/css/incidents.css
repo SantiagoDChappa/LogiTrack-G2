@@ -79,6 +79,15 @@ html[data-theme="dark"] {
     text-transform: uppercase;
     letter-spacing: .04em;
     color: var(--inc-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.incident-filter-icon {
+    font-size: 1rem !important;
+    line-height: 1;
+    color: var(--inc-muted);
 }
 
 .incident-filter input,

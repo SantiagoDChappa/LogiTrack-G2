@@ -12,7 +12,10 @@
         <div class="page-header">
             <h1>Incidencia #<%= incident.id %></h1>
             <div class="page-header__actions">
-                <a href="/incident" class="btn-secondary">Volver</a>
+                <a href="/incident" class="btn-secondary">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver
+                </a>
             </div>
         </div>
 
@@ -118,7 +121,10 @@
                                 <p class="user-picker__empty">Elegí una sucursal primero.</p>
                             </div>
                         </div>
-                        <button type="submit" class="btn-secondary">Asignar</button>
+                        <button type="submit" class="btn-secondary">
+                            <span class="material-symbols-outlined">person_add</span>
+                            Asignar
+                        </button>
                     </form>
                     <script id="assignable-users-data" type="application/json"><%- JSON.stringify(assignableUsers) %></script>
                     <script>
@@ -199,7 +205,10 @@
                             </select>
                         </label>
                         <input type="text" name="comment" placeholder="Comentario (opcional)">
-                        <button type="submit" class="btn-secondary">Cambiar</button>
+                        <button type="submit" class="btn-secondary">
+                            <span class="material-symbols-outlined">swap_horiz</span>
+                            Cambiar
+                        </button>
                     </form>
                 <% } %>
 
@@ -214,6 +223,7 @@
                             </select>
                         </label>
                         <button type="submit" class="<%= incident.escalated ? 'btn-secondary' : 'btn-warning' %>">
+                            <span class="material-symbols-outlined"><%= incident.escalated ? 'expand_more' : 'priority_high' %></span>
                             <%= incident.escalated ? 'Quitar escalado' : 'Escalar' %>
                         </button>
                     </form>
@@ -247,14 +257,20 @@
                 <% if (flags.canReopen) { %>
                     <form method="POST" action="/incident/<%= incident.id %>/reopen" class="incident-action-form">
                         <input type="text" name="comment" placeholder="Motivo de reapertura">
-                        <button type="submit" class="btn-secondary">Reabrir</button>
+                        <button type="submit" class="btn-secondary">
+                            <span class="material-symbols-outlined">restart_alt</span>
+                            Reabrir
+                        </button>
                     </form>
                 <% } %>
 
                 <% if (flags.canComment) { %>
                     <form method="POST" action="/incident/<%= incident.id %>/comment" class="incident-action-form">
                         <textarea name="comment" rows="3" placeholder="Agregar comentario..." required></textarea>
-                        <button type="submit" class="btn-secondary">Comentar</button>
+                        <button type="submit" class="btn-secondary">
+                            <span class="material-symbols-outlined">comment</span>
+                            Comentar
+                        </button>
                     </form>
                 <% } %>
             </div>
