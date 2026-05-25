@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Autogestión de Envío — LogiTrack</title>
+    <link rel="stylesheet" href="/css/portal.css">
+    <style>
+        .self-wrap { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: var(--surface, #fff); border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+        .card h2 { margin: 0 0 .75rem; font-size: 1.1rem; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        label { display: block; font-size: .85rem; margin: .5rem 0 .25rem; color: #475569; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: .55rem .65rem; border: 1px solid #cbd5e1; border-radius: 8px; font-family: inherit; font-size: .95rem; }
+        textarea { resize: vertical; min-height: 60px; }
+        .btn { background: #2563eb; color: #fff; border: none; padding: .7rem 1.2rem; border-radius: 10px; font-weight: 600; cursor: pointer; }
+        .btn[disabled] { background: #94a3b8; cursor: not-allowed; }
+        .ok { background: #dcfce7; color: #166534; padding: .6rem .8rem; border-radius: 8px; margin-bottom: 1rem; }
+        .lock { background: #fef3c7; color: #92400e; padding: .6rem .8rem; border-radius: 8px; margin-bottom: 1rem; }
+        .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#e0e7ff; color:#3730a3; font-size:.75rem; font-weight:700; }
+    </style>
+</head>
+<body>
+    <div class="self-wrap">
+        <h1>Tu envío <span class="pill"><%= shipment.trackingId %></span></h1>
+        <p>Hola <%= shipment.recipient?.fullName || 'destinatario' %> — desde acá podés ajustar la franja horaria y modalidad de entrega, y dejarle al repartidor referencias de tu domicilio.</p>
+
+        <% if (saved) { %>
+            <div class="ok">Cambios guardados. Te notificaremos novedades.</div>
+        <% } %>
+        <% if (!editable) { %>
+            <div class="lock">El envío está en estado "<%= shipment.status?.description %>" y ya no admite cambios desde autogestión.</div>
+        <% } %>
+
+        <form method="POST" action="/portal/self/<%= shipment.portalToken %>">
+            <div class="card">
+                <h2>Franja horaria preferida</h2>
+                <div class="grid2">
+                    <div>
+                        <label>Desde</label>
+                        <select name="windowFrom" <%= editable ? '' : 'disabled' %>>
+                            <option value="">— sin preferencia —</option>
+                            <% timeWindows.forEach(w => { %>
+                                <option value="<%= w.fromTime %>" <%= shipment.expectedDeliveryFrom === w.fromTime ? 'selected' : '' %>>
+                                    <%= w.label %> (<%= String(w.fromTime).slice(0,5) %>)
+                                </option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Hasta</label>
+                        <select name="windowTo" <%= editable ? '' : 'disabled' %>>
+                            <option value="">— sin preferencia —</option>
+                            <% timeWindows.forEach(w => { %>
+                                <option value="<%= w.toTime %>" <%= shipment.expectedDeliveryTo === w.toTime ? 'selected' : '' %>>
+                                    <%= w.label %> (<%= String(w.toTime).slice(0,5) %>)
+                                </option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Modalidad de entrega</h2>
+                <label>
+                    <input type="radio" name="deliveryMode" value="home" <%= shipment.deliveryMode === 'home' ? 'checked' : '' %> <%= editable ? '' : 'disabled' %>>
+                    Envío a domicilio
+                </label>
+                <label>
+                    <input type="radio" name="deliveryMode" value="branch_pickup" <%= shipment.deliveryMode === 'branch_pickup' ? 'checked' : '' %> <%= editable ? '' : 'disabled' %>>
+                    Retiro por sucursal
+                </label>
+                <label>Sucursal de retiro (sólo si elegís retiro)</label>
+                <select name="pickupBranchId" <%= editable ? '' : 'disabled' %>>
+                    <option value="">— ninguna —</option>
+                    <% branches.forEach(b => { %>
+                        <option value="<%= b.id %>" <%= shipment.pickupBranchId === b.id ? 'selected' : '' %>><%= b.name %> — <%= b.address || '' %></option>
+                    <% }) %>
+                </select>
+            </div>
+
+            <div class="card">
+                <h2>Referencias de domicilio</h2>
+                <p style="color:#64748b;font-size:.85rem;margin-top:0">Ayudá al repartidor con detalles del domicilio.</p>
+                <div class="grid2">
+                    <div>
+                        <label>Timbre / Departamento</label>
+                        <input type="text" name="ringLabel" value="<%= shipment.address?.ringLabel || '' %>" maxlength="40" <%= editable ? '' : 'disabled' %>>
+                    </div>
+                    <div>
+                        <label>Piso / Depto</label>
+                        <input type="text" name="floorApt" value="<%= shipment.address?.floorApt || '' %>" maxlength="40" <%= editable ? '' : 'disabled' %>>
+                    </div>
+                </div>
+                <label>Referencias para encontrar el domicilio</label>
+                <textarea name="referencesTxt" maxlength="500" <%= editable ? '' : 'disabled' %>><%= shipment.address?.referencesTxt || '' %></textarea>
+                <label>¿Recibe portería?</label>
+                <input type="text" name="porterNote" value="<%= shipment.address?.porterNote || '' %>" placeholder="Ej: portería 24hs, dejar con Juan" maxlength="255" <%= editable ? '' : 'disabled' %>>
+                <label>Restricciones / aclaraciones</label>
+                <textarea name="restrictions" maxlength="500" <%= editable ? '' : 'disabled' %>><%= shipment.address?.restrictions || '' %></textarea>
+            </div>
+
+            <button class="btn" type="submit" <%= editable ? '' : 'disabled' %>>Guardar cambios</button>
+        </form>
+    </div>
+</body>
+</html>

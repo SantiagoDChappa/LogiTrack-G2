@@ -447,4 +447,91 @@ const publicSuccess = (req, res) => {
     });
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, getIncidentTypesApi, publicSuccess, createIncidentFromPortal };
+// =========================================================================
+// Sprint 3 - 3.2 Autogestión del destinatario: ver y editar franja horaria,
+// modalidad de entrega y comentarios estructurados del domicilio sin login.
+// Acceso vía portalToken único por envío (no expone otros datos del sistema).
+// =========================================================================
+const getSelfServiceForm = async (req, res) => {
+    try {
+        const token = String(req.params.token || '');
+        if (!token) { return res.status(400).render('error', { message: 'Token inválido' }); }
+        const shipment = await Shipment.findOne({
+            where: { portalToken: token },
+            include: [
+                { model: Person, as: 'recipient', attributes: ['fullName'] },
+                { model: Status, as: 'status',    attributes: ['description'] },
+                { model: Address, as: 'address',  required: false, include: [{ model: Province, as: 'province' }] },
+                { model: Branch,  as: 'pickupBranch', required: false },
+            ],
+        });
+        if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
+        // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
+        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
+        const timeWindows = await require('../models/deliveryTimeWindow').getActive();
+        const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
+        res.render('portal/selfService', { shipment, timeWindows, branches, editable, saved: req.query.saved === '1' });
+    } catch (err) {
+        console.error('getSelfServiceForm:', err.message);
+        res.status(500).render('error', { message: 'Error al cargar autogestión' });
+    }
+};
+
+const saveSelfService = async (req, res) => {
+    try {
+        const token = String(req.params.token || '');
+        const shipment = await Shipment.findOne({ where: { portalToken: token } });
+        if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
+        if (!editable) { return res.status(409).json({ error: 'El envío está en un estado que no permite autogestión.' }); }
+
+        const from = req.body.windowFrom || null;
+        const to   = req.body.windowTo   || null;
+        const deliveryMode    = req.body.deliveryMode    || shipment.deliveryMode;
+        const pickupBranchId  = req.body.pickupBranchId  ? Number(req.body.pickupBranchId) : null;
+        if (deliveryMode === 'branch_pickup' && !pickupBranchId) {
+            return res.status(400).json({ error: 'Seleccioná una sucursal de retiro.' });
+        }
+
+        await Shipment.update({
+            expectedDeliveryFrom: from,
+            expectedDeliveryTo:   to,
+            deliveryMode,
+            pickupBranchId: deliveryMode === 'branch_pickup' ? pickupBranchId : null,
+        }, { where: { id: shipment.id } });
+
+        // Sprint 3 - 3.3 comentarios estructurados de domicilio
+        if (shipment.addressId) {
+            await Address.update({
+                ringLabel:      (req.body.ringLabel      || '').trim() || null,
+                floorApt:       (req.body.floorApt       || '').trim() || null,
+                referencesTxt:  (req.body.referencesTxt  || '').trim() || null,
+                porterNote:     (req.body.porterNote     || '').trim() || null,
+                restrictions:   (req.body.restrictions   || '').trim() || null,
+            }, { where: { id: shipment.addressId } });
+        }
+
+        // History event RESCHEDULED + notif
+        try {
+            const shipmentHistoryModel = require('../models/shipmentHistory');
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: shipment.statusId,
+                toStatusId:   shipment.statusId,
+                comment:      `Autogestión destinatario: franja ${from || '-'}–${to || '-'}, modalidad ${deliveryMode}`,
+                userId:       null,
+                eventType:    'RESCHEDULED',
+            });
+            const { NotificationEvent } = require('../constants/enums');
+            require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, shipment.id)
+                .catch(() => {});
+        } catch (e) { console.error('selfService history err:', e.message); }
+
+        res.redirect(`/portal/self/${token}?saved=1`);
+    } catch (err) {
+        console.error('saveSelfService:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, getSelfServiceForm, saveSelfService };
