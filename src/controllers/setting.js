@@ -12,10 +12,11 @@ const failedReasonModel = require('../models/failedAttemptReason');
 const standardMessageModel = require('../models/standardMessage');
 const deliveryWindowModel = require('../models/deliveryTimeWindow');
 const incidentTypeModel = require('../models/incidentType');
+const incidentNotifConfig = require('../services/incidentNotifConfig');
 
 const getSettings = async (req, res) => {
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
-           failedReasons, stdMessages, timeWindows, incidentTypes] = await Promise.all([
+           failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
@@ -28,6 +29,7 @@ const getSettings = async (req, res) => {
         standardMessageModel.getAll().catch(() => []),
         deliveryWindowModel.getAll().catch(() => []),
         incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
+        incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
     ]);
 
     const templatesByEvent = {};
@@ -39,7 +41,7 @@ const getSettings = async (req, res) => {
 
     res.render('setting/index', {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
-        failedReasons, stdMessages, timeWindows, incidentTypes,
+        failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -407,8 +409,26 @@ const saveIncidentType = async (req, res) => {
     }
 };
 
+const saveIncidentNotifConfig = async (req, res) => {
+    try {
+        await incidentNotifConfig.set({
+            notifySupervisorBranch:  req.body.notifySupervisorBranch  === 'on',
+            notifyAssignedOperator:  req.body.notifyAssignedOperator  === 'on',
+            notifyAdmins:            req.body.notifyAdmins            === 'on',
+            notifyReporter:          req.body.notifyReporter          === 'on',
+            notifyShipmentRecipient: req.body.notifyShipmentRecipient === 'on',
+            customEmails:            req.body.customEmails || ''
+        });
+        res.redirect('/setting?success=incident_notif');
+    } catch (err) {
+        console.error('saveIncidentNotifConfig:', err.message);
+        res.status(500).redirect('/setting?error=incident_notif');
+    }
+};
+
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
     saveParams, saveNotificationConfig, saveEmailTemplate, saveTestEmailOverride,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
+    saveIncidentNotifConfig,
 };

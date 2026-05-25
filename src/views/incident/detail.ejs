@@ -70,17 +70,124 @@
                 <h2>Acciones</h2>
 
                 <% if (flags.canAssign && assignableUsers.length) { %>
-                    <form method="POST" action="/incident/<%= incident.id %>/assign" class="incident-action-form">
-                        <label>Asignar a
-                            <select name="assignedToUserId">
-                                <option value="">— Sin asignar —</option>
-                                <% assignableUsers.forEach(u => { %>
-                                    <option value="<%= u.id %>" <%= incident.assignedToUserId === u.id ? 'selected' : '' %>><%= u.fullName %></option>
+                    <style>
+                        .incident-assign-form { flex-direction: column; align-items: stretch; gap: .75rem; }
+                        .incident-assign-form .form-group { display: flex; flex-direction: column; gap: .3rem; width: 100%; }
+                        .incident-assign-form label,
+                        .incident-assign-form .form-group > label {
+                            display: block; flex: none; margin: 0;
+                            font-size: .72rem; font-weight: 600; text-transform: uppercase;
+                            letter-spacing: .04em; color: var(--inc-muted);
+                        }
+                        .incident-assign-form select {
+                            width: 100%; min-width: 0; padding: .5rem .7rem;
+                            border: 1px solid var(--inc-border); border-radius: var(--inc-radius-sm);
+                            background: var(--inc-surface); color: var(--inc-text); font: inherit; font-size: .88rem;
+                        }
+                        .incident-assign-form .user-picker {
+                            grid-template-columns: 1fr; gap: .4rem; padding: .55rem; min-height: 0;
+                        }
+                        .incident-assign-form .user-card { padding: .5rem .6rem; gap: .55rem; }
+                        .incident-assign-form .user-card__name { font-size: .85rem; }
+                        .incident-assign-form .user-card__role { font-size: .7rem; }
+                        .incident-assign-form .branch-picker__hint { margin-top: .15rem; font-size: .72rem; }
+                        .incident-assign-form button[type="submit"] { align-self: flex-end; }
+                    </style>
+                    <form method="POST" action="/incident/<%= incident.id %>/assign" class="incident-action-form incident-assign-form" id="assignForm">
+                        <% const currentAssignee = assignableUsers.find(u => u.id === incident.assignedToUserId); %>
+                        <% const initialBranchId = currentAssignee ? currentAssignee.branchId : ''; %>
+                        <div class="form-group">
+                            <label for="assignBranchId">Sucursal</label>
+                            <select id="assignBranchId">
+                                <option value="">— Elegí una sucursal —</option>
+                                <% branches.forEach(b => {
+                                    const branchUserCount = assignableUsers.filter(u => u.branchId === b.id).length;
+                                    const isSelected = String(initialBranchId) === String(b.id);
+                                %>
+                                    <option value="<%= b.id %>" <%= isSelected ? 'selected' : '' %>>
+                                        <%= b.name %> (<%= branchUserCount %> usuario<%= branchUserCount === 1 ? '' : 's' %>)
+                                    </option>
                                 <% }) %>
                             </select>
-                        </label>
+                            <small class="branch-picker__hint" id="assign-branch-hint">Elegí una sucursal para ver sus usuarios.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Asignar a</label>
+                            <input type="hidden" id="assignedToUserId" name="assignedToUserId" value="<%= incident.assignedToUserId || '' %>">
+                            <div class="user-picker" id="assign-user-picker">
+                                <p class="user-picker__empty">Elegí una sucursal primero.</p>
+                            </div>
+                        </div>
                         <button type="submit" class="btn-secondary">Asignar</button>
                     </form>
+                    <script id="assignable-users-data" type="application/json"><%- JSON.stringify(assignableUsers) %></script>
+                    <script>
+                    (function () {
+                        const branchSelect = document.getElementById('assignBranchId');
+                        const userPicker   = document.getElementById('assign-user-picker');
+                        const hiddenUser   = document.getElementById('assignedToUserId');
+                        const hint         = document.getElementById('assign-branch-hint');
+                        const allUsers     = JSON.parse(document.getElementById('assignable-users-data').textContent || '[]');
+                        const preselectedUserId = <%- JSON.stringify(incident.assignedToUserId || '') %>;
+
+                        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+                        function renderUsers(branchId) {
+                            userPicker.innerHTML = '';
+                            if (!branchId) {
+                                userPicker.innerHTML = '<p class="user-picker__empty">Elegí una sucursal primero.</p>';
+                                return;
+                            }
+                            const filtered = allUsers.filter(u => u.branchId === branchId);
+                            if (filtered.length === 0) {
+                                userPicker.innerHTML = '<p class="user-picker__empty">Esta sucursal no tiene usuarios asignables.</p>';
+                                return;
+                            }
+                            filtered.forEach(u => {
+                                const isSel = String(preselectedUserId) === String(u.id);
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = 'user-card' + (isSel ? ' is-selected' : '');
+                                btn.dataset.userId = String(u.id);
+                                btn.innerHTML = ''
+                                    + '<span class="user-card__avatar material-symbols-outlined">person</span>'
+                                    + '<span class="user-card__body">'
+                                    + '<span class="user-card__name">' + escapeHtml(u.fullName) + '</span>'
+                                    + '<span class="user-card__role">' + escapeHtml(u.roleDescription || 'Sin rol') + '</span>'
+                                    + '</span>'
+                                    + '<span class="user-card__check material-symbols-outlined">check_circle</span>';
+                                btn.addEventListener('click', () => selectUser(u.id, btn));
+                                userPicker.appendChild(btn);
+                            });
+                        }
+
+                        function selectUser(userId, btnEl) {
+                            hiddenUser.value = String(userId);
+                            userPicker.querySelectorAll('.user-card').forEach(c => c.classList.remove('is-selected'));
+                            btnEl.classList.add('is-selected');
+                        }
+
+                        branchSelect.addEventListener('change', () => {
+                            const bid = branchSelect.value ? Number(branchSelect.value) : null;
+                            hiddenUser.value = '';
+                            renderUsers(bid);
+                            hint.textContent = bid
+                                ? 'Sucursal: ' + branchSelect.options[branchSelect.selectedIndex].text.trim() + '. Elegí el usuario asignado.'
+                                : 'Elegí una sucursal para ver sus usuarios.';
+                        });
+
+                        if (branchSelect.value) {
+                            renderUsers(Number(branchSelect.value));
+                        }
+
+                        document.getElementById('assignForm').addEventListener('submit', function (e) {
+                            if (!hiddenUser.value) {
+                                e.preventDefault();
+                                alert('Elegí una sucursal y un usuario antes de asignar.');
+                            }
+                        });
+                    })();
+                    </script>
                 <% } %>
 
                 <% if (flags.canChangeStatus) { %>

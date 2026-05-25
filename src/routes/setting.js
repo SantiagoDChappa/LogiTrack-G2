@@ -19,5 +19,6 @@ router.post('/time-window',            requireAdmin, settingController.saveTimeW
 router.post('/time-window/:id',        requireAdmin, settingController.saveTimeWindow);
 router.post('/incident-type',          requireAdmin, settingController.saveIncidentType);
 router.post('/incident-type/:id',      requireAdmin, settingController.saveIncidentType);
+router.post('/incident-notification',  requireAdmin, settingController.saveIncidentNotifConfig);
 
 module.exports = router;

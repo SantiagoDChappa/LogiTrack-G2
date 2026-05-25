@@ -9,6 +9,7 @@ const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
 const { sendEmail }        = require('../services/emailSender');
 const incidentRules        = require('../services/incidentRules');
+const incidentNotifConfig  = require('../services/incidentNotifConfig');
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
     ShipmentHistoryEvent, NotificationEvent, Status
@@ -235,25 +236,20 @@ const create = async (req, res) => {
         return created;
     });
 
-    notifyIncidentToSupervisors(incident.id, shipment, type, assignee, user)
-        .catch(e => console.error('[incident] notif supervisor:', e.message));
-
-    require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
-        .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
+    notifyIncidentCreated(incident.id, shipment, type, assignee, user)
+        .catch(e => console.error('[incident] notif:', e.message));
 
     res.redirect(`/incident/${incident.id}`);
 };
 
-const notifyIncidentToSupervisors = async (incidentId, shipment, type, assignee, openedBy) => {
-    const supervisors = await User.findAll({
-        where: {
-            roleId:   RoleType.SUPERVISOR.id,
-            branchId: assignee.branchId,
-            active:   true
-        },
-        attributes: ['id', 'email', 'fullName']
-    });
-    const emails = supervisors.map(s => s.email).filter(Boolean);
+const notifyIncidentCreated = async (incidentId, shipment, type, assignee, openedBy) => {
+    const cfg = await incidentNotifConfig.get();
+    const emails = await incidentNotifConfig.resolveRecipients(cfg, { shipment, assignee, openedBy });
+
+    if (cfg.notifyShipmentRecipient) {
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
+            .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
+    }
     if (emails.length === 0) { return; }
 
     const subject = `[LogiTrack] Nueva incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
@@ -278,19 +274,29 @@ const getDetail = async (req, res) => {
         return res.status(403).send('Acceso denegado');
     }
 
-    const [history, assignableUsers] = await Promise.all([
+    const [history, assignableUsers, branches] = await Promise.all([
         incidentHistoryModel.getByIncidentId(id),
         isSupOrAdmin(user) ? User.findAll({
-            where: { roleId: [RoleType.OPERATOR.id, RoleType.SUPERVISOR.id], active: true },
-            attributes: ['id', 'fullName'],
+            where: { roleId: [RoleType.OPERATOR.id, RoleType.SUPERVISOR.id, RoleType.ADMIN.id], active: true },
+            attributes: ['id', 'fullName', 'roleId', 'branchId'],
             order: [['fullName', 'ASC']]
-        }) : Promise.resolve([])
+        }) : Promise.resolve([]),
+        isSupOrAdmin(user) ? branchModel.getAll() : Promise.resolve([])
     ]);
+
+    const assignableUsersPayload = assignableUsers.map(u => ({
+        id:              u.id,
+        fullName:        u.fullName,
+        roleId:          u.roleId,
+        roleDescription: roleDescriptionById[u.roleId] || '',
+        branchId:        u.branchId
+    }));
 
     res.render('incident/detail', {
         incident,
         history,
-        assignableUsers,
+        assignableUsers: assignableUsersPayload,
+        branches,
         flags: computeActionFlags(incident, user),
         query: req.query
     });

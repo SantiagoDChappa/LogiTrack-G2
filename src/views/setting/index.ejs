@@ -346,6 +346,54 @@
                 </form>
             </div>
 
+            <!-- Card: Notificaciones de incidencias (destinatarios internos) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">report</span>
+                    Notificaciones de incidencias
+                </h2>
+                <p class="settings-subtitle">
+                    Elegí quiénes reciben un email cuando se registra una nueva incidencia interna. Se pueden combinar destinatarios por rol y emails personalizados.
+                </p>
+                <form method="POST" action="/setting/incident-notification">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifySupervisorBranch" <%= incidentNotif.notifySupervisorBranch ? 'checked' : '' %>>
+                            <span>Supervisor de la sucursal del usuario asignado</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyAssignedOperator" <%= incidentNotif.notifyAssignedOperator ? 'checked' : '' %>>
+                            <span>Operador asignado a la incidencia</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyAdmins" <%= incidentNotif.notifyAdmins ? 'checked' : '' %>>
+                            <span>Todos los administradores</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyReporter" <%= incidentNotif.notifyReporter ? 'checked' : '' %>>
+                            <span>Usuario que reportó la incidencia (copia)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;grid-column:1/-1">
+                            <input type="checkbox" name="notifyShipmentRecipient" <%= incidentNotif.notifyShipmentRecipient ? 'checked' : '' %>>
+                            <span>Destinatario del envío (usa template de <code>SHIPMENT_INCIDENT</code>)</span>
+                        </label>
+                    </div>
+                    <div class="field" style="margin-top:1rem">
+                        <label for="incident_notif_custom">Emails personalizados extra</label>
+                        <input type="text" id="incident_notif_custom" name="customEmails"
+                               value="<%= incidentNotif.customEmails || '' %>"
+                               placeholder="ej: ops@logitrack.com, calidad@logitrack.com">
+                        <small style="color:var(--color-text-secondary)">Separar por coma, espacio o punto y coma. Se ignoran direcciones inválidas.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar notificaciones de incidencias
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card: Email de prueba (override) -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
