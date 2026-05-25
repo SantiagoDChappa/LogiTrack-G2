@@ -7,7 +7,7 @@ const shipmentModel        = require('../models/shipment');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
-const { sendEmail }        = require('../services/emailSender');
+const { sendEmail }        = require('../services/notification/emailSender');
 const incidentRules        = require('../services/incidentRules');
 const incidentNotifConfig  = require('../services/incidentNotifConfig');
 const {
