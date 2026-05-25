@@ -63,11 +63,12 @@ const FailedAttempt = sequelize.define('failedAttempt', {
     timestamps: true
 });
 
-const create = (data) => FailedAttempt.create(data);
+const create = (data, options = {}) => FailedAttempt.create(data, { transaction: options.transaction });
 
-const getByShipmentId = (shipmentId) => FailedAttempt.findAll({
+const getByShipmentId = (shipmentId, options = {}) => FailedAttempt.findAll({
     where: { shipmentId },
-    order: [['attemptDate', 'DESC']]
+    order: [['attemptDate', 'DESC']],
+    transaction: options.transaction,
 });
 
 const getById = (id) => FailedAttempt.findOne({ where: { id } });

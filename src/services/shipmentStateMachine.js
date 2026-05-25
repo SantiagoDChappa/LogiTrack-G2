@@ -3,6 +3,24 @@ const shipmentModel = require('../models/shipment');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const { Status, RoleType } = require('../constants/enums');
 
+// Mantiene en sincronía RouteStop ↔ Shipment. Cuando un envío llega a un estado final
+// (entregado / fallido / cancelado), las paradas de ruta pendientes asociadas se cierran
+// dentro de la misma transacción para que el ruteo refleje el estado real del envío.
+const ROUTE_CLOSING_STATUSES = new Set([
+    Status.DELIVERED.id,
+    Status.FAILED_ATTEMPT.id,
+    Status.PACKAGE_FAILED.id,
+    Status.CANCELLED.id,
+]);
+const syncRouteStopForShipment = async (shipmentId, toStatusId, transaction) => {
+    if (!ROUTE_CLOSING_STATUSES.has(toStatusId)) { return; }
+    const { RouteStop } = require('../models/routeStop');
+    await RouteStop.update(
+        { completed: true, completedAt: new Date() },
+        { where: { shipmentId, stopType: 'delivery', completed: false }, transaction }
+    );
+};
+
 const S = Status;
 const R = RoleType;
 
@@ -178,6 +196,8 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
             ...(deliveryUserId !== undefined ? { deliveryUserId } : {}),
             ...(toStatusId === S.AT_BRANCH.id && branchId ? { currentBranchId: branchId } : {}),
         });
+
+        await syncRouteStopForShipment(shipmentId, toStatusId, t);
 
         const finalComment = comment && String(comment).trim()
             ? String(comment).trim()

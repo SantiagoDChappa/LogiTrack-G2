@@ -23,7 +23,7 @@ const Address = sequelize.define('address', {
 },
 { tableName: 'address' });
 
-const create = (data) => {
+const create = (data, options = {}) => {
     return Address.create({
         street:         data.street,
         number:         data.number,
@@ -37,7 +37,7 @@ const create = (data) => {
         referencesTxt:  data.referencesTxt || null,
         porterNote:     data.porterNote    || null,
         restrictions:   data.restrictions  || null,
-    });
+    }, { transaction: options.transaction });
 };
 
 module.exports = { Address, create };

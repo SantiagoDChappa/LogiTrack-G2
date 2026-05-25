@@ -18,24 +18,25 @@ const Person = sequelize.define('person', {
 
 const getAll = () => Person.findAll();
 
-const create = (data) => Person.create({
+const create = (data, options = {}) => Person.create({
     fullName:     data.name,
     document:     data.document,
     phone:        data.phone,
     email:        data.email
-});
+}, { transaction: options.transaction });
 
-const createOrUpdate = async (data) => {
-    const person = await findByDocument(data.document);
+const createOrUpdate = async (data, options = {}) => {
+    const transaction = options.transaction;
+    const person = await Person.findOne({ where: { document: data.document }, transaction });
 
     if (person) {
         await person.update({
             phone:        data.phone,
             email:        data.email
-        });
+        }, { transaction });
         return person;
     }
-    return create(data);
+    return create(data, { transaction });
 };
 
 const search = ({ senderName, senderDocument, recipientName, recipientDocument }) => {

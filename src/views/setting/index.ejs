@@ -680,35 +680,65 @@
                     Franjas horarias de entrega
                 </h2>
                 <p class="settings-subtitle">Bloques horarios que el destinatario puede elegir en autogestión del portal y que se muestran en alta de envío.</p>
-                <div class="table-wrapper">
-                <table>
-                    <thead><tr><th>Etiqueta</th><th>Desde</th><th>Hasta</th><th>Activo</th><th></th></tr></thead>
-                    <tbody>
-                        <% (timeWindows || []).forEach(w => { %>
-                        <tr>
-                            <form method="POST" action="/setting/time-window/<%= w.id %>">
-                                <td><input type="text" name="label" value="<%= w.label %>" required></td>
-                                <td><input type="time" name="fromTime" value="<%= String(w.fromTime).slice(0,5) %>" required></td>
-                                <td><input type="time" name="toTime" value="<%= String(w.toTime).slice(0,5) %>" required></td>
-                                <td><input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>></td>
-                                <td>
-                                    <button class="btn-primary" type="submit">Guardar</button>
-                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')">Borrar</button>
-                                </td>
-                            </form>
-                        </tr>
-                        <% }) %>
-                        <tr>
-                            <form method="POST" action="/setting/time-window">
-                                <td><input type="text" name="label" placeholder="Ej: Mañana" required></td>
-                                <td><input type="time" name="fromTime" required></td>
-                                <td><input type="time" name="toTime" required></td>
-                                <td><input type="checkbox" name="active" checked></td>
-                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
-                            </form>
-                        </tr>
-                    </tbody>
-                </table>
+                <style>
+                    .tw-list { display:flex; flex-direction:column; gap:.5rem; }
+                    .tw-row {
+                        display:grid;
+                        grid-template-columns: 1.4fr .8fr .8fr auto auto;
+                        gap:.5rem;
+                        align-items:center;
+                        padding:.5rem .75rem;
+                        background: var(--color-bg-secondary, #f8fafc);
+                        border:1px solid var(--color-border, #e2e8f0);
+                        border-radius:8px;
+                    }
+                    .tw-row input[type="text"], .tw-row input[type="time"] {
+                        padding:.4rem .55rem; font-size:.85rem; height:34px;
+                        border:1px solid var(--color-border, #cbd5e1); border-radius:6px;
+                        background: var(--color-surface, #fff); color: var(--color-text);
+                        width:100%; box-sizing:border-box;
+                    }
+                    .tw-row label.tw-active {
+                        display:flex; align-items:center; gap:.3rem;
+                        font-size:.8rem; color: var(--color-text-secondary);
+                        white-space:nowrap;
+                    }
+                    .tw-row .tw-actions { display:flex; gap:.3rem; }
+                    .tw-row .tw-actions button {
+                        padding:.35rem .65rem; font-size:.8rem; height:34px;
+                    }
+                    .tw-row.tw-new { border-style:dashed; background:transparent; }
+                    @media (max-width: 720px) {
+                        .tw-row { grid-template-columns: 1fr 1fr; }
+                        .tw-row .tw-actions { grid-column:1/-1; justify-content:flex-end; }
+                    }
+                </style>
+                <div class="tw-list">
+                    <% (timeWindows || []).forEach(w => { %>
+                        <form method="POST" action="/setting/time-window/<%= w.id %>" class="tw-row">
+                            <input type="text" name="label" value="<%= w.label %>" required>
+                            <input type="time" name="fromTime" value="<%= String(w.fromTime).slice(0,5) %>" required>
+                            <input type="time" name="toTime" value="<%= String(w.toTime).slice(0,5) %>" required>
+                            <label class="tw-active">
+                                <input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>> Activo
+                            </label>
+                            <div class="tw-actions">
+                                <button class="btn-primary" type="submit">Guardar</button>
+                                <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')">Borrar</button>
+                            </div>
+                        </form>
+                    <% }) %>
+                    <form method="POST" action="/setting/time-window" class="tw-row tw-new">
+                        <input type="text" name="label" placeholder="Ej: Mañana" required>
+                        <input type="time" name="fromTime" required>
+                        <input type="time" name="toTime" required>
+                        <label class="tw-active">
+                            <input type="checkbox" name="active" checked> Activo
+                        </label>
+                        <div class="tw-actions">
+                            <button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

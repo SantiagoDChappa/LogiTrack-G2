@@ -7,7 +7,7 @@ const shipmentModel        = require('../models/shipment');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
-const { sendEmail }        = require('../services/emailSender');
+const { sendEmail }        = require('../services/notification/emailSender');
 const incidentRules        = require('../services/incidentRules');
 const incidentNotifConfig  = require('../services/incidentNotifConfig');
 const {
@@ -110,7 +110,7 @@ const getCreateForm = async (req, res) => {
         incidentTypeModel.getActive(),
         branchModel.getAll(),
         User.findAll({
-            where: { active: true },
+            where: { active: true, roleId: STAFF_ROLES },
             attributes: ['id', 'fullName', 'roleId', 'branchId'],
             order: [['fullName', 'ASC']]
         })
@@ -134,7 +134,7 @@ const create = async (req, res) => {
             incidentTypeModel.getActive(),
             branchModel.getAll(),
             User.findAll({
-                where: { active: true },
+                where: { active: true, roleId: STAFF_ROLES },
                 attributes: ['id', 'fullName', 'roleId', 'branchId'],
                 order: [['fullName', 'ASC']]
             })
@@ -161,15 +161,23 @@ const create = async (req, res) => {
         return renderFormError('Faltan completar: ' + missing.join(', ') + '.');
     }
 
-    const branch = await branchModel.getById(Number(branchId));
-    if (!branch) {
+    const noBranch = Number(branchId) === 0;
+    const branch = noBranch ? null : await branchModel.getById(Number(branchId));
+    if (!noBranch && !branch) {
         return renderFormError('Sucursal inválida');
     }
     const assignee = await User.findOne({ where: { id: Number(assignedToUserId), active: true } });
     if (!assignee) {
         return renderFormError('Usuario asignado inválido');
     }
-    if (assignee.branchId !== branch.id) {
+    if (!STAFF_ROLES.includes(assignee.roleId)) {
+        return renderFormError('El usuario asignado no es staff');
+    }
+    if (noBranch) {
+        if (assignee.branchId !== null) {
+            return renderFormError('El usuario asignado pertenece a una sucursal, elegila en vez de "Sin sucursal"');
+        }
+    } else if (assignee.branchId !== branch.id) {
         return renderFormError('El usuario asignado no pertenece a la sucursal seleccionada');
     }
 

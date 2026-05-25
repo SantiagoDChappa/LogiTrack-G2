@@ -79,12 +79,26 @@
                 <label>Sucursal asignada <span class="req">*</span></label>
                 <input type="hidden" id="branchId" name="branchId" value="<%= form.branchId || '' %>" required>
                 <div class="branch-picker" id="branch-picker">
+                    <% const noBranchUsers = users.filter(u => u.branchId === null || u.branchId === undefined).length; %>
+                    <% if (noBranchUsers > 0) {
+                        const isSelected = String(form.branchId) === '0';
+                    %>
+                        <button type="button"
+                                class="branch-card<%= isSelected ? ' is-selected' : '' %>"
+                                data-branch-id="0"
+                                data-user-count="<%= noBranchUsers %>">
+                            <span class="branch-card__icon material-symbols-outlined">person</span>
+                            <span class="branch-card__name">Sin sucursal</span>
+                            <span class="branch-card__count"><%= noBranchUsers %> usuario<%= noBranchUsers === 1 ? '' : 's' %></span>
+                        </button>
+                    <% } %>
                     <% branches.forEach(b => {
                         const branchUserCount = users.filter(u => u.branchId === b.id).length;
+                        if (branchUserCount === 0) { return; }
                         const isSelected = String(form.branchId) === String(b.id);
                     %>
                         <button type="button"
-                                class="branch-card<%= isSelected ? ' is-selected' : '' %><%= branchUserCount === 0 ? ' is-empty' : '' %>"
+                                class="branch-card<%= isSelected ? ' is-selected' : '' %>"
                                 data-branch-id="<%= b.id %>"
                                 data-user-count="<%= branchUserCount %>">
                             <span class="branch-card__icon material-symbols-outlined">store</span>
@@ -119,7 +133,9 @@
                 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
                 function renderUsers(branchId) {
-                    const filtered = allUsers.filter(u => u.branchId === branchId);
+                    const filtered = branchId === 0
+                        ? allUsers.filter(u => u.branchId === null || u.branchId === undefined)
+                        : allUsers.filter(u => u.branchId === branchId);
                     userPicker.innerHTML = '';
                     if (filtered.length === 0) {
                         userPicker.innerHTML = '<p class="user-picker__empty">Esta sucursal no tiene usuarios asignados todavía.</p>';

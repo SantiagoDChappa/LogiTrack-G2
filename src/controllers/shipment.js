@@ -25,6 +25,7 @@ const notificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
 const notificationEventModel = require('../models/notificationEvents')
 const { queueEmail } = require('../services/notification/notificationEmailService');
+const sequelize = require('../database/connection');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
 const stateMachine = require('../services/shipmentStateMachine');
@@ -315,19 +316,22 @@ const createShipment = async (req, res) => {
             }
         }
 
+        // Bloque transaccional: crea persona(s), dirección, envío e historial inicial de forma atómica.
+        // Si cualquier paso falla, rollback evita registros huérfanos (ej: address sin shipment, shipment sin history).
+        const shipment = await sequelize.transaction(async (t) => {
         const sender = await personModel.createOrUpdate({
             name: body.senderName,
             document: body.senderDocument,
             phone: body.senderPhone,
             email: body.senderEmail,
-        });
+        }, { transaction: t });
 
         const recipient = await personModel.createOrUpdate({
             name: body.recipientName,
             document: body.recipientDocument,
             phone: body.recipientPhone,
             email: body.recipientEmail
-        });
+        }, { transaction: t });
 
         const addressPayload = isPickup
             ? {
@@ -350,9 +354,40 @@ const createShipment = async (req, res) => {
             };
 
         const [address, creatorCoordsForCreate] = await Promise.all([
-            addressModel.create(addressPayload),
+            addressModel.create(addressPayload, { transaction: t }),
             resolveUserBranchCoords(res.locals.currentUser?.id),
         ]);
+
+        // Fallback de currentBranchId si el creador no tiene sucursal (ej: admin):
+        //   1. branch del creador
+        //   2. pickupBranchId (si es retiro en sucursal)
+        //   3. sucursal mas cercana a la direccion destino (haversine)
+        const resolveCurrentBranchId = async () => {
+            if (creatorCoordsForCreate.branchId) { return creatorCoordsForCreate.branchId; }
+            if (isPickup && pickupBranch?.id) { return pickupBranch.id; }
+            const destLat = addressPayload.lat;
+            const destLng = addressPayload.lng;
+            if (destLat == null || destLng == null) { return null; }
+            const allBranches = await branchModel.getAll();
+            const usable = allBranches.filter(b => b.latitude != null && b.longitude != null && !b.closed);
+            if (usable.length === 0) { return null; }
+            const toRad = d => d * Math.PI / 180;
+            const dist = (a, b) => {
+                const R = 6371;
+                const dLat = toRad(Number(b.lat) - Number(a.lat));
+                const dLng = toRad(Number(b.lng) - Number(a.lng));
+                const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(Number(a.lat))) * Math.cos(toRad(Number(b.lat))) * Math.sin(dLng / 2) ** 2;
+                return 2 * R * Math.asin(Math.sqrt(x));
+            };
+            let nearest = usable[0];
+            let nearestD = dist({ lat: destLat, lng: destLng }, { lat: nearest.latitude, lng: nearest.longitude });
+            for (const b of usable.slice(1)) {
+                const d = dist({ lat: destLat, lng: destLng }, { lat: b.latitude, lng: b.longitude });
+                if (d < nearestD) { nearest = b; nearestD = d; }
+            }
+            return nearest.id;
+        };
+        const resolvedCurrentBranchId = await resolveCurrentBranchId();
 
         const destLatForPriority = isPickup ? Number(pickupBranch.latitude)  : (body.addressLat ? parseFloat(body.addressLat) : null);
         const destLngForPriority = isPickup ? Number(pickupBranch.longitude) : (body.addressLng ? parseFloat(body.addressLng) : null);
@@ -379,7 +414,7 @@ const createShipment = async (req, res) => {
             return v.length === 5 ? `${v}:00` : v;
         };
 
-        const shipment = await shipmentModel.create({
+        const created = await shipmentModel.create({
             senderId:        sender.id,
             recipientId:     recipient.id,
             addressId:       address.id,
@@ -391,25 +426,28 @@ const createShipment = async (req, res) => {
             volumeM3:        body.volumeM3       || null,
             basePriority:    initialPriority,
             priority:        initialPriority,
-            currentBranchId: creatorCoordsForCreate.branchId || null,
+            currentBranchId: resolvedCurrentBranchId,
             zoneId: resolvedZone?.id || null,
             expectedDeliveryDate: body.expectedDeliveryDate || null,
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
-        });
+        }, { transaction: t });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
         await shipmentHistoryModel.create({
-            shipmentId: shipment.id,
+            shipmentId: created.id,
             fromStatusId: null,
-            toStatusId: shipment.statusId,
+            toStatusId: created.statusId,
             eventType: 'CREATED',
             userId: res.locals.currentUser?.id || null,
             branchId: creatorCoords.branchId,
             latitude: creatorCoords.latitude,
             longitude: creatorCoords.longitude,
+            transaction: t,
         });
 
+        return created;
+        });
 
         const freshShipment = await shipmentModel.getById(shipment.id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
@@ -568,47 +606,85 @@ const updateShipment = async (req, res) => {
             }
 
             const newStatus = await statusModel.getById(targetStatusId);
-            if (shipment.statusId !== targetStatusId) {
-                const actorCoords = await resolveUserBranchCoords(currentUser?.id);
-                await shipmentHistoryModel.create({
-                    shipmentId: id,
-                    fromStatusId: shipment.statusId,
-                    toStatusId: Number(body.newStatusId),
-                    comment: body.statusComment || null,
-                    userId: currentUser?.id || null,
-                    eventType: 'STATUS_CHANGE',
-                    branchId: actorCoords.branchId,
-                    latitude: actorCoords.latitude,
-                    longitude: actorCoords.longitude,
-                });
+            // Bloque transaccional: cambio de estado + historial + update de envío + prioridad atómicos.
+            // Sin esto, un fallo a mitad de camino deja envío con estado nuevo y sin historial (o viceversa).
+            await sequelize.transaction(async (t) => {
+                if (shipment.statusId !== targetStatusId) {
+                    const actorCoords = await resolveUserBranchCoords(currentUser?.id);
+                    await shipmentHistoryModel.create({
+                        shipmentId: id,
+                        fromStatusId: shipment.statusId,
+                        toStatusId: Number(body.newStatusId),
+                        comment: body.statusComment || null,
+                        userId: currentUser?.id || null,
+                        eventType: 'STATUS_CHANGE',
+                        branchId: actorCoords.branchId,
+                        latitude: actorCoords.latitude,
+                        longitude: actorCoords.longitude,
+                        transaction: t,
+                    });
 
-                await shipmentModel.updateStatus(id, Number(body.newStatusId));
-                if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+                    await shipmentModel.updateStatus(id, Number(body.newStatusId), { transaction: t });
 
-            }
+                    // Sync ruteo: cerrar RouteStop si el estado nuevo es terminal.
+                    const { RouteStop } = require('../models/routeStop');
+                    const closing = new Set([Status.DELIVERED.id, Status.FAILED_ATTEMPT.id, Status.PACKAGE_FAILED.id, Status.CANCELLED.id]);
+                    if (closing.has(Number(body.newStatusId))) {
+                        await RouteStop.update(
+                            { completed: true, completedAt: new Date() },
+                            { where: { shipmentId: Number(id), stopType: 'delivery', completed: false }, transaction: t }
+                        );
+                    }
+                }
+
+                if (isOperator) {
+                    body.street = shipment.address.street;
+                    body.number = shipment.address.number;
+                    body.province = shipment.address.provinceId;
+                    body.postalCode = shipment.address.postalCode;
+                    body.floorApartment = shipment.address.floorApartment;
+                    body.addressLat = shipment.address.lat;
+                    body.addressLng = shipment.address.lng;
+                    body.weightKg = shipment.weightKg;
+                    body.packageQty = shipment.packageQty;
+                    body.shipmentTypeId = shipment.shipmentTypeId;
+                }
+
+                if (shipment.statusId === Status.IN_TRANSIT.id) {
+                    body.deliveryUserId = shipment.deliveryUserId;
+                }
+
+                await shipmentModel.update(body, { transaction: t });
+
+                const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
+                await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
+            });
+            if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+        } else {
+            // No hay cambio de estado: igual envolvemos update + prioridad en una transacción.
+            await sequelize.transaction(async (t) => {
+                if (isOperator) {
+                    body.street = shipment.address.street;
+                    body.number = shipment.address.number;
+                    body.province = shipment.address.provinceId;
+                    body.postalCode = shipment.address.postalCode;
+                    body.floorApartment = shipment.address.floorApartment;
+                    body.addressLat = shipment.address.lat;
+                    body.addressLng = shipment.address.lng;
+                    body.weightKg = shipment.weightKg;
+                    body.packageQty = shipment.packageQty;
+                    body.shipmentTypeId = shipment.shipmentTypeId;
+                }
+
+                if (shipment.statusId === Status.IN_TRANSIT.id) {
+                    body.deliveryUserId = shipment.deliveryUserId;
+                }
+
+                await shipmentModel.update(body, { transaction: t });
+                const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
+                await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
+            });
         }
-
-        if (isOperator) {
-            body.street = shipment.address.street;
-            body.number = shipment.address.number;
-            body.province = shipment.address.provinceId;
-            body.postalCode = shipment.address.postalCode;
-            body.floorApartment = shipment.address.floorApartment;
-            body.addressLat = shipment.address.lat;
-            body.addressLng = shipment.address.lng;
-            body.weightKg = shipment.weightKg;
-            body.packageQty = shipment.packageQty;
-            body.shipmentTypeId = shipment.shipmentTypeId;
-        }
-
-        if (shipment.statusId === Status.IN_TRANSIT.id) {
-            body.deliveryUserId = shipment.deliveryUserId;
-        }
-
-        await shipmentModel.update(body);
-
-        const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
-        await shipmentModel.updatePriority(shipment.id, newPriority);
         res.redirect('/shipment?success=2');
     } catch (err) {
         console.error('ERROR updateShipment:', err.message);
@@ -626,19 +702,32 @@ const updateShipmentStatus = async (req, res) => {
         ]);
 
         const actorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
-        await shipmentHistoryModel.create({
-            shipmentId: id,
-            fromStatusId: shipment.statusId,
-            toStatusId: Number(newStatusId),
-            comment: comment || null,
-            userId: res.locals.currentUser?.id || null,
-            eventType: 'STATUS_CHANGE',
-            branchId: actorCoords.branchId,
-            latitude: actorCoords.latitude,
-            longitude: actorCoords.longitude,
-        });
+        // Bloque transaccional: historial + cambio de estado + cierre de RouteStop atómicos.
+        await sequelize.transaction(async (t) => {
+            await shipmentHistoryModel.create({
+                shipmentId: id,
+                fromStatusId: shipment.statusId,
+                toStatusId: Number(newStatusId),
+                comment: comment || null,
+                userId: res.locals.currentUser?.id || null,
+                eventType: 'STATUS_CHANGE',
+                branchId: actorCoords.branchId,
+                latitude: actorCoords.latitude,
+                longitude: actorCoords.longitude,
+                transaction: t,
+            });
 
-        await shipmentModel.updateStatus(id, Number(newStatusId));
+            await shipmentModel.updateStatus(id, Number(newStatusId), { transaction: t });
+
+            const { RouteStop } = require('../models/routeStop');
+            const closing = new Set([Status.DELIVERED.id, Status.FAILED_ATTEMPT.id, Status.PACKAGE_FAILED.id, Status.CANCELLED.id]);
+            if (closing.has(Number(newStatusId))) {
+                await RouteStop.update(
+                    { completed: true, completedAt: new Date() },
+                    { where: { shipmentId: Number(id), stopType: 'delivery', completed: false }, transaction: t }
+                );
+            }
+        });
 
         const eventCode = await notificationEventModel.getEventCodeByShipmentStatus(Number(newStatusId));
         const freshShipment = await shipmentModel.getById(id);

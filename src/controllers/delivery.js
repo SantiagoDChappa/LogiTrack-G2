@@ -36,51 +36,66 @@ const saveFailedAttempt = async (req, res) => {
         const { reason, observation, latitude, longitude, photoBase64 } = req.body;
         const suggestedDate = getSuggestedDate(reason);
 
-        await failedAttemptModel.create({
-            
-            shipmentId:    shipment.id,
-            reason,
-            observation:   observation || null,
-            latitude:      latitude    || null,
-            longitude:     longitude   || null,
-            photoBase64:   photoBase64 || null,
-            suggestedDate,
-            status:        'pendiente'
-        });
-        // Verificar si superó el máximo de intentos fallidos
         const settingModel = require('../models/setting');
         const settings = await settingModel.getAll();
         const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
 
-        const intentosPrevios = await failedAttemptModel.getByShipmentId(shipment.id);
-        console.log(`[Intentos fallidos] Envío ${shipment.id}: ${intentosPrevios.length} intentos, máximo: ${maxIntentos}`);
-        if (intentosPrevios.length > maxIntentos) {
-            await ShipmentModel.updateStatus(shipment.id, 5); // 5 = Cancelado
+        // Bloque transaccional: registro de intento fallido + historial + cambio de estado
+        // (y eventual cancelación por exceso) deben quedar todos o ninguno.
+        await sequelize.transaction(async (t) => {
+            await failedAttemptModel.create({
+                shipmentId:    shipment.id,
+                reason,
+                observation:   observation || null,
+                latitude:      latitude    || null,
+                longitude:     longitude   || null,
+                photoBase64:   photoBase64 || null,
+                suggestedDate,
+                status:        'pendiente'
+            }, { transaction: t });
+
+            const intentosPrevios = await failedAttemptModel.getByShipmentId(shipment.id, { transaction: t });
+            const excede = intentosPrevios.length > maxIntentos;
+
             await shipmentHistoryModel.create({
                 shipmentId:   shipment.id,
                 fromStatusId: shipment.statusId,
-                toStatusId:   5,
-                comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
+                toStatusId:   Status.FAILED_ATTEMPT.id,
+                comment:      `Intento fallido: ${reason}`,
                 userId:       res.locals.currentUser?.id || null,
                 eventType:    'STATUS_CHANGE',
+                transaction:  t,
             });
-        }
-        await shipmentHistoryModel.create({
-            shipmentId:   shipment.id,
-            fromStatusId: shipment.statusId,
-            toStatusId:   Status.FAILED_ATTEMPT.id,
-            comment:      `Intento fallido: ${reason}`,
-            userId:       res.locals.currentUser?.id || null,
-            eventType:    'STATUS_CHANGE',
+
+            await Shipment.update(
+                { statusId: Status.FAILED_ATTEMPT.id },
+                { where: { id: shipment.id }, transaction: t }
+            );
+
+            if (excede) {
+                await ShipmentModel.updateStatus(shipment.id, 5, { transaction: t });
+                await shipmentHistoryModel.create({
+                    shipmentId:   shipment.id,
+                    fromStatusId: Status.FAILED_ATTEMPT.id,
+                    toStatusId:   5,
+                    comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
+                    userId:       res.locals.currentUser?.id || null,
+                    eventType:    'STATUS_CHANGE',
+                    transaction:  t,
+                });
+                // Sync ruteo
+                await RouteStop.update(
+                    { completed: true, completedAt: new Date() },
+                    { where: { shipmentId: shipment.id, stopType: 'delivery', completed: false }, transaction: t }
+                );
+            } else {
+                // FAILED_ATTEMPT también cierra el stop de la ruta
+                await RouteStop.update(
+                    { completed: true, completedAt: new Date() },
+                    { where: { shipmentId: shipment.id, stopType: 'delivery', completed: false }, transaction: t }
+                );
+            }
         });
-
-        await Shipment.update(
-            { statusId: Status.FAILED_ATTEMPT.id },
-            { where: { id: shipment.id } }
-        );
-
-        console.log('Estado anterior:', shipment.statusId);
-        console.log('Estado nuevo:', Status.FAILED_ATTEMPT.id);
 
         res.redirect('/delivery?failed=true');
 

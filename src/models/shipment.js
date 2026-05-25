@@ -101,7 +101,7 @@ const generateTrackingId = async (prefix = 'ENV') => {
     return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
 };
 
-const create = async (data) => {
+const create = async (data, options = {}) => {
     const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
     const { generateSecretCode, generatePortalToken } = require('../utils/shipmentTokens');
     return Shipment.create({
@@ -128,7 +128,7 @@ const create = async (data) => {
         priority:         data.priority     || 1,
         basePriority:     data.basePriority || 1,
         createdAt:        new Date().toISOString().split('T')[0]
-    });
+    }, { transaction: options.transaction });
 };
 
 const findByLegacyTrackingId = (legacyTrackingId) => {
@@ -207,14 +207,16 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
     });
 };
 
-const update = async (data) => {
+const update = async (data, options = {}) => {
     const { Status } = require('./status');
     const { Person } = require('./person');
     const { Address } = require('./address');
-    
-    const shipment = await Shipment.findOne({ 
+    const transaction = options.transaction;
+
+    const shipment = await Shipment.findOne({
         where: { id: data.id },
-        include: [{ model: Status, as: 'status' }]
+        include: [{ model: Status, as: 'status' }],
+        transaction,
     });
     if (!shipment) { return null; }
 
@@ -225,7 +227,7 @@ const update = async (data) => {
         if (data.deliveryUserId !== undefined) {
              await Shipment.update(
                 { deliveryUserId: data.deliveryUserId || null },
-                { where: { id: data.id } }
+                { where: { id: data.id }, transaction }
             );
         }
         return shipment;
@@ -235,13 +237,13 @@ const update = async (data) => {
     if (statusId === 2 || statusId === 6 || statusId === 7) {
         await Person.update(
             { phone: data.recipientPhone, email: data.recipientEmail },
-            { where: { id: shipment.recipientId } }
+            { where: { id: shipment.recipientId }, transaction }
         );
 
         if (data.deliveryUserId !== undefined) {
             await Shipment.update(
                { deliveryUserId: data.deliveryUserId || null },
-               { where: { id: data.id } }
+               { where: { id: data.id }, transaction }
            );
         }
         return shipment;
@@ -250,7 +252,7 @@ const update = async (data) => {
     if (statusId === 1) { // Pendiente — modificación completa
         await Person.update(
             { fullName: data.recipientName, document: data.recipientDocument, phone: data.recipientPhone, email: data.recipientEmail },
-            { where: { id: shipment.recipientId } }
+            { where: { id: shipment.recipientId }, transaction }
         );
 
         await Address.update(
@@ -263,7 +265,7 @@ const update = async (data) => {
                 lat: data.addressLat || null,
                 lng: data.addressLng || null
             },
-            { where: { id: shipment.addressId } }
+            { where: { id: shipment.addressId }, transaction }
         );
 
         await Shipment.update(
@@ -273,7 +275,7 @@ const update = async (data) => {
                 packageQty:      data.packageQty      || shipment.packageQty,
                 shipmentTypeId:  data.shipmentTypeId  || shipment.shipmentTypeId,
             },
-            { where: { id: data.id } }
+            { where: { id: data.id }, transaction }
         );
     }
 
@@ -342,8 +344,8 @@ const getForKanban = (statusIds, { branchId } = {}) => {
     });
 };
 
-const updatePriority = (id, newPriority) => {
-    return Shipment.update({ priority: newPriority }, { where: { id } });
+const updatePriority = (id, newPriority, options = {}) => {
+    return Shipment.update({ priority: newPriority }, { where: { id }, transaction: options.transaction });
 };
 
 const getActiveShipments = () => {
