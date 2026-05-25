@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
@@ -11,7 +12,6 @@
             flex-direction: column;
             gap: var(--space-6);
         }
-
         .settings-card {
             background: var(--color-surface);
             border: 1px solid var(--color-border);
@@ -20,7 +20,6 @@
             box-shadow: var(--shadow-sm);
             max-width: 1100px;
         }
-
         .settings-card-title {
             font-size: var(--font-size-base);
             font-weight: var(--font-weight-semibold);
@@ -32,19 +31,50 @@
             align-items: center;
             gap: var(--space-2);
         }
-
         .settings-card-title .material-symbols-outlined {
             font-size: 1.1rem;
             color: var(--color-primary);
         }
-
         .settings-subtitle {
             font-size: var(--font-size-sm);
             color: var(--color-text-secondary);
             margin-bottom: var(--space-5);
             line-height: 1.5;
         }
-
+        #form-notification-config {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            margin-top: var(--space-4);
+        }
+        .notification-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 16px;
+            border: 1px solid #dcdcdc;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .notification-item:hover {
+            background-color: #f1f3f5;
+            border-color: #bdbdbd;
+        }
+        .notification-item span {
+            color: #333;
+        }
+        .notification-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
         .settings-actions {
             display: flex;
             justify-content: flex-end;
@@ -52,8 +82,6 @@
             border-top: 1px solid var(--color-border);
             margin-top: var(--space-5);
         }
-
-        /* Reutiliza la grid de direccion de new.ejs */
         .settings-addr {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -64,8 +92,6 @@
         .settings-addr .span-full {
             grid-column: 1 / -1;
         }
-
-        /* Branch assignment table */
         .branch-select {
             width: 100%;
             min-width: 180px;
@@ -79,16 +105,17 @@
     </style>
     <link rel="stylesheet" href="/css/settings.css">
 </head>
+
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
         <div class="page-header">
             <h1>Ajustes</h1>
         </div>
-        
+
         <div class="settings-content">
 
-            <!-- ── Card 1: Dirección de origen ─────────────────────────────── -->
+            <!-- Card 1: Dirección de origen -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">location_on</span>
@@ -98,26 +125,17 @@
                     Esta dirección representa la sucursal o punto de partida de todos los envíos.
                     Se usa para calcular la distancia real hasta el destino y mejorar la predicción del modelo de ML.
                 </p>
-
                 <form method="POST" action="/setting">
-
-                    <!-- Campos hidden: ID para el autocomplete, name para el POST -->
                     <input type="hidden" id="street"      name="origin_street"      value="<%= settings.origin_street      || '' %>">
                     <input type="hidden" id="number"      name="origin_number"      value="<%= settings.origin_number      || '' %>">
                     <input type="hidden" id="province"    name="origin_province_id" value="<%= settings.origin_province_id || '' %>">
                     <input type="hidden" id="postal-code" name="origin_postal_code" value="<%= settings.origin_postal_code || '' %>">
-
                     <div class="settings-addr">
-
-                        <!-- Buscador unificado -->
                         <div class="field addr-search-wrapper addr-full">
                             <label for="address-search">Dirección completa <span class="req">*</span></label>
-                            <input id="address-search" type="text" autocomplete="off"
-                                   placeholder="Ej: Av. Corrientes 1234, Buenos Aires">
+                            <input id="address-search" type="text" autocomplete="off" placeholder="Ej: Av. Corrientes 1234, Buenos Aires">
                             <div id="address-dropdown" class="addr-dropdown" style="display:none;"></div>
                         </div>
-
-                        <!-- Chip de dirección seleccionada -->
                         <div class="addr-selected-row addr-full" id="addr-selected-row" style="display:none;">
                             <div id="address-chip" class="addr-chip">
                                 <span class="material-symbols-outlined">pin_drop</span>
@@ -127,13 +145,8 @@
                                 <span class="material-symbols-outlined">close</span> Cambiar
                             </button>
                         </div>
-
-                        <!-- Resultado de validación -->
-                        <div id="address-validation-result"
-                             class="addr-validation-box addr-validation-box--empty addr-full"></div>
-
+                        <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full"></div>
                     </div>
-
                     <div class="settings-actions">
                         <button type="submit" class="btn-primary">
                             <span class="material-symbols-outlined">save</span>
@@ -142,7 +155,8 @@
                     </div>
                 </form>
             </div>
-            <!-- ── Card 3: Parámetros del sistema ─────────────────────────── -->
+
+            <!-- Card 2: Parámetros del sistema -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">tune</span>
@@ -151,44 +165,121 @@
                 <p class="settings-subtitle">
                     Configurá el comportamiento general del sistema. Estos valores afectan el flujo de envíos, notificaciones y entregas.
                 </p>
-
                 <form method="POST" action="/setting/params">
                     <div class="settings-addr">
 
                         <div class="field">
                             <label for="max_intentos_fallidos">Máximo de intentos fallidos <span class="req">*</span></label>
-                            <input type="number" id="max_intentos_fallidos" name="max_intentos_fallidos"
-                                   min="1" max="10" value="<%= params.max_intentos_fallidos %>" required>
+                            <input type="number" id="max_intentos_fallidos" name="max_intentos_fallidos" min="1" max="10" value="<%= params.max_intentos_fallidos %>" required>
                             <small style="color:var(--color-text-secondary)">Entre 1 y 10. Después de este número el envío se cancela automáticamente.</small>
                         </div>
 
                         <div class="field">
                             <label for="dias_expiracion_envio">Días para expiración de envío <span class="req">*</span></label>
-                            <input type="number" id="dias_expiracion_envio" name="dias_expiracion_envio"
-                                   min="1" max="365" value="<%= params.dias_expiracion_envio %>" required>
+                            <input type="number" id="dias_expiracion_envio" name="dias_expiracion_envio" min="1" max="365" value="<%= params.dias_expiracion_envio %>" required>
                             <small style="color:var(--color-text-secondary)">Entre 1 y 365. Días desde la creación hasta que un envío pendiente expira.</small>
                         </div>
 
                         <div class="field">
                             <label for="horario_entrega_inicio">Inicio de ventana de entrega <span class="req">*</span></label>
-                            <input type="time" id="horario_entrega_inicio" name="horario_entrega_inicio"
-                                   value="<%= params.horario_entrega_inicio %>" required>
+                            <input type="time" id="horario_entrega_inicio" name="horario_entrega_inicio" value="<%= params.horario_entrega_inicio %>" required>
                         </div>
 
                         <div class="field">
                             <label for="horario_entrega_fin">Fin de ventana de entrega <span class="req">*</span></label>
-                            <input type="time" id="horario_entrega_fin" name="horario_entrega_fin"
-                                   value="<%= params.horario_entrega_fin %>" required>
+                            <input type="time" id="horario_entrega_fin" name="horario_entrega_fin" value="<%= params.horario_entrega_fin %>" required>
                             <small style="color:var(--color-text-secondary)">El horario de fin debe ser posterior al de inicio.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="peso_maximo_envio">Peso máximo por envío (kg) <span class="req">*</span></label>
+                            <input type="number" id="peso_maximo_envio" name="peso_maximo_envio" min="1" max="999" step="0.1" value="<%= params.peso_maximo_envio %>" required>
+                            <small style="color:var(--color-text-secondary)">Peso máximo permitido por envío.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="cantidad_maxima_paquetes">Cantidad máxima de paquetes <span class="req">*</span></label>
+                            <input type="number" id="cantidad_maxima_paquetes" name="cantidad_maxima_paquetes" min="1" max="999" value="<%= params.cantidad_maxima_paquetes %>" required>
+                            <small style="color:var(--color-text-secondary)">Límite de paquetes por envío.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="costo_base_envio">Costo base de envío ($) <span class="req">*</span></label>
+                            <input type="number" id="costo_base_envio" name="costo_base_envio" min="0" step="0.01" value="<%= params.costo_base_envio %>" required>
+                            <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
+                        </div>
+
+                        <div class="field span-full">
+                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
+                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
+                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="telefono_soporte">Teléfono de soporte</label>
+                            <input type="text" id="telefono_soporte" name="telefono_soporte" maxlength="20" value="<%= params.telefono_soporte %>">
+                            <small style="color:var(--color-text-secondary)">Visible en el portal público.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="email_soporte">Email de soporte</label>
+                            <input type="email" id="email_soporte" name="email_soporte" maxlength="100" value="<%= params.email_soporte %>">
+                            <small style="color:var(--color-text-secondary)">Visible en el portal público.</small>
                         </div>
 
                         <div class="field span-full">
                             <label>Notificaciones activas</label>
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                                <input type="checkbox" name="notificaciones_activas" value="true"
-                                       <%= params.notificaciones_activas === 'true' ? 'checked' : '' %>>
+                                <input type="checkbox" name="notificaciones_activas" value="true" <%= params.notificaciones_activas === 'true' ? 'checked' : '' %>>
                                 <span>Habilitar notificaciones automáticas al cliente</span>
                             </label>
+                        </div>
+
+                        <!-- Procesos automáticos -->
+                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
+                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">schedule</span>
+                                Procesos automáticos
+                            </label>
+                            <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
+                                Programá los procesos en horarios de baja actividad para reducir costos de infraestructura en AWS.
+                            </small>
+                            <div style="margin-top:var(--space-3);padding:12px 16px;background:rgba(37,99,235,0.06);border-left:3px solid var(--color-primary);border-radius:6px;font-size:0.82rem;color:var(--color-text-secondary);line-height:1.6">
+                                <strong style="color:var(--color-text);display:block;margin-bottom:4px">
+                                    <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">cloud</span>
+                                    ¿Por qué configurar el horario?
+                                </strong>
+                                En infraestructura cloud (AWS Lambda, EC2, etc.) el costo se calcula por uso.
+                                Programar procesos pesados como reportes automáticos, notificaciones masivas y revisión de prioridades
+                                en horarios de <strong>baja actividad</strong> (ej: 02:00 a 05:00 hs) permite reducir significativamente
+                                los costos operativos, ya que estos procesos no compiten con el tráfico de usuarios activos.
+                                Por ejemplo, si el sistema corre en una instancia EC2 bajo demanda, ejecutar tareas en horario pico
+                                puede costar hasta <strong>3 veces más</strong> que en horario nocturno.
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_revisar_expirados_hora">Revisar pedidos expirados</label>
+                            <input type="time" id="proceso_revisar_expirados_hora" name="proceso_revisar_expirados_hora" value="<%= params.proceso_revisar_expirados_hora %>">
+                            <small style="color:var(--color-text-secondary)">Cancela envíos pendientes que superaron el límite de días.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_revisar_prioridades_hora">Revisar prioridades de envío</label>
+                            <input type="time" id="proceso_revisar_prioridades_hora" name="proceso_revisar_prioridades_hora" value="<%= params.proceso_revisar_prioridades_hora %>">
+                            <small style="color:var(--color-text-secondary)">Recalcula prioridades según peso, distancia y tiempo de espera.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_generar_reportes_hora">Generación de reportes automáticos</label>
+                            <input type="time" id="proceso_generar_reportes_hora" name="proceso_generar_reportes_hora" value="<%= params.proceso_generar_reportes_hora %>">
+                            <small style="color:var(--color-text-secondary)">Genera y almacena reportes diarios de operaciones.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_notificaciones_hora">Envío de notificaciones pendientes</label>
+                            <input type="time" id="proceso_notificaciones_hora" name="proceso_notificaciones_hora" value="<%= params.proceso_notificaciones_hora %>">
+                            <small style="color:var(--color-text-secondary)">Procesa y envía notificaciones acumuladas al cliente.</small>
                         </div>
 
                     </div>
@@ -202,14 +293,203 @@
                 </form>
             </div>
 
-            <!-- ── Card: Optimización de ruteo (piggyback) ─────────────────── -->
+            <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">mark_email_read</span>
+                    Notificaciones por evento
+                </h2>
+                <p class="settings-subtitle">
+                    Por cada evento podés elegir si se notifica, a quién (destinatario / remitente / ambos / un email personalizado) y editar el texto del email.
+                </p>
+                <form method="POST" action="/setting/notification-config">
+                    <div style="display:flex;flex-direction:column;gap:.6rem">
+                        <% notifConfig.forEach(config => { %>
+                            <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                                    <input type="checkbox" name="enabled_<%= config.eventCode %>"
+                                        <%= config.enabled ? 'checked' : '' %>>
+                                    <%= config.description %>
+                                </label>
+
+                                <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
+                                    <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
+                                    <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
+                                    <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
+                                    <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
+                                </select>
+
+                                <input type="email" name="custom_<%= config.eventCode %>"
+                                    placeholder="email@dominio.com"
+                                    value="<%= config.customEmail || '' %>"
+                                    data-event="<%= config.eventCode %>"
+                                    class="notif-custom-input"
+                                    <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
+
+                                <button type="button" class="btn-secondary notif-edit-tpl-btn"
+                                    data-event="<%= config.eventCode %>"
+                                    data-description="<%= config.description %>"
+                                    data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
+                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>">
+                                    <span class="material-symbols-outlined">edit_note</span>
+                                    Editar mail
+                                </button>
+                            </div>
+                        <% }) %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar notificaciones
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Notificaciones de incidencias (destinatarios internos) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">report</span>
+                    Notificaciones de incidencias
+                </h2>
+                <p class="settings-subtitle">
+                    Elegí quiénes reciben un email cuando se registra una nueva incidencia interna. Se pueden combinar destinatarios por rol y emails personalizados.
+                </p>
+                <form method="POST" action="/setting/incident-notification">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifySupervisorBranch" <%= incidentNotif.notifySupervisorBranch ? 'checked' : '' %>>
+                            <span>Supervisor de la sucursal del usuario asignado</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyAssignedOperator" <%= incidentNotif.notifyAssignedOperator ? 'checked' : '' %>>
+                            <span>Operador asignado a la incidencia</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyAdmins" <%= incidentNotif.notifyAdmins ? 'checked' : '' %>>
+                            <span>Todos los administradores</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyReporter" <%= incidentNotif.notifyReporter ? 'checked' : '' %>>
+                            <span>Usuario que reportó la incidencia (copia)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;grid-column:1/-1">
+                            <input type="checkbox" name="notifyShipmentRecipient" <%= incidentNotif.notifyShipmentRecipient ? 'checked' : '' %>>
+                            <span>Destinatario del envío (usa template de <code>SHIPMENT_INCIDENT</code>)</span>
+                        </label>
+                    </div>
+                    <div class="field" style="margin-top:1rem">
+                        <label for="incident_notif_custom">Emails personalizados extra</label>
+                        <input type="text" id="incident_notif_custom" name="customEmails"
+                               value="<%= incidentNotif.customEmails || '' %>"
+                               placeholder="ej: ops@logitrack.com, calidad@logitrack.com">
+                        <small style="color:var(--color-text-secondary)">Separar por coma, espacio o punto y coma. Se ignoran direcciones inválidas.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar notificaciones de incidencias
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Email de prueba (override) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">science</span>
+                    Email de prueba (override)
+                </h2>
+                <p class="settings-subtitle">
+                    Si se configura un email aquí, <strong>todos</strong> los mails del sistema se redirigen a esta dirección (en vez de ir al destinatario/remitente real). Útil para testeo. Dejar vacío para operar normal.
+                </p>
+                <form method="POST" action="/setting/test-email-override">
+                    <div class="field" style="max-width:520px">
+                        <label for="test_email_override">Email override (vacío = desactivado)</label>
+                        <input type="email" id="test_email_override" name="test_email_override"
+                            value="<%= params.test_email_override %>" placeholder="ej: dev@tudominio.com">
+                        <small style="color:var(--color-text-secondary)">El asunto recibirá un prefijo <code>[TEST → destinatarios reales]</code>.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar override
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Modal: Editar template de email -->
+            <div id="tpl-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center">
+                <form id="tpl-modal-form" method="POST" action=""
+                    style="background:var(--color-bg,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);width:min(640px,92vw);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
+                    <h3 style="margin:0">Editar email — <span id="tpl-modal-event"></span></h3>
+                    <div class="field">
+                        <label for="tpl-modal-subject">Asunto</label>
+                        <input type="text" id="tpl-modal-subject" name="subject" required>
+                    </div>
+                    <div class="field">
+                        <label for="tpl-modal-body">Cuerpo del mensaje</label>
+                        <textarea id="tpl-modal-body" name="body" rows="8" required style="font-family:inherit;resize:vertical"></textarea>
+                        <small style="color:var(--color-text-secondary)">
+                            Placeholders disponibles: <code>{{fullName}}</code>, <code>{{trackingCode}}</code>
+                        </small>
+                    </div>
+                    <div class="settings-actions" style="justify-content:flex-end;gap:.6rem">
+                        <button type="button" class="btn-secondary" id="tpl-modal-cancel">Cancelar</button>
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar mail
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <script>
+                (function setupNotifConfig() {
+                    document.querySelectorAll('.notif-mode-select').forEach(sel => {
+                        sel.addEventListener('change', e => {
+                            const ev = e.target.dataset.event;
+                            const input = document.querySelector('.notif-custom-input[data-event="' + ev + '"]');
+                            if (!input) return;
+                            input.disabled = e.target.value !== 'custom';
+                            if (input.disabled) input.value = '';
+                        });
+                    });
+
+                    const backdrop = document.getElementById('tpl-modal-backdrop');
+                    const form     = document.getElementById('tpl-modal-form');
+                    const eventLbl = document.getElementById('tpl-modal-event');
+                    const subject  = document.getElementById('tpl-modal-subject');
+                    const body     = document.getElementById('tpl-modal-body');
+
+                    document.querySelectorAll('.notif-edit-tpl-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            form.action = '/setting/email-template/' + btn.dataset.event;
+                            eventLbl.textContent = btn.dataset.description;
+                            subject.value = btn.dataset.subject || '';
+                            body.value    = btn.dataset.body    || '';
+                            backdrop.style.display = 'flex';
+                        });
+                    });
+
+                    document.getElementById('tpl-modal-cancel').addEventListener('click', () => {
+                        backdrop.style.display = 'none';
+                    });
+                    backdrop.addEventListener('click', e => {
+                        if (e.target === backdrop) backdrop.style.display = 'none';
+                    });
+                })();
+            </script>
+
+            <!-- Card 3: Optimización de ruteo -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">alt_route</span>
                     Optimización de ruteo · Sumar a rutas pendientes
                 </h2>
                 <p class="settings-subtitle">
-                    Cuando un transporte tiene una ruta <strong>Planificada</strong> (todavía no salió), el optimizador puede evaluar si un envío nuevo cabe en esa ruta sin disparar el costo. Configurá los umbrales aceptables. Si el envío está <strong>En Tránsito</strong>, el transporte queda siempre bloqueado.
+                    Cuando un transporte tiene una ruta <strong>Planificada</strong> (todavía no salió), el optimizador puede evaluar si un envío nuevo cabe en esa ruta sin disparar el costo.
                 </p>
                 <form method="POST" action="/setting/route-optimizer">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4) var(--space-5)">
@@ -218,40 +498,32 @@
                                 <input type="checkbox" name="piggyback_enabled" value="on" <%= routeOpt.piggyback_enabled ? 'checked' : '' %>>
                                 <strong>Permitir sumar envíos a rutas pendientes (piggyback)</strong>
                             </label>
-                            <small style="color:var(--color-text-secondary)">Si está desactivado, los transportes con ruta Planificada se excluyen completamente del optimizador.</small>
                         </div>
                         <div class="field">
-                            <label for="piggyback_max_extra_pct">Desvío máximo permitido (% sobre distancia actual)</label>
+                            <label for="piggyback_max_extra_pct">Desvío máximo permitido (%)</label>
                             <input type="number" id="piggyback_max_extra_pct" name="piggyback_max_extra_pct" min="0" max="100" step="1" value="<%= routeOpt.piggyback_max_extra_pct %>">
-                            <small style="color:var(--color-text-secondary)">Ej: 15% — si la ruta actual es 100km, acepta hasta +15km extra.</small>
                         </div>
                         <div class="field">
-                            <label for="piggyback_max_extra_km">Desvío máximo absoluto (km extra)</label>
+                            <label for="piggyback_max_extra_km">Desvío máximo absoluto (km)</label>
                             <input type="number" id="piggyback_max_extra_km" name="piggyback_max_extra_km" min="0" max="500" step="1" value="<%= routeOpt.piggyback_max_extra_km %>">
-                            <small style="color:var(--color-text-secondary)">Tope independiente del %. Bloquea sumar si el detour supera este número de km.</small>
                         </div>
                         <div class="field">
-                            <label for="piggyback_max_extra_cost_pct">Costo extra máximo (% sobre costo actual)</label>
+                            <label for="piggyback_max_extra_cost_pct">Costo extra máximo (%)</label>
                             <input type="number" id="piggyback_max_extra_cost_pct" name="piggyback_max_extra_cost_pct" min="0" max="100" step="1" value="<%= routeOpt.piggyback_max_extra_cost_pct %>">
-                            <small style="color:var(--color-text-secondary)">Costo adicional aceptable comparado con el costo total de la ruta planificada.</small>
                         </div>
-
                         <div class="field" style="grid-column:1/-1;padding-top:var(--space-3);border-top:1px solid var(--color-border)">
                             <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer">
                                 <input type="checkbox" name="urgent_combine_enabled" value="on" <%= routeOpt.urgent_combine_enabled ? 'checked' : '' %>>
                                 <strong>Combinar envíos urgentes cercanos en un mismo transporte</strong>
                             </label>
-                            <small style="color:var(--color-text-secondary)">Si está activado, los envíos urgentes que vayan a destinos cercanos se agrupan en un solo vehículo dedicado. Si está desactivado, cada urgente fuerza un vehículo propio.</small>
                         </div>
                         <div class="field">
-                            <label for="urgent_combine_max_km">Distancia máxima entre urgentes combinables (km)</label>
+                            <label for="urgent_combine_max_km">Distancia máxima entre urgentes (km)</label>
                             <input type="number" id="urgent_combine_max_km" name="urgent_combine_max_km" min="0" max="200" step="1" value="<%= routeOpt.urgent_combine_max_km %>">
-                            <small style="color:var(--color-text-secondary)">Ej: 15km — dos urgentes a menos de 15km entre sí viajan juntos.</small>
                         </div>
                         <div class="field">
-                            <label for="cluster_merge_radius_km">Radio para agrupar envíos en un mismo transporte (km a la redonda)</label>
+                            <label for="cluster_merge_radius_km">Radio para agrupar envíos (km)</label>
                             <input type="number" id="cluster_merge_radius_km" name="cluster_merge_radius_km" min="0" max="500" step="1" value="<%= routeOpt.cluster_merge_radius_km %>">
-                            <small style="color:var(--color-text-secondary)">Ej: 60km — envíos cuyos destinos estén dentro de este radio entre sí se asignan al mismo vehículo aunque figuren en provincias distintas (típico CABA + GBA).</small>
                         </div>
                     </div>
                     <div class="settings-actions">
@@ -263,7 +535,7 @@
                 </form>
             </div>
 
-            <!-- ── Card 2: Asignación de sucursales a usuarios ─────────────── -->
+            <!-- Card 4: Asignación de sucursales -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">store</span>
@@ -272,15 +544,10 @@
                 <p class="settings-subtitle">
                     Asigná una sucursal a cada usuario. Los usuarios sin sucursal asignada aparecen con "Sin sucursal".
                 </p>
-
                 <% if (branches.length === 0) { %>
-                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                        No hay sucursales cargadas en el sistema. Ejecutá el script SQL de inserción de sucursales primero.
-                    </p>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">No hay sucursales cargadas en el sistema.</p>
                 <% } else if (users.length === 0) { %>
-                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">
-                        No hay usuarios registrados en el sistema.
-                    </p>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">No hay usuarios registrados en el sistema.</p>
                 <% } else { %>
                 <form method="POST" action="/setting/assign-branch">
                 <div class="table-wrapper">
@@ -307,10 +574,7 @@
                                     <select name="branchId[]" class="branch-select">
                                         <option value="">— Sin sucursal —</option>
                                         <% branches.forEach(branch => { %>
-                                            <option value="<%= branch.id %>"
-                                                <%= user.branchId === branch.id ? 'selected' : '' %>>
-                                                <%= branch.name %>
-                                            </option>
+                                            <option value="<%= branch.id %>" <%= user.branchId === branch.id ? 'selected' : '' %>><%= branch.name %></option>
                                         <% }); %>
                                     </select>
                                 </td>
@@ -326,16 +590,216 @@
                     </button>
                 </div>
                 </form>
-                
                 <% } %>
             </div>
 
+            <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">cancel</span>
+                    Motivos de intento fallido
+                </h2>
+                <p class="settings-subtitle">Catálogo editable de motivos que ve el repartidor al marcar entrega fallida. <code>creates_incident=on</code> abre incidencia automática; <code>max_attempts_override</code> reemplaza el tope global solo para ese motivo.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Código</th><th>Etiqueta</th><th>Días reintento</th><th>Activo</th><th>Crea incidencia</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        <% (failedReasons || []).forEach(r => { %>
+                        <tr>
+                            <form method="POST" action="/setting/failed-reason/<%= r.id %>">
+                                <td><code><%= r.code %></code></td>
+                                <td><input type="text" name="label" value="<%= r.label %>" required></td>
+                                <td><input type="number" name="retryDays" min="0" max="30" value="<%= r.retryDays %>" style="width:70px"></td>
+                                <td><input type="checkbox" name="active" <%= r.active ? 'checked' : '' %>></td>
+                                <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="btn-primary" type="submit">Guardar</button>
+                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')">Borrar</button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/failed-reason">
+                                <td><input type="text" name="code" placeholder="codigo_snake" required></td>
+                                <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
+                                <td><input type="number" name="retryDays" min="0" max="30" value="1" style="width:70px"></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><input type="checkbox" name="createsIncident"></td>
+                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Tipos de incidencia configurables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">report</span>
+                    Tipos de incidencia
+                </h2>
+                <p class="settings-subtitle">Categorías que ve el usuario al reportar una incidencia desde el portal o el chatbot.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Código</th><th>Etiqueta</th><th>Activo</th><th></th></tr></thead>
+                    <tbody>
+                        <% (incidentTypes || []).forEach(t => { %>
+                        <tr>
+                            <form method="POST" action="/setting/incident-type/<%= t.id %>">
+                                <td><code><%= t.code %></code></td>
+                                <td><input type="text" name="label" value="<%= t.description %>" required></td>
+                                <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="btn-primary" type="submit">Guardar</button>
+                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')">Desactivar</button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/incident-type">
+                                <td><input type="text" name="code" placeholder="CODIGO" required></td>
+                                <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Franjas horarias habilitadas globalmente -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Franjas horarias de entrega
+                </h2>
+                <p class="settings-subtitle">Bloques horarios que el destinatario puede elegir en autogestión del portal y que se muestran en alta de envío.</p>
+                <style>
+                    .tw-list { display:flex; flex-direction:column; gap:.5rem; }
+                    .tw-row {
+                        display:grid;
+                        grid-template-columns: 1.4fr .8fr .8fr auto auto;
+                        gap:.5rem;
+                        align-items:center;
+                        padding:.5rem .75rem;
+                        background: var(--color-bg-secondary, #f8fafc);
+                        border:1px solid var(--color-border, #e2e8f0);
+                        border-radius:8px;
+                    }
+                    .tw-row input[type="text"], .tw-row input[type="time"] {
+                        padding:.4rem .55rem; font-size:.85rem; height:34px;
+                        border:1px solid var(--color-border, #cbd5e1); border-radius:6px;
+                        background: var(--color-surface, #fff); color: var(--color-text);
+                        width:100%; box-sizing:border-box;
+                    }
+                    .tw-row label.tw-active {
+                        display:flex; align-items:center; gap:.3rem;
+                        font-size:.8rem; color: var(--color-text-secondary);
+                        white-space:nowrap;
+                    }
+                    .tw-row .tw-actions { display:flex; gap:.3rem; }
+                    .tw-row .tw-actions button {
+                        padding:.35rem .65rem; font-size:.8rem; height:34px;
+                    }
+                    .tw-row.tw-new { border-style:dashed; background:transparent; }
+                    @media (max-width: 720px) {
+                        .tw-row { grid-template-columns: 1fr 1fr; }
+                        .tw-row .tw-actions { grid-column:1/-1; justify-content:flex-end; }
+                    }
+                </style>
+                <div class="tw-list">
+                    <% (timeWindows || []).forEach(w => { %>
+                        <form method="POST" action="/setting/time-window/<%= w.id %>" class="tw-row">
+                            <input type="text" name="label" value="<%= w.label %>" required>
+                            <input type="time" name="fromTime" value="<%= String(w.fromTime).slice(0,5) %>" required>
+                            <input type="time" name="toTime" value="<%= String(w.toTime).slice(0,5) %>" required>
+                            <label class="tw-active">
+                                <input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>> Activo
+                            </label>
+                            <div class="tw-actions">
+                                <button class="btn-primary" type="submit">Guardar</button>
+                                <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')">Borrar</button>
+                            </div>
+                        </form>
+                    <% }) %>
+                    <form method="POST" action="/setting/time-window" class="tw-row tw-new">
+                        <input type="text" name="label" placeholder="Ej: Mañana" required>
+                        <input type="time" name="fromTime" required>
+                        <input type="time" name="toTime" required>
+                        <label class="tw-active">
+                            <input type="checkbox" name="active" checked> Activo
+                        </label>
+                        <div class="tw-actions">
+                            <button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Mensajes estándar parametrizables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">edit_note</span>
+                    Mensajes estándar
+                </h2>
+                <p class="settings-subtitle">Textos reutilizables (reprogramación, próxima entrega, devuelto). Soportan placeholders <code>{{date}}</code>, <code>{{branch}}</code>, <code>{{eta}}</code>.</p>
+                <% (stdMessages || []).forEach(m => { %>
+                <form method="POST" action="/setting/standard-message/<%= m.code %>" style="margin-bottom:1rem">
+                    <label style="font-weight:600"><%= m.label %> <code style="font-size:.75rem;color:#64748b">(<%= m.code %>)</code></label>
+                    <textarea name="body" rows="2" style="width:100%;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px"><%= m.body %></textarea>
+                    <button class="btn-primary" type="submit" style="margin-top:.25rem">Guardar</button>
+                </form>
+                <% }) %>
+            </div>
+
+            <!-- Card 5: Historial de cambios -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">history</span>
+                    Historial de cambios de configuración
+                </h2>
+                <p class="settings-subtitle">
+                    Registro de los últimos 50 cambios realizados por administradores.
+                </p>
+                <% if (settingLogs.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay cambios registrados.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Usuario</th>
+                                <th>Parámetro</th>
+                                <th>Valor anterior</th>
+                                <th>Valor nuevo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% settingLogs.forEach(log => { %>
+                            <tr>
+                                <td><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
+                                <td><%= log.user ? log.user.fullName : 'Sistema' %></td>
+                                <td><code><%= log.key %></code></td>
+                                <td><%= log.oldValue || '-' %></td>
+                                <td><strong><%= log.newValue || '-' %></strong></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
         </div>
     </main>
 
-    <%
-        const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
-    %>
+    <% const _currentProv = provinces.find(p => p.id == settings.origin_province_id); %>
     <script id="setting-addr-data" type="application/json"><%- JSON.stringify({
         street: settings.origin_street || null,
         number: settings.origin_number || null,
@@ -348,17 +812,14 @@
     <script src="/js/address-autocomplete.js" defer></script>
     <script>
         const _addr = JSON.parse(document.getElementById('setting-addr-data').textContent);
-
         if (_addr.street && _addr.number) {
             document.addEventListener('DOMContentLoaded', function () {
                 const mainLine = _addr.street + ' ' + _addr.number;
                 const subLine  = _addr.prov;
-
                 const row  = document.getElementById('addr-selected-row');
                 const text = document.getElementById('addr-chip-text');
                 if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' — ' + subLine : '');
                 if (row)  row.style.display = 'flex';
-
                 const box = document.getElementById('address-validation-result');
                 if (box) {
                     box.className = 'addr-validation-box addr-validation-box--valid addr-full';
@@ -371,7 +832,12 @@
         const _param = new URLSearchParams(window.location.search).get('success');
         if (_param === '1' || _param === '2' || _param === '3' || _param === '4') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
-            const _titles = { '1': 'Ajustes guardados', '2': 'Sucursal asignada correctamente', '3': 'Configuración de ruteo guardada', '4': 'Parámetros guardados correctamente' };
+            const _titles = {
+                '1': 'Ajustes guardados',
+                '2': 'Sucursal asignada correctamente',
+                '3': 'Configuración de ruteo guardada',
+                '4': 'Parámetros guardados correctamente'
+            };
             Swal.fire({
                 icon: 'success',
                 title: _titles[_param],
@@ -383,4 +849,5 @@
         }
     </script>
 </body>
+
 </html>

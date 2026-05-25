@@ -36,7 +36,11 @@
             <% if (!branchId) { %>
                 <div style="text-align:center;padding:var(--space-12) var(--space-6);color:var(--color-text-secondary)">
                     <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:var(--space-4);opacity:.4">warehouse</span>
-                    Seleccioná una sucursal para ver envíos y transportes disponibles.
+                    <% if (isAdmin) { %>
+                        Seleccioná una sucursal para ver envíos y transportes disponibles.
+                    <% } else { %>
+                        Tu usuario no tiene sucursal asignada. Pedile al administrador que te asigne una en <strong>Ajustes → Asignación de sucursales</strong>, después cerrá sesión e iniciá de nuevo.
+                    <% } %>
                 </div>
             <% } else if (shipments.length === 0) { %>
                 <div class="empty-row" style="padding:var(--space-8);text-align:center;color:var(--color-text-secondary)">

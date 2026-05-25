@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Rendimiento de Repartidores</title>
+    <link rel="stylesheet" href="/css/report.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Rendimiento de Repartidores</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/delivery-performance" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="btn-primary">
+                                <span class="material-symbols-outlined">search</span>
+                                Consultar
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/delivery-performance" class="btn-outline">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                    Limpiar
+                                </a>
+                            <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/delivery-performance/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="btn-outline">
+                                    <span class="material-symbols-outlined">download</span>
+                                    Exportar CSV
+                                </a>
+                                <a href="/report/delivery-performance/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="btn-outline">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                    Exportar PDF
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+                <% if (hasQuery && rows.length === 0) { %>
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">person_off</span>
+                            <p>No existen envíos asociados a repartidores en el período <strong><%= dateFrom %></strong> → <strong><%= dateTo %></strong>.</p>
+                        </div>
+                    </div>
+                <% } else if (rows.length > 0) { %>
+                    <div class="report-card">
+                        <div class="dp-table-header">
+                            <h2>Resultados — <%= rows.length %> repartidor<%= rows.length !== 1 ? 'es' : '' %></h2>
+                            <span class="dp-sort-hint">
+                                <span class="material-symbols-outlined">swap_vert</span>
+                                Clic en columna para ordenar
+                            </span>
+                        </div>
+                        <table class="report-table dp-table" id="perf-table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-col="full_name">Repartidor <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="assigned">Asignados <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="delivered">Entregados <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="on_time">A tiempo <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="incidents">Incidencias <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right dp-col-pct" data-col="success_pct">% Éxito <span class="sort-icon">↕</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="perf-tbody">
+                                <% rows.forEach(row => { %>
+                                    <tr
+                                        data-full_name="<%= row.full_name %>"
+                                        data-assigned="<%= row.assigned %>"
+                                        data-delivered="<%= row.delivered %>"
+                                        data-on_time="<%= row.on_time %>"
+                                        data-incidents="<%= row.incidents %>"
+                                        data-success_pct="<%= row.success_pct %>"
+                                    >
+                                        <td>
+                                            <div class="dp-driver-cell">
+                                                <div class="dp-avatar"><%= row.full_name.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
+                                                <%= row.full_name %>
+                                            </div>
+                                        </td>
+                                        <td class="text-right count-cell"><%= row.assigned %></td>
+                                        <td class="text-right count-cell"><%= row.delivered %></td>
+                                        <td class="text-right">
+                                            <% if (row.delivered > 0) { %>
+                                                <span class="ot-badge ot-badge--green"><%= row.on_time %></span>
+                                            <% } else { %>
+                                                <span class="dp-na">—</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="text-right">
+                                            <% if (row.incidents > 0) { %>
+                                                <span class="ot-badge ot-badge--red"><%= row.incidents %></span>
+                                            <% } else { %>
+                                                <span class="dp-na">0</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="text-right">
+                                            <div class="dp-pct-cell">
+                                                <div class="dp-pct-bar-track">
+                                                    <div class="dp-pct-bar-fill <%= row.success_pct >= 80 ? 'fill--green' : row.success_pct >= 50 ? 'fill--amber' : 'fill--red' %>"
+                                                         style="width:<%= row.success_pct %>%"></div>
+                                                </div>
+                                                <span class="dp-pct-label"><%= row.success_pct %>%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        // Validación fecha cliente
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+
+        // Ordenamiento por columna
+        (function () {
+            const tbody = document.getElementById('perf-tbody');
+            if (!tbody) return;
+
+            let lastCol = null;
+            let asc = true;
+
+            document.querySelectorAll('#perf-table th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', () => {
+                    const col = th.dataset.col;
+                    if (lastCol === col) { asc = !asc; } else { asc = col === 'full_name'; }
+                    lastCol = col;
+
+                    // Actualizar íconos
+                    document.querySelectorAll('#perf-table .sort-icon').forEach(i => i.textContent = '↕');
+                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        const va = a.dataset[col];
+                        const vb = b.dataset[col];
+                        const isNum = col !== 'full_name';
+                        const cmp = isNum ? Number(va) - Number(vb) : va.localeCompare(vb, 'es');
+                        return asc ? cmp : -cmp;
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

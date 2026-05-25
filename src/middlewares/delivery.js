@@ -16,7 +16,9 @@ const handleCreateValidationErrors = (req, res, next) => {
     if (!errors.isEmpty()) {
         return res.render('delivery/evidence', {
             shipmentId: req.params.id,
-            errors: errors.mapped()
+            errors:     errors.mapped(),
+            routeId:    req.body.routeId || req.query.routeId || null,
+            stopId:     req.body.stopId  || req.query.stopId  || null,
         });
     }
     next();

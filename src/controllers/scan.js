@@ -109,13 +109,44 @@ const postFailedAttempt = async (req, res) => {
             longitude:  coords.longitude,
         });
 
-        await failedAttemptModel.create({
-            shipmentId:    shipment.id,
-            reason,
-            observation,
-            suggestedDate,
-            status:        'pendiente',
-            operatorId:    currentUser.id,
+        // Bloque transaccional: registro del intento + posible cancelación automática.
+        // El cambio de estado a FAILED_ATTEMPT ya quedó persistido por stateMachine.transition arriba
+        // (que tiene su propia transacción). Esta segunda transacción agrupa los efectos derivados.
+        const sequelize = require('../database/connection');
+        const settingModel = require('../models/setting');
+        const settings = await settingModel.getAll();
+        const maxIntentos = parseInt(settings.max_intentos_fallidos) || 3;
+
+        await sequelize.transaction(async (t) => {
+            await failedAttemptModel.create({
+                shipmentId:    shipment.id,
+                reason,
+                observation,
+                suggestedDate,
+                status:        'pendiente',
+                operatorId:    currentUser.id,
+            }, { transaction: t });
+
+            const intentosPrevios = await failedAttemptModel.getByShipmentId(shipment.id, { transaction: t });
+            if (intentosPrevios.length >= maxIntentos) {
+                const shipmentHistoryModel = require('../models/shipmentHistory');
+                await shipmentModel.updateStatus(shipment.id, 5, { transaction: t });
+                await shipmentHistoryModel.create({
+                    shipmentId:   shipment.id,
+                    fromStatusId: Status.FAILED_ATTEMPT.id,
+                    toStatusId:   5,
+                    comment:      `Envío cancelado automáticamente por superar ${maxIntentos} intentos fallidos`,
+                    userId:       currentUser?.id || null,
+                    eventType:    'STATUS_CHANGE',
+                    transaction:  t,
+                });
+                // Sync ruteo: cancelado cierra la parada
+                const { RouteStop } = require('../models/routeStop');
+                await RouteStop.update(
+                    { completed: true, completedAt: new Date() },
+                    { where: { shipmentId: shipment.id, stopType: 'delivery', completed: false }, transaction: t }
+                );
+            }
         });
 
         const newStatus = await statusModel.getById(Status.FAILED_ATTEMPT.id);

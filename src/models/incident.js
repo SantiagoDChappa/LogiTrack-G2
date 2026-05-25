@@ -39,14 +39,17 @@ const includesFull = () => {
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, openedChannel, resolution, limit = 200 } = {}) => {
     const where = {};
+    if (id)                { where.id = id; }
     if (status)            { where.status = status; }
     if (typeof escalated === 'boolean') { where.escalated = escalated; }
     if (priority)          { where.priority = priority; }
     if (assignedToUserId)  { where.assignedToUserId = assignedToUserId; }
     if (shipmentId)        { where.shipmentId = shipmentId; }
     if (openedByUserId)    { where.openedByUserId = openedByUserId; }
+    if (openedChannel)     { where.openedChannel = openedChannel; }
+    if (resolution)        { where.resolution = resolution; }
 
     const { Shipment }     = require('./shipment');
     const { IncidentType } = require('./incidentType');
@@ -75,4 +78,9 @@ const countOpenByShipment = (shipmentId) => Incident.count({
     where: { shipmentId, status: ['OPEN', 'IN_REVIEW'] }
 });
 
-module.exports = { Incident, findByIdFull, list, countOpenByShipment };
+const findOpenByShipment = (shipmentId) => Incident.findAll({
+    where: { shipmentId, status: ['OPEN', 'IN_REVIEW'] },
+    attributes: ['id', 'incidentTypeId', 'status']
+});
+
+module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment };

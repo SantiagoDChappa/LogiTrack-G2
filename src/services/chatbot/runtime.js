@@ -80,6 +80,23 @@ function findShipmentById(shipments, shipmentId) {
     return shipments.find((shipment) => shipment.id === String(shipmentId || '')) || null;
 }
 
+const INCIDENT_STEPS = new Set(['tracking', 'type', 'description', 'name', 'email', 'confirm']);
+
+function normalizeIncidentDraft(rawDraft) {
+    if (!rawDraft || typeof rawDraft !== 'object') { return null; }
+    const step = INCIDENT_STEPS.has(rawDraft.step) ? rawDraft.step : null;
+    if (!step) { return null; }
+    return {
+        step,
+        trackingId:     rawDraft.trackingId     ? String(rawDraft.trackingId).slice(0, 40)  : null,
+        incidentTypeId: rawDraft.incidentTypeId ? Number(rawDraft.incidentTypeId) || null   : null,
+        incidentTypeLabel: rawDraft.incidentTypeLabel ? String(rawDraft.incidentTypeLabel).slice(0, 120) : null,
+        description:    rawDraft.description    ? String(rawDraft.description).slice(0, 2000) : null,
+        reporterName:   rawDraft.reporterName   ? String(rawDraft.reporterName).slice(0, 120) : null,
+        reporterEmail:  rawDraft.reporterEmail  ? String(rawDraft.reporterEmail).slice(0, 160) : null,
+    };
+}
+
 function normalizeState(rawState, shipments) {
     const requestedId = rawState?.selectedShipmentId ? String(rawState.selectedShipmentId) : null;
     const hasStoredSelection = requestedId && findShipmentById(shipments, requestedId);
@@ -88,6 +105,7 @@ function normalizeState(rawState, shipments) {
     return {
         selectedShipmentId: autoSelectedId || (hasStoredSelection ? requestedId : null),
         pendingAction: rawState?.pendingAction ? String(rawState.pendingAction) : null,
+        incidentDraft: normalizeIncidentDraft(rawState?.incidentDraft),
     };
 }
 

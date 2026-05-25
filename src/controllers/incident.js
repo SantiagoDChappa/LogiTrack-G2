@@ -4,10 +4,21 @@ const incidentTypeModel    = require('../models/incidentType');
 const incidentHistoryModel = require('../models/incidentHistory');
 const { Incident }         = incidentModel;
 const shipmentModel        = require('../models/shipment');
+const shipmentHistoryModel = require('../models/shipmentHistory');
 const { User }             = require('../models/user');
+const branchModel          = require('../models/branch');
+const { sendEmail }        = require('../services/notification/emailSender');
+const incidentRules        = require('../services/incidentRules');
+const incidentNotifConfig  = require('../services/incidentNotifConfig');
 const {
-    RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType
+    RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
+    ShipmentHistoryEvent, NotificationEvent, Status
 } = require('../constants/enums');
+
+const roleDescriptionById = Object.values(RoleType).reduce((acc, r) => {
+    acc[r.id] = r.description;
+    return acc;
+}, {});
 
 const STAFF_ROLES = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id];
 const isStaff      = (u) => STAFF_ROLES.includes(u?.roleId);
@@ -33,14 +44,28 @@ const computeActionFlags = (incident, user) => ({
     canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED
 });
 
+// Acepta '200', 'INC-200', 'INC200', ' 200 '. Devuelve el numero o null si no se reconoce.
+const parseIncidentIdInput = (raw) => {
+    if (raw === undefined || raw === null) { return null; }
+    const m = String(raw).trim().match(/^(?:INC[-\s]?)?(\d+)$/i);
+    return m ? Number(m[1]) : null;
+};
+
 const list = async (req, res) => {
     const user = res.locals.currentUser;
     const filters = {
+        id:                parseIncidentIdInput(req.query.id),
         status:            req.query.status   || null,
         priority:          req.query.priority ? Number(req.query.priority) : null,
         assignedToUserId:  req.query.assignedToUserId ? Number(req.query.assignedToUserId) : null,
-        shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null
+        shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null,
+        openedChannel:     req.query.origin === 'EXTERNO' ? IncidentChannel.PORTAL
+                          : req.query.origin === 'INTERNO' ? IncidentChannel.INTERNAL
+                          : null,
+        resolution:        req.query.resolution || null,
     };
+    const rawIdInput = (req.query.id !== undefined && req.query.id !== null) ? String(req.query.id).trim() : '';
+    const idInputInvalid = rawIdInput.length > 0 && filters.id === null;
     if (req.query.escalated === '1' || req.query.escalated === 'true')  { filters.escalated = true;  }
     if (req.query.escalated === '0' || req.query.escalated === 'false') { filters.escalated = false; }
 
@@ -61,7 +86,8 @@ const list = async (req, res) => {
         incidents,
         filters: req.query,
         assignableUsers,
-        canCreate: true
+        canCreate: true,
+        idInputInvalid
     });
 };
 
@@ -80,22 +106,79 @@ const getCreateForm = async (req, res) => {
         }
     }
 
-    const types = await incidentTypeModel.getActive();
-    res.render('incident/new', { shipment, types, error: null, form: {} });
+    const [types, branches, users] = await Promise.all([
+        incidentTypeModel.getActive(),
+        branchModel.getAll(),
+        User.findAll({
+            where: { active: true, roleId: STAFF_ROLES },
+            attributes: ['id', 'fullName', 'roleId', 'branchId'],
+            order: [['fullName', 'ASC']]
+        })
+    ]);
+    const usersPayload = users.map(u => ({
+        id:       u.id,
+        fullName: u.fullName,
+        roleId:   u.roleId,
+        roleDescription: roleDescriptionById[u.roleId] || '',
+        branchId: u.branchId
+    }));
+    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: {} });
 };
 
 const create = async (req, res) => {
     const user = res.locals.currentUser;
-    const { shipmentId, incidentTypeId, description, priority } = req.body;
+    const { shipmentId, incidentTypeId, description, priority, branchId, assignedToUserId } = req.body;
 
-    if (!shipmentId || !incidentTypeId || !description || description.trim().length === 0) {
-        const types = await incidentTypeModel.getActive();
+    const renderFormError = async (errorMessage) => {
+        const [types, branches, users] = await Promise.all([
+            incidentTypeModel.getActive(),
+            branchModel.getAll(),
+            User.findAll({
+                where: { active: true, roleId: STAFF_ROLES },
+                attributes: ['id', 'fullName', 'roleId', 'branchId'],
+                order: [['fullName', 'ASC']]
+            })
+        ]);
+        const usersPayload = users.map(u => ({
+            id: u.id, fullName: u.fullName, roleId: u.roleId,
+            roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
+        }));
         return res.status(400).render('incident/new', {
             shipment: shipmentId ? await shipmentModel.getById(Number(shipmentId)) : null,
-            types,
-            error: 'shipmentId, tipo y descripción son obligatorios',
+            types, branches, users: usersPayload,
+            error: errorMessage,
             form: req.body
         });
+    };
+
+    const missing = [];
+    if (!shipmentId)     { missing.push('envío'); }
+    if (!incidentTypeId) { missing.push('tipo'); }
+    if (!description || String(description).trim().length === 0) { missing.push('descripción'); }
+    if (!branchId)       { missing.push('sucursal'); }
+    if (!assignedToUserId) { missing.push('usuario asignado'); }
+    if (missing.length) {
+        return renderFormError('Faltan completar: ' + missing.join(', ') + '.');
+    }
+
+    const noBranch = Number(branchId) === 0;
+    const branch = noBranch ? null : await branchModel.getById(Number(branchId));
+    if (!noBranch && !branch) {
+        return renderFormError('Sucursal inválida');
+    }
+    const assignee = await User.findOne({ where: { id: Number(assignedToUserId), active: true } });
+    if (!assignee) {
+        return renderFormError('Usuario asignado inválido');
+    }
+    if (!STAFF_ROLES.includes(assignee.roleId)) {
+        return renderFormError('El usuario asignado no es staff');
+    }
+    if (noBranch) {
+        if (assignee.branchId !== null) {
+            return renderFormError('El usuario asignado pertenece a una sucursal, elegila en vez de "Sin sucursal"');
+        }
+    } else if (assignee.branchId !== branch.id) {
+        return renderFormError('El usuario asignado no pertenece a la sucursal seleccionada');
     }
 
     const shipment = await shipmentModel.getById(Number(shipmentId));
@@ -111,17 +194,33 @@ const create = async (req, res) => {
         return res.status(400).render('error', { message: 'Tipo de incidencia inválido' });
     }
 
+    const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
+    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
+    if (eligibilityError) {
+        return renderFormError(eligibilityError);
+    }
+
     const incident = await sequelize.transaction(async (t) => {
         const created = await Incident.create({
-            shipmentId:     shipment.id,
-            incidentTypeId: type.id,
-            status:         IncidentStatus.OPEN,
-            priority:       priority ? Math.min(4, Math.max(1, Number(priority))) : 2,
-            escalated:      false,
-            description:    description.trim().slice(0, 2000),
-            openedChannel:  IncidentChannel.INTERNAL,
-            openedByUserId: user.id
+            shipmentId:       shipment.id,
+            incidentTypeId:   type.id,
+            status:           IncidentStatus.OPEN,
+            priority:         priority ? Math.min(4, Math.max(1, Number(priority))) : 2,
+            escalated:        false,
+            description:      description.trim().slice(0, 2000),
+            openedChannel:    IncidentChannel.INTERNAL,
+            openedByUserId:   user.id,
+            assignedToUserId: assignee.id
         }, { transaction: t });
+
+        await incidentHistoryModel.create({
+            incidentId: created.id,
+            eventType:  IncidentEventType.ASSIGNED,
+            toValue:    String(assignee.id),
+            comment:    `Asignada a ${assignee.fullName} (${roleDescriptionById[assignee.roleId] || ''})`,
+            userId:     user.id,
+            transaction: t
+        });
 
         await incidentHistoryModel.create({
             incidentId: created.id,
@@ -132,10 +231,44 @@ const create = async (req, res) => {
             transaction: t
         });
 
+        await shipmentHistoryModel.create({
+            shipmentId:   shipment.id,
+            fromStatusId: shipment.statusId,
+            toStatusId:   shipment.statusId,
+            eventType:    ShipmentHistoryEvent.INCIDENT_OPENED,
+            comment:      `Incidencia #${created.id} (${type.code}) — ${description.trim().slice(0, 200)}`,
+            userId:       user.id,
+            transaction:  t
+        });
+
         return created;
     });
 
+    notifyIncidentCreated(incident.id, shipment, type, assignee, user)
+        .catch(e => console.error('[incident] notif:', e.message));
+
     res.redirect(`/incident/${incident.id}`);
+};
+
+const notifyIncidentCreated = async (incidentId, shipment, type, assignee, openedBy) => {
+    const cfg = await incidentNotifConfig.get();
+    const emails = await incidentNotifConfig.resolveRecipients(cfg, { shipment, assignee, openedBy });
+
+    if (cfg.notifyShipmentRecipient) {
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
+            .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
+    }
+    if (emails.length === 0) { return; }
+
+    const subject = `[LogiTrack] Nueva incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
+    const body =
+        `Se registró una nueva incidencia.\n\n` +
+        `Incidencia: #${incidentId} (${type.code} - ${type.description})\n` +
+        `Envío: ${shipment.trackingId || shipment.id}\n` +
+        `Asignada a: ${assignee.fullName}\n` +
+        `Reportada por: ${openedBy.fullName || openedBy.email || 'usuario interno'}\n\n` +
+        `Acceder al detalle: /incident/${incidentId}`;
+    await sendEmail(emails.join(','), subject, body);
 };
 
 const getDetail = async (req, res) => {
@@ -149,19 +282,29 @@ const getDetail = async (req, res) => {
         return res.status(403).send('Acceso denegado');
     }
 
-    const [history, assignableUsers] = await Promise.all([
+    const [history, assignableUsers, branches] = await Promise.all([
         incidentHistoryModel.getByIncidentId(id),
         isSupOrAdmin(user) ? User.findAll({
-            where: { roleId: [RoleType.OPERATOR.id, RoleType.SUPERVISOR.id], active: true },
-            attributes: ['id', 'fullName'],
+            where: { roleId: [RoleType.OPERATOR.id, RoleType.SUPERVISOR.id, RoleType.ADMIN.id], active: true },
+            attributes: ['id', 'fullName', 'roleId', 'branchId'],
             order: [['fullName', 'ASC']]
-        }) : Promise.resolve([])
+        }) : Promise.resolve([]),
+        isSupOrAdmin(user) ? branchModel.getAll() : Promise.resolve([])
     ]);
+
+    const assignableUsersPayload = assignableUsers.map(u => ({
+        id:              u.id,
+        fullName:        u.fullName,
+        roleId:          u.roleId,
+        roleDescription: roleDescriptionById[u.roleId] || '',
+        branchId:        u.branchId
+    }));
 
     res.render('incident/detail', {
         incident,
         history,
-        assignableUsers,
+        assignableUsers: assignableUsersPayload,
+        branches,
         flags: computeActionFlags(incident, user),
         query: req.query
     });
@@ -313,15 +456,30 @@ const escalate = async (req, res) => {
 const close = async (req, res) => {
     const user = res.locals.currentUser;
     const id = Number(req.params.id);
-    const { resolution, comment } = req.body;
+    const { resolution, comment, shipmentAction } = req.body;
 
     if (![IncidentResolution.PROCEDENTE, IncidentResolution.NO_PROCEDENTE].includes(resolution)) {
         return res.status(400).redirect(`/incident/${id}?error=resolution_required`);
+    }
+    const VALID_ACTIONS = ['none', 'cancel'];
+    const action = VALID_ACTIONS.includes(shipmentAction) ? shipmentAction : 'none';
+    if (action !== 'none' && resolution !== IncidentResolution.PROCEDENTE) {
+        return res.status(400).redirect(`/incident/${id}?error=action_requires_procedente`);
+    }
+
+    if (!comment || String(comment).trim().length === 0) {
+        return res.status(400).redirect(`/incident/${id}?error=comment_required`);
     }
     const incident = await Incident.findByPk(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (incident.status === IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=already_closed`);
+    }
+
+    const shipment = await shipmentModel.getById(incident.shipmentId);
+    const TERMINAL = [Status.DELIVERED.id, Status.CANCELLED.id];
+    if (action === 'cancel' && shipment && TERMINAL.includes(shipment.statusId)) {
+        return res.status(400).redirect(`/incident/${id}?error=shipment_already_terminal`);
     }
 
     const from = incident.status;
@@ -337,11 +495,31 @@ const close = async (req, res) => {
             eventType:  IncidentEventType.CLOSED,
             fromValue:  from,
             toValue:    resolution,
-            comment:    comment || null,
+            comment:    String(comment).trim(),
             userId:     user.id,
             transaction: t
         });
+
+        if (action === 'cancel' && shipment) {
+            const prevStatusId = shipment.statusId;
+            await shipmentModel.updateStatus(shipment.id, Status.CANCELLED.id, { transaction: t });
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: prevStatusId,
+                toStatusId:   Status.CANCELLED.id,
+                eventType:    ShipmentHistoryEvent.STATUS_CHANGE,
+                comment:      `Cancelado por resolución de incidencia #${id} (devolución)`,
+                userId:       user.id,
+                transaction:  t
+            });
+        }
     });
+
+    if (action === 'cancel') {
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, incident.shipmentId)
+            .catch(e => console.error('[incident] notif CANCELLED:', e.message));
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
@@ -372,7 +550,76 @@ const reopen = async (req, res) => {
     res.redirect(`/incident/${id}`);
 };
 
+// Autocomplete de envíos para el form de alta de incidencia.
+// Acepta `q` (tracking parcial, nombre destinatario, o ID exacto).
+// Respeta RBAC: el repartidor sólo ve envíos asignados a él.
+const searchShipments = async (req, res) => {
+    const { Op } = require('sequelize');
+    const { Shipment } = require('../models/shipment');
+    const { Person }   = require('../models/person');
+    const { Address }  = require('../models/address');
+    const { Status }   = require('../models/status');
+    const user = res.locals.currentUser;
+
+    const q = String(req.query.q || '').trim();
+    if (q.length < 1) { return res.json([]); }
+
+    const where = {};
+    const asNum = Number(q);
+    if (Number.isInteger(asNum) && asNum > 0) {
+        where[Op.or] = [
+            { id: asNum },
+            { trackingId: { [Op.iLike]: `%${q}%` } },
+        ];
+    } else {
+        where.trackingId = { [Op.iLike]: `%${q}%` };
+    }
+    if (isDelivery(user)) {
+        where.deliveryUserId = user.id;
+    }
+
+    const recipientWhere = q && !Number.isInteger(asNum) ? { fullName: { [Op.iLike]: `%${q}%` } } : null;
+
+    const baseRows = await Shipment.findAll({
+        where,
+        include: [
+            { model: Person,  as: 'recipient' },
+            { model: Address, as: 'address' },
+            { model: Status,  as: 'status', attributes: ['id', 'description'] },
+        ],
+        limit: 10,
+        order: [['createdAt', 'DESC']],
+    });
+
+    // Si el query parece nombre y no encontramos por tracking, hacemos un segundo lookup por destinatario.
+    let extraRows = [];
+    if (recipientWhere && baseRows.length < 10) {
+        const baseIds = baseRows.map(r => r.id);
+        const extraWhere = baseIds.length > 0 ? { id: { [Op.notIn]: baseIds } } : {};
+        if (isDelivery(user)) { extraWhere.deliveryUserId = user.id; }
+        extraRows = await Shipment.findAll({
+            where: extraWhere,
+            include: [
+                { model: Person,  as: 'recipient', where: recipientWhere, required: true },
+                { model: Address, as: 'address' },
+                { model: Status,  as: 'status', attributes: ['id', 'description'] },
+            ],
+            limit: 10 - baseRows.length,
+            order: [['createdAt', 'DESC']],
+        });
+    }
+
+    const rows = [...baseRows, ...extraRows].slice(0, 10);
+    res.json(rows.map(s => ({
+        id:             s.id,
+        trackingId:     s.trackingId,
+        recipientName:  s.recipient ? s.recipient.fullName : '',
+        addressLine:    s.address ? `${s.address.street || ''} ${s.address.number || ''}`.trim() : '',
+        statusLabel:    s.status ? s.status.description : '',
+    })));
+};
+
 module.exports = {
     list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen
+    assign, changeStatus, escalate, close, reopen, searchShipments
 };

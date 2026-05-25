@@ -68,7 +68,23 @@ const getUpdateUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    await userModel.update(req.params.id, req.body);
+    // Sprint 3 - 4.2: normalizar ventana operativa del chofer. Checkbox ausente => false.
+    const data = { ...req.body };
+    if (String(data.roleId) === '3') {
+      data.driverAvailable = data.driverAvailable === 'true' || data.driverAvailable === true || data.driverAvailable === 'on';
+      data.driverShiftStart = data.driverShiftStart || null;
+      data.driverShiftEnd   = data.driverShiftEnd   || null;
+      data.driverUnavailableReason = data.driverUnavailableReason || null;
+      data.driverUnavailableUntil  = data.driverUnavailableUntil  || null;
+    } else {
+      // Si no es delivery, limpiamos campos de turno (evita arrastrar datos viejos)
+      data.driverShiftStart = null;
+      data.driverShiftEnd   = null;
+      data.driverAvailable  = true;
+      data.driverUnavailableReason = null;
+      data.driverUnavailableUntil  = null;
+    }
+    await userModel.update(req.params.id, data);
     res.redirect('/user?success=2');
   } catch (err) {
     console.error('ERROR updateuser:', err.message);

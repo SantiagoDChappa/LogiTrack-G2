@@ -33,6 +33,12 @@ const Shipment = sequelize.define('shipment', {
     refrigerated:         { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'refrigerated' },
     oversized:            { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'oversized' },
     estimatedMinutes:     { type: DataTypes.INTEGER,        allowNull: false, defaultValue: 5,     field: 'estimated_minutes' },
+    deliveryMode:         { type: DataTypes.STRING(20),     allowNull: false, defaultValue: 'home', field: 'delivery_mode' },
+    pickupBranchId:       { type: DataTypes.INTEGER,        allowNull: true,  field: 'pickup_branch_id' },
+    // Sprint 3 - 4.1 Código clave de entrega
+    deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
+    // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
+    portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -44,15 +50,18 @@ const getAll = () => {
     const { TypeShipment } = require('./typeShipment');
     const { User } = require('./user');
     
-    return Shipment.findAll({ 
+    const { Branch } = require('./branch');
+
+    return Shipment.findAll({
         include: [
             { model: Person, as: 'sender' },
             { model: Person, as: 'recipient' },
             { model: Status, as: 'status' },
-            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
-            { model: User, as: 'deliveryUser', required: false }
-        ] 
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'pickupBranch', required: false }
+        ]
     });
 };
 
@@ -72,10 +81,11 @@ const getById = (id) => {
             { model: Person, as: 'sender' },
             { model: Person, as: 'recipient' },
             { model: Status, as: 'status' },
-            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
             { model: User, as: 'deliveryUser', required: false },
             { model: Branch, as: 'currentBranch', required: false },
+            { model: Branch, as: 'pickupBranch',  required: false },
             { model: Zone, as: 'zone', required: false }
         ]
     });
@@ -91,14 +101,19 @@ const generateTrackingId = async (prefix = 'ENV') => {
     return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
 };
 
-const create = async (data) => {
+const create = async (data, options = {}) => {
     const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
+    const { generateSecretCode, generatePortalToken } = require('../utils/shipmentTokens');
     return Shipment.create({
         trackingId,
+        deliverySecretCode: data.deliverySecretCode || generateSecretCode(),
+        portalToken:        data.portalToken        || generatePortalToken(),
         statusId:         data.statusId || 1,
         senderId:         data.senderId,
         recipientId:      data.recipientId,
         addressId:        data.addressId,
+        deliveryMode:     data.deliveryMode    || 'home',
+        pickupBranchId:   data.pickupBranchId  || null,
         shipmentTypeId:   data.shipmentTypeId || null,
         weightKg:         data.weightKg       || null,
         volumeM3:         data.volumeM3        || null,
@@ -113,7 +128,7 @@ const create = async (data) => {
         priority:         data.priority     || 1,
         basePriority:     data.basePriority || 1,
         createdAt:        new Date().toISOString().split('T')[0]
-    });
+    }, { transaction: options.transaction });
 };
 
 const findByLegacyTrackingId = (legacyTrackingId) => {
@@ -192,14 +207,16 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
     });
 };
 
-const update = async (data) => {
+const update = async (data, options = {}) => {
     const { Status } = require('./status');
     const { Person } = require('./person');
     const { Address } = require('./address');
-    
-    const shipment = await Shipment.findOne({ 
+    const transaction = options.transaction;
+
+    const shipment = await Shipment.findOne({
         where: { id: data.id },
-        include: [{ model: Status, as: 'status' }]
+        include: [{ model: Status, as: 'status' }],
+        transaction,
     });
     if (!shipment) { return null; }
 
@@ -210,7 +227,7 @@ const update = async (data) => {
         if (data.deliveryUserId !== undefined) {
              await Shipment.update(
                 { deliveryUserId: data.deliveryUserId || null },
-                { where: { id: data.id } }
+                { where: { id: data.id }, transaction }
             );
         }
         return shipment;
@@ -220,13 +237,13 @@ const update = async (data) => {
     if (statusId === 2 || statusId === 6 || statusId === 7) {
         await Person.update(
             { phone: data.recipientPhone, email: data.recipientEmail },
-            { where: { id: shipment.recipientId } }
+            { where: { id: shipment.recipientId }, transaction }
         );
 
         if (data.deliveryUserId !== undefined) {
             await Shipment.update(
                { deliveryUserId: data.deliveryUserId || null },
-               { where: { id: data.id } }
+               { where: { id: data.id }, transaction }
            );
         }
         return shipment;
@@ -235,7 +252,7 @@ const update = async (data) => {
     if (statusId === 1) { // Pendiente — modificación completa
         await Person.update(
             { fullName: data.recipientName, document: data.recipientDocument, phone: data.recipientPhone, email: data.recipientEmail },
-            { where: { id: shipment.recipientId } }
+            { where: { id: shipment.recipientId }, transaction }
         );
 
         await Address.update(
@@ -248,7 +265,7 @@ const update = async (data) => {
                 lat: data.addressLat || null,
                 lng: data.addressLng || null
             },
-            { where: { id: shipment.addressId } }
+            { where: { id: shipment.addressId }, transaction }
         );
 
         await Shipment.update(
@@ -258,7 +275,7 @@ const update = async (data) => {
                 packageQty:      data.packageQty      || shipment.packageQty,
                 shipmentTypeId:  data.shipmentTypeId  || shipment.shipmentTypeId,
             },
-            { where: { id: data.id } }
+            { where: { id: data.id }, transaction }
         );
     }
 
@@ -273,15 +290,17 @@ const getByTrackingId = (trackingId) => {
     const { TypeShipment } = require('./typeShipment');
     const { User }         = require('./user');
 
+    const { Branch } = require('./branch');
     return Shipment.findOne({
         where: { trackingId },
         include: [
             { model: Person, as: 'sender' },
             { model: Person, as: 'recipient' },
             { model: Status, as: 'status' },
-            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
             { model: TypeShipment, as: 'shipmentType' },
-            { model: User, as: 'deliveryUser', required: false }
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'pickupBranch', required: false }
         ]
     });
 };
@@ -325,8 +344,8 @@ const getForKanban = (statusIds, { branchId } = {}) => {
     });
 };
 
-const updatePriority = (id, newPriority) => {
-    return Shipment.update({ priority: newPriority }, { where: { id } });
+const updatePriority = (id, newPriority, options = {}) => {
+    return Shipment.update({ priority: newPriority }, { where: { id }, transaction: options.transaction });
 };
 
 const getActiveShipments = () => {

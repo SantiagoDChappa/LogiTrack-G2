@@ -4,6 +4,7 @@
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/shipments-restyle.css">
+    <link rel="stylesheet" href="/css/shipment-new.css">
     <title>Nuevo Envío - LogiTrack</title>
 </head>
 <body>
@@ -61,7 +62,51 @@
                     </button>
                 </div>
 
-                <div class="direccion">
+                <div class="modalidad-entrega">
+                    <h3>Modalidad de entrega <span class="req">*</span></h3>
+                    <div class="field" style="display:flex;gap:1.5rem;align-items:center;">
+                        <label style="display:flex;gap:0.5rem;align-items:center;font-weight:500;cursor:pointer;">
+                            <input type="radio" name="deliveryMode" value="home"
+                                <%= (body.deliveryMode === 'branch_pickup') ? '' : 'checked' %>>
+                            Envío a domicilio
+                        </label>
+                        <label style="display:flex;gap:0.5rem;align-items:center;font-weight:500;cursor:pointer;">
+                            <input type="radio" name="deliveryMode" value="branch_pickup"
+                                <%= (body.deliveryMode === 'branch_pickup') ? 'checked' : '' %>>
+                            Retiro por sucursal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="retiro-sucursal" id="pickup-branch-section" style="<%= (body.deliveryMode === 'branch_pickup') ? '' : 'display:none;' %>">
+                    <h3>Sucursal de retiro</h3>
+                    <div class="field">
+                        <label for="pickup-province">Provincia / Zona</label>
+                        <select id="pickup-province">
+                            <option value="">Todas las provincias</option>
+                            <% provinces.forEach(p => { %>
+                                <option value="<%= p.id %>"><%= p.description %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="pickup-branch-id">Sucursal <span class="req">*</span></label>
+                        <select id="pickup-branch-id" name="pickupBranchId" data-initial="<%= body.pickupBranchId || '' %>">
+                            <option value="">Seleccione una sucursal</option>
+                            <% (pickupBranches || []).forEach(b => { %>
+                                <option value="<%= b.id %>" data-province="<%= b.provinceId %>"
+                                    <%= String(body.pickupBranchId || '') === String(b.id) ? 'selected' : '' %>>
+                                    <%= b.name %> — <%= b.address %>
+                                </option>
+                            <% }) %>
+                        </select>
+                        <span class="field-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;">
+                            Solo se listan sucursales habilitadas para retiro.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="direccion" id="address-section" style="<%= (body.deliveryMode === 'branch_pickup') ? 'display:none;' : '' %>">
                     <h3>Dirección de entrega</h3>
 
                     <!-- Campos hidden enviados al servidor -->
@@ -186,6 +231,44 @@
         }
         document.getElementById('weight-kg')?.addEventListener('input', calcularVolumen);
         document.getElementById('package-qty')?.addEventListener('input', calcularVolumen);
+
+        // Modalidad de entrega: toggle dirección vs sucursal de retiro
+        (function setupDeliveryMode() {
+            const radios = document.querySelectorAll('input[name="deliveryMode"]');
+            const addrSection = document.getElementById('address-section');
+            const pickupSection = document.getElementById('pickup-branch-section');
+            const addrSearch = document.getElementById('address-search');
+            const pickupSelect = document.getElementById('pickup-branch-id');
+            const pickupProvince = document.getElementById('pickup-province');
+
+            function applyMode(mode) {
+                const isPickup = mode === 'branch_pickup';
+                addrSection.style.display = isPickup ? 'none' : '';
+                pickupSection.style.display = isPickup ? '' : 'none';
+                if (addrSearch) { addrSearch.required = !isPickup; }
+                if (pickupSelect) { pickupSelect.required = isPickup; }
+            }
+
+            radios.forEach(r => r.addEventListener('change', e => applyMode(e.target.value)));
+
+            // Filtro sucursales por provincia (cliente, contra opciones renderizadas)
+            pickupProvince?.addEventListener('change', () => {
+                const pid = pickupProvince.value;
+                let firstVisible = null;
+                Array.from(pickupSelect.options).forEach(opt => {
+                    if (!opt.value) { opt.hidden = false; return; }
+                    const match = !pid || opt.dataset.province === pid;
+                    opt.hidden = !match;
+                    if (match && !firstVisible) { firstVisible = opt; }
+                });
+                if (pickupSelect.selectedOptions[0]?.hidden) {
+                    pickupSelect.value = '';
+                }
+            });
+
+            const initial = document.querySelector('input[name="deliveryMode"]:checked')?.value || 'home';
+            applyMode(initial);
+        })();
     </script>
 </body>
 </html>

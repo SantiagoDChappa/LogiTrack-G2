@@ -1,16 +1,20 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
-const { NotificationEvent: NotificationEventCodes } = require('../constants/enums');
+const { NotificationEvent: NotificationEventCodes, mapperShipmentStatusToEvent } = require('../constants/enums');
 
-const NotificationEvent = sequelize.define('notification_event', {
+const NotificationEvent = sequelize.define('notificationEvent', {
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
     },
-    code:        { type: DataTypes.ENUM(...Object.values(NotificationEventCodes)) },
+    code:        { type: DataTypes.STRING(60) },
     description: { type: DataTypes.STRING },
 },
-{ tableName: 'notification_event' });
+{ tableName: 'notification_events' });
 
-module.exports = { NotificationEvent };
+const getEventCodeByShipmentStatus = (shipmentId) => {
+    return mapperShipmentStatusToEvent[shipmentId] || null;
+};
+
+module.exports = { NotificationEvent, getEventCodeByShipmentStatus };

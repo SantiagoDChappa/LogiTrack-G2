@@ -34,18 +34,6 @@ const ShipmentPriority = Object.freeze({
     URGENT: { id: 4, description: 'Urgente' },
 });
 
-const NotificationEvent = Object.freeze({
-    SHIPMENT_PENDING:        'SHIPMENT_PENDING',
-    SHIPMENT_IN_TRANSIT:     'SHIPMENT_IN_TRANSIT',
-    SHIPMENT_IN_BRANCH:      'SHIPMENT_IN_BRANCH',
-    SHIPMENT_DELIVERED:      'SHIPMENT_DELIVERED',
-    SHIPMENT_CANCELLED:      'SHIPMENT_CANCELLED',
-    SHIPMENT_ASSIGNED:       'SHIPMENT_ASSIGNED',
-    SHIPMENT_IN_PREPARATION: 'SHIPMENT_IN_PREPARATION',
-    SHIPMENT_PACKAGE_FAILED: 'SHIPMENT_PACKAGE_FAILED',
-    SHIPMENT_FAILED_ATTEMPT: 'SHIPMENT_FAILED_ATTEMPT',
-});
-
 const IncidentStatus = Object.freeze({
     OPEN:      'OPEN',
     IN_REVIEW: 'IN_REVIEW',
@@ -81,7 +69,72 @@ const IncidentPriority = Object.freeze({
     URGENT: { id: 4, description: 'Urgente' },
 });
 
+const NotificationEvent = Object.freeze({
+    SHIPMENT_PENDING:             'SHIPMENT_PENDING',
+    SHIPMENT_IN_TRANSIT:          'SHIPMENT_IN_TRANSIT',
+    SHIPMENT_IN_BRANCH:           'SHIPMENT_IN_BRANCH',
+    SHIPMENT_DELIVERED:           'SHIPMENT_DELIVERED',
+    SHIPMENT_CANCELLED:           'SHIPMENT_CANCELLED',
+    SHIPMENT_ASSIGNED:            'SHIPMENT_ASSIGNED',
+    SHIPMENT_IN_PREPARATION:      'SHIPMENT_IN_PREPARATION',
+    SHIPMENT_PACKAGE_FAILED:      'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_FAILED_ATTEMPT:      'SHIPMENT_FAILED_ATTEMPT',
+    // Sprint 3 — eventos extendidos PDF 2.3
+    SHIPMENT_OUT_FOR_DELIVERY:    'SHIPMENT_OUT_FOR_DELIVERY',   // Salida a reparto
+    SHIPMENT_NEXT_DELIVERY:       'SHIPMENT_NEXT_DELIVERY',      // Próxima entrega (ETA cercana)
+    SHIPMENT_ARRIVED_DESTINATION: 'SHIPMENT_ARRIVED_DESTINATION',// Llegada al domicilio
+    SHIPMENT_RETURNED_BRANCH:     'SHIPMENT_RETURNED_BRANCH',    // Vuelta a sucursal
+    SHIPMENT_RESCHEDULED:         'SHIPMENT_RESCHEDULED',        // Reprogramación
+    SHIPMENT_INCIDENT:            'SHIPMENT_INCIDENT',           // Incidencia / demora
+    ROUTE_CANCELLED:              'ROUTE_CANCELLED',
+    ROUTE_INTERRUPTED:            'ROUTE_INTERRUPTED',
+});
+
+// Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
+const ShipmentHistoryEvent = Object.freeze({
+    STATUS_CHANGE:        'STATUS_CHANGE',
+    OUT_FOR_DELIVERY:     'OUT_FOR_DELIVERY',
+    ARRIVED_DESTINATION:  'ARRIVED_DESTINATION',
+    RETRY_SAME_DAY:       'RETRY_SAME_DAY',
+    RESCHEDULED:          'RESCHEDULED',
+    RETURNED_TO_BRANCH:   'RETURNED_TO_BRANCH',
+    ROUTE_ASSIGNED:       'ROUTE_ASSIGNED',
+    INCIDENT_OPENED:      'INCIDENT_OPENED',
+});
+
+// Razones formales de falla de ruta PDF 2.4
+const RouteFailureReason = Object.freeze({
+    DRIVER_UNAVAILABLE:  'DRIVER_UNAVAILABLE',
+    VEHICLE_OUT_SERVICE: 'VEHICLE_OUT_SERVICE',
+    WEATHER:             'WEATHER',
+    INCIDENT:            'INCIDENT',
+    OPERATIONAL:         'OPERATIONAL',
+    OTHER:               'OTHER',
+});
+
+const mapperShipmentStatusToEvent = {
+    [Status.PENDING.id]:        NotificationEvent.SHIPMENT_PENDING,
+    [Status.IN_TRANSIT.id]:     NotificationEvent.SHIPMENT_IN_TRANSIT,
+    [Status.AT_BRANCH.id]:      NotificationEvent.SHIPMENT_IN_BRANCH,
+    [Status.DELIVERED.id]:      NotificationEvent.SHIPMENT_DELIVERED,
+    [Status.CANCELLED.id]:      NotificationEvent.SHIPMENT_CANCELLED,
+    [Status.ASSIGNED.id]:       NotificationEvent.SHIPMENT_ASSIGNED,
+    [Status.IN_PREPARATION.id]: NotificationEvent.SHIPMENT_IN_PREPARATION,
+    [Status.PACKAGE_FAILED.id]: NotificationEvent.SHIPMENT_PACKAGE_FAILED,
+    [Status.FAILED_ATTEMPT.id]: NotificationEvent.SHIPMENT_FAILED_ATTEMPT,
+};
+
+const EmailQueueStatus = {
+    PENDING: 'PENDING',
+    PROCESSING: 'PROCESSING',
+    SENT: 'SENT',
+    FAILED: 'FAILED'
+}
+
+
 module.exports = {
-    Status, PersonType, RoleType, ShipmentType, ShipmentPriority, NotificationEvent,
-    IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority
+    Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
+    IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority,
+    NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
+    ShipmentHistoryEvent, RouteFailureReason
 };

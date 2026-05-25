@@ -1,10 +1,10 @@
-const crypto               = require('crypto');
-const QRCode               = require('qrcode');
-const shipmentModel        = require('../models/shipment');
-const personModel          = require('../models/person');
-const provinceModel        = require('../models/province');
-const addressModel         = require('../models/address');
-const statusModel          = require('../models/status');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
+const shipmentModel = require('../models/shipment');
+const personModel = require('../models/person');
+const provinceModel = require('../models/province');
+const addressModel = require('../models/address');
+const statusModel = require('../models/status');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const typeShipmentModel = require('../models/typeShipment');
 const settingModel = require('../models/setting');
@@ -12,32 +12,40 @@ const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
-const { RoleType, Status, ShipmentType, ShipmentPriority } = require('../constants/enums');
-const { validationResult }   = require('express-validator');
-const csvImport            = require('../services/csvImport');
-const csvExport            = require('../services/csvExport');
-const shipmentImportModel  = require('../models/shipmentImport');
-const branchModel          = require('../models/branch');
+const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+const { validationResult } = require('express-validator');
+const csvImport = require('../services/csvImport');
+const csvExport = require('../services/csvExport');
+const shipmentImportModel = require('../models/shipmentImport');
+const branchModel = require('../models/branch');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
 const { resolveZone } = require('../services/zoneResolver.service');
+const { sendEmail } = require('../services/notification/emailSender');
+const notificationConfigModel = require('../models/notificationConfig');
+const emailTemplateModel = require('../models/emailTemplate');
+const notificationEventModel = require('../models/notificationEvents')
+const { queueEmail } = require('../services/notification/notificationEmailService');
+const sequelize = require('../database/connection');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
-const stateMachine         = require('../services/shipmentStateMachine');
-const routePlanner         = require('../services/routePlanner');
+const stateMachine = require('../services/shipmentStateMachine');
+const routePlanner = require('../services/routePlanner');
+const console = require('console');
 
 const renderStateMachineError = (err, res, redirectUrl) => {
     if (err && err.name === 'StateMachineError') {
         const map = {
             INVALID_TRANSITION: 422,
-            FORBIDDEN_ROLE:     403,
-            COMMENT_REQUIRED:   400,
+            FORBIDDEN_ROLE: 403,
+            COMMENT_REQUIRED: 400,
             SHIPMENT_NOT_FOUND: 404,
         };
         const status = map[err.code] || 400;
         const qs = `smError=${encodeURIComponent(err.code)}&smMsg=${encodeURIComponent(err.message)}`;
-        return res.status(status).redirect(`${redirectUrl}?${qs}`);
+        res.status(status).redirect(`${redirectUrl}?${qs}`);
+        return true;
     }
-    return null;
+    return false;
 };
 
 const home = async (req, res) => {
@@ -62,8 +70,8 @@ const searchShipments = async (req, res) => {
         senderDocument: senderDocument?.trim(),
         recipientName: recipientName?.trim(),
         recipientDocument: recipientDocument?.trim(),
-        statusIds:         statusIds ? [].concat(statusIds) : [],
-        currentBranchId:   isAdmin ? (Number(currentBranchId) || null) : (user?.branchId || null),
+        statusIds: statusIds ? [].concat(statusIds) : [],
+        currentBranchId: isAdmin ? (Number(currentBranchId) || null) : null,
     };
     const [shipments, statuses, branches] = await Promise.all([
         shipmentModel.search(query),
@@ -90,29 +98,29 @@ const getDetail = async (req, res) => {
     if (!shipment) { return res.status(404).send('Envío no encontrado'); }
 
     const destProv = PROVINCES[shipment.address.provinceId];
-    const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
-    const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
+    const destLat = shipment.address.lat || (destProv ? destProv.lat : null);
+    const destLng = shipment.address.lng || (destProv ? destProv.lng : null);
     const stops = history
         .filter(h => h.latitude !== null && h.latitude !== undefined && h.longitude !== null && h.longitude !== undefined)
         .map(h => {
             const isPOD = h.eventType === 'POD' || (h.toStatus && h.toStatus.id === Status.DELIVERED.id);
             const branchName = h.branch?.name || null;
             return {
-                lat:       Number(h.latitude),
-                lng:       Number(h.longitude),
-                label:     isPOD ? 'Entrega final (GPS)' : (branchName || h.eventType),
-                status:    h.toStatus?.description || '',
+                lat: Number(h.latitude),
+                lng: Number(h.longitude),
+                label: isPOD ? 'Entrega final (GPS)' : (branchName || h.eventType),
+                status: h.toStatus?.description || '',
                 timestamp: h.changedAt,
                 isPOD,
                 isCreated: h.eventType === 'CREATED',
             };
         });
     const firstBranchEvent = history.find(h => h.branch);
-    let originBranch       = firstBranchEvent?.branch || shipment.currentBranch || null;
+    let originBranch = firstBranchEvent?.branch || shipment.currentBranch || null;
 
     if (!originBranch) {
         const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
-        const creatorId    = createdEvent?.user?.id;
+        const creatorId = createdEvent?.user?.id;
         if (creatorId) {
             const creator = await userModel.getById(creatorId);
             if (creator?.branchId) {
@@ -121,22 +129,22 @@ const getDetail = async (req, res) => {
         }
     }
 
-    const lastBranchEvent  = [...history].reverse().find(h => h.branch);
-    const currentBranch    = lastBranchEvent?.branch || shipment.currentBranch || null;
-    const fallbackStreet   = [originStreet, originNumber].filter(Boolean).join(' ');
+    const lastBranchEvent = [...history].reverse().find(h => h.branch);
+    const currentBranch = lastBranchEvent?.branch || shipment.currentBranch || null;
+    const fallbackStreet = [originStreet, originNumber].filter(Boolean).join(' ');
     const mapData = {
         origin: originBranch ? {
-            lat:   Number(originBranch.latitude),
-            lng:   Number(originBranch.longitude),
+            lat: Number(originBranch.latitude),
+            lng: Number(originBranch.longitude),
             label: originBranch.name.startsWith('Sucursal') ? originBranch.name : `Sucursal ${originBranch.name}`,
         } : {
-            lat:   parseFloat(originLat)  || -34.6037,
-            lng:   parseFloat(originLng)  || -58.3816,
+            lat: parseFloat(originLat) || -34.6037,
+            lng: parseFloat(originLng) || -58.3816,
             label: fallbackStreet || 'Punto de origen central',
         },
         currentBranch: currentBranch ? {
-            lat:   Number(currentBranch.latitude),
-            lng:   Number(currentBranch.longitude),
+            lat: Number(currentBranch.latitude),
+            lng: Number(currentBranch.longitude),
             label: currentBranch.name.startsWith('Sucursal') ? currentBranch.name : `Sucursal ${currentBranch.name}`,
         } : null,
         destination: destLat ? {
@@ -156,8 +164,8 @@ const getDetail = async (req, res) => {
         && Number.isFinite(mapData.destination.lng)) {
         try {
             mapData.route = await routePlanner.planShipmentRoute({
-                origin:         { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
-                destination:    { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
+                origin: { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
+                destination: { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
                 originBranchId: originBranch?.id || null,
             });
         } catch (err) {
@@ -165,7 +173,7 @@ const getDetail = async (req, res) => {
         }
     }
 
-    const returnUrl   = req.query.from || '/shipment';
+    const returnUrl = req.query.from || '/shipment';
     const returnLabel = req.query.fromLabel || 'Administrador de envíos';
 
     // SLA penalty + desglose costo cliente
@@ -184,47 +192,99 @@ const getDetail = async (req, res) => {
     })();
 
     // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
-    const costClient = (() => {
-        if (!shipment.zone) { return null; }
-        const zone = shipment.zone;
+    const costClient = await (async () => {
+        const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
         const w = Number(shipment.weightKg || 0);
         const v = Number(shipment.volumeM3 || 0);
-        const base = Number(zone.baseCost || 0);
+
+        if (!shipment.zone) {
+            return costoBase > 0 ? {
+                costoBase,
+                zoneBase: 0,
+                wSurcharge: 0,
+                vSurcharge: 0,
+                subtotal: costoBase,
+                penalty: 0,
+                final: costoBase
+            } : null;
+        }
+
+        const zone = shipment.zone;
+        const zoneBase = Number(zone.baseCost || 0);
         const wSurcharge = Number(zone.surchargePerKg || 0) * w;
         const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
-        const subtotal = base + wSurcharge + vSurcharge;
+        const subtotal = costoBase + zoneBase + wSurcharge + vSurcharge;
         const penalty = sla?.penaltyPct ? subtotal * (sla.penaltyPct / 100) : 0;
-        return { base, wSurcharge, vSurcharge, subtotal, penalty: Number(penalty.toFixed(2)), final: Number((subtotal - penalty).toFixed(2)) };
+        return {
+            costoBase,
+            zoneBase,
+            wSurcharge,
+            vSurcharge,
+            subtotal,
+            penalty: Number(penalty.toFixed(2)),
+            final: Number((subtotal - penalty).toFixed(2))
+        };
     })();
+
 
     res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel, sla, costClient });
 };
 
 const getNewShipmentForm = async (req, res) => {
-    const provinces = await provinceModel.getAll();
-    const typesShipment = await typeShipmentModel.getAll();
-    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment });
+    const [provinces, typesShipment, pickupBranches] = await Promise.all([
+        provinceModel.getAll(),
+        typeShipmentModel.getAll(),
+        branchModel.getPickupEnabled(),
+    ]);
+    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches });
 };
 
 const createShipment = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const provinces = await provinceModel.getAll();
-        const typesShipment = await typeShipmentModel.getAll();
+        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+            provinceModel.getAll(),
+            typeShipmentModel.getAll(),
+            branchModel.getPickupEnabled(),
+        ]);
         return res.render('shipment/new', {
             errors: errors.array().map(e => e.msg),
             body: req.body,
             provinces,
-            typesShipment
+            typesShipment,
+            pickupBranches
         });
     }
 
     try {
         const body = req.body;
+        const deliveryMode = body.deliveryMode === 'branch_pickup' ? 'branch_pickup' : 'home';
+        const isPickup = deliveryMode === 'branch_pickup';
+
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
 
-        if (body.addressLat && body.addressLng && body.province) {
+        let pickupBranch = null;
+        if (isPickup) {
+            if (!body.pickupBranchId) { throw new Error('Debe seleccionar una sucursal de retiro'); }
+            pickupBranch = await branchModel.getById(Number(body.pickupBranchId));
+            if (!pickupBranch) { throw new Error('Sucursal de retiro no encontrada'); }
+            if (!pickupBranch.pickupEnabled) { throw new Error('La sucursal seleccionada no está habilitada para retiro'); }
+        }
+
+        // Validar contra parámetros configurables del sistema
+        const settings = await settingModel.getAll();
+        const pesoMaximo = parseFloat(settings.peso_maximo_envio) || 50;
+        const cantMaxima = parseInt(settings.cantidad_maxima_paquetes) || 20;
+
+        if (parseFloat(body.weightKg) > pesoMaximo) {
+            throw new Error(`El peso no puede superar ${pesoMaximo} kg (configurado en Ajustes)`);
+        }
+        if (parseInt(body.packageQty) > cantMaxima) {
+            throw new Error(`La cantidad de paquetes no puede superar ${cantMaxima} (configurado en Ajustes)`);
+        }
+
+        if (!isPickup && body.addressLat && body.addressLng && body.province) {
             const { isCoordInProvince, findProvinceByCoord } = require('../utils/provinceBbox');
             const lat = parseFloat(body.addressLat);
             const lng = parseFloat(body.addressLng);
@@ -237,42 +297,54 @@ const createShipment = async (req, res) => {
         }
 
         const { normalizePostalCode } = require('../utils/postalCode');
-        if (body.postalCode && body.province) {
+        if (!isPickup && body.postalCode && body.province) {
             const norm = normalizePostalCode(body.postalCode, body.province);
             if (!norm.ok) { throw new Error(norm.reason); }
             body.postalCode = norm.value;
         }
 
-        if (body.skipDuplicateCheck !== 'true') {
+        if (!isPickup && body.skipDuplicateCheck !== 'true') {
             const dup = await shipmentModel.findPotentialDuplicate({
-                senderDocument:    body.senderDocument,
+                senderDocument: body.senderDocument,
                 recipientDocument: body.recipientDocument,
-                street:            body.street,
-                number:            body.number,
-                provinceId:        body.province,
-                statusId:          1,
+                street: body.street,
+                number: body.number,
+                provinceId: body.province,
+                statusId: 1,
             });
             if (dup) {
                 throw new Error(`Posible duplicado: ya existe envío ${dup.trackingId} con mismo remitente, destinatario y dirección en estado Pendiente. Si querés crearlo igual, marcá "Crear de todos modos".`);
             }
         }
 
+        // Bloque transaccional: crea persona(s), dirección, envío e historial inicial de forma atómica.
+        // Si cualquier paso falla, rollback evita registros huérfanos (ej: address sin shipment, shipment sin history).
+        const shipment = await sequelize.transaction(async (t) => {
         const sender = await personModel.createOrUpdate({
-            name:     body.senderName,
+            name: body.senderName,
             document: body.senderDocument,
-            phone:    body.senderPhone,
-            email:    body.senderEmail,
-        });
+            phone: body.senderPhone,
+            email: body.senderEmail,
+        }, { transaction: t });
 
         const recipient = await personModel.createOrUpdate({
             name: body.recipientName,
             document: body.recipientDocument,
             phone: body.recipientPhone,
             email: body.recipientEmail
-        });
+        }, { transaction: t });
 
-        const [address, creatorCoordsForCreate] = await Promise.all([
-            addressModel.create({
+        const addressPayload = isPickup
+            ? {
+                street:         pickupBranch.address || pickupBranch.name,
+                number:         0,
+                provinceId:     pickupBranch.provinceId,
+                postalCode:     pickupBranch.postalCode,
+                floorApartment: null,
+                lat:            pickupBranch.latitude  ? Number(pickupBranch.latitude)  : null,
+                lng:            pickupBranch.longitude ? Number(pickupBranch.longitude) : null,
+            }
+            : {
                 street:         body.street,
                 number:         body.number,
                 provinceId:     body.province,
@@ -280,17 +352,51 @@ const createShipment = async (req, res) => {
                 floorApartment: body.floorApartment,
                 lat:            body.addressLat ? parseFloat(body.addressLat) : null,
                 lng:            body.addressLng ? parseFloat(body.addressLng) : null,
-            }),
+            };
+
+        const [address, creatorCoordsForCreate] = await Promise.all([
+            addressModel.create(addressPayload, { transaction: t }),
             resolveUserBranchCoords(res.locals.currentUser?.id),
         ]);
+
+        // Fallback de currentBranchId si el creador no tiene sucursal (ej: admin):
+        //   1. branch del creador
+        //   2. pickupBranchId (si es retiro en sucursal)
+        //   3. sucursal mas cercana a la direccion destino (haversine)
+        const resolveCurrentBranchId = async () => {
+            if (creatorCoordsForCreate.branchId) { return creatorCoordsForCreate.branchId; }
+            if (isPickup && pickupBranch?.id) { return pickupBranch.id; }
+            const destLat = addressPayload.lat;
+            const destLng = addressPayload.lng;
+            if (destLat == null || destLng == null) { return null; }
+            const allBranches = await branchModel.getAll();
+            const usable = allBranches.filter(b => b.latitude != null && b.longitude != null && !b.closed);
+            if (usable.length === 0) { return null; }
+            const toRad = d => d * Math.PI / 180;
+            const dist = (a, b) => {
+                const R = 6371;
+                const dLat = toRad(Number(b.lat) - Number(a.lat));
+                const dLng = toRad(Number(b.lng) - Number(a.lng));
+                const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(Number(a.lat))) * Math.cos(toRad(Number(b.lat))) * Math.sin(dLng / 2) ** 2;
+                return 2 * R * Math.asin(Math.sqrt(x));
+            };
+            let nearest = usable[0];
+            let nearestD = dist({ lat: destLat, lng: destLng }, { lat: nearest.latitude, lng: nearest.longitude });
+            for (const b of usable.slice(1)) {
+                const d = dist({ lat: destLat, lng: destLng }, { lat: b.latitude, lng: b.longitude });
+                if (d < nearestD) { nearest = b; nearestD = d; }
+            }
+            return nearest.id;
+        };
+        const resolvedCurrentBranchId = await resolveCurrentBranchId();
+
+        const destLatForPriority = isPickup ? Number(pickupBranch.latitude)  : (body.addressLat ? parseFloat(body.addressLat) : null);
+        const destLngForPriority = isPickup ? Number(pickupBranch.longitude) : (body.addressLng ? parseFloat(body.addressLng) : null);
 
         const initialPriority = calInitialPriority({
             weight: body.weightKg || null,
             type:   body.shipmentTypeId || null,
-            destinationUbication: {
-                lat: body.addressLat ? parseFloat(body.addressLat) : null,
-                lng: body.addressLng ? parseFloat(body.addressLng) : null,
-            },
+            destinationUbication: { lat: destLatForPriority, lng: destLngForPriority },
             originUbication: {
                 lat: res.locals.currentUser?.branch?.latitude,
                 lng: res.locals.currentUser?.branch?.longitude,
@@ -298,8 +404,8 @@ const createShipment = async (req, res) => {
         });
 
         const resolvedZone = await resolveZone({
-            postalCode: body.postalCode,
-            provinceId: body.province,
+            postalCode: isPickup ? pickupBranch.postalCode : body.postalCode,
+            provinceId: isPickup ? pickupBranch.provinceId : body.province,
         });
 
         const normalizeTime = (t) => {
@@ -309,121 +415,134 @@ const createShipment = async (req, res) => {
             return v.length === 5 ? `${v}:00` : v;
         };
 
-        const shipment = await shipmentModel.create({
+        const created = await shipmentModel.create({
             senderId:        sender.id,
             recipientId:     recipient.id,
             addressId:       address.id,
+            deliveryMode:    deliveryMode,
+            pickupBranchId:  isPickup ? pickupBranch.id : null,
             shipmentTypeId:  body.shipmentTypeId || null,
             weightKg:        body.weightKg       || null,
             packageQty:      body.packageQty     || null,
             volumeM3:        body.volumeM3       || null,
             basePriority:    initialPriority,
             priority:        initialPriority,
-            currentBranchId: creatorCoordsForCreate.branchId || null,
-            zoneId:          resolvedZone?.id || null,
+            currentBranchId: resolvedCurrentBranchId,
+            zoneId: resolvedZone?.id || null,
             expectedDeliveryDate: body.expectedDeliveryDate || null,
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
-            expectedDeliveryTo:   normalizeTime(body.expectedDeliveryTo),
-        });
+            expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
+        }, { transaction: t });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
         await shipmentHistoryModel.create({
-            shipmentId:   shipment.id,
+            shipmentId: created.id,
             fromStatusId: null,
-            toStatusId:   shipment.statusId,
-            eventType:    'CREATED',
-            userId:       res.locals.currentUser?.id || null,
-            branchId:     creatorCoords.branchId,
-            latitude:     creatorCoords.latitude,
-            longitude:    creatorCoords.longitude,
+            toStatusId: created.statusId,
+            eventType: 'CREATED',
+            userId: res.locals.currentUser?.id || null,
+            branchId: creatorCoords.branchId,
+            latitude: creatorCoords.latitude,
+            longitude: creatorCoords.longitude,
+            transaction: t,
         });
+
+        return created;
+        });
+
+        const freshShipment = await shipmentModel.getById(shipment.id);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
 
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
-        const provinces = await provinceModel.getAll();
-        const typesShipment = await typeShipmentModel.getAll();
+        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+            provinceModel.getAll(),
+            typeShipmentModel.getAll(),
+            branchModel.getPickupEnabled(),
+        ]);
         res.render('shipment/new', {
             errors: [err.message],
             body: req.body,
             provinces,
-            typesShipment
+            typesShipment,
+            pickupBranches
         });
     }
 };
 
 const getUpdateShipment = async (req, res) => {
-  const { id } = req.params;
-  const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
-      provinceModel.getAll(),
-      statusModel.getAll(),
-      shipmentModel.getById(id),
-      shipmentHistoryModel.getByShipmentId(id),
-      typeShipmentModel.getAll(),
-      settingModel.get('origin_lat'),
-      settingModel.get('origin_lng'),
-      settingModel.get('origin_street'),
-      settingModel.get('origin_number'),
-      userModel.search({ roleId: RoleType.DELIVERY.id })
-  ]);
+    const { id } = req.params;
+    const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
+        provinceModel.getAll(),
+        statusModel.getAll(),
+        shipmentModel.getById(id),
+        shipmentHistoryModel.getByShipmentId(id),
+        typeShipmentModel.getAll(),
+        settingModel.get('origin_lat'),
+        settingModel.get('origin_lng'),
+        settingModel.get('origin_street'),
+        settingModel.get('origin_number'),
+        userModel.search({ roleId: RoleType.DELIVERY.id })
+    ]);
 
-  const destProv = PROVINCES[shipment.address.provinceId];
-  const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
-  const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
-  const mapData = {
-      origin: {
-          lat:   parseFloat(originLat)  || -34.6037,
-          lng:   parseFloat(originLng)  || -58.3816,
-          label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
-      },
-      destination: destLat ? {
-          lat:   destLat,
-          lng:   destLng,
-          label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
-      } : null,
-  };
+    const destProv = PROVINCES[shipment.address.provinceId];
+    const destLat = shipment.address.lat || (destProv ? destProv.lat : null);
+    const destLng = shipment.address.lng || (destProv ? destProv.lng : null);
+    const mapData = {
+        origin: {
+            lat: parseFloat(originLat) || -34.6037,
+            lng: parseFloat(originLng) || -58.3816,
+            label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+        },
+        destination: destLat ? {
+            lat: destLat,
+            lng: destLng,
+            label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
+        } : null,
+    };
 
-  // Resolver sucursal origen desde historial (igual que getDetail)
-  const firstBranchEvent = history.find(h => h.branch);
-  let originBranch = firstBranchEvent?.branch || null;
-  if (!originBranch) {
-      const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
-      if (createdEvent?.user?.id) {
-          const creator = await userModel.getById(createdEvent.user.id);
-          if (creator?.branchId) {
-              const branchModel = require('../models/branch');
-              originBranch = await branchModel.getById(creator.branchId);
-          }
-      }
-  }
-  if (originBranch) {
-      mapData.origin = {
-          lat:   Number(originBranch.latitude),
-          lng:   Number(originBranch.longitude),
-          label: originBranch.name,
-      };
-  }
+    // Resolver sucursal origen desde historial (igual que getDetail)
+    const firstBranchEvent = history.find(h => h.branch);
+    let originBranch = firstBranchEvent?.branch || null;
+    if (!originBranch) {
+        const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
+        if (createdEvent?.user?.id) {
+            const creator = await userModel.getById(createdEvent.user.id);
+            if (creator?.branchId) {
+                const branchModel = require('../models/branch');
+                originBranch = await branchModel.getById(creator.branchId);
+            }
+        }
+    }
+    if (originBranch) {
+        mapData.origin = {
+            lat: Number(originBranch.latitude),
+            lng: Number(originBranch.longitude),
+            label: originBranch.name,
+        };
+    }
 
-  mapData.route = null;
-  if (mapData.destination
-      && Number.isFinite(mapData.origin.lat) && Number.isFinite(mapData.origin.lng)
-      && Number.isFinite(mapData.destination.lat) && Number.isFinite(mapData.destination.lng)) {
-      try {
-          mapData.route = await routePlanner.planShipmentRoute({
-              origin:         { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
-              destination:    { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
-              originBranchId: originBranch?.id || res.locals.currentUser?.branchId || null,
-          });
-      } catch (err) {
-          console.error('ERROR planShipmentRoute (update):', err.message);
-      }
-  }
+    mapData.route = null;
+    if (mapData.destination
+        && Number.isFinite(mapData.origin.lat) && Number.isFinite(mapData.origin.lng)
+        && Number.isFinite(mapData.destination.lat) && Number.isFinite(mapData.destination.lng)) {
+        try {
+            mapData.route = await routePlanner.planShipmentRoute({
+                origin: { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
+                destination: { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
+                originBranchId: originBranch?.id || res.locals.currentUser?.branchId || null,
+            });
+        } catch (err) {
+            console.error('ERROR planShipmentRoute (update):', err.message);
+        }
+    }
 
-  const returnUrl = req.query.from || '/shipment';
-  const currentUser = res.locals.currentUser;
-  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
-  const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
+    const returnUrl = req.query.from || '/shipment';
+    const currentUser = res.locals.currentUser;
+    const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
+    const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
+    res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
 };
 
 const updateShipment = async (req, res) => {
@@ -488,45 +607,85 @@ const updateShipment = async (req, res) => {
             }
 
             const newStatus = await statusModel.getById(targetStatusId);
-            if (shipment.statusId !== targetStatusId) {
-                const actorCoords = await resolveUserBranchCoords(currentUser?.id);
-                await shipmentHistoryModel.create({
-                    shipmentId:   id,
-                    fromStatusId: shipment.statusId,
-                    toStatusId:   Number(body.newStatusId),
-                    comment:      body.statusComment || null,
-                    userId:       currentUser?.id    || null,
-                    eventType:    'STATUS_CHANGE',
-                    branchId:     actorCoords.branchId,
-                    latitude:     actorCoords.latitude,
-                    longitude:    actorCoords.longitude,
-                });
+            // Bloque transaccional: cambio de estado + historial + update de envío + prioridad atómicos.
+            // Sin esto, un fallo a mitad de camino deja envío con estado nuevo y sin historial (o viceversa).
+            await sequelize.transaction(async (t) => {
+                if (shipment.statusId !== targetStatusId) {
+                    const actorCoords = await resolveUserBranchCoords(currentUser?.id);
+                    await shipmentHistoryModel.create({
+                        shipmentId: id,
+                        fromStatusId: shipment.statusId,
+                        toStatusId: Number(body.newStatusId),
+                        comment: body.statusComment || null,
+                        userId: currentUser?.id || null,
+                        eventType: 'STATUS_CHANGE',
+                        branchId: actorCoords.branchId,
+                        latitude: actorCoords.latitude,
+                        longitude: actorCoords.longitude,
+                        transaction: t,
+                    });
 
-                await shipmentModel.updateStatus(id, Number(body.newStatusId));
-                if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
-            }
+                    await shipmentModel.updateStatus(id, Number(body.newStatusId), { transaction: t });
+
+                    // Sync ruteo: cerrar RouteStop si el estado nuevo es terminal.
+                    const { RouteStop } = require('../models/routeStop');
+                    const closing = new Set([Status.DELIVERED.id, Status.FAILED_ATTEMPT.id, Status.PACKAGE_FAILED.id, Status.CANCELLED.id]);
+                    if (closing.has(Number(body.newStatusId))) {
+                        await RouteStop.update(
+                            { completed: true, completedAt: new Date() },
+                            { where: { shipmentId: Number(id), stopType: 'delivery', completed: false }, transaction: t }
+                        );
+                    }
+                }
+
+                if (isOperator) {
+                    body.street = shipment.address.street;
+                    body.number = shipment.address.number;
+                    body.province = shipment.address.provinceId;
+                    body.postalCode = shipment.address.postalCode;
+                    body.floorApartment = shipment.address.floorApartment;
+                    body.addressLat = shipment.address.lat;
+                    body.addressLng = shipment.address.lng;
+                    body.weightKg = shipment.weightKg;
+                    body.packageQty = shipment.packageQty;
+                    body.shipmentTypeId = shipment.shipmentTypeId;
+                }
+
+                if (shipment.statusId === Status.IN_TRANSIT.id) {
+                    body.deliveryUserId = shipment.deliveryUserId;
+                }
+
+                await shipmentModel.update(body, { transaction: t });
+
+                const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
+                await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
+            });
+            if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+        } else {
+            // No hay cambio de estado: igual envolvemos update + prioridad en una transacción.
+            await sequelize.transaction(async (t) => {
+                if (isOperator) {
+                    body.street = shipment.address.street;
+                    body.number = shipment.address.number;
+                    body.province = shipment.address.provinceId;
+                    body.postalCode = shipment.address.postalCode;
+                    body.floorApartment = shipment.address.floorApartment;
+                    body.addressLat = shipment.address.lat;
+                    body.addressLng = shipment.address.lng;
+                    body.weightKg = shipment.weightKg;
+                    body.packageQty = shipment.packageQty;
+                    body.shipmentTypeId = shipment.shipmentTypeId;
+                }
+
+                if (shipment.statusId === Status.IN_TRANSIT.id) {
+                    body.deliveryUserId = shipment.deliveryUserId;
+                }
+
+                await shipmentModel.update(body, { transaction: t });
+                const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
+                await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
+            });
         }
-
-        if (isOperator) {
-            body.street = shipment.address.street;
-            body.number = shipment.address.number;
-            body.province = shipment.address.provinceId;
-            body.postalCode = shipment.address.postalCode;
-            body.floorApartment = shipment.address.floorApartment;
-            body.addressLat = shipment.address.lat;
-            body.addressLng = shipment.address.lng;
-            body.weightKg = shipment.weightKg;
-            body.packageQty = shipment.packageQty;
-            body.shipmentTypeId = shipment.shipmentTypeId;
-        }
-
-        if (shipment.statusId === Status.IN_TRANSIT.id) {
-            body.deliveryUserId = shipment.deliveryUserId;
-        }
-
-        await shipmentModel.update(body);
-        const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
-        await shipmentModel.updatePriority(shipment.id, newPriority);
         res.redirect('/shipment?success=2');
     } catch (err) {
         console.error('ERROR updateShipment:', err.message);
@@ -544,19 +703,36 @@ const updateShipmentStatus = async (req, res) => {
         ]);
 
         const actorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
-        await shipmentHistoryModel.create({
-            shipmentId:   id,
-            fromStatusId: shipment.statusId,
-            toStatusId:   Number(newStatusId),
-            comment:      comment || null,
-            userId:       res.locals.currentUser?.id || null,
-            eventType:    'STATUS_CHANGE',
-            branchId:     actorCoords.branchId,
-            latitude:     actorCoords.latitude,
-            longitude:    actorCoords.longitude,
+        // Bloque transaccional: historial + cambio de estado + cierre de RouteStop atómicos.
+        await sequelize.transaction(async (t) => {
+            await shipmentHistoryModel.create({
+                shipmentId: id,
+                fromStatusId: shipment.statusId,
+                toStatusId: Number(newStatusId),
+                comment: comment || null,
+                userId: res.locals.currentUser?.id || null,
+                eventType: 'STATUS_CHANGE',
+                branchId: actorCoords.branchId,
+                latitude: actorCoords.latitude,
+                longitude: actorCoords.longitude,
+                transaction: t,
+            });
+
+            await shipmentModel.updateStatus(id, Number(newStatusId), { transaction: t });
+
+            const { RouteStop } = require('../models/routeStop');
+            const closing = new Set([Status.DELIVERED.id, Status.FAILED_ATTEMPT.id, Status.PACKAGE_FAILED.id, Status.CANCELLED.id]);
+            if (closing.has(Number(newStatusId))) {
+                await RouteStop.update(
+                    { completed: true, completedAt: new Date() },
+                    { where: { shipmentId: Number(id), stopType: 'delivery', completed: false }, transaction: t }
+                );
+            }
         });
 
-        await shipmentModel.updateStatus(id, Number(newStatusId));
+        const eventCode = await notificationEventModel.getEventCodeByShipmentStatus(Number(newStatusId));
+        const freshShipment = await shipmentModel.getById(id);
+        await notifyShipmentEvent(eventCode || NotificationEvent.SHIPMENT_ASSIGNED, freshShipment);
 
         if (Number(newStatusId) === 4) {
             try {
@@ -582,23 +758,22 @@ const updateShipmentStatus = async (req, res) => {
 
 const assignDelivery = async (req, res) => {
     try {
-        const { id }             = req.params;
+        const { id } = req.params;
         const { deliveryUserId } = req.body;
-        const currentUser        = res.locals.currentUser;
+        const currentUser = res.locals.currentUser;
 
         const supervisorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.assignDelivery({
-            shipmentId:     Number(id),
+            shipmentId: Number(id),
             deliveryUserId: deliveryUserId || null,
-            actor:          currentUser,
-            branchId:       supervisorCoords.branchId,
-            latitude:       supervisorCoords.latitude,
-            longitude:      supervisorCoords.longitude,
+            actor: currentUser,
+            branchId: supervisorCoords.branchId,
+            latitude: supervisorCoords.latitude,
+            longitude: supervisorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        const newStatus = await statusModel.getById(fresh.statusId);
-        if (newStatus) { notifyStatusChange(fresh, newStatus.description); }
+        const shipment = await shipmentModel.getById(id);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_ASSIGNED, shipment);
 
         res.redirect(`/shipment/update/${id}?success=3`);
     } catch (err) {
@@ -611,21 +786,21 @@ const assignDelivery = async (req, res) => {
 
 const prepareShipment = async (req, res) => {
     try {
-        const { id }      = req.params;
+        const { id } = req.params;
         const currentUser = res.locals.currentUser;
 
         const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.IN_PREPARATION.id,
-            actor:      currentUser,
-            branchId:   actorCoords.branchId,
-            latitude:   actorCoords.latitude,
-            longitude:  actorCoords.longitude,
+            actor: currentUser,
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        notifyStatusChange(fresh, Status.IN_PREPARATION.description);
+        const shipment = await shipmentModel.getById(id);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_IN_PREPARATION, shipment);
 
         res.redirect(`/shipment/update/${id}?success=4`);
     } catch (err) {
@@ -638,7 +813,7 @@ const prepareShipment = async (req, res) => {
 
 const cancelShipment = async (req, res) => {
     try {
-        const { id }      = req.params;
+        const { id } = req.params;
         const { comment } = req.body;
         const currentUser = res.locals.currentUser;
 
@@ -646,15 +821,15 @@ const cancelShipment = async (req, res) => {
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.CANCELLED.id,
-            actor:      currentUser,
+            actor: currentUser,
             comment,
-            branchId:   actorCoords.branchId,
-            latitude:   actorCoords.latitude,
-            longitude:  actorCoords.longitude,
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        notifyStatusChange(fresh, Status.CANCELLED.description);
+        const shipment = await shipmentModel.getById(id);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipment);
 
         res.redirect(`/shipment/update/${id}?success=5`);
     } catch (err) {
@@ -667,7 +842,7 @@ const cancelShipment = async (req, res) => {
 
 const markPackageFailed = async (req, res) => {
     try {
-        const { id }      = req.params;
+        const { id } = req.params;
         const { comment } = req.body;
         const currentUser = res.locals.currentUser;
 
@@ -675,15 +850,15 @@ const markPackageFailed = async (req, res) => {
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.PACKAGE_FAILED.id,
-            actor:      currentUser,
+            actor: currentUser,
             comment,
-            branchId:   actorCoords.branchId,
-            latitude:   actorCoords.latitude,
-            longitude:  actorCoords.longitude,
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
-        const fresh = await shipmentModel.getById(id);
-        notifyStatusChange(fresh, Status.PACKAGE_FAILED.description);
+        const shipment = await shipmentModel.getById(id);
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_PACKAGE_FAILED, shipment);
 
         res.redirect(`/shipment/update/${id}?success=6`);
     } catch (err) {
@@ -705,10 +880,10 @@ const getKanban = async (req, res) => {
         Status.PACKAGE_FAILED.id,
     ];
 
-    const user      = res.locals.currentUser;
-    const isAdmin   = isAdminUser(user);
+    const user = res.locals.currentUser;
+    const isAdmin = isAdminUser(user);
     const branchIdQ = Number(req.query.branchId) || null;
-    const branchId  = isAdmin ? branchIdQ : (user?.branchId || null);
+    const branchId = isAdmin ? branchIdQ : (user?.branchId || null);
 
     const [shipments, deliveryUsers, branches] = await Promise.all([
         shipmentModel.getForKanban(KANBAN_STATUS_IDS, { branchId }),
@@ -764,9 +939,9 @@ const getKanban = async (req, res) => {
                 groupMap.set(key, {
                     key,
                     transportName: t.name,
-                    plate:         t.plate || '',
-                    driverName:    t.driver?.fullName || s.deliveryUser?.fullName || '',
-                    shipments:     [],
+                    plate: t.plate || '',
+                    driverName: t.driver?.fullName || s.deliveryUser?.fullName || '',
+                    shipments: [],
                 });
             }
             groupMap.get(key).shipments.push(s);
@@ -820,7 +995,7 @@ const calculateInitialPriority = async (req, res) => {
     }
 
     const originUbication = {
-        latitude:  res.locals.currentUser?.branch?.latitude,
+        latitude: res.locals.currentUser?.branch?.latitude,
         longitude: res.locals.currentUser?.branch?.longitude,
     };
 
@@ -877,10 +1052,82 @@ function calculateDistance(destinationUbication, originUbication) {
     return R * c;
 }
 
+async function resolveShipmentForNotification(shipmentOrId) {
+    if (shipmentOrId && typeof shipmentOrId === 'object' && shipmentOrId.sender && shipmentOrId.recipient) {
+        return shipmentOrId;
+    }
+    const id = typeof shipmentOrId === 'object' ? shipmentOrId.id : shipmentOrId;
+    return shipmentModel.getById(id);
+}
+
+async function notifyShipmentEvent(eventCode, shipmentOrId) {
+    try {
+        const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
+        if (!cfg || !cfg.enabled) { return; }
+
+        const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
+        if (!template) { return; }
+
+        const shipment = await resolveShipmentForNotification(shipmentOrId);
+        if (!shipment) { return; }
+
+        const mode = cfg.recipientMode || 'recipient';
+        const recipients = [];
+        if ((mode === 'recipient' || mode === 'both') && shipment.recipient?.email) { recipients.push(shipment.recipient.email); }
+        if ((mode === 'sender'    || mode === 'both') && shipment.sender?.email)    { recipients.push(shipment.sender.email);    }
+        if (mode === 'custom' && cfg.customEmail)                                   { recipients.push(cfg.customEmail);           }
+
+        if (recipients.length === 0) {
+            console.warn(`notifyShipmentEvent: ${eventCode} sin destinatarios (mode=${mode})`);
+            return;
+        }
+
+        const fullName = shipment.recipient?.fullName || '';
+        const trackingCode = shipment.trackingId || '';
+        const secretCode = shipment.deliverySecretCode || '';
+        const secretCodeLine = secretCode
+            ? `\n\nCódigo clave de entrega: ${secretCode}. Mostráselo al repartidor para confirmar la entrega.`
+            : '';
+        const fill = (s) => String(s || '')
+            .replace(/\{\{fullName\}\}/g,       fullName)
+            .replace(/\{\{trackingCode\}\}/g,   trackingCode)
+            .replace(/\{\{secretCode\}\}/g,     secretCode)
+            .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine);
+
+        await queueEmail({
+            recipient: recipients.join(','),
+            subject:   fill(template.subject),
+            body:      fill(template.body),
+        });
+    } catch (err) {
+        console.error('notifyShipmentEvent error:', err.message);
+    }
+}
+
+// Wrapper legacy — algunos llamadores usaban data={recipientEmail,...}
+async function notifyRecipient(eventCode, dataOrShipment) {
+    if (dataOrShipment && (dataOrShipment.sender || dataOrShipment.recipient || dataOrShipment.id)) {
+        return notifyShipmentEvent(eventCode, dataOrShipment);
+    }
+    // Compatibilidad mínima: si solo viene email suelto, mandar usando template sin recipient_mode
+    const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
+    if (!cfg || !cfg.enabled) { return; }
+    const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
+    if (!template || !dataOrShipment?.recipientEmail) { return; }
+    const fill = (s) => String(s || '')
+        .replace(/\{\{fullName\}\}/g,     dataOrShipment.recipientFullName || '')
+        .replace(/\{\{trackingCode\}\}/g, dataOrShipment.shipmentTrackingCode || '');
+    await queueEmail({
+        recipient: dataOrShipment.recipientEmail,
+        subject:   fill(template.subject),
+        body:      fill(template.body),
+    });
+}
+
 const importPreviews = new Map();
-const importReports  = new Map();
+const importReports = new Map();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
-const REPORT_TTL_MS  = 60 * 60 * 1000;
+const REPORT_TTL_MS = 60 * 60 * 1000;
 
 const cleanupExpired = (map, ttl) => {
     const now = Date.now();
@@ -899,7 +1146,7 @@ const processImportPreview = async (req, res) => {
     if (!req.file) {
         return res.render('shipment/import', {
             result: null,
-            error:  'Debe seleccionar un archivo CSV',
+            error: 'Debe seleccionar un archivo CSV',
         });
     }
 
@@ -909,7 +1156,7 @@ const processImportPreview = async (req, res) => {
     const previewId = crypto.randomUUID();
     importPreviews.set(previewId, {
         analysis,
-        filename:  req.file.originalname,
+        filename: req.file.originalname,
         createdAt: Date.now(),
     });
 
@@ -927,12 +1174,12 @@ const commitImport = async (req, res) => {
     if (!entry) {
         return res.status(410).render('shipment/import', {
             result: null,
-            error:  'El preview expiró o no existe. Volvé a subir el archivo.',
+            error: 'El preview expiró o no existe. Volvé a subir el archivo.',
         });
     }
 
     const userId = res.locals.currentUser?.id || null;
-    const force  = req.body.force === 'true';
+    const force = req.body.force === 'true';
 
     const commit = await csvImport.commitAnalysis(entry.analysis, { userId, includeDuplicates: force });
 
@@ -941,13 +1188,13 @@ const commitImport = async (req, res) => {
     try {
         await shipmentImportModel.create({
             userId,
-            filename:       entry.filename,
-            totalRows:      entry.analysis.total,
-            importedCount:  commit.imported.length,
-            errorCount:     result.errors.length,
+            filename: entry.filename,
+            totalRows: entry.analysis.total,
+            importedCount: commit.imported.length,
+            errorCount: result.errors.length,
             duplicateCount: entry.analysis.summary.duplicates,
-            forced:         force,
-            aborted:        entry.analysis.aborted,
+            forced: force,
+            aborted: entry.analysis.aborted,
         });
     } catch (err) {
         console.error('ERROR persistiendo shipment_import:', err.message);
@@ -960,7 +1207,7 @@ const commitImport = async (req, res) => {
         cleanupExpired(importReports, REPORT_TTL_MS);
         reportId = crypto.randomUUID();
         importReports.set(reportId, {
-            csv:       csvImport.buildErrorReportCsv(result.errors),
+            csv: csvImport.buildErrorReportCsv(result.errors),
             createdAt: Date.now(),
         });
     }
@@ -974,7 +1221,7 @@ const downloadImportReport = (req, res) => {
     if (!entry) {
         return res.status(404).send('El reporte expiró o no existe');
     }
-    res.setHeader('Content-Type',        'text/csv; charset=utf-8');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="errores-import-${req.params.id}.csv"`);
     res.send(entry.csv);
 };
@@ -989,7 +1236,7 @@ const exportShipments = async (req, res) => {
         const shipments = await shipmentModel.getAll();
         const csv = csvExport.buildShipmentsCsv(shipments);
         const today = new Date().toISOString().split('T')[0];
-        res.setHeader('Content-Type',        'text/csv; charset=utf-8');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="envios-${today}.csv"`);
         res.send(csv);
     } catch (err) {
@@ -998,4 +1245,4 @@ const exportShipments = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority };
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority, notifyShipmentEvent };

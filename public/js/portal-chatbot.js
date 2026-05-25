@@ -20,6 +20,7 @@
         selectedShipmentId: 'portalChatbotSelectedShipmentId',
         restorePending: 'portalChatbotRestorePending',
         thread: 'portalChatbotThread',
+        incidentDraft: 'portalChatbotIncidentDraft',
     };
     const INIT_GREETING = 'Hola. Te ayudo a seguir tu envio y entender que esta pasando.';
 
@@ -27,6 +28,7 @@
     const state = {
         pendingAction: null,
         selectedShipmentId: readStorage(STORAGE_KEYS.selectedShipmentId) || null,
+        incidentDraft: readJsonStorage(STORAGE_KEYS.incidentDraft) || null,
     };
     let thread = [];
 
@@ -141,6 +143,7 @@
                     state: {
                         pendingAction: state.pendingAction,
                         selectedShipmentId: state.selectedShipmentId,
+                        incidentDraft: state.incidentDraft,
                     },
                     input,
                 }),
@@ -156,7 +159,13 @@
         }
     }
 
-    function applyBotResponse(response, options) {
+    const TYPING_DELAY_MS = 450;
+    const MESSAGE_GAP_MS  = 250;
+    const prefersReducedMotion = (typeof window !== 'undefined' && window.matchMedia)
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false;
+
+    async function applyBotResponse(response, options) {
         syncState(response?.state || {});
 
         const settings = options || {};
@@ -170,18 +179,59 @@
             nextMessages = nextMessages.slice(1);
         }
 
+        const instant = settings.instant === true || prefersReducedMotion;
+
         if (nextMessages.length) {
-            nextMessages.forEach(function (message) {
-                addMessage(message.role || 'bot', message);
-            });
+            for (let i = 0; i < nextMessages.length; i += 1) {
+                const message = nextMessages[i];
+                if (!instant) {
+                    showTypingIndicator();
+                    await wait(TYPING_DELAY_MS);
+                    hideTypingIndicator();
+                }
+                addMessage(message.role || 'bot', message, { animated: !instant });
+                if (!instant && i < nextMessages.length - 1) {
+                    await wait(MESSAGE_GAP_MS);
+                }
+            }
         }
 
         executeEffects(response?.effects || []);
     }
 
+    function wait(ms) {
+        return new Promise(function (resolve) { window.setTimeout(resolve, ms); });
+    }
+
+    function showTypingIndicator() {
+        if (!messagesEl || messagesEl.querySelector('.portal-chatbot-typing')) { return; }
+        const wrap = document.createElement('article');
+        wrap.className = 'portal-chatbot-message portal-chatbot-message--bot portal-chatbot-typing';
+        wrap.innerHTML = '<div class="portal-chatbot-bubble portal-chatbot-typing-bubble">'
+            + '<span class="portal-chatbot-typing-dot"></span>'
+            + '<span class="portal-chatbot-typing-dot"></span>'
+            + '<span class="portal-chatbot-typing-dot"></span>'
+            + '</div>';
+        messagesEl.appendChild(wrap);
+        scrollThreadToBottom();
+    }
+
+    function hideTypingIndicator() {
+        if (!messagesEl) { return; }
+        const node = messagesEl.querySelector('.portal-chatbot-typing');
+        if (node) { node.remove(); }
+    }
+
     function syncState(nextState) {
         state.selectedShipmentId = nextState.selectedShipmentId || null;
         state.pendingAction = nextState.pendingAction || null;
+        state.incidentDraft = nextState.incidentDraft || null;
+
+        if (state.incidentDraft) {
+            writeJsonStorage(STORAGE_KEYS.incidentDraft, state.incidentDraft);
+        } else {
+            removeStorage(STORAGE_KEYS.incidentDraft);
+        }
 
         if (state.selectedShipmentId) {
             writeStorage(STORAGE_KEYS.selectedShipmentId, state.selectedShipmentId);
@@ -281,15 +331,15 @@
         writeStorage(STORAGE_KEYS.open, '0');
     }
 
-    function addBotMessage(payload) {
-        addMessage('bot', payload);
+    function addBotMessage(payload, options) {
+        addMessage('bot', payload, options);
     }
 
     function addUserMessage(text) {
         addMessage('user', { text: text });
     }
 
-    function addMessage(role, payload) {
+    function addMessage(role, payload, options) {
         const message = {
             role,
             text: payload.text || '',
@@ -301,12 +351,16 @@
 
         thread.push(message);
         persistThread();
-        renderMessage(message.role, message);
+        renderMessage(message.role, message, options);
     }
 
-    function renderMessage(role, payload) {
+    function renderMessage(role, payload, options) {
+        const opts = options || {};
+        const animated = opts.animated === true && !prefersReducedMotion;
+
         const wrapper = document.createElement('article');
         wrapper.className = 'portal-chatbot-message portal-chatbot-message--' + role;
+        if (animated) { wrapper.classList.add('is-entering'); }
 
         const bubble = document.createElement('div');
         bubble.className = 'portal-chatbot-bubble';
@@ -329,12 +383,14 @@
         if (Array.isArray(payload.actions) && payload.actions.length) {
             const actionsEl = document.createElement('div');
             actionsEl.className = 'portal-chatbot-actions';
+            if (animated) { actionsEl.classList.add('is-staggered'); }
 
-            payload.actions.forEach(function (item) {
+            payload.actions.forEach(function (item, idx) {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'portal-chatbot-chip';
                 button.dataset.action = item.action;
+                if (animated) { button.style.setProperty('--chip-idx', String(idx)); }
 
                 if (item.value != null && item.value !== '') {
                     button.dataset.value = item.value;
@@ -349,6 +405,15 @@
 
         messagesEl.appendChild(wrapper);
         scrollThreadToBottom();
+
+        if (animated) {
+            // Forzar reflow para que la transición se aplique al pasar a estado final
+            // eslint-disable-next-line no-unused-expressions
+            wrapper.offsetHeight;
+            window.requestAnimationFrame(function () {
+                wrapper.classList.remove('is-entering');
+            });
+        }
     }
 
     function restoreConversationIfNeeded() {
@@ -475,6 +540,24 @@
             window.sessionStorage.removeItem(key);
         } catch (error) {
             // ignore storage errors
+        }
+    }
+
+    function writeJsonStorage(key, value) {
+        try {
+            window.sessionStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            // ignore storage errors
+        }
+    }
+
+    function readJsonStorage(key) {
+        try {
+            const raw = window.sessionStorage.getItem(key);
+            if (!raw) { return null; }
+            return JSON.parse(raw);
+        } catch (error) {
+            return null;
         }
     }
 })();

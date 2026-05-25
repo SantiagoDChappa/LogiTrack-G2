@@ -15,6 +15,10 @@ const Transport = sequelize.define('transport', {
     enabled:       { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     commissionPerDelivery: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0,  field: 'commission_per_delivery' },
     fuelLPer100Km:         { type: DataTypes.DECIMAL(5, 2),  allowNull: false, defaultValue: 10, field: 'fuel_l_per_100km' },
+    // Sprint 3 - 2.4 Vehículo fuera de servicio
+    outOfService:          { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'out_of_service' },
+    outOfServiceReason:    { type: DataTypes.STRING(160), allowNull: true,  field: 'out_of_service_reason' },
+    outOfServiceUntil:     { type: DataTypes.DATEONLY,    allowNull: true,  field: 'out_of_service_until' },
 }, { tableName: 'transport', timestamps: false });
 
 const getAll = ({ branchId } = {}) => {
@@ -48,7 +52,10 @@ const getById = (id) => {
 const getEnabledForBranch = (branchId) => {
     const { User } = require('./user');
     const { Zone } = require('./zone');
-    const where = { enabled: true };
+    // Sprint 3 - 2.4 / 4.2: ignora vehículos fuera de servicio. La disponibilidad
+    // del chofer se valida en el optimizador (no aquí) para no perder transportes
+    // sin chofer asignado todavía.
+    const where = { enabled: true, outOfService: false };
     if (branchId) { where.branchId = branchId; }
     return Transport.findAll({
         where,

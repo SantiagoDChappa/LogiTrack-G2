@@ -1,16 +1,31 @@
 const jwt = require('jsonwebtoken');
 
-const requireAuth = (req, res, next) => {
+const requireAuth = async (req, res, next) => {
     const token = req.cookies.token;
-
     if (!token) {
         const returnTo = req.originalUrl;
         return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
-
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Refrescar branchId desde DB si en el token vino null (asignacion posterior al login)
+        if (decoded?.id && !decoded.branchId) {
+            try {
+                const userModel = require('../models/user');
+                const fresh = await userModel.getById(decoded.id);
+                if (fresh?.branchId) {
+                    decoded.branchId = fresh.branchId;
+                    const branchModel = require('../models/branch');
+                    const b = await branchModel.getById(fresh.branchId);
+                    if (b) {
+                        decoded.branch = { id: b.id, latitude: b.latitude, longitude: b.longitude };
+                    }
+                }
+            } catch { /* ignore */ }
+        }
         res.locals.currentUser = decoded;
+        const settingModel = require('../models/setting');
+        res.locals.nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
         next();
     } catch {
         const returnTo = req.originalUrl;

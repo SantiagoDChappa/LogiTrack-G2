@@ -11,6 +11,21 @@ const {
 const { getSelectedShipment } = require('../runtime');
 const { getShipmentStage, normalizeText } = require('../utils');
 
+const CLARIFICATION_ACTION_LABELS = {
+    'request-lookup': 'Buscar mi envio',
+    'show-main-menu': 'Ver menu principal',
+    'show-status': 'Estado actual',
+    'show-history': 'Historial',
+    'show-location': 'Donde esta',
+    'show-eta': 'Fecha estimada',
+    'show-issues': 'Que paso con mi envio',
+    'show-branch': 'Sucursal o retiro',
+    'show-pod': 'Comprobante de entrega',
+    'show-delivery-issue': 'No reconozco la entrega',
+    'show-management': 'Cambios o gestiones',
+    'show-support': 'Hablar con soporte',
+};
+
 function buildTrackedText(shipment, text) {
     if (!shipment) {
         return text;
@@ -19,8 +34,17 @@ function buildTrackedText(shipment, text) {
     return text.replace('{trackingId}', shipment.trackingId);
 }
 
+function buildClarificationActions(actions) {
+    const unique = Array.from(new Set(actions.filter(Boolean)));
+    return unique.map((action) => createAction(
+        CLARIFICATION_ACTION_LABELS[action] || 'Seguir por esta opcion',
+        action
+    ));
+}
+
 function buildUnderstandMenuResponse(runtime) {
     const shipment = getSelectedShipment(runtime);
+    const stage = getShipmentStage(shipment?.statusKey);
 
     if (!shipment) {
         return {
@@ -31,6 +55,39 @@ function buildUnderstandMenuResponse(runtime) {
                         createAction('Buscar mi envio', 'request-lookup'),
                         createAction('Ver guia de estados', 'show-status-guide'),
                         createAction('Volver al menu', 'show-main-menu'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'entregado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} como referencia, te puedo explicar la entrega, mostrar el historial visible o ayudarte si no la reconoces.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Comprobante de entrega', 'show-pod'),
+                        createAction('No reconozco la entrega', 'show-delivery-issue'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'cancelado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} como referencia, te puedo explicar por que ya no sigue en curso y mostrarte el historial visible.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
                     ],
                 }),
             ],
@@ -56,6 +113,7 @@ function buildUnderstandMenuResponse(runtime) {
 
 function buildLocationMenuResponse(runtime) {
     const shipment = getSelectedShipment(runtime);
+    const stage = getShipmentStage(shipment?.statusKey);
 
     if (!shipment) {
         return {
@@ -72,39 +130,30 @@ function buildLocationMenuResponse(runtime) {
         };
     }
 
-    const stage = getShipmentStage(shipment.statusKey);
-    const actions = [
-        createAction('Donde esta', 'show-location'),
-        createAction('Fecha estimada', 'show-eta'),
-        createAction('Historial', 'show-history'),
-    ];
-
-    if (stage === 'en_sucursal') {
-        actions[2] = createAction('Sucursal o retiro', 'show-branch');
-    }
-
-    return {
-        messages: [
-            createMessage({
-                text: buildTrackedText(shipment, 'Si queres revisar {trackingId}, te puedo mostrar donde esta, cual es la ultima referencia visible y cuando podria llegar.'),
-                actions,
-            }),
-        ],
-        effects: [],
-    };
-}
-
-function buildProblemMenuResponse(runtime) {
-    const shipment = getSelectedShipment(runtime);
-
-    if (!shipment) {
+    if (stage === 'entregado') {
         return {
             messages: [
                 createMessage({
-                    text: 'Si hubo un problema con tu envio, primero pasame el tracking o el DNI. Despues te ayudo a revisar demoras, intentos fallidos o un reclamo.',
+                    text: buildTrackedText(shipment, '{trackingId} ya figura entregado. Si queres, te muestro la ultima referencia visible, el historial o el comprobante.'),
                     actions: [
-                        createAction('Buscar mi envio', 'request-lookup'),
-                        createAction('Problemas comunes', 'show-issues'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Comprobante de entrega', 'show-pod'),
+                        createAction('No reconozco la entrega', 'show-delivery-issue'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'cancelado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, '{trackingId} esta cancelado, asi que ya no sigue avanzando. Si queres, te muestro el estado final o el historial visible.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Historial', 'show-history'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
                 }),
@@ -113,28 +162,152 @@ function buildProblemMenuResponse(runtime) {
         };
     }
 
-    const stage = getShipmentStage(shipment.statusKey);
-    const text = stage === 'entregado'
-        ? buildTrackedText(shipment, 'Si el problema con {trackingId} es que figura entregado pero no lo tenes, te ayudo a revisar ese caso.')
-        : buildTrackedText(shipment, 'Si hubo un problema con {trackingId}, revisemos que paso y que opciones tenes ahora.');
-    const actions = stage === 'entregado'
-        ? [
-            createAction('No reconozco la entrega', 'show-delivery-issue'),
-            createAction('Comprobante de entrega', 'show-pod'),
-            createAction('Hablar con soporte', 'show-support'),
-        ]
-        : [
-            createAction('Que paso con mi envio', 'show-issues'),
-            createAction('Fecha estimada', 'show-eta'),
-            createAction('Sucursal o retiro', 'show-branch'),
-            createAction('Hablar con soporte', 'show-support'),
-        ];
+    if (stage === 'en_sucursal') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} te puedo mostrar la ultima referencia visible, el historial y lo que aparece sobre sucursal o retiro.'),
+                    actions: [
+                        createAction('Sucursal o retiro', 'show-branch'),
+                        createAction('Donde esta', 'show-location'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'aun_no_salio') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, '{trackingId} todavia no salio a recorrido. Si queres, te muestro el estado actual, la fecha estimada o que significa esta etapa.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Fecha estimada', 'show-eta'),
+                        createAction('Que significa este estado', 'show-status-guide', shipment.statusKey),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'con_problema') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} te puedo mostrar la ultima referencia visible y revisar si la demora o el problema cambio la fecha estimada.'),
+                    actions: [
+                        createAction('Donde esta', 'show-location'),
+                        createAction('Que paso con mi envio', 'show-issues'),
+                        createAction('Fecha estimada', 'show-eta'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
 
     return {
         messages: [
             createMessage({
-                text,
-                actions,
+                text: buildTrackedText(shipment, 'Si queres revisar {trackingId}, te puedo mostrar donde esta, cual es la ultima referencia visible y cuando podria llegar.'),
+                actions: [
+                    createAction('Donde esta', 'show-location'),
+                    createAction('Fecha estimada', 'show-eta'),
+                    createAction('Historial', 'show-history'),
+                    createAction('Hablar con soporte', 'show-support'),
+                ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
+function buildProblemMenuResponse(runtime) {
+    const shipment = getSelectedShipment(runtime);
+    const stage = getShipmentStage(shipment?.statusKey);
+
+    if (!shipment) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'Si hubo un problema con tu envio, primero pasame el tracking o el DNI. Despues te ayudo a revisar demoras, intentos fallidos o un reclamo.',
+                    actions: [
+                        createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Reportar incidencia', 'report-incident-start'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'entregado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Si el problema con {trackingId} es la entrega, te puedo ayudar con el comprobante o con el caso de entrega no reconocida.'),
+                    actions: [
+                        createAction('No reconozco la entrega', 'show-delivery-issue'),
+                        createAction('Reportar incidencia', 'report-incident-start'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'cancelado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, '{trackingId} ya esta cancelado. Si queres, te muestro el historial visible o te paso a soporte para revisar el caso.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'en_sucursal') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Si hubo un problema con {trackingId}, te conviene revisar la sucursal visible, el historial y la ayuda de soporte.'),
+                    actions: [
+                        createAction('Sucursal o retiro', 'show-branch'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    return {
+        messages: [
+            createMessage({
+                text: stage === 'con_problema'
+                    ? buildTrackedText(shipment, 'Con {trackingId} te puedo mostrar que paso, si hay una nueva fecha estimada y cuando conviene hablar con soporte.')
+                    : buildTrackedText(shipment, 'Si hubo un problema con {trackingId}, revisemos que paso y que opciones tenes ahora.'),
+                actions: [
+                    createAction('Que paso con mi envio', 'show-issues'),
+                    createAction('Reportar incidencia', 'report-incident-start'),
+                    createAction('Sucursal o retiro', 'show-branch'),
+                    createAction('Hablar con soporte', 'show-support'),
+                ],
             }),
         ],
         effects: [],
@@ -143,6 +316,7 @@ function buildProblemMenuResponse(runtime) {
 
 function buildDeliveryMenuResponse(runtime) {
     const shipment = getSelectedShipment(runtime);
+    const stage = getShipmentStage(shipment?.statusKey);
 
     if (!shipment) {
         return {
@@ -160,38 +334,66 @@ function buildDeliveryMenuResponse(runtime) {
         };
     }
 
-    const stage = getShipmentStage(shipment.statusKey);
-    let text = buildTrackedText(shipment, 'Con {trackingId} te puedo ayudar a revisar entrega, retiro o comprobante.');
-    let actions = [
-        createAction('Sucursal o retiro', 'show-branch'),
-        createAction('Comprobante de entrega', 'show-pod'),
-        createAction('Historial', 'show-history'),
-        createAction('Hablar con soporte', 'show-support'),
-    ];
-
     if (stage === 'entregado') {
-        text = buildTrackedText(shipment, 'Con {trackingId} te puedo ayudar a revisar la entrega, el comprobante o un reclamo si no reconoces la entrega.');
-        actions = [
-            createAction('Comprobante de entrega', 'show-pod'),
-            createAction('No reconozco la entrega', 'show-delivery-issue'),
-            createAction('Historial', 'show-history'),
-            createAction('Hablar con soporte', 'show-support'),
-        ];
-    } else if (stage === 'en_sucursal') {
-        text = buildTrackedText(shipment, 'Con {trackingId} te puedo ayudar a revisar la referencia visible y si conviene consultar retiro.');
-        actions = [
-            createAction('Sucursal o retiro', 'show-branch'),
-            createAction('Donde esta', 'show-location'),
-            createAction('Historial', 'show-history'),
-            createAction('Hablar con soporte', 'show-support'),
-        ];
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} te puedo ayudar a revisar la entrega, el comprobante o un reclamo si no la reconoces.'),
+                    actions: [
+                        createAction('Comprobante de entrega', 'show-pod'),
+                        createAction('No reconozco la entrega', 'show-delivery-issue'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'en_sucursal') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} te puedo mostrar la sucursal visible, la ultima referencia y el historial para que revises el retiro.'),
+                    actions: [
+                        createAction('Sucursal o retiro', 'show-branch'),
+                        createAction('Donde esta', 'show-location'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'cancelado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, '{trackingId} esta cancelado, asi que ya no tiene una entrega o retiro activo. Si queres, te muestro el estado final o te paso con soporte.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
     }
 
     return {
         messages: [
             createMessage({
-                text,
-                actions,
+                text: buildTrackedText(shipment, 'Con {trackingId} te puedo ayudar a revisar entrega, retiro o comprobante segun el estado actual.'),
+                actions: [
+                    createAction('Sucursal o retiro', 'show-branch'),
+                    createAction('Comprobante de entrega', 'show-pod'),
+                    createAction('Historial', 'show-history'),
+                    createAction('Hablar con soporte', 'show-support'),
+                ],
             }),
         ],
         effects: [],
@@ -201,18 +403,78 @@ function buildDeliveryMenuResponse(runtime) {
 function buildManagementMenuResponse(runtime) {
     const shipment = getSelectedShipment(runtime);
     const stage = getShipmentStage(shipment?.statusKey);
-    let text = 'Aca te ayudo con cambios, alertas y soporte.';
 
-    if (shipment && stage === 'aun_no_salio') {
-        text = buildTrackedText(shipment, 'Con {trackingId} te puedo orientar sobre cambios posibles, alertas y como escalar el caso si hace falta.');
-    } else if (shipment && stage !== 'default') {
-        text = buildTrackedText(shipment, 'Con {trackingId} te puedo orientar sobre cambios, restricciones y soporte segun el estado actual.');
+    if (!shipment) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'Aca te ayudo con cambios, alertas y soporte. Si queres revisar una gestion puntual, primero pasame el tracking o el DNI.',
+                    actions: [
+                        createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Hablar con soporte', 'show-support'),
+                        createAction('Acceso empresas', 'go-login'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'entregado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, '{trackingId} ya fue entregado, asi que no admite cambios. Si el problema es la entrega, te conviene revisar ese caso con soporte.'),
+                    actions: [
+                        createAction('No reconozco la entrega', 'show-delivery-issue'),
+                        createAction('Hablar con soporte', 'show-support'),
+                        createAction('Historial', 'show-history'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'cancelado') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, '{trackingId} ya esta cancelado, asi que no tiene una gestion activa desde el portal. Si queres mas contexto, soporte puede revisarlo.'),
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Hablar con soporte', 'show-support'),
+                        createAction('Acceso empresas', 'go-login'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    if (stage === 'con_problema') {
+        return {
+            messages: [
+                createMessage({
+                    text: buildTrackedText(shipment, 'Con {trackingId} te puedo orientar sobre cambios, restricciones y como escalar el caso mientras se revisa el problema visible.'),
+                    actions: [
+                        createAction('Cambios o gestiones', 'show-management'),
+                        createAction('Que paso con mi envio', 'show-issues'),
+                        createAction('Hablar con soporte', 'show-support'),
+                        createAction('Acceso empresas', 'go-login'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
     }
 
     return {
         messages: [
             createMessage({
-                text,
+                text: stage === 'aun_no_salio'
+                    ? buildTrackedText(shipment, 'Con {trackingId} te puedo orientar sobre cambios posibles, alertas y como escalar el caso si hace falta.')
+                    : buildTrackedText(shipment, 'Con {trackingId} te puedo orientar sobre cambios, restricciones y soporte segun el estado actual.'),
                 actions: [
                     createAction('Cambios o gestiones', 'show-management'),
                     createAction('Notificaciones', 'show-notifications'),
@@ -248,7 +510,7 @@ function buildInitResponse(runtime) {
             text: runtime.context.error + ' Si queres, probamos otra busqueda o vemos otras opciones.',
             actions: [
                 createAction('Buscar otro envio', 'request-lookup'),
-                createAction('Preguntas frecuentes', 'scroll-faq'),
+                createAction('Ver preguntas frecuentes', 'scroll-faq'),
                 createAction('Hablar con soporte', 'show-support'),
             ],
         }));
@@ -263,7 +525,6 @@ function buildInitResponse(runtime) {
             html: buildShipmentSummary(shipment),
             actions: buildShipmentContextActions(shipment),
         }));
-        messages.push(buildMainMenuMessage(true));
         return { messages, effects };
     }
 
@@ -282,7 +543,7 @@ function buildInitResponse(runtime) {
         messages.push(createMessage({
             text: 'No encontre resultados para esa busqueda. Si queres, proba con otro tracking, busca por DNI o anda a soporte.',
             actions: [
-                createAction('Buscar un envio', 'request-lookup'),
+                createAction('Buscar mi envio', 'request-lookup'),
                 createAction('Hablar con soporte', 'show-support'),
             ],
         }));
@@ -290,13 +551,6 @@ function buildInitResponse(runtime) {
         return { messages, effects };
     }
 
-    messages.push(createMessage({
-        text: 'Para arrancar, pasame un numero de seguimiento como ENV-001 o el DNI del destinatario.',
-        actions: [
-            createAction('Buscar un envio', 'request-lookup'),
-            createAction('Ver preguntas frecuentes', 'scroll-faq'),
-        ],
-    }));
     messages.push(buildMainMenuMessage(true));
 
     return { messages, effects };
@@ -306,7 +560,7 @@ function buildRequestLookupResponse() {
     return {
         messages: [
             createMessage({
-                text: 'Pasame un tracking o un DNI y lo busco. Por ejemplo: ENV-001 o 12345678.',
+                text: 'Pasame el tracking o el DNI que queres buscar y lo reviso. Por ejemplo: ENV-001 o 12345678.',
                 actions: [
                     createAction('Volver al menu', 'show-main-menu'),
                 ],
@@ -394,14 +648,82 @@ function buildMainMenuResponse(runtime) {
     };
 }
 
-function buildFallbackResponse() {
+function buildAcknowledgementResponse(runtime) {
+    const shipment = getSelectedShipment(runtime);
+
+    if (shipment) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'Perfecto. Si queres, sigo con ' + shipment.trackingId + ' o buscamos otro envio.',
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Buscar otro envio', 'request-lookup'),
+                        createAction('Ver menu principal', 'show-main-menu'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    return {
+        messages: [
+            createMessage({
+                text: 'Perfecto. Cuando quieras, te ayudo con otro envio o con una consulta del portal.',
+                actions: [
+                    createAction('Buscar mi envio', 'request-lookup'),
+                    createAction('Ver menu principal', 'show-main-menu'),
+                ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
+function buildClarificationResponse(actions) {
+    const clarificationActions = buildClarificationActions(actions);
+
+    return {
+        messages: [
+            createMessage({
+                text: 'Te entendi a medias. Decime por cual de estas opciones queres seguir y te llevo directo.',
+                actions: clarificationActions.length
+                    ? clarificationActions
+                    : [
+                        createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Ver menu principal', 'show-main-menu'),
+                    ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
+function buildFallbackResponse(shipment) {
+    if (shipment) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'No termine de ubicar esa consulta sobre ' + shipment.trackingId + '. Si queres, te muestro el estado, el historial o te paso con soporte.',
+                    actions: [
+                        createAction('Estado actual', 'show-status'),
+                        createAction('Historial', 'show-history'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
     return {
         messages: [
             createMessage({
                 text: 'No termine de entenderte. Si queres, te ayudo con seguimiento, historial, demoras, sucursales o soporte.',
                 actions: [
                     createAction('Ver menu principal', 'show-main-menu'),
-                    createAction('Buscar un envio', 'request-lookup'),
+                    createAction('Buscar mi envio', 'request-lookup'),
                     createAction('Hablar con soporte', 'show-support'),
                 ],
             }),
@@ -411,9 +733,11 @@ function buildFallbackResponse() {
 }
 
 module.exports = {
+    buildAcknowledgementResponse,
+    buildClarificationResponse,
+    buildDeliveryMenuResponse,
     buildFallbackResponse,
     buildInitResponse,
-    buildDeliveryMenuResponse,
     buildLocationMenuResponse,
     buildLookupSubmitResponse,
     buildMainMenuResponse,
