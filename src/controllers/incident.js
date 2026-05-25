@@ -45,7 +45,11 @@ const list = async (req, res) => {
         status:            req.query.status   || null,
         priority:          req.query.priority ? Number(req.query.priority) : null,
         assignedToUserId:  req.query.assignedToUserId ? Number(req.query.assignedToUserId) : null,
-        shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null
+        shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null,
+        openedChannel:     req.query.origin === 'EXTERNO' ? IncidentChannel.PORTAL
+                          : req.query.origin === 'INTERNO' ? IncidentChannel.INTERNAL
+                          : null,
+        resolution:        req.query.resolution || null,
     };
     if (req.query.escalated === '1' || req.query.escalated === 'true')  { filters.escalated = true;  }
     if (req.query.escalated === '0' || req.query.escalated === 'false') { filters.escalated = false; }
@@ -131,14 +135,14 @@ const create = async (req, res) => {
         });
     };
 
-    if (!shipmentId || !incidentTypeId || !description || description.trim().length === 0) {
-        return renderFormError('shipmentId, tipo y descripción son obligatorios');
-    }
-    if (!branchId) {
-        return renderFormError('La sucursal es obligatoria');
-    }
-    if (!assignedToUserId) {
-        return renderFormError('Debe seleccionar un usuario asignado');
+    const missing = [];
+    if (!shipmentId)     { missing.push('envío'); }
+    if (!incidentTypeId) { missing.push('tipo'); }
+    if (!description || String(description).trim().length === 0) { missing.push('descripción'); }
+    if (!branchId)       { missing.push('sucursal'); }
+    if (!assignedToUserId) { missing.push('usuario asignado'); }
+    if (missing.length) {
+        return renderFormError('Faltan completar: ' + missing.join(', ') + '.');
     }
 
     const branch = await branchModel.getById(Number(branchId));

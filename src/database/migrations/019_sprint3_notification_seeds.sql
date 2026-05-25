@@ -60,7 +60,7 @@ SELECT
 FROM (
     SELECT row_number() OVER () AS row_n, t.v, t.s, t.b
     FROM (VALUES
-        ('SHIPMENT_OUT_FOR_DELIVERY',    'Tu envío salió a reparto',          'Hola {{fullName}}, tu envío {{trackingCode}} salió a reparto y llegará hoy.'),
+        ('SHIPMENT_OUT_FOR_DELIVERY',    'Tu envío salió a reparto',          'Hola {{fullName}}, tu envío {{trackingCode}} salió a reparto y llegará hoy.{{secretCodeLine}}'),
         ('SHIPMENT_NEXT_DELIVERY',       'Tu envío está cerca',               'Hola {{fullName}}, tu envío {{trackingCode}} es la próxima entrega del repartidor.'),
         ('SHIPMENT_ARRIVED_DESTINATION', 'El repartidor llegó',               'Hola {{fullName}}, el repartidor llegó al domicilio con tu envío {{trackingCode}}.'),
         ('SHIPMENT_RETURNED_BRANCH',     'Tu envío volvió a sucursal',        'Hola {{fullName}}, tu envío {{trackingCode}} regresó a sucursal. Te avisaremos del próximo intento.'),

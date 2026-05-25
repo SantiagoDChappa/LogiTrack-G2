@@ -545,7 +545,8 @@
     });
 
     // Validación al submit
-    document.querySelector('form').addEventListener('submit', function(e) {
+    document.querySelector('form').addEventListener('submit', async function(e) {
+        e.preventDefault();
         const name = nameInput.value.trim();
         const lastname = lastnameInput.value.trim();
         const dniRaw = dniInput.value.replace(/\D/g, '');
@@ -571,7 +572,6 @@
         if (!signatureDrawn) missing.push('Firma del receptor');
 
         if (missing.length || invalid.length) {
-            e.preventDefault();
             const parts = [];
             if (missing.length) parts.push('Faltan completar: ' + missing.join(', ') + '.');
             if (invalid.length) parts.push(invalid.join('. ') + '.');
@@ -579,8 +579,31 @@
             return;
         }
 
-        // Enviar DNI limpio al server
         dniInput.value = dniRaw;
+
+        const form = e.target;
+        const params = new URLSearchParams();
+        Array.from(form.elements).forEach(el => {
+            if (!el.name) return;
+            if (el.type === 'file') return;
+            params.append(el.name, el.value);
+        });
+
+        try {
+            const resp = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString(),
+            });
+            if (resp.ok || resp.redirected) {
+                window.location = resp.url;
+                return;
+            }
+            const msg = (await resp.text()) || 'Error al confirmar entrega.';
+            showValidation(msg);
+        } catch (err) {
+            showValidation('Error de red al confirmar entrega.');
+        }
     });
 
     function showValidation(msg) {

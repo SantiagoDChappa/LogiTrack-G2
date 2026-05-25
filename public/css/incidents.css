@@ -196,10 +196,56 @@ html[data-theme="dark"] {
     box-shadow: 0 0 0 1px rgba(185, 28, 28, .15);
 }
 
+.incident-origin {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border: 1px solid transparent;
+}
+.incident-origin--externo { background: #ede9fe; color: #5b21b6; border-color: rgba(91, 33, 182, .18); }
+.incident-origin--interno { background: #e0f2fe; color: #075985; border-color: rgba(7, 89, 133, .18); }
+
+.incident-resolution {
+    display: inline-flex;
+    align-items: center;
+    padding: .2rem .55rem;
+    border-radius: var(--inc-radius-sm);
+    font-size: .72rem;
+    font-weight: 700;
+}
+.incident-resolution.is-procedente    { background: #d1fae5; color: #065f46; }
+.incident-resolution.is-no-procedente { background: #fee2e2; color: #991b1b; }
+.incident-resolution.is-pending       { background: transparent; color: var(--inc-muted); font-weight: 500; }
+
 /* ============================================================
    Form (new + detail action forms)
    ============================================================ */
-.incident-form,
+.incident-form {
+    max-width: none;
+    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+    padding: 1.75rem clamp(1.25rem, 2.5vw, 2.25rem) 1.5rem;
+    background: var(--inc-surface);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-lg);
+    box-shadow: var(--inc-shadow-md);
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1.1rem 1.25rem;
+}
+
+.incident-form > .form-group { grid-column: span 12; margin-bottom: 0; }
+.incident-form > .form-actions { grid-column: span 12; }
+
+@media (min-width: 960px) {
+    .incident-form > .form-group[data-col="6"]  { grid-column: span 6; }
+    .incident-form > .form-group[data-col="4"]  { grid-column: span 4; }
+    .incident-form > .form-group[data-col="8"]  { grid-column: span 8; }
+}
+
 .portal-incident-form {
     max-width: 720px;
     margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
@@ -791,8 +837,8 @@ html[data-theme="dark"] {
 
 /* ── User picker ────────────────────────────────────── */
 .user-picker {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: .55rem;
     margin-top: .35rem;
     padding: .85rem;
@@ -808,6 +854,7 @@ html[data-theme="dark"] {
     font-size: .85rem;
     text-align: center;
     padding: .5rem;
+    grid-column: 1 / -1;
 }
 
 .user-card {

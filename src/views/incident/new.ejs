@@ -17,11 +17,11 @@
             <div class="alert alert-error"><%= error %></div>
         <% } %>
 
-        <form method="POST" action="/incident" class="incident-form">
+        <form method="POST" action="/incident" class="incident-form" id="incidentForm" novalidate>
             <div class="form-group">
-                <label for="shipmentSearch">Envío</label>
+                <label for="shipmentSearch">Envío <span class="req">*</span></label>
                 <input type="hidden" id="shipmentId" name="shipmentId"
-                       value="<%= shipment ? shipment.id : (form.shipmentId || '') %>" required>
+                       value="<%= shipment ? shipment.id : (form.shipmentId || '') %>">
                 <% if (shipment) { %>
                     <div class="ship-chip" id="ship-chip">
                         <span class="material-symbols-outlined">inventory_2</span>
@@ -170,7 +170,7 @@
             })();
             </script>
 
-            <div class="form-group">
+            <div class="form-group" data-col="6">
                 <label for="incidentTypeId">Tipo</label>
                 <select id="incidentTypeId" name="incidentTypeId" required>
                     <option value="">Seleccione un tipo...</option>
@@ -180,7 +180,7 @@
                 </select>
             </div>
 
-            <div class="form-group">
+            <div class="form-group" data-col="6">
                 <label for="priority">Prioridad</label>
                 <select id="priority" name="priority">
                     <option value="1" <%= String(form.priority) === '1' ? 'selected' : '' %>>Baja</option>
@@ -200,6 +200,25 @@
                 <button type="submit" class="btn-primary">Crear incidencia</button>
             </div>
         </form>
+
+        <script>
+        (function () {
+            const form = document.getElementById('incidentForm');
+            if (!form) return;
+            form.addEventListener('submit', function (e) {
+                const missing = [];
+                if (!form.shipmentId.value)       { missing.push('envío'); }
+                if (!form.incidentTypeId.value)   { missing.push('tipo'); }
+                if (!(form.description.value || '').trim()) { missing.push('descripción'); }
+                if (!form.branchId.value)         { missing.push('sucursal'); }
+                if (!form.assignedToUserId.value) { missing.push('usuario asignado'); }
+                if (missing.length) {
+                    e.preventDefault();
+                    alert('Faltan completar: ' + missing.join(', ') + '.');
+                }
+            });
+        })();
+        </script>
     </main>
     <script src="/js/header.js" defer></script>
     <% if (!shipment) { %>

@@ -993,9 +993,15 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
 
         const fullName = shipment.recipient?.fullName || '';
         const trackingCode = shipment.trackingId || '';
+        const secretCode = shipment.deliverySecretCode || '';
+        const secretCodeLine = secretCode
+            ? `\n\nCódigo clave de entrega: ${secretCode}. Mostráselo al repartidor para confirmar la entrega.`
+            : '';
         const fill = (s) => String(s || '')
-            .replace(/\{\{fullName\}\}/g,     fullName)
-            .replace(/\{\{trackingCode\}\}/g, trackingCode);
+            .replace(/\{\{fullName\}\}/g,       fullName)
+            .replace(/\{\{trackingCode\}\}/g,   trackingCode)
+            .replace(/\{\{secretCode\}\}/g,     secretCode)
+            .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine);
 
         await sendEmail(recipients.join(','), fill(template.subject), fill(template.body));
     } catch (err) {
