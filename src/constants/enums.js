@@ -124,9 +124,17 @@ const mapperShipmentStatusToEvent = {
     [Status.FAILED_ATTEMPT.id]: NotificationEvent.SHIPMENT_FAILED_ATTEMPT,
 };
 
+const EmailQueueStatus = {
+    PENDING: 'PENDING',
+    PROCESSING: 'PROCESSING',
+    SENT: 'SENT',
+    FAILED: 'FAILED'
+}
+
+
 module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
     IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority,
-    NotificationEvent, mapperShipmentStatusToEvent,
+    NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason
 };

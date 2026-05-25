@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const cookieParser = require('cookie-parser');
@@ -37,6 +38,7 @@ const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
+
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -116,6 +118,9 @@ app.use('/api/persons',personRoutes);
     }
     res.redirect('/login');
 });*/
+const scheduler = require('./src/cron/scheduler');
+scheduler.startSchedulers();
+
 
 if (process.env.NODE_ENV !== 'test') {
     app.listen(port, () => {

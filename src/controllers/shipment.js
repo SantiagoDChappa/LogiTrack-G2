@@ -1,10 +1,10 @@
-const crypto               = require('crypto');
-const QRCode               = require('qrcode');
-const shipmentModel        = require('../models/shipment');
-const personModel          = require('../models/person');
-const provinceModel        = require('../models/province');
-const addressModel         = require('../models/address');
-const statusModel          = require('../models/status');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
+const shipmentModel = require('../models/shipment');
+const personModel = require('../models/person');
+const provinceModel = require('../models/province');
+const addressModel = require('../models/address');
+const statusModel = require('../models/status');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const typeShipmentModel = require('../models/typeShipment');
 const settingModel = require('../models/setting');
@@ -13,29 +13,30 @@ const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
-const { validationResult }   = require('express-validator');
-const csvImport            = require('../services/csvImport');
-const csvExport            = require('../services/csvExport');
-const shipmentImportModel  = require('../models/shipmentImport');
-const branchModel          = require('../models/branch');
+const { validationResult } = require('express-validator');
+const csvImport = require('../services/csvImport');
+const csvExport = require('../services/csvExport');
+const shipmentImportModel = require('../models/shipmentImport');
+const branchModel = require('../models/branch');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
 const { resolveZone } = require('../services/zoneResolver.service');
-const { sendEmail } = require('../services/emailSender');
+const { sendEmail } = require('../services/notification/emailSender');
 const notificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
 const notificationEventModel = require('../models/notificationEvents')
+const { queueEmail } = require('../services/notification/notificationEmailService');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
-const stateMachine         = require('../services/shipmentStateMachine');
-const routePlanner         = require('../services/routePlanner');
+const stateMachine = require('../services/shipmentStateMachine');
+const routePlanner = require('../services/routePlanner');
 const console = require('console');
 
 const renderStateMachineError = (err, res, redirectUrl) => {
     if (err && err.name === 'StateMachineError') {
         const map = {
             INVALID_TRANSITION: 422,
-            FORBIDDEN_ROLE:     403,
-            COMMENT_REQUIRED:   400,
+            FORBIDDEN_ROLE: 403,
+            COMMENT_REQUIRED: 400,
             SHIPMENT_NOT_FOUND: 404,
         };
         const status = map[err.code] || 400;
@@ -67,8 +68,8 @@ const searchShipments = async (req, res) => {
         senderDocument: senderDocument?.trim(),
         recipientName: recipientName?.trim(),
         recipientDocument: recipientDocument?.trim(),
-        statusIds:         statusIds ? [].concat(statusIds) : [],
-        currentBranchId:   isAdmin ? (Number(currentBranchId) || null) : null,
+        statusIds: statusIds ? [].concat(statusIds) : [],
+        currentBranchId: isAdmin ? (Number(currentBranchId) || null) : null,
     };
     const [shipments, statuses, branches] = await Promise.all([
         shipmentModel.search(query),
@@ -95,29 +96,29 @@ const getDetail = async (req, res) => {
     if (!shipment) { return res.status(404).send('Envío no encontrado'); }
 
     const destProv = PROVINCES[shipment.address.provinceId];
-    const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
-    const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
+    const destLat = shipment.address.lat || (destProv ? destProv.lat : null);
+    const destLng = shipment.address.lng || (destProv ? destProv.lng : null);
     const stops = history
         .filter(h => h.latitude !== null && h.latitude !== undefined && h.longitude !== null && h.longitude !== undefined)
         .map(h => {
             const isPOD = h.eventType === 'POD' || (h.toStatus && h.toStatus.id === Status.DELIVERED.id);
             const branchName = h.branch?.name || null;
             return {
-                lat:       Number(h.latitude),
-                lng:       Number(h.longitude),
-                label:     isPOD ? 'Entrega final (GPS)' : (branchName || h.eventType),
-                status:    h.toStatus?.description || '',
+                lat: Number(h.latitude),
+                lng: Number(h.longitude),
+                label: isPOD ? 'Entrega final (GPS)' : (branchName || h.eventType),
+                status: h.toStatus?.description || '',
                 timestamp: h.changedAt,
                 isPOD,
                 isCreated: h.eventType === 'CREATED',
             };
         });
     const firstBranchEvent = history.find(h => h.branch);
-    let originBranch       = firstBranchEvent?.branch || shipment.currentBranch || null;
+    let originBranch = firstBranchEvent?.branch || shipment.currentBranch || null;
 
     if (!originBranch) {
         const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
-        const creatorId    = createdEvent?.user?.id;
+        const creatorId = createdEvent?.user?.id;
         if (creatorId) {
             const creator = await userModel.getById(creatorId);
             if (creator?.branchId) {
@@ -126,22 +127,22 @@ const getDetail = async (req, res) => {
         }
     }
 
-    const lastBranchEvent  = [...history].reverse().find(h => h.branch);
-    const currentBranch    = lastBranchEvent?.branch || shipment.currentBranch || null;
-    const fallbackStreet   = [originStreet, originNumber].filter(Boolean).join(' ');
+    const lastBranchEvent = [...history].reverse().find(h => h.branch);
+    const currentBranch = lastBranchEvent?.branch || shipment.currentBranch || null;
+    const fallbackStreet = [originStreet, originNumber].filter(Boolean).join(' ');
     const mapData = {
         origin: originBranch ? {
-            lat:   Number(originBranch.latitude),
-            lng:   Number(originBranch.longitude),
+            lat: Number(originBranch.latitude),
+            lng: Number(originBranch.longitude),
             label: originBranch.name.startsWith('Sucursal') ? originBranch.name : `Sucursal ${originBranch.name}`,
         } : {
-            lat:   parseFloat(originLat)  || -34.6037,
-            lng:   parseFloat(originLng)  || -58.3816,
+            lat: parseFloat(originLat) || -34.6037,
+            lng: parseFloat(originLng) || -58.3816,
             label: fallbackStreet || 'Punto de origen central',
         },
         currentBranch: currentBranch ? {
-            lat:   Number(currentBranch.latitude),
-            lng:   Number(currentBranch.longitude),
+            lat: Number(currentBranch.latitude),
+            lng: Number(currentBranch.longitude),
             label: currentBranch.name.startsWith('Sucursal') ? currentBranch.name : `Sucursal ${currentBranch.name}`,
         } : null,
         destination: destLat ? {
@@ -161,8 +162,8 @@ const getDetail = async (req, res) => {
         && Number.isFinite(mapData.destination.lng)) {
         try {
             mapData.route = await routePlanner.planShipmentRoute({
-                origin:         { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
-                destination:    { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
+                origin: { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
+                destination: { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
                 originBranchId: originBranch?.id || null,
             });
         } catch (err) {
@@ -170,7 +171,7 @@ const getDetail = async (req, res) => {
         }
     }
 
-    const returnUrl   = req.query.from || '/shipment';
+    const returnUrl = req.query.from || '/shipment';
     const returnLabel = req.query.fromLabel || 'Administrador de envíos';
 
     // SLA penalty + desglose costo cliente
@@ -189,7 +190,7 @@ const getDetail = async (req, res) => {
     })();
 
     // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
-const costClient = await (async () => {
+    const costClient = await (async () => {
         const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
         const w = Number(shipment.weightKg || 0);
         const v = Number(shipment.volumeM3 || 0);
@@ -222,7 +223,7 @@ const costClient = await (async () => {
             final: Number((subtotal - penalty).toFixed(2))
         };
     })();
-    
+
 
     res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel, sla, costClient });
 };
@@ -302,12 +303,12 @@ const createShipment = async (req, res) => {
 
         if (!isPickup && body.skipDuplicateCheck !== 'true') {
             const dup = await shipmentModel.findPotentialDuplicate({
-                senderDocument:    body.senderDocument,
+                senderDocument: body.senderDocument,
                 recipientDocument: body.recipientDocument,
-                street:            body.street,
-                number:            body.number,
-                provinceId:        body.province,
-                statusId:          1,
+                street: body.street,
+                number: body.number,
+                provinceId: body.province,
+                statusId: 1,
             });
             if (dup) {
                 throw new Error(`Posible duplicado: ya existe envío ${dup.trackingId} con mismo remitente, destinatario y dirección en estado Pendiente. Si querés crearlo igual, marcá "Crear de todos modos".`);
@@ -315,10 +316,10 @@ const createShipment = async (req, res) => {
         }
 
         const sender = await personModel.createOrUpdate({
-            name:     body.senderName,
+            name: body.senderName,
             document: body.senderDocument,
-            phone:    body.senderPhone,
-            email:    body.senderEmail,
+            phone: body.senderPhone,
+            email: body.senderEmail,
         });
 
         const recipient = await personModel.createOrUpdate({
@@ -391,22 +392,22 @@ const createShipment = async (req, res) => {
             basePriority:    initialPriority,
             priority:        initialPriority,
             currentBranchId: creatorCoordsForCreate.branchId || null,
-            zoneId:          resolvedZone?.id || null,
+            zoneId: resolvedZone?.id || null,
             expectedDeliveryDate: body.expectedDeliveryDate || null,
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
-            expectedDeliveryTo:   normalizeTime(body.expectedDeliveryTo),
+            expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
         });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
         await shipmentHistoryModel.create({
-            shipmentId:   shipment.id,
+            shipmentId: shipment.id,
             fromStatusId: null,
-            toStatusId:   shipment.statusId,
-            eventType:    'CREATED',
-            userId:       res.locals.currentUser?.id || null,
-            branchId:     creatorCoords.branchId,
-            latitude:     creatorCoords.latitude,
-            longitude:    creatorCoords.longitude,
+            toStatusId: shipment.statusId,
+            eventType: 'CREATED',
+            userId: res.locals.currentUser?.id || null,
+            branchId: creatorCoords.branchId,
+            latitude: creatorCoords.latitude,
+            longitude: creatorCoords.longitude,
         });
 
 
@@ -432,77 +433,77 @@ const createShipment = async (req, res) => {
 };
 
 const getUpdateShipment = async (req, res) => {
-  const { id } = req.params;
-  const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
-      provinceModel.getAll(),
-      statusModel.getAll(),
-      shipmentModel.getById(id),
-      shipmentHistoryModel.getByShipmentId(id),
-      typeShipmentModel.getAll(),
-      settingModel.get('origin_lat'),
-      settingModel.get('origin_lng'),
-      settingModel.get('origin_street'),
-      settingModel.get('origin_number'),
-      userModel.search({ roleId: RoleType.DELIVERY.id })
-  ]);
+    const { id } = req.params;
+    const [provinces, statuses, shipment, history, typesShipment, originLat, originLng, originStreet, originNumber, deliveryUsers] = await Promise.all([
+        provinceModel.getAll(),
+        statusModel.getAll(),
+        shipmentModel.getById(id),
+        shipmentHistoryModel.getByShipmentId(id),
+        typeShipmentModel.getAll(),
+        settingModel.get('origin_lat'),
+        settingModel.get('origin_lng'),
+        settingModel.get('origin_street'),
+        settingModel.get('origin_number'),
+        userModel.search({ roleId: RoleType.DELIVERY.id })
+    ]);
 
-  const destProv = PROVINCES[shipment.address.provinceId];
-  const destLat  = shipment.address.lat  || (destProv ? destProv.lat  : null);
-  const destLng  = shipment.address.lng  || (destProv ? destProv.lng  : null);
-  const mapData = {
-      origin: {
-          lat:   parseFloat(originLat)  || -34.6037,
-          lng:   parseFloat(originLng)  || -58.3816,
-          label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
-      },
-      destination: destLat ? {
-          lat:   destLat,
-          lng:   destLng,
-          label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
-      } : null,
-  };
+    const destProv = PROVINCES[shipment.address.provinceId];
+    const destLat = shipment.address.lat || (destProv ? destProv.lat : null);
+    const destLng = shipment.address.lng || (destProv ? destProv.lng : null);
+    const mapData = {
+        origin: {
+            lat: parseFloat(originLat) || -34.6037,
+            lng: parseFloat(originLng) || -58.3816,
+            label: [originStreet, originNumber].filter(Boolean).join(' ') || 'Origen',
+        },
+        destination: destLat ? {
+            lat: destLat,
+            lng: destLng,
+            label: [shipment.address.street, shipment.address.number].filter(Boolean).join(' ') || (destProv ? destProv.name : ''),
+        } : null,
+    };
 
-  // Resolver sucursal origen desde historial (igual que getDetail)
-  const firstBranchEvent = history.find(h => h.branch);
-  let originBranch = firstBranchEvent?.branch || null;
-  if (!originBranch) {
-      const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
-      if (createdEvent?.user?.id) {
-          const creator = await userModel.getById(createdEvent.user.id);
-          if (creator?.branchId) {
-              const branchModel = require('../models/branch');
-              originBranch = await branchModel.getById(creator.branchId);
-          }
-      }
-  }
-  if (originBranch) {
-      mapData.origin = {
-          lat:   Number(originBranch.latitude),
-          lng:   Number(originBranch.longitude),
-          label: originBranch.name,
-      };
-  }
+    // Resolver sucursal origen desde historial (igual que getDetail)
+    const firstBranchEvent = history.find(h => h.branch);
+    let originBranch = firstBranchEvent?.branch || null;
+    if (!originBranch) {
+        const createdEvent = history.find(h => h.eventType === 'CREATED' && h.user?.id);
+        if (createdEvent?.user?.id) {
+            const creator = await userModel.getById(createdEvent.user.id);
+            if (creator?.branchId) {
+                const branchModel = require('../models/branch');
+                originBranch = await branchModel.getById(creator.branchId);
+            }
+        }
+    }
+    if (originBranch) {
+        mapData.origin = {
+            lat: Number(originBranch.latitude),
+            lng: Number(originBranch.longitude),
+            label: originBranch.name,
+        };
+    }
 
-  mapData.route = null;
-  if (mapData.destination
-      && Number.isFinite(mapData.origin.lat) && Number.isFinite(mapData.origin.lng)
-      && Number.isFinite(mapData.destination.lat) && Number.isFinite(mapData.destination.lng)) {
-      try {
-          mapData.route = await routePlanner.planShipmentRoute({
-              origin:         { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
-              destination:    { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
-              originBranchId: originBranch?.id || res.locals.currentUser?.branchId || null,
-          });
-      } catch (err) {
-          console.error('ERROR planShipmentRoute (update):', err.message);
-      }
-  }
+    mapData.route = null;
+    if (mapData.destination
+        && Number.isFinite(mapData.origin.lat) && Number.isFinite(mapData.origin.lng)
+        && Number.isFinite(mapData.destination.lat) && Number.isFinite(mapData.destination.lng)) {
+        try {
+            mapData.route = await routePlanner.planShipmentRoute({
+                origin: { lat: mapData.origin.lat, lng: mapData.origin.lng, label: mapData.origin.label },
+                destination: { lat: mapData.destination.lat, lng: mapData.destination.lng, label: mapData.destination.label },
+                originBranchId: originBranch?.id || res.locals.currentUser?.branchId || null,
+            });
+        } catch (err) {
+            console.error('ERROR planShipmentRoute (update):', err.message);
+        }
+    }
 
-  const returnUrl = req.query.from || '/shipment';
-  const currentUser = res.locals.currentUser;
-  const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
-  const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
-  res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
+    const returnUrl = req.query.from || '/shipment';
+    const currentUser = res.locals.currentUser;
+    const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
+    const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
+    res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
 };
 
 const updateShipment = async (req, res) => {
@@ -570,20 +571,20 @@ const updateShipment = async (req, res) => {
             if (shipment.statusId !== targetStatusId) {
                 const actorCoords = await resolveUserBranchCoords(currentUser?.id);
                 await shipmentHistoryModel.create({
-                    shipmentId:   id,
+                    shipmentId: id,
                     fromStatusId: shipment.statusId,
-                    toStatusId:   Number(body.newStatusId),
-                    comment:      body.statusComment || null,
-                    userId:       currentUser?.id    || null,
-                    eventType:    'STATUS_CHANGE',
-                    branchId:     actorCoords.branchId,
-                    latitude:     actorCoords.latitude,
-                    longitude:    actorCoords.longitude,
+                    toStatusId: Number(body.newStatusId),
+                    comment: body.statusComment || null,
+                    userId: currentUser?.id || null,
+                    eventType: 'STATUS_CHANGE',
+                    branchId: actorCoords.branchId,
+                    latitude: actorCoords.latitude,
+                    longitude: actorCoords.longitude,
                 });
 
                 await shipmentModel.updateStatus(id, Number(body.newStatusId));
                 if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
-                
+
             }
         }
 
@@ -626,15 +627,15 @@ const updateShipmentStatus = async (req, res) => {
 
         const actorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
         await shipmentHistoryModel.create({
-            shipmentId:   id,
+            shipmentId: id,
             fromStatusId: shipment.statusId,
-            toStatusId:   Number(newStatusId),
-            comment:      comment || null,
-            userId:       res.locals.currentUser?.id || null,
-            eventType:    'STATUS_CHANGE',
-            branchId:     actorCoords.branchId,
-            latitude:     actorCoords.latitude,
-            longitude:    actorCoords.longitude,
+            toStatusId: Number(newStatusId),
+            comment: comment || null,
+            userId: res.locals.currentUser?.id || null,
+            eventType: 'STATUS_CHANGE',
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
         await shipmentModel.updateStatus(id, Number(newStatusId));
@@ -667,18 +668,18 @@ const updateShipmentStatus = async (req, res) => {
 
 const assignDelivery = async (req, res) => {
     try {
-        const { id }             = req.params;
+        const { id } = req.params;
         const { deliveryUserId } = req.body;
-        const currentUser        = res.locals.currentUser;
+        const currentUser = res.locals.currentUser;
 
         const supervisorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.assignDelivery({
-            shipmentId:     Number(id),
+            shipmentId: Number(id),
             deliveryUserId: deliveryUserId || null,
-            actor:          currentUser,
-            branchId:       supervisorCoords.branchId,
-            latitude:       supervisorCoords.latitude,
-            longitude:      supervisorCoords.longitude,
+            actor: currentUser,
+            branchId: supervisorCoords.branchId,
+            latitude: supervisorCoords.latitude,
+            longitude: supervisorCoords.longitude,
         });
 
         const shipment = await shipmentModel.getById(id);
@@ -695,17 +696,17 @@ const assignDelivery = async (req, res) => {
 
 const prepareShipment = async (req, res) => {
     try {
-        const { id }      = req.params;
+        const { id } = req.params;
         const currentUser = res.locals.currentUser;
 
         const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.IN_PREPARATION.id,
-            actor:      currentUser,
-            branchId:   actorCoords.branchId,
-            latitude:   actorCoords.latitude,
-            longitude:  actorCoords.longitude,
+            actor: currentUser,
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
         const shipment = await shipmentModel.getById(id);
@@ -722,7 +723,7 @@ const prepareShipment = async (req, res) => {
 
 const cancelShipment = async (req, res) => {
     try {
-        const { id }      = req.params;
+        const { id } = req.params;
         const { comment } = req.body;
         const currentUser = res.locals.currentUser;
 
@@ -730,11 +731,11 @@ const cancelShipment = async (req, res) => {
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.CANCELLED.id,
-            actor:      currentUser,
+            actor: currentUser,
             comment,
-            branchId:   actorCoords.branchId,
-            latitude:   actorCoords.latitude,
-            longitude:  actorCoords.longitude,
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
         const shipment = await shipmentModel.getById(id);
@@ -751,7 +752,7 @@ const cancelShipment = async (req, res) => {
 
 const markPackageFailed = async (req, res) => {
     try {
-        const { id }      = req.params;
+        const { id } = req.params;
         const { comment } = req.body;
         const currentUser = res.locals.currentUser;
 
@@ -759,11 +760,11 @@ const markPackageFailed = async (req, res) => {
         await stateMachine.transition({
             shipmentId: Number(id),
             toStatusId: Status.PACKAGE_FAILED.id,
-            actor:      currentUser,
+            actor: currentUser,
             comment,
-            branchId:   actorCoords.branchId,
-            latitude:   actorCoords.latitude,
-            longitude:  actorCoords.longitude,
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
         });
 
         const shipment = await shipmentModel.getById(id);
@@ -789,10 +790,10 @@ const getKanban = async (req, res) => {
         Status.PACKAGE_FAILED.id,
     ];
 
-    const user      = res.locals.currentUser;
-    const isAdmin   = isAdminUser(user);
+    const user = res.locals.currentUser;
+    const isAdmin = isAdminUser(user);
     const branchIdQ = Number(req.query.branchId) || null;
-    const branchId  = isAdmin ? branchIdQ : (user?.branchId || null);
+    const branchId = isAdmin ? branchIdQ : (user?.branchId || null);
 
     const [shipments, deliveryUsers, branches] = await Promise.all([
         shipmentModel.getForKanban(KANBAN_STATUS_IDS, { branchId }),
@@ -848,9 +849,9 @@ const getKanban = async (req, res) => {
                 groupMap.set(key, {
                     key,
                     transportName: t.name,
-                    plate:         t.plate || '',
-                    driverName:    t.driver?.fullName || s.deliveryUser?.fullName || '',
-                    shipments:     [],
+                    plate: t.plate || '',
+                    driverName: t.driver?.fullName || s.deliveryUser?.fullName || '',
+                    shipments: [],
                 });
             }
             groupMap.get(key).shipments.push(s);
@@ -904,7 +905,7 @@ const calculateInitialPriority = async (req, res) => {
     }
 
     const originUbication = {
-        latitude:  res.locals.currentUser?.branch?.latitude,
+        latitude: res.locals.currentUser?.branch?.latitude,
         longitude: res.locals.currentUser?.branch?.longitude,
     };
 
@@ -1003,7 +1004,11 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
             .replace(/\{\{secretCode\}\}/g,     secretCode)
             .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine);
 
-        await sendEmail(recipients.join(','), fill(template.subject), fill(template.body));
+        await queueEmail({
+            recipient: recipients.join(','),
+            subject:   fill(template.subject),
+            body:      fill(template.body),
+        });
     } catch (err) {
         console.error('notifyShipmentEvent error:', err.message);
     }
@@ -1022,13 +1027,17 @@ async function notifyRecipient(eventCode, dataOrShipment) {
     const fill = (s) => String(s || '')
         .replace(/\{\{fullName\}\}/g,     dataOrShipment.recipientFullName || '')
         .replace(/\{\{trackingCode\}\}/g, dataOrShipment.shipmentTrackingCode || '');
-    await sendEmail(dataOrShipment.recipientEmail, fill(template.subject), fill(template.body));
+    await queueEmail({
+        recipient: dataOrShipment.recipientEmail,
+        subject:   fill(template.subject),
+        body:      fill(template.body),
+    });
 }
 
 const importPreviews = new Map();
-const importReports  = new Map();
+const importReports = new Map();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
-const REPORT_TTL_MS  = 60 * 60 * 1000;
+const REPORT_TTL_MS = 60 * 60 * 1000;
 
 const cleanupExpired = (map, ttl) => {
     const now = Date.now();
@@ -1047,7 +1056,7 @@ const processImportPreview = async (req, res) => {
     if (!req.file) {
         return res.render('shipment/import', {
             result: null,
-            error:  'Debe seleccionar un archivo CSV',
+            error: 'Debe seleccionar un archivo CSV',
         });
     }
 
@@ -1057,7 +1066,7 @@ const processImportPreview = async (req, res) => {
     const previewId = crypto.randomUUID();
     importPreviews.set(previewId, {
         analysis,
-        filename:  req.file.originalname,
+        filename: req.file.originalname,
         createdAt: Date.now(),
     });
 
@@ -1075,12 +1084,12 @@ const commitImport = async (req, res) => {
     if (!entry) {
         return res.status(410).render('shipment/import', {
             result: null,
-            error:  'El preview expiró o no existe. Volvé a subir el archivo.',
+            error: 'El preview expiró o no existe. Volvé a subir el archivo.',
         });
     }
 
     const userId = res.locals.currentUser?.id || null;
-    const force  = req.body.force === 'true';
+    const force = req.body.force === 'true';
 
     const commit = await csvImport.commitAnalysis(entry.analysis, { userId, includeDuplicates: force });
 
@@ -1089,13 +1098,13 @@ const commitImport = async (req, res) => {
     try {
         await shipmentImportModel.create({
             userId,
-            filename:       entry.filename,
-            totalRows:      entry.analysis.total,
-            importedCount:  commit.imported.length,
-            errorCount:     result.errors.length,
+            filename: entry.filename,
+            totalRows: entry.analysis.total,
+            importedCount: commit.imported.length,
+            errorCount: result.errors.length,
             duplicateCount: entry.analysis.summary.duplicates,
-            forced:         force,
-            aborted:        entry.analysis.aborted,
+            forced: force,
+            aborted: entry.analysis.aborted,
         });
     } catch (err) {
         console.error('ERROR persistiendo shipment_import:', err.message);
@@ -1108,7 +1117,7 @@ const commitImport = async (req, res) => {
         cleanupExpired(importReports, REPORT_TTL_MS);
         reportId = crypto.randomUUID();
         importReports.set(reportId, {
-            csv:       csvImport.buildErrorReportCsv(result.errors),
+            csv: csvImport.buildErrorReportCsv(result.errors),
             createdAt: Date.now(),
         });
     }
@@ -1122,7 +1131,7 @@ const downloadImportReport = (req, res) => {
     if (!entry) {
         return res.status(404).send('El reporte expiró o no existe');
     }
-    res.setHeader('Content-Type',        'text/csv; charset=utf-8');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="errores-import-${req.params.id}.csv"`);
     res.send(entry.csv);
 };
@@ -1137,7 +1146,7 @@ const exportShipments = async (req, res) => {
         const shipments = await shipmentModel.getAll();
         const csv = csvExport.buildShipmentsCsv(shipments);
         const today = new Date().toISOString().split('T')[0];
-        res.setHeader('Content-Type',        'text/csv; charset=utf-8');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="envios-${today}.csv"`);
         res.send(csv);
     } catch (err) {
