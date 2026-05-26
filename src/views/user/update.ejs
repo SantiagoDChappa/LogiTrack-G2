@@ -41,8 +41,8 @@
                         </select>
                     </div>
 
-                    <div class="field" id="branch-field" style="display:<%= user.roleId == 3 ? 'block' : 'none' %>">
-                        <label for="branchId">Sucursal</label>
+                    <div class="field" id="branch-field" style="display:<%= [1,2,3].includes(Number(user.roleId)) ? 'block' : 'none' %>">
+                        <label for="branchId">Sucursal <span style="color:red">*</span></label>
                         <select id="branchId" name="branchId">
                             <option value="">Seleccione una sucursal</option>
                             <% (branches || []).forEach(b => { %>
@@ -110,7 +110,7 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/document-format.js" defer></script>
-    <script>function toggleBranchField(v){document.getElementById('branch-field').style.display=v==3?'block':'none';var ds=document.getElementById('driver-shift-section');if(ds){ds.style.display=v==3?'block':'none';}}</script>
+    <script>function toggleBranchField(v){var show=['1','2','3'].includes(String(v));document.getElementById('branch-field').style.display=show?'block':'none';var ds=document.getElementById('driver-shift-section');if(ds){ds.style.display=String(v)==='3'?'block':'none';}}</script>
     <% if (user.active) { %>
     <script>
         document.getElementById('btn-baja').addEventListener('click', function() {
