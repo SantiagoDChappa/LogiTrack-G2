@@ -21,10 +21,13 @@ const Transport = sequelize.define('transport', {
     outOfServiceUntil:     { type: DataTypes.DATEONLY,    allowNull: true,  field: 'out_of_service_until' },
 }, { tableName: 'transport', timestamps: false });
 
-const getAll = () => {
+const getAll = ({ branchId } = {}) => {
     const { User } = require('./user');
     const { Branch } = require('./branch');
+    const where = {};
+    if (branchId) { where.branchId = branchId; }
     return Transport.findAll({
+        where,
         include: [
             { model: User,   as: 'driver', required: false },
             { model: Branch, as: 'branch', required: false },
