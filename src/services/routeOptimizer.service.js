@@ -41,9 +41,12 @@ const classifyTransport = (t) => {
     else if (w <= 1000) { type = 'van';           defaultRange = 600;  }
     else if (w <= 2000) { type = 'camion-chico';  defaultRange = 1200; }
     else                { type = 'camion-grande'; defaultRange = Infinity; }
-    // Si el vehículo declara autonomía real, usar el doble (dos tanques con paradas de servicio)
-    // como rango operativo. Toma el mayor entre default por categoría y autonomía declarada x2.
-    const effectiveRange = autonomy > 0 ? Math.max(defaultRange, autonomy * 2) : defaultRange;
+    // Si el vehículo declara autonomía real, esa es la cota dura del rango operativo:
+    // no se puede llegar a un destino mas lejos que la autonomia sin una sucursal de servicio
+    // dentro del rango (eso lo resuelve el insertor de paradas de servicio, no este filtro).
+    // Antes se usaba autonomy*2 asumiendo "dos tanques" pero permite asignar motos a tramos
+    // imposibles (ej. ENV a 370km con moto de 200km de autonomia).
+    const effectiveRange = autonomy > 0 ? autonomy : defaultRange;
     return { type, maxRangeKm: effectiveRange };
 };
 
