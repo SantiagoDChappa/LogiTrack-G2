@@ -132,15 +132,18 @@
                                        value="<%= form.reporterName || '' %>" placeholder="Ej: Juan Perez" autocomplete="name" required>
                             </div>
                             <div class="form-group">
-                                <label for="reporterEmail">Email (opcional)</label>
+                                <label for="reporterEmail">Email <span class="req" aria-hidden="true">*</span></label>
                                 <input type="email" id="reporterEmail" name="reporterEmail"
-                                       value="<%= form.reporterEmail || '' %>" placeholder="ejemplo@correo.com" autocomplete="email">
+                                       value="<%= form.reporterEmail || '' %>"
+                                       placeholder="ejemplo@correo.com"
+                                       autocomplete="email" required>
+                                <small>Debe coincidir con el del remitente o destinatario registrados. Te llegará un mail para confirmar el reporte.</small>
                             </div>
                             <div class="form-group portal-incident-field--full">
                                 <label for="reporterDocument">DNI (opcional)</label>
                                 <input type="text" id="reporterDocument" name="reporterDocument"
                                        value="<%= form.reporterDocument || '' %>"
-                                       placeholder="Si coincide con remitente o destinatario, se vincula automaticamente">
+                                       placeholder="Si lo dejás, se vincula automáticamente">
                             </div>
                         </div>
                     </section>

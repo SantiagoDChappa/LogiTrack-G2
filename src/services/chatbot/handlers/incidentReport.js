@@ -3,7 +3,7 @@
 // (messages + effects). El servicio de chat es responsable de capturar
 // texto libre y enrutarlo al handler del step activo.
 
-const { createAction, createEffect, createMessage } = require('../responseBuilder');
+const { createAction, createMessage } = require('../responseBuilder');
 const { getSelectedShipment } = require('../runtime');
 
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -164,9 +164,8 @@ function handleNameInput(runtime, text) {
     return {
         messages: [
             createMessage({
-                text: 'Si querés que te contactemos por mail, escribilo. Si no, tocá Omitir.',
+                text: 'Escribime el mail del remitente o destinatario registrado en el envío. Te voy a mandar un link para que confirmes el reporte.',
                 actions: [
-                    createAction('Omitir email', 'report-incident-skip-email'),
                     ...cancelActions(),
                 ],
             }),
@@ -197,13 +196,14 @@ function buildConfirmMessage(draft) {
 
 function handleEmailInput(runtime, text) {
     const raw = String(text || '').trim();
-    if (raw && raw.toLowerCase() !== 'omitir' && !EMAIL_RX.test(raw)) {
+    // El email ya NO es opcional: lo usamos para validar contra sender/recipient
+    // del shipment y para mandar el mail de confirmacion.
+    if (!raw || !EMAIL_RX.test(raw)) {
         return {
             messages: [
                 createMessage({
-                    text: 'Ese email no se ve válido. Escribilo bien o tocá Omitir.',
+                    text: 'Necesito un email válido para enviarte el link de confirmación. Tiene que ser el del remitente o destinatario registrado.',
                     actions: [
-                        createAction('Omitir email', 'report-incident-skip-email'),
                         ...cancelActions(),
                     ],
                 }),
@@ -211,7 +211,7 @@ function handleEmailInput(runtime, text) {
             effects: [],
         };
     }
-    const email = (!raw || raw.toLowerCase() === 'omitir') ? null : raw.slice(0, 160);
+    const email = raw.slice(0, 160);
     setDraft(runtime, { step: 'confirm', reporterEmail: email });
     return {
         messages: [buildConfirmMessage(runtime.state.incidentDraft)],
@@ -219,10 +219,16 @@ function handleEmailInput(runtime, text) {
     };
 }
 
-function handleSkipEmail(runtime) {
-    setDraft(runtime, { step: 'confirm', reporterEmail: null });
+function handleSkipEmail(_runtime) {
+    // Mantenido por compatibilidad con la action "Omitir email" si quedo en algun
+    // boton previo, pero ahora rechaza al usuario hacia el paso de email otra vez.
     return {
-        messages: [buildConfirmMessage(runtime.state.incidentDraft)],
+        messages: [
+            createMessage({
+                text: 'El email es obligatorio. Tiene que coincidir con el remitente o destinatario para que podamos confirmar tu reporte.',
+                actions: [...cancelActions()],
+            }),
+        ],
         effects: [],
     };
 }
@@ -260,8 +266,14 @@ async function handleConfirm(runtime, createIncidentFromPortal) {
     }
 
     clearDraft(runtime);
-    const successText = 'Listo. Tu incidencia fue registrada con el número #' + result.incident.id
-        + '. Te vamos a contactar' + (draft.reporterEmail ? ' a ' + draft.reporterEmail : '') + '.';
+    // Ahora el reporte queda PENDIENTE de confirmacion por email; ya no
+    // existe result.incident, sino result.pending con email + expiresAt + devLink (en dev).
+    const pendingEmail = (result.pending && result.pending.email) || draft.reporterEmail || 'tu email';
+    let successText = 'Listo. Te enviamos un mail a ' + pendingEmail + ' para que confirmes el reporte. '
+        + 'Recién cuando hagas click en el link, un supervisor lo ve. El link expira en 24h.';
+    if (result.pending && result.pending.devLink) {
+        successText += '\n\n[Modo desarrollo] Link de confirmacion: ' + result.pending.devLink;
+    }
     return {
         messages: [
             createMessage({
