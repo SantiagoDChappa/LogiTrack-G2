@@ -228,6 +228,20 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
         } catch { /* ignore */ }
 
         return { ok: true, fromStatusId, toStatusId, eventType: eventTypeOverride || rule.eventType };
+    }).then(async (result) => {
+        // Notificacion por email (fuera de la transaccion, fire and forget).
+        try {
+            const { getEventCodeByShipmentStatus } = require('../models/notificationEvents');
+            const eventCode = getEventCodeByShipmentStatus(result.toStatusId);
+            if (eventCode) {
+                const shipmentCtrl = require('../controllers/shipment');
+                shipmentCtrl.notifyShipmentEvent(eventCode, shipmentId)
+                    .catch(e => console.error('[stateMachine] notify:', e.message));
+            }
+        } catch (e) {
+            console.error('[stateMachine] notify dispatch error:', e.message);
+        }
+        return result;
     });
 };
 
@@ -271,6 +285,19 @@ const assignDelivery = ({ shipmentId, deliveryUserId, actor, branchId, latitude,
         });
 
         return { ok: true, fromStatusId, toStatusId: S.ASSIGNED.id, eventType: rule.eventType };
+    }).then(async (result) => {
+        try {
+            const { getEventCodeByShipmentStatus } = require('../models/notificationEvents');
+            const eventCode = getEventCodeByShipmentStatus(result.toStatusId);
+            if (eventCode) {
+                const shipmentCtrl = require('../controllers/shipment');
+                shipmentCtrl.notifyShipmentEvent(eventCode, shipmentId)
+                    .catch(e => console.error('[stateMachine] notify (assign):', e.message));
+            }
+        } catch (e) {
+            console.error('[stateMachine] notify dispatch error (assign):', e.message);
+        }
+        return result;
     });
 };
 
