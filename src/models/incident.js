@@ -39,7 +39,7 @@ const includesFull = () => {
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, openedChannel, resolution, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, branchId, openedChannel, resolution, limit = 200 } = {}) => {
     const where = {};
     if (id)                { where.id = id; }
     if (status)            { where.status = status; }
@@ -55,9 +55,12 @@ const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, o
     const { IncidentType } = require('./incidentType');
     const { User }         = require('./user');
 
-    const shipmentInclude = { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId', 'deliveryUserId'] };
-    if (deliveryUserId) {
-        shipmentInclude.where = { deliveryUserId };
+    const shipmentInclude = { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId', 'deliveryUserId', 'currentBranchId'] };
+    const shipmentWhere = {};
+    if (deliveryUserId) { shipmentWhere.deliveryUserId = deliveryUserId; }
+    if (branchId)       { shipmentWhere.currentBranchId = branchId; }
+    if (Object.keys(shipmentWhere).length > 0) {
+        shipmentInclude.where = shipmentWhere;
         shipmentInclude.required = true;
     }
 

@@ -58,9 +58,13 @@ const home = async (req, res) => {
 };
 
 const searchShipments = async (req, res) => {
-    const user = res.locals.currentUser;
-    const isAdmin = isAdminUser(user);
+    const currentUser = res.locals.currentUser;
+    const isAdmin = isAdminUser(currentUser);
     const { trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, currentBranchId } = req.query;
+    // RBAC por sucursal: admin elige sucursal por filtro; no-admin queda forzado a su propia branchId.
+    const effectiveBranchId = isAdmin
+        ? (Number(currentBranchId) || null)
+        : (currentUser?.branchId || null);
     const query = {
         trackingId,
         role,
@@ -71,7 +75,7 @@ const searchShipments = async (req, res) => {
         recipientName: recipientName?.trim(),
         recipientDocument: recipientDocument?.trim(),
         statusIds: statusIds ? [].concat(statusIds) : [],
-        currentBranchId: isAdmin ? (Number(currentBranchId) || null) : null,
+        currentBranchId: effectiveBranchId,
     };
     const [shipments, statuses, branches] = await Promise.all([
         shipmentModel.search(query),
@@ -96,6 +100,19 @@ const getDetail = async (req, res) => {
     ]);
 
     if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+
+    // RBAC por sucursal: admin ve todo; delivery ve los asignados a él;
+    // staff (supervisor/operador) ve solo envíos de su sucursal actual.
+    const viewer = res.locals.currentUser;
+    if (viewer && !isAdminUser(viewer)) {
+        if (viewer.roleId === RoleType.DELIVERY.id) {
+            if (shipment.deliveryUserId !== viewer.id) {
+                return res.status(403).send('No tenés acceso a este envío.');
+            }
+        } else if (viewer.branchId && shipment.currentBranchId !== viewer.branchId) {
+            return res.status(403).send('Este envío no pertenece a tu sucursal.');
+        }
+    }
 
     const destProv = PROVINCES[shipment.address.provinceId];
     const destLat = shipment.address.lat || (destProv ? destProv.lat : null);

@@ -79,6 +79,15 @@ html[data-theme="dark"] {
     text-transform: uppercase;
     letter-spacing: .04em;
     color: var(--inc-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.incident-filter-icon {
+    font-size: 1rem !important;
+    line-height: 1;
+    color: var(--inc-muted);
 }
 
 .incident-filter input,
@@ -1465,3 +1474,50 @@ html[data-theme="dark"] {
 }
 
 .user-card.is-selected .user-card__check { opacity: 1; }
+
+/* ============================================================
+   Cierre de incidencia: 2 botones (Procedente / No procedente)
+   ============================================================ */
+.incident-close-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.incident-close-buttons .btn-success,
+.incident-close-buttons .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--inc-radius-sm, 8px);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 150ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.incident-close-buttons .btn-success {
+    background: var(--inc-green, #16a34a);
+    color: #fff;
+    border-color: var(--inc-green, #16a34a);
+}
+
+.incident-close-buttons .btn-success:hover {
+    background: #15803d;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+    transform: translateY(-1px);
+}
+
+.incident-close-buttons .btn-success:active { transform: translateY(0); }
+
+.incident-close-buttons .btn-danger:hover {
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+    transform: translateY(-1px);
+}
+
+.incident-close-buttons .btn-danger:active { transform: translateY(0); }
+
+.incident-close-buttons .material-symbols-outlined { font-size: 1rem; }
