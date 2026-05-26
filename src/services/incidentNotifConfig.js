@@ -7,7 +7,9 @@ const SETTING_KEY = 'incident_notif_config';
 const DEFAULTS = Object.freeze({
     notifySupervisorBranch:  true,
     notifyAssignedOperator:  true,
-    notifyAdmins:            false,
+    // Activado: cuando llega una incidencia desde el portal publico el admin la recibe
+    // para poder asignarla manualmente al supervisor que corresponda.
+    notifyAdmins:            true,
     notifyReporter:          false,
     notifyShipmentRecipient: false,
     customEmails:            ''
@@ -52,10 +54,19 @@ const set = async (input) => {
     return next;
 };
 
-// Devuelve lista deduplicada de emails segun config y contexto (shipment, assignee, openedBy).
-const resolveRecipients = async (cfg, { shipment: _shipment, assignee, openedBy }) => {
+// Devuelve lista deduplicada de emails segun config y contexto.
+// context = {
+//   shipment,             // requerido — incluido con sender + recipient
+//   assignee,             // null si todavia no se asigno (caso portal publico recien creada)
+//   openedBy,             // user staff que la abrio (null si vino del portal)
+//   reporterEmail,        // email del reporter externo (cuando openedBy es null)
+//   matchedRole,          // 'sender' | 'recipient' | null — para item #10 (otro extremo del envio)
+// }
+const resolveRecipients = async (cfg, context) => {
+    const { shipment, assignee, openedBy, reporterEmail, matchedRole } = context || {};
     const out = new Set();
     const pushUserEmail = (u) => { if (u?.email) { out.add(u.email); } };
+    const pushPersonEmail = (p) => { if (p?.email) { out.add(p.email); } };
 
     if (cfg.notifySupervisorBranch && assignee?.branchId) {
         const supervisors = await User.findAll({
@@ -74,9 +85,20 @@ const resolveRecipients = async (cfg, { shipment: _shipment, assignee, openedBy 
         });
         admins.forEach(pushUserEmail);
     }
-    if (cfg.notifyReporter && openedBy?.id !== assignee?.id) {
-        pushUserEmail(openedBy);
+    if (cfg.notifyReporter) {
+        if (openedBy && openedBy.id !== assignee?.id) { pushUserEmail(openedBy); }
+        if (!openedBy && reporterEmail)                { out.add(String(reporterEmail).trim()); }
     }
+    if (cfg.notifyShipmentRecipient && shipment?.recipient?.email) {
+        out.add(shipment.recipient.email);
+    }
+
+    // Item #10: si el reporter es uno de los dos extremos del envio, notificar al otro extremo.
+    // Esto es comportamiento implicito (sin flag): cuando el destinatario reclama, queremos
+    // que el remitente se entere; y viceversa.
+    if (matchedRole === 'recipient' && shipment?.sender)    { pushPersonEmail(shipment.sender); }
+    if (matchedRole === 'sender'    && shipment?.recipient) { pushPersonEmail(shipment.recipient); }
+
     parseEmails(cfg.customEmails).forEach(e => out.add(e));
 
     return Array.from(out).filter(isValidEmail);

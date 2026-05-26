@@ -518,6 +518,17 @@ const confirmIncidentByToken = async (rawToken) => {
         return created;
     });
 
+    // Disparar notificaciones (admin + otro extremo del envio, segun config y matchedRole).
+    // Fire-and-forget: no bloquear la confirmacion si el mail falla.
+    const { notifyIncidentCreated } = require('./incident');
+    notifyIncidentCreated(incident.id, shipment, type, {
+        assignee:      null,
+        openedBy:      null,
+        reporterName:  pending.reporterName,
+        reporterEmail: pending.reporterEmail,
+        matchedRole:   pending.matchedRole
+    }).catch(e => console.error('[portal] notif incidencia confirmada:', e.message));
+
     return { ok: true, incident, shipment, type };
 };
 
