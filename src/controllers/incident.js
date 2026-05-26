@@ -256,15 +256,21 @@ const create = async (req, res) => {
         return created;
     });
 
-    notifyIncidentCreated(incident.id, shipment, type, assignee, user)
+    notifyIncidentCreated(incident.id, shipment, type, { assignee, openedBy: user })
         .catch(e => console.error('[incident] notif:', e.message));
 
     res.redirect(`/incident/${incident.id}`);
 };
 
-const notifyIncidentCreated = async (incidentId, shipment, type, assignee, openedBy) => {
+// Notif al crear una incidencia. Se usa tanto desde el flujo interno (assignee
+// + openedBy son usuarios staff) como desde el confirm del portal publico
+// (assignee = null, openedBy = null, reporterEmail + matchedRole vienen del portal).
+const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
+    const { assignee = null, openedBy = null, reporterName = null, reporterEmail = null, matchedRole = null } = ctx;
     const cfg = await incidentNotifConfig.get();
-    const emails = await incidentNotifConfig.resolveRecipients(cfg, { shipment, assignee, openedBy });
+    const emails = await incidentNotifConfig.resolveRecipients(cfg, {
+        shipment, assignee, openedBy, reporterEmail, matchedRole
+    });
 
     if (cfg.notifyShipmentRecipient) {
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
@@ -272,15 +278,38 @@ const notifyIncidentCreated = async (incidentId, shipment, type, assignee, opene
     }
     if (emails.length === 0) { return; }
 
+    const reportedByLabel = openedBy
+        ? (openedBy.fullName || openedBy.email || 'usuario interno')
+        : (reporterName ? `${reporterName} (portal público)` : 'portal público');
+    const assigneeLabel = assignee ? assignee.fullName : 'sin asignar';
+
     const subject = `[LogiTrack] Nueva incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
     const body =
         `Se registró una nueva incidencia.\n\n` +
         `Incidencia: #${incidentId} (${type.code} - ${type.description})\n` +
         `Envío: ${shipment.trackingId || shipment.id}\n` +
-        `Asignada a: ${assignee.fullName}\n` +
-        `Reportada por: ${openedBy.fullName || openedBy.email || 'usuario interno'}\n\n` +
+        `Asignada a: ${assigneeLabel}\n` +
+        `Reportada por: ${reportedByLabel}\n\n` +
         `Acceder al detalle: /incident/${incidentId}`;
     await sendEmail(emails.join(','), subject, body);
+};
+
+// Notif a un usuario cuando es asignado o reasignado a una incidencia.
+// Se manda SIEMPRE (sin pasar por la config), porque es la accion intencional
+// del admin/supervisor al asignar. Si el target no tiene email, skip silencioso.
+const notifyIncidentAssigned = async (incidentId, shipment, type, targetUser, assignedBy) => {
+    if (!targetUser || !targetUser.email) { return; }
+    const assignedByLabel = assignedBy
+        ? (assignedBy.fullName || assignedBy.email || 'un admin')
+        : 'un admin';
+    const subject = `[LogiTrack] Te asignaron la incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
+    const body =
+        `${targetUser.fullName || ''},\n\n` +
+        `Te asignaron la incidencia #${incidentId} (${type.code} - ${type.description})\n` +
+        `Envío: ${shipment.trackingId || shipment.id}\n` +
+        `Asignada por: ${assignedByLabel}\n\n` +
+        `Acceder al detalle: /incident/${incidentId}`;
+    await sendEmail(targetUser.email, subject, body);
 };
 
 const getDetail = async (req, res) => {
@@ -375,6 +404,18 @@ const assign = async (req, res) => {
             transaction: t
         });
     });
+
+    // Notif al asignado si efectivamente cambio el asignado (no spammear si re-guardan el mismo).
+    if (targetUser && targetUser.id !== previousId) {
+        // Necesito el incident + shipment + type para armar el mail. El findByPk de arriba
+        // no incluye relations; vuelvo a buscarlo con includes.
+        const fullIncident = await incidentModel.findByIdFull(id).catch(() => null);
+        if (fullIncident && fullIncident.shipment && fullIncident.type) {
+            notifyIncidentAssigned(id, fullIncident.shipment, fullIncident.type, targetUser, user)
+                .catch(e => console.error('[incident] notif assign:', e.message));
+        }
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
@@ -633,5 +674,8 @@ const searchShipments = async (req, res) => {
 
 module.exports = {
     list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen, searchShipments
+    assign, changeStatus, escalate, close, reopen, searchShipments,
+    // Exportadas para que portal.js (flujo publico de confirmacion) y otros
+    // controllers reutilicen el mismo pipeline de mails.
+    notifyIncidentCreated, notifyIncidentAssigned
 };
