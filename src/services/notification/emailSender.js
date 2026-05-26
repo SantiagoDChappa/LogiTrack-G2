@@ -26,7 +26,7 @@ async function sendEmail(to, subject, text) {
         const finalTo = useOverride ? override.trim() : recipients.join(', ');
         if (!finalTo) {
             console.warn('sendEmail: sin destinatarios válidos, no se envía');
-            return;
+            return false;
         }
 
         const finalSubject = useOverride
@@ -39,9 +39,11 @@ async function sendEmail(to, subject, text) {
             subject: finalSubject,
             text,
         });
+        return true;
     }
     catch (error) {
         console.error('Error sending email:', error);
+        return false;
     }
 }
 
