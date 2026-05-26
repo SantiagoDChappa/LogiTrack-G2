@@ -51,8 +51,10 @@ const classifyTransport = (t) => {
 const AUTONOMY_SAFETY = 0.85;
 // Radio maximo razonable para desvio a sucursal de servicio (km)
 const SERVICE_DETOUR_MAX_KM = 80;
-// Pickup oportunista: detour maximo aceptable para recoger envios en sucursales del corredor
-const OPPORTUNISTIC_DETOUR_MAX_KM = 60;
+// Pickup oportunista: detour maximo por DEFECTO si no hay setting configurado.
+// El umbral real se toma de piggyback_max_extra_km / piggyback_max_extra_pct (ajustes en DB)
+// para que "desvío max" sea único y consistente entre piggyback y pickup oportunista.
+const OPPORTUNISTIC_DETOUR_MAX_KM_FALLBACK = 60;
 
 // Encuentra la mejor sucursal de servicio entre A y B:
 // - alcanzable desde A con la autonomia restante (haversine(A,C) <= reachKm)
@@ -336,12 +338,16 @@ const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) =
 // Busca envios pendientes en sucursales del corredor origen->destinos del cluster
 // que entren en la capacidad libre del bucket. Mismo cluster.provinceId.
 // Filtra envios ya asignados a rutas activas.
-const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster }) => {
+const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster, thresholds }) => {
     if (!cluster.provinceId) { return; }
     const t = bucket.transport;
     const capWeightLeft = num(t.maxWeightKg) - bucket.usedWeight;
     const capVolumeLeft = num(t.maxVolumeM3) - bucket.usedVolume;
     if (capWeightLeft <= 0 || capVolumeLeft <= 0) { return; }
+
+    // Umbrales de desvío: lee piggyback_* desde DB. Si vienen 0/undefined, usa fallbacks.
+    const maxExtraKmCfg  = thresholds && thresholds.maxExtraKm  > 0 ? Number(thresholds.maxExtraKm)  : OPPORTUNISTIC_DETOUR_MAX_KM_FALLBACK;
+    const maxExtraPctCfg = thresholds && thresholds.maxExtraPct > 0 ? Number(thresholds.maxExtraPct) : Infinity;
 
     const origin = { lat: num(branch.latitude), lng: num(branch.longitude) };
     const dests = bucket.shipments
@@ -363,7 +369,7 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster })
         const dOrigin = haversineKm(origin, { lat, lng });
         const dToCentroid = haversineKm({ lat, lng }, centroid);
         const detour = dOrigin + dToCentroid - baseDist;
-        if (detour <= OPPORTUNISTIC_DETOUR_MAX_KM) {
+        if (detour <= maxExtraKmCfg) {
             corridorBranchIds.push(b.id);
             corridorDetourByBranch.set(b.id, { detourKm: detour, dOrigin, dToCentroid });
         }
@@ -407,7 +413,6 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster })
     for (const s of fits) {
         const w = num(s.weightKg), v = num(s.volumeM3);
         if (usedW + w > capWeightLeft || usedV + v > capVolumeLeft) { continue; }
-        usedW += w; usedV += v;
 
         // Cost-benefit per shipment: comparar ir directo origen->destino vs via sucursal pickup
         const br = branchById.get(s.currentBranchId);
@@ -418,6 +423,15 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster })
         const extraKm = viaKm - directKm;
         const pctExtra = directKm > 0 ? (extraKm / directKm) * 100 : 0;
         const corridorInfo = corridorDetourByBranch.get(s.currentBranchId) || {};
+
+        // Validar contra umbrales (piggyback_*) ANTES de agregar.
+        // Antes solo se filtraba por corridor (haversine branch→centroide), pero un envío
+        // individual puede tener extraKm gigante aunque la sucursal esté en corredor.
+        if (extraKm > maxExtraKmCfg) { continue; }
+        if (pctExtra > maxExtraPctCfg) { continue; }
+        if ((corridorInfo.detourKm || 0) > maxExtraKmCfg) { continue; }
+
+        usedW += w; usedV += v;
         s._opportunisticInfo = {
             branchId: s.currentBranchId,
             branchName: br ? br.name : `Sucursal #${s.currentBranchId}`,
@@ -1372,7 +1386,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         unassigned.push(...clUn);
         for (const bucket of buckets) {
             usedTxIds.add(bucket.transport.id);
-            await enrichBucketWithOpportunisticPickups({ bucket, branch, cluster });
+            await enrichBucketWithOpportunisticPickups({ bucket, branch, cluster, thresholds: piggySettings });
             const proposal = await buildProposal({ bucket, branch, cluster });
             proposals.push(proposal);
         }
