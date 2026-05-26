@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
-    createPublicApi, getIncidentTypesApi,
+    createPublicApi, confirmIncident, getIncidentTypesApi,
     getSelfServiceForm, saveSelfService,
 } = require('../controllers/portal');
 
 router.get('/',                        getPortal);
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        createPublic);
+router.get('/portal/incident/confirm', confirmIncident);
 router.get('/portal/incident/success', publicSuccess);
 
 // API JSON (usado por chatbot wizard)

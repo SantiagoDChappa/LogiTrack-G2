@@ -23,6 +23,7 @@ const { ReturnToBranchScan } = require('./returnToBranchScan');
 const { IncidentType }    = require('./incidentType');
 const { Incident }        = require('./incident');
 const { IncidentHistory } = require('./incidentHistory');
+const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -184,6 +185,7 @@ module.exports = {
     IncidentType,
     Incident,
     IncidentHistory,
+    IncidentPendingConfirmation,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,
