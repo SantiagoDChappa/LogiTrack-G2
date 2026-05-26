@@ -84,7 +84,7 @@
                         </select>
                     </div>
 
-                    <div class="field" id="branch-field" style="display:<%= body.roleId == 3 ? 'block' : 'none' %>">
+                    <div class="field" id="branch-field" style="display:<%= [1,2,3].includes(Number(body.roleId)) ? 'block' : 'none' %>">
                         <label for="branchId">Sucursal <span style="color:red">*</span></label>
                         <select id="branchId" name="branchId">
                             <option value="">Seleccione una sucursal</option>
@@ -108,7 +108,7 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
-    <script>function toggleBranchField(v){document.getElementById('branch-field').style.display=v==3?'block':'none';}</script>
+    <script>function toggleBranchField(v){var show=['1','2','3'].includes(String(v));document.getElementById('branch-field').style.display=show?'block':'none';}</script>
     <script src="/js/document-format.js" defer></script>
     <script>
         const passwordInput  = document.getElementById('password');

@@ -32,14 +32,15 @@ const includesFull = () => {
         { model: IncidentType, as: 'type' },
         { model: User,         as: 'openedByUser',   attributes: ['id', 'fullName'], required: false },
         { model: Person,       as: 'openedByPerson', required: false },
-        { model: User,         as: 'assignedTo',     attributes: ['id', 'fullName'], required: false },
+        { model: User,         as: 'assignedTo',     attributes: ['id', 'fullName', 'branchId'], required: false },
         { model: User,         as: 'closedBy',       attributes: ['id', 'fullName'], required: false }
     ];
 };
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, branchId, openedChannel, resolution, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, limit = 200 } = {}) => {
+    const { Op } = require('sequelize');
     const where = {};
     if (id)                { where.id = id; }
     if (status)            { where.status = status; }
@@ -64,16 +65,37 @@ const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, o
         shipmentInclude.required = true;
     }
 
+    // RBAC supervisor/operador: visible si el envio esta en su sucursal,
+    // si la incidencia esta asignada a alguien de su sucursal, o asignada al usuario.
+    if (staffScope) {
+        const orClauses = [];
+        if (staffScope.branchId) {
+            orClauses.push({ '$shipment.currentBranchId$': staffScope.branchId });
+            orClauses.push({ '$assignedTo.branchId$':      staffScope.branchId });
+        }
+        if (staffScope.userId) {
+            orClauses.push({ assignedToUserId: staffScope.userId });
+            orClauses.push({ openedByUserId:   staffScope.userId });
+        }
+        if (orClauses.length > 0) {
+            where[Op.and] = [...(where[Op.and] || []), { [Op.or]: orClauses }];
+        } else {
+            // staff sin sucursal y sin id: no ve nada
+            where.id = -1;
+        }
+    }
+
     return Incident.findAll({
         where,
         include: [
             shipmentInclude,
             { model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'] },
-            { model: User, as: 'assignedTo',   attributes: ['id', 'fullName'], required: false },
+            { model: User, as: 'assignedTo',   attributes: ['id', 'fullName', 'branchId'], required: false },
             { model: User, as: 'openedByUser', attributes: ['id', 'fullName'], required: false }
         ],
         order: [['escalated', 'DESC'], ['priority', 'DESC'], ['createdAt', 'DESC']],
-        limit
+        limit,
+        subQuery: false
     });
 };
 

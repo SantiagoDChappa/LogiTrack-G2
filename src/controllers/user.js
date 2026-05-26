@@ -15,13 +15,26 @@ const getIndex = (req, res) => {
     res.render('user/index', { users: [], query: {}, roleLabels: ROLE_LABELS, roleClasses: ROLE_CLASSES, roleTypes: Object.values(RoleType) });
 };
 
+const ROLES_REQUIRE_BRANCH = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.DELIVERY.id];
+
+const validateBranchForRole = (body) => {
+  const roleId = Number(body.roleId);
+  const branchId = body.branchId ? Number(body.branchId) : null;
+  if (ROLES_REQUIRE_BRANCH.includes(roleId) && !branchId) {
+    return 'La sucursal es obligatoria para Supervisor, Operador y Repartidor.';
+  }
+  return null;
+};
+
 const createUser = async (req, res) => {
   try {
     const body = req.body;
-
-    //Creo el envio
+    const branchError = validateBranchForRole(body);
+    if (branchError) {
+      const branches = await branchModel.getAll();
+      return res.status(400).render('user/new', { body, errors: [branchError], roleTypes: Object.values(RoleType), branches });
+    }
     await userModel.create(body);
-    
     res.redirect('/user?success=1');
   } catch (err) {
     console.error('ERROR createUser:', err.message);
@@ -68,6 +81,12 @@ const getUpdateUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
+    const branchError = validateBranchForRole(req.body);
+    if (branchError) {
+      const [user, branches] = await Promise.all([userModel.getById(req.params.id), branchModel.getAll()]);
+      const returnUrl = req.query.from || '/user';
+      return res.status(400).render('user/update', { errors: [branchError], user: { ...user.toJSON(), ...req.body }, roleTypes: Object.values(RoleType), branches, returnUrl });
+    }
     // Sprint 3 - 4.2: normalizar ventana operativa del chofer. Checkbox ausente => false.
     const data = { ...req.body };
     if (String(data.roleId) === '3') {

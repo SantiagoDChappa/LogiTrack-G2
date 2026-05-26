@@ -29,10 +29,16 @@ const incidentVisibleTo = (incident, user) => {
     if (!incident) { return false; }
     if (user?.roleId === RoleType.ADMIN.id) { return true; }
     if (isStaff(user)) {
-        // Supervisor / operador: solo incidencias cuyo envío esté en su sucursal actual.
-        // Si el usuario no tiene sucursal asignada, no ve nada (caso atípico).
-        if (!user.branchId) { return false; }
-        return incident.shipment && incident.shipment.currentBranchId === user.branchId;
+        // Supervisor / operador: visible si el envio esta en su sucursal,
+        // si la incidencia esta asignada a alguien de su sucursal,
+        // o si fue asignada/abierta por el propio usuario.
+        if (incident.assignedToUserId === user.id) { return true; }
+        if (incident.openedByUserId   === user.id) { return true; }
+        if (user.branchId) {
+            if (incident.shipment   && incident.shipment.currentBranchId === user.branchId) { return true; }
+            if (incident.assignedTo && incident.assignedTo.branchId      === user.branchId) { return true; }
+        }
+        return false;
     }
     if (isDelivery(user)) {
         if (incident.openedByUserId === user.id) { return true; }
@@ -79,10 +85,10 @@ const list = async (req, res) => {
         filters.deliveryUserId = user.id;
     }
 
-    // RBAC por sucursal: staff no-admin (supervisor / operador) ve solo incidencias
-    // de envíos cuya sucursal actual coincide con la suya. Admin ve todo.
-    if (user?.roleId !== RoleType.ADMIN.id && user?.branchId) {
-        filters.branchId = user.branchId;
+    // RBAC staff no-admin: visible si el envio esta en su sucursal,
+    // si la incidencia esta asignada a alguien de su sucursal, o asignada/abierta por el.
+    if (isStaff(user) && user?.roleId !== RoleType.ADMIN.id) {
+        filters.staffScope = { branchId: user.branchId || null, userId: user.id };
     }
 
     const [incidents, assignableUsers] = await Promise.all([
