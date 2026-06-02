@@ -12,6 +12,12 @@
         <div class="page-header">
             <h1>Incidencias</h1>
             <div class="page-header__actions">
+                <% const _role = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.roleId : null; %>
+                <% if (_role === 1 || _role === 4) { %>
+                    <a href="/incident/config/templates" class="btn-secondary">
+                        <span class="material-symbols-outlined">checklist</span>Checklist por tipo
+                    </a>
+                <% } %>
                 <a href="/incident/new" class="btn-primary">
                     <span class="material-symbols-outlined">add</span>Nueva incidencia
                 </a>

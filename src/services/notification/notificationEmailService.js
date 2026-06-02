@@ -5,6 +5,7 @@ async function queueEmail(data) {
         recipient: data.recipient,
         subject: data.subject,
         body: data.body,
+        format: data.format === 'html' ? 'html' : 'text',
         attempts: 0,
         status: 'PENDING'
     });

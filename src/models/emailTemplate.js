@@ -20,6 +20,11 @@ const EmailTemplate = sequelize.define('emailTemplate', {
         type: DataTypes.TEXT,
         allowNull: false,
     },
+    format: {
+        type: DataTypes.STRING(8),
+        allowNull: false,
+        defaultValue: 'text',
+    },
 },
     {
         tableName: 'email_template',
@@ -33,11 +38,12 @@ const getAll = async () => {
     return EmailTemplate.findAll({ order: [['id', 'ASC']] });
 };
 
-const updateTemplate = async (eventCode, { subject, body }) => {
+const updateTemplate = async (eventCode, { subject, body, format }) => {
     const tpl = await EmailTemplate.findOne({ where: { eventCode } });
     if (!tpl) { return null; }
     if (subject !== undefined) { tpl.subject = subject; }
     if (body    !== undefined) { tpl.body    = body;    }
+    if (format  !== undefined) { tpl.format  = format;  }
     await tpl.save();
     return tpl;
 };

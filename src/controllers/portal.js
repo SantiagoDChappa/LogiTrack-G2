@@ -286,7 +286,11 @@ const getPortal = async (req, res) => {
                 // ignore live tracking lookup errors in public portal
             }
 
-            return { ...json, history, mapStops: stops, activeRouteId };
+            // US-E05 / US-C02: trazabilidad de incidencias y seguimiento de recuperación (datos seguros).
+            const publicIncidents = await buildPublicIncidents(json.id);
+            const recovery        = await buildRecovery(json.id);
+
+            return { ...json, history, mapStops: stops, activeRouteId, incidents: publicIncidents, recovery };
         }));
 
         return res.render('portal', {
@@ -318,7 +322,52 @@ const { Incident }         = incidentModel;
 const incidentTypeModel    = require('../models/incidentType');
 const incidentHistoryModel = require('../models/incidentHistory');
 const incidentRules        = require('../services/incidentRules');
+const { snapshotChecklist } = require('../services/incidentChecklist');
+const { IncidentAttachment } = require('../models/incidentAttachment');
 const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
+
+const failedAttemptModel = require('../models/failedAttempt');
+
+// Estados de incidencia con etiqueta amigable para el portal.
+const INCIDENT_STATUS_LABEL = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
+const INCIDENT_RESOLUTION_LABEL = { PROCEDENTE: 'Procedente', NO_PROCEDENTE: 'No procedente' };
+
+// US-E05: incidencias del envío con campos seguros para el cliente (sin datos internos).
+const buildPublicIncidents = async (shipmentId) => {
+    const { IncidentType } = require('../models/incidentType');
+    const rows = await Incident.findAll({
+        where: { shipmentId },
+        attributes: ['id', 'status', 'resolution', 'createdAt', 'closedAt'],
+        include: [{ model: IncidentType, as: 'type', attributes: ['description'] }],
+        order: [['createdAt', 'DESC']],
+    });
+    return rows.map(r => {
+        const j = r.toJSON();
+        return {
+            id:             j.id,
+            typeLabel:      j.type ? j.type.description : 'Incidencia',
+            statusLabel:    INCIDENT_STATUS_LABEL[j.status] || j.status,
+            resolutionLabel: j.resolution ? (INCIDENT_RESOLUTION_LABEL[j.resolution] || j.resolution) : null,
+            createdAtLabel: formatDate(j.createdAt),
+            closedAtLabel:  j.closedAt ? formatDate(j.closedAt) : null,
+        };
+    });
+};
+
+// US-C02: seguimiento de recuperación / reprogramación (intentos fallidos), campos seguros.
+const buildRecovery = async (shipmentId) => {
+    const attempts = await failedAttemptModel.getByShipmentId(shipmentId);
+    return attempts.map(a => {
+        const j = a.toJSON ? a.toJSON() : a;
+        return {
+            attemptDateLabel:     formatDate(j.attemptDate),
+            reason:               j.reason || null,
+            suggestedDateLabel:   j.suggestedDate   ? formatDate(j.suggestedDate)   : null,
+            rescheduledDateLabel: j.rescheduledDate ? formatDate(j.rescheduledDate) : null,
+            status:               j.status || null,
+        };
+    });
+};
 
 const findShipmentByTracking = (trackingId) => {
     const t = (trackingId || '').trim();
@@ -357,7 +406,7 @@ const getPublicCreateForm = async (req, res) => {
 
 // Logica compartida entre createPublic (form) y createPublicApi (JSON / bot).
 // Retorna { ok: true, incident, shipment } o { ok: false, status, message }.
-const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument }) => {
+const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, attachment }) => {
     const tracking = (trackingId || '').trim().toUpperCase();
     if (!tracking)                                                        { return { ok: false, status: 400, message: 'Código de seguimiento requerido.' }; }
     if (!incidentTypeId)                                                  { return { ok: false, status: 400, message: 'Seleccione un tipo de incidencia.' }; }
@@ -404,14 +453,46 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
             transaction: t
         });
 
+        await snapshotChecklist(created.id, type.id, t);
+
+        if (attachment && attachment.dataBase64) {
+            await IncidentAttachment.create({
+                incidentId:         created.id,
+                fileName:           String(attachment.fileName || 'evidencia').slice(0, 200),
+                mimeType:           attachment.mimeType,
+                dataBase64:         attachment.dataBase64,
+                source:             'PORTAL',
+                uploadedByPersonId: openedByPersonId,
+                createdAt:          new Date()
+            }, { transaction: t });
+            await incidentHistoryModel.create({
+                incidentId: created.id,
+                eventType:  IncidentEventType.EVIDENCE_ADDED,
+                comment:    `Evidencia adjuntada desde el portal: ${String(attachment.fileName || 'archivo').slice(0, 120)}`,
+                personId:   openedByPersonId,
+                transaction: t
+            });
+        }
+
         return created;
     });
 
     return { ok: true, incident, shipment, type };
 };
 
+const ALLOWED_ATTACHMENT_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+const buildAttachmentFromFile = (file) => {
+    if (!file || !ALLOWED_ATTACHMENT_MIME.includes(file.mimetype)) { return null; }
+    return {
+        fileName:   file.originalname,
+        mimeType:   file.mimetype,
+        dataBase64: file.buffer.toString('base64')
+    };
+};
+
 const createPublic = async (req, res) => {
-    const result = await createIncidentFromPortal(req.body);
+    const result = await createIncidentFromPortal({ ...req.body, attachment: buildAttachmentFromFile(req.file) });
     if (!result.ok) {
         const types = await incidentTypeModel.getActive();
         return res.status(result.status).render('portal/incidentNew', {

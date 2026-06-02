@@ -12,7 +12,18 @@ const transporter = nodemailer.createTransport({
 
 const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
-async function sendEmail(to, subject, text) {
+// Quita etiquetas HTML para generar un fallback de texto plano.
+const htmlToText = (html) => String(html || '')
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\s*\/p\s*>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+// `format` opcional: 'html' envía cuerpo HTML (con fallback de texto); cualquier otro valor = texto plano.
+async function sendEmail(to, subject, content, format = 'text') {
     try {
         const override = (await settingModel.get('test_email_override')) || '';
         const useOverride = isValidEmail(override);
@@ -33,12 +44,19 @@ async function sendEmail(to, subject, text) {
             ? `[TEST → ${recipients.join(', ') || 'sin destinatarios'}] ${subject}`
             : subject;
 
-        await transporter.sendMail({
+        const message = {
             from: process.env.EMAIL_USER,
             to:   finalTo,
             subject: finalSubject,
-            text,
-        });
+        };
+        if (format === 'html') {
+            message.html = content;
+            message.text = htmlToText(content);
+        } else {
+            message.text = content;
+        }
+
+        await transporter.sendMail(message);
     }
     catch (error) {
         console.error('Error sending email:', error);

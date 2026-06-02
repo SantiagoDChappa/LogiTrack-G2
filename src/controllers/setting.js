@@ -34,7 +34,7 @@ const getSettings = async (req, res) => {
 
     const templatesByEvent = {};
     for (const t of emailTemplates) {
-        templatesByEvent[t.eventCode] = { subject: t.subject, body: t.body };
+        templatesByEvent[t.eventCode] = { subject: t.subject, body: t.body, format: t.format || 'text' };
     }
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
@@ -100,15 +100,56 @@ const saveEmailTemplate = async (req, res) => {
         const { eventCode } = req.params;
         const subject = (req.body.subject || '').trim();
         const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
         if (!subject || !body) {
             return res.redirect('/setting?error=template_empty');
         }
-        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body });
+        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body, format });
         if (!updated) { return res.redirect('/setting?error=template_not_found'); }
         res.redirect('/setting?success=tpl');
     } catch (err) {
         console.error('saveEmailTemplate:', err.message);
         res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+// Placeholders disponibles + valores de ejemplo (deben coincidir con el render real en shipment.notifyShipmentEvent).
+const SAMPLE_BASE = (process.env.APP_URL || process.env.BASE_URL || 'https://logitrack-prototype.onrender.com').replace(/\/+$/, '');
+const SAMPLE_PLACEHOLDERS = {
+    fullName:       'Juan Pérez',
+    trackingCode:   'ENV-001234',
+    secretCode:     '4827',
+    secretCodeLine: '\n\nCódigo clave de entrega: 4827. Mostráselo al repartidor para confirmar la entrega.',
+    trackingUrl:    `${SAMPLE_BASE}/portal?q=ENV-001234`,
+    selfServiceUrl: `${SAMPLE_BASE}/portal/self/demo-token-1234`,
+    incidentUrl:    `${SAMPLE_BASE}/portal/incident/new?trackingId=ENV-001234`,
+};
+
+const fillSample = (s) => String(s || '')
+    .replace(/\{\{fullName\}\}/g,       SAMPLE_PLACEHOLDERS.fullName)
+    .replace(/\{\{trackingCode\}\}/g,   SAMPLE_PLACEHOLDERS.trackingCode)
+    .replace(/\{\{secretCode\}\}/g,     SAMPLE_PLACEHOLDERS.secretCode)
+    .replace(/\{\{secretCodeLine\}\}/g, SAMPLE_PLACEHOLDERS.secretCodeLine)
+    .replace(/\{\{trackingUrl\}\}/g,    SAMPLE_PLACEHOLDERS.trackingUrl)
+    .replace(/\{\{selfServiceUrl\}\}/g, SAMPLE_PLACEHOLDERS.selfServiceUrl)
+    .replace(/\{\{incidentUrl\}\}/g,    SAMPLE_PLACEHOLDERS.incidentUrl);
+
+// Envía un email de prueba del template (sin persistir cambios) usando datos de ejemplo.
+const sendTestTemplate = async (req, res) => {
+    try {
+        const { sendEmail } = require('../services/notification/emailSender');
+        const to      = (req.body.testEmail || '').trim();
+        const subject = (req.body.subject || '').trim();
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        if (!isValidEmail(to)) { return res.status(400).json({ ok: false, error: 'Email de prueba inválido.' }); }
+        if (!subject || !body) { return res.status(400).json({ ok: false, error: 'Asunto y cuerpo son obligatorios.' }); }
+
+        await sendEmail(to, `[PRUEBA] ${fillSample(subject)}`, fillSample(body), format);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('sendTestTemplate:', err.message);
+        res.status(500).json({ ok: false, error: 'No se pudo enviar el email de prueba.' });
     }
 };
 
@@ -428,7 +469,7 @@ const saveIncidentNotifConfig = async (req, res) => {
 
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
-    saveParams, saveNotificationConfig, saveEmailTemplate, saveTestEmailOverride,
+    saveParams, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
     saveIncidentNotifConfig,
 };

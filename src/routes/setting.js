@@ -9,7 +9,8 @@ router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 router.post('/params',          requireAdmin, settingController.saveParams);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
-router.post('/email-template/:eventCode',   requireAdmin, settingController.saveEmailTemplate);
+router.post('/email-template/:eventCode',        requireAdmin, settingController.saveEmailTemplate);
+router.post('/email-template/:eventCode/test',   requireAdmin, settingController.sendTestTemplate);
 router.post('/test-email-override',         requireAdmin, settingController.saveTestEmailOverride);
 // Sprint 3 - 2.5 parámetros configurables nuevos
 router.post('/failed-reason',          requireAdmin, settingController.saveFailedReason);

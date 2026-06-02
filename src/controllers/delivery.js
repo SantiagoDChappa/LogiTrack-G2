@@ -10,6 +10,8 @@ const { RoutePause } = require('../models/routePause');
 
 const { getSuggestedDate } = require('../utils/failedAttempt');
 const failedAttemptModel = require('../models/failedAttempt');
+const { autoCreateIncident } = require('../services/incidentAutoGen');
+const { autoCloseForShipment } = require('../services/incidentAutoClose');
 
 const showFailedForm = async (req, res) => {
     try {
@@ -95,6 +97,13 @@ const saveFailedAttempt = async (req, res) => {
                     { where: { shipmentId: shipment.id, stopType: 'delivery', completed: false }, transaction: t }
                 );
             }
+
+            // US-E02: generar incidencia automática por entrega fallida (dedup interno).
+            await autoCreateIncident({
+                shipmentId:  shipment.id,
+                typeCode:    'DELIVERY_FAILED',
+                description: `Intento de entrega fallido. Motivo: ${reason}.`
+            }, t);
         });
 
         res.redirect('/delivery?failed=true');
@@ -247,6 +256,9 @@ const saveEvidence = async (req, res) => {
                     { where: { id: stopId, routeId }, transaction: t }
                 );
             }
+
+            // US-E09: cerrar automáticamente las incidencias auto-generadas del envío.
+            await autoCloseForShipment(shipment.id, { reason: 'Cierre automático: envío entregado' }, t);
         });
 
         if (routeId) {

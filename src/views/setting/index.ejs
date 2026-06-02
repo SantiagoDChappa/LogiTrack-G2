@@ -102,6 +102,85 @@
             color: var(--color-text);
             font-size: var(--font-size-sm);
         }
+
+        /* === Editor interactivo de plantillas de email === */
+        .tplm-backdrop { display:none; position:fixed; inset:0; z-index:200;
+            background:rgba(15,23,42,.6); backdrop-filter:blur(4px);
+            align-items:center; justify-content:center; padding:1rem; }
+        .tplm-dialog { background:var(--color-bg,#fff); border:1px solid var(--color-border,#e2e8f0);
+            border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.32);
+            width:min(960px,96vw); height:min(720px,92vh); display:flex; flex-direction:column; overflow:hidden; }
+        .tplm-head { display:flex; align-items:flex-start; justify-content:space-between;
+            padding:1rem 1.25rem; border-bottom:1px solid var(--color-border); }
+        .tplm-title { margin:0; font-size:1.05rem; }
+        .tplm-event { font-size:.8rem; color:var(--color-text-secondary); }
+        .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
+            display:inline-flex; padding:.2rem; border-radius:6px; }
+        .tplm-close:hover { background:var(--color-bg-secondary,#f1f3f5); color:var(--color-text); }
+        .tplm-body { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;
+            padding:1.1rem 1.25rem; overflow:auto; }
+        .tplm-editor { display:flex; flex-direction:column; gap:.85rem; min-width:0; }
+        .tplm-row { display:flex; align-items:center; gap:.75rem; }
+        .tplm-label { font-size:.8rem; font-weight:600; color:var(--color-text-secondary); }
+        .tplm-segmented { display:inline-flex; border:1px solid var(--color-border); border-radius:999px; overflow:hidden; }
+        .tplm-segmented button { display:inline-flex; align-items:center; gap:.35rem; border:none;
+            background:transparent; color:var(--color-text-secondary); padding:.4rem .9rem; cursor:pointer; font:inherit; font-size:.85rem; }
+        .tplm-segmented button .material-symbols-outlined { font-size:1.05rem; }
+        .tplm-segmented button.is-active { background:var(--color-primary,#2563eb); color:#fff; }
+        .tplm-chips { display:flex; flex-wrap:wrap; gap:.4rem; }
+        .tplm-chip { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.78rem;
+            background:var(--color-bg-secondary,#eef2ff); color:var(--color-primary,#2563eb);
+            border:1px solid var(--color-border,#dbe1ea); border-radius:999px;
+            padding:.25rem .6rem; cursor:grab; transition:all .12s ease; }
+        .tplm-chip:hover { background:var(--color-primary,#2563eb); color:#fff; }
+        .tplm-chip:active { cursor:grabbing; }
+        .tplm-chip--link { background:rgba(124,58,237,.10); color:#7c3aed; border-color:rgba(124,58,237,.25); }
+        .tplm-chip--link:hover { background:#7c3aed; color:#fff; }
+        .tplm-hint { display:block; margin-top:.4rem; font-size:.78rem; color:var(--color-text-secondary); line-height:1.4; }
+        .tplm-ph-desc { display:flex; align-items:flex-start; gap:.45rem; margin-top:.5rem;
+            padding:.5rem .65rem; border:1px solid var(--color-border); border-radius:8px;
+            background:var(--color-bg-secondary,#f8fafc); color:var(--color-text-secondary);
+            font-size:.8rem; line-height:1.35; box-sizing:border-box;
+            height:3.6rem; overflow:auto; transition:border-color .15s ease; }
+        .tplm-ph-desc-text { display:block; }
+        .tplm-ph-desc.is-active { border-color:var(--color-primary,#2563eb); color:var(--color-text); }
+        .tplm-ph-desc .material-symbols-outlined { font-size:1.05rem; flex:none; }
+        .tplm-ph-desc strong { font-family:ui-monospace,Menlo,Consolas,monospace; }
+        .tplm-ph-desc em { color:var(--color-text-secondary); font-style:italic; }
+        .tplm-snippets { display:flex; flex-wrap:wrap; gap:.4rem; }
+        .tplm-snip { display:inline-flex; align-items:center; gap:.35rem; font-size:.8rem;
+            background:var(--color-bg-secondary,#f1f5f9); color:var(--color-text);
+            border:1px solid var(--color-border,#dbe1ea); border-radius:8px;
+            padding:.35rem .7rem; cursor:pointer; transition:all .12s ease; }
+        .tplm-snip:hover { border-color:var(--color-primary,#2563eb); color:var(--color-primary,#2563eb); }
+        .tplm-snip .material-symbols-outlined { font-size:1.05rem; }
+        .tplm-textarea { font-family:ui-monospace,Menlo,Consolas,monospace; resize:vertical;
+            width:100%; line-height:1.5; }
+        .tplm-test { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+            padding-top:.6rem; border-top:1px dashed var(--color-border); }
+        .tplm-test input { flex:1 1 200px; }
+        .tplm-test-msg { font-size:.82rem; color:var(--color-text-secondary); }
+        .tplm-test-msg.ok  { color:#16a34a; }
+        .tplm-test-msg.err { color:#dc2626; }
+        /* Lienzo de vista previa: claro por defecto, oscuro en data-theme=dark */
+        .tplm-preview { --pv-bg:#ffffff; --pv-text:#0f172a; --pv-muted:#64748b; --pv-border:#e2e8f0;
+            display:flex; flex-direction:column; min-width:0;
+            border:1px solid var(--color-border); border-radius:10px; background:var(--pv-bg); overflow:hidden; }
+        [data-theme="dark"] .tplm-preview { --pv-bg:#0f172a; --pv-text:#e2e8f0; --pv-muted:#94a3b8; --pv-border:rgba(148,163,184,.18); }
+        .tplm-preview-head { display:flex; align-items:center; gap:.4rem; padding:.6rem .8rem;
+            border-bottom:1px solid var(--pv-border); font-size:.82rem; font-weight:600; color:var(--pv-muted); background:var(--pv-bg); }
+        .tplm-preview-head small { font-weight:400; margin-left:auto; }
+        .tplm-preview-head .material-symbols-outlined { font-size:1.05rem; }
+        .tplm-preview-subject { padding:.6rem .8rem; font-weight:600; border-bottom:1px solid var(--pv-border);
+            color:var(--pv-text); white-space:pre-wrap; word-break:break-word; }
+        .tplm-preview-body { flex:1; min-height:240px; background:var(--pv-bg); display:flex; }
+        .tplm-preview-body pre { flex:1; min-height:0; margin:0; padding:.8rem; overflow:auto;
+            white-space:pre-wrap; word-break:break-word;
+            color:var(--pv-text); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.85rem; }
+        .tplm-preview-body iframe { flex:1; min-height:0; width:100%; border:none; background:var(--pv-bg); display:none; }
+        .tplm-foot { display:flex; justify-content:flex-end; gap:.6rem;
+            padding:.85rem 1.25rem; border-top:1px solid var(--color-border); }
+        @media (max-width:760px) { .tplm-body { grid-template-columns:1fr; } }
     </style>
     <link rel="stylesheet" href="/css/settings.css">
 </head>
@@ -330,7 +409,8 @@
                                     data-event="<%= config.eventCode %>"
                                     data-description="<%= config.description %>"
                                     data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
-                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>">
+                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
+                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>">
                                     <span class="material-symbols-outlined">edit_note</span>
                                     Editar mail
                                 </button>
@@ -419,30 +499,109 @@
                 </form>
             </div>
 
-            <!-- Modal: Editar template de email -->
-            <div id="tpl-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center">
-                <form id="tpl-modal-form" method="POST" action=""
-                    style="background:var(--color-bg,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.2);width:min(640px,92vw);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:1rem">
-                    <h3 style="margin:0">Editar email — <span id="tpl-modal-event"></span></h3>
-                    <div class="field">
-                        <label for="tpl-modal-subject">Asunto</label>
-                        <input type="text" id="tpl-modal-subject" name="subject" required>
-                    </div>
-                    <div class="field">
-                        <label for="tpl-modal-body">Cuerpo del mensaje</label>
-                        <textarea id="tpl-modal-body" name="body" rows="8" required style="font-family:inherit;resize:vertical"></textarea>
-                        <small style="color:var(--color-text-secondary)">
-                            Placeholders disponibles: <code>{{fullName}}</code>, <code>{{trackingCode}}</code>
-                        </small>
-                    </div>
-                    <div class="settings-actions" style="justify-content:flex-end;gap:.6rem">
-                        <button type="button" class="btn-secondary" id="tpl-modal-cancel">Cancelar</button>
-                        <button type="submit" class="btn-primary">
-                            <span class="material-symbols-outlined">save</span>
-                            Guardar mail
+            <!-- Modal: Editar template de email (interactivo) -->
+            <div id="tpl-modal-backdrop" class="tplm-backdrop">
+                <div class="tplm-dialog">
+                    <header class="tplm-head">
+                        <div>
+                            <h3 class="tplm-title">Editar email</h3>
+                            <span class="tplm-event" id="tpl-modal-event"></span>
+                        </div>
+                        <button type="button" class="tplm-close" id="tpl-modal-cancel" aria-label="Cerrar">
+                            <span class="material-symbols-outlined">close</span>
                         </button>
+                    </header>
+
+                    <div class="tplm-body">
+                        <form id="tpl-modal-form" method="POST" action="" class="tplm-editor">
+                            <input type="hidden" name="format" id="tpl-modal-format" value="text">
+
+                            <div class="tplm-row">
+                                <span class="tplm-label">Formato</span>
+                                <div class="tplm-segmented" id="tpl-format-toggle">
+                                    <button type="button" data-format="text" class="is-active">
+                                        <span class="material-symbols-outlined">subject</span> Texto
+                                    </button>
+                                    <button type="button" data-format="html">
+                                        <span class="material-symbols-outlined">code</span> HTML
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="tpl-modal-subject">Asunto</label>
+                                <input type="text" id="tpl-modal-subject" name="subject" required>
+                            </div>
+
+                            <div class="field">
+                                <label>Placeholders <small>(click para insertar · o arrastrá al texto)</small></label>
+                                <div class="tplm-chips" id="tpl-placeholders">
+                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{fullName}}"
+                                        data-desc="Nombre completo del destinatario del envío." data-sample="Juan Pérez">{{fullName}}</button>
+                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{trackingCode}}"
+                                        data-desc="Código de seguimiento del envío." data-sample="ENV-001234">{{trackingCode}}</button>
+                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{secretCode}}"
+                                        data-desc="Código clave de entrega que el destinatario muestra al repartidor." data-sample="4827">{{secretCode}}</button>
+                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{secretCodeLine}}"
+                                        data-desc="Frase completa con el código clave (incluye el texto explicativo). Útil cuando el envío tiene código." data-sample="Código clave de entrega: 4827. Mostráselo al repartidor…">{{secretCodeLine}}</button>
+                                    <button type="button" class="tplm-chip tplm-chip--link" draggable="true" data-token="{{trackingUrl}}"
+                                        data-desc="🔗 Acción: ver el seguimiento del envío en el portal." data-sample="https://…/portal?q=ENV-001234">{{trackingUrl}}</button>
+                                    <button type="button" class="tplm-chip tplm-chip--link" draggable="true" data-token="{{selfServiceUrl}}"
+                                        data-desc="🔗 Acción: reprogramar la entrega o elegir retiro en sucursal (autogestión sin login)." data-sample="https://…/portal/self/&lt;token&gt;">{{selfServiceUrl}}</button>
+                                    <button type="button" class="tplm-chip tplm-chip--link" draggable="true" data-token="{{incidentUrl}}"
+                                        data-desc="🔗 Acción: reportar o responder una incidencia del envío." data-sample="https://…/portal/incident/new?trackingId=ENV-001234">{{incidentUrl}}</button>
+                                </div>
+                                <div class="tplm-ph-desc" id="tpl-ph-desc">
+                                    <span class="material-symbols-outlined">touch_app</span>
+                                    <span class="tplm-ph-desc-text">Pasá el cursor o tabulá sobre un placeholder para ver qué inserta.</span>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label>Bloques rápidos <small>(insertan contenido listo según el formato)</small></label>
+                                <div class="tplm-snippets" id="tpl-snippets">
+                                    <button type="button" class="tplm-snip" data-snip="reprogramar"><span class="material-symbols-outlined">event_repeat</span> Botón reprogramar</button>
+                                    <button type="button" class="tplm-snip" data-snip="seguimiento"><span class="material-symbols-outlined">local_shipping</span> Botón seguimiento</button>
+                                    <button type="button" class="tplm-snip" data-snip="incidencia"><span class="material-symbols-outlined">report</span> Botón incidencia</button>
+                                    <button type="button" class="tplm-snip" data-snip="saludo"><span class="material-symbols-outlined">waving_hand</span> Saludo</button>
+                                    <button type="button" class="tplm-snip" data-snip="firma"><span class="material-symbols-outlined">draw</span> Firma</button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="tpl-modal-body">Cuerpo del mensaje</label>
+                                <textarea id="tpl-modal-body" name="body" rows="10" required class="tplm-textarea"></textarea>
+                            </div>
+
+                            <div class="tplm-test">
+                                <input type="email" id="tpl-modal-test-email" placeholder="email@dominio.com para enviar prueba">
+                                <button type="button" class="btn-secondary" id="tpl-modal-test-btn">
+                                    <span class="material-symbols-outlined">send</span> Enviar prueba
+                                </button>
+                                <span class="tplm-test-msg" id="tpl-modal-test-msg"></span>
+                            </div>
+                        </form>
+
+                        <div class="tplm-preview">
+                            <div class="tplm-preview-head">
+                                <span class="material-symbols-outlined">visibility</span> Vista previa
+                                <small>datos de ejemplo</small>
+                            </div>
+                            <div class="tplm-preview-subject" id="tpl-preview-subject"></div>
+                            <div class="tplm-preview-body">
+                                <pre id="tpl-preview-text"></pre>
+                                <iframe id="tpl-preview-html" title="Vista previa HTML" sandbox=""></iframe>
+                            </div>
+                        </div>
                     </div>
-                </form>
+
+                    <footer class="tplm-foot">
+                        <button type="button" class="btn-secondary" id="tpl-modal-cancel2">Cancelar</button>
+                        <button type="submit" form="tpl-modal-form" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span> Guardar mail
+                        </button>
+                    </footer>
+                </div>
             </div>
 
             <script>
@@ -457,27 +616,155 @@
                         });
                     });
 
+                    const SAMPLE = {
+                        '{{fullName}}': 'Juan Pérez',
+                        '{{trackingCode}}': 'ENV-001234',
+                        '{{secretCode}}': '4827',
+                        '{{secretCodeLine}}': '\n\nCódigo clave de entrega: 4827. Mostráselo al repartidor para confirmar la entrega.',
+                        '{{trackingUrl}}': 'https://logitrack.app/portal?q=ENV-001234',
+                        '{{selfServiceUrl}}': 'https://logitrack.app/portal/self/demo-token-1234',
+                        '{{incidentUrl}}': 'https://logitrack.app/portal/incident/new?trackingId=ENV-001234'
+                    };
+                    const fillSample = (s) => String(s || '').replace(/\{\{fullName\}\}|\{\{trackingCode\}\}|\{\{secretCode\}\}|\{\{secretCodeLine\}\}|\{\{trackingUrl\}\}|\{\{selfServiceUrl\}\}|\{\{incidentUrl\}\}/g, m => SAMPLE[m] ?? m);
+                    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
                     const backdrop = document.getElementById('tpl-modal-backdrop');
                     const form     = document.getElementById('tpl-modal-form');
                     const eventLbl = document.getElementById('tpl-modal-event');
                     const subject  = document.getElementById('tpl-modal-subject');
                     const body     = document.getElementById('tpl-modal-body');
+                    const formatIn = document.getElementById('tpl-modal-format');
+                    const toggle   = document.getElementById('tpl-format-toggle');
+                    const pvSubject= document.getElementById('tpl-preview-subject');
+                    const pvText   = document.getElementById('tpl-preview-text');
+                    const pvHtml   = document.getElementById('tpl-preview-html');
+                    let currentEvent = '';
+
+                    function setFormat(fmt) {
+                        formatIn.value = fmt;
+                        toggle.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b.dataset.format === fmt));
+                        renderPreview();
+                    }
+
+                    function renderPreview() {
+                        const fmt = formatIn.value;
+                        pvSubject.textContent = fillSample(subject.value) || '(sin asunto)';
+                        const filled = fillSample(body.value);
+                        if (fmt === 'html') {
+                            pvText.style.display = 'none';
+                            pvHtml.style.display = 'block';
+                            // Si ya es un documento HTML completo, se usa tal cual (como lo recibirá el cliente).
+                            // Si es un fragmento, se envuelve en un documento mínimo acorde al tema.
+                            const isFullDoc = /<!doctype/i.test(filled) || /<html[\s>]/i.test(filled);
+                            if (isFullDoc) {
+                                pvHtml.srcdoc = filled;
+                            } else {
+                                const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+                                const pv = dark ? { bg:'#0f172a', fg:'#e2e8f0' } : { bg:'#ffffff', fg:'#0f172a' };
+                                pvHtml.srcdoc = '<!doctype html><meta charset="utf-8"><body style="font-family:system-ui,sans-serif;margin:12px;background:' + pv.bg + ';color:' + pv.fg + '">' + filled + '</body>';
+                            }
+                        } else {
+                            pvHtml.style.display = 'none';
+                            pvText.style.display = 'block';
+                            pvText.textContent = filled || '(sin contenido)';
+                        }
+                    }
+
+                    function insertToken(token) {
+                        const start = body.selectionStart ?? body.value.length;
+                        const end   = body.selectionEnd   ?? body.value.length;
+                        body.value = body.value.slice(0, start) + token + body.value.slice(end);
+                        const pos = start + token.length;
+                        body.focus();
+                        body.setSelectionRange(pos, pos);
+                        renderPreview();
+                    }
+
+                    // Panel descriptivo del placeholder enfocado / con hover
+                    const phDescBox  = document.getElementById('tpl-ph-desc');
+                    const phDescText = phDescBox.querySelector('.tplm-ph-desc-text');
+                    const phDefault  = phDescText.textContent;
+                    const showDesc = (chip) => {
+                        phDescText.innerHTML = '<strong>' + chip.dataset.token + '</strong> — ' + (chip.dataset.desc || '')
+                            + (chip.dataset.sample ? ' <em>Ej.: ' + chip.dataset.sample + '</em>' : '');
+                        phDescBox.classList.add('is-active');
+                    };
+                    const clearDesc = () => { phDescText.textContent = phDefault; phDescBox.classList.remove('is-active'); };
+
+                    // Chips: click para insertar + descripción al hover/focus
+                    document.querySelectorAll('.tplm-chip').forEach(chip => {
+                        chip.addEventListener('click', () => insertToken(chip.dataset.token));
+                        chip.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', chip.dataset.token));
+                        chip.addEventListener('mouseenter', () => showDesc(chip));
+                        chip.addEventListener('focus', () => showDesc(chip));
+                        chip.addEventListener('mouseleave', clearDesc);
+                        chip.addEventListener('blur', clearDesc);
+                    });
+                    // Textarea: aceptar drop de chips en la posición del cursor
+                    body.addEventListener('dragover', e => e.preventDefault());
+                    body.addEventListener('drop', e => {
+                        e.preventDefault();
+                        const token = e.dataTransfer.getData('text/plain');
+                        if (token) { insertToken(token); }
+                    });
+
+                    // Bloques rápidos: versión HTML (botón inline email-safe) y versión texto.
+                    const btnHtml = (url, label) => '<a href="' + url + '" style="display:inline-block;background:#2563eb;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-family:sans-serif;font-weight:600">' + label + '</a>';
+                    const SNIPPETS = {
+                        reprogramar: { html: btnHtml('{{selfServiceUrl}}', 'Reprogramar entrega'), text: 'Reprogramá tu entrega o elegí retiro en sucursal: {{selfServiceUrl}}' },
+                        seguimiento: { html: btnHtml('{{trackingUrl}}', 'Ver seguimiento'),       text: 'Seguí tu envío: {{trackingUrl}}' },
+                        incidencia:  { html: btnHtml('{{incidentUrl}}', 'Reportar incidencia'),    text: 'Reportá un problema con tu envío: {{incidentUrl}}' },
+                        saludo:      { html: '<p>Hola <strong>{{fullName}}</strong>,</p>',         text: 'Hola {{fullName}},' },
+                        firma:       { html: '<p style="color:#64748b;font-size:13px">Equipo LogiTrack · Ante dudas, respondé este correo.</p>', text: '\n— Equipo LogiTrack\nAnte dudas, respondé este correo.' }
+                    };
+                    document.querySelectorAll('.tplm-snip').forEach(b => {
+                        b.addEventListener('click', () => {
+                            const snip = SNIPPETS[b.dataset.snip];
+                            if (!snip) { return; }
+                            const isHtml = formatIn.value === 'html';
+                            const content = isHtml ? snip.html : snip.text;
+                            insertToken((body.value && !body.value.endsWith('\n') ? '\n' : '') + content + '\n');
+                        });
+                    });
+
+                    toggle.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setFormat(b.dataset.format)));
+                    subject.addEventListener('input', renderPreview);
+                    body.addEventListener('input', renderPreview);
 
                     document.querySelectorAll('.notif-edit-tpl-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
-                            form.action = '/setting/email-template/' + btn.dataset.event;
+                            currentEvent = btn.dataset.event;
+                            form.action = '/setting/email-template/' + currentEvent;
                             eventLbl.textContent = btn.dataset.description;
                             subject.value = btn.dataset.subject || '';
                             body.value    = btn.dataset.body    || '';
+                            setFormat(btn.dataset.format === 'html' ? 'html' : 'text');
+                            document.getElementById('tpl-modal-test-msg').textContent = '';
                             backdrop.style.display = 'flex';
                         });
                     });
 
-                    document.getElementById('tpl-modal-cancel').addEventListener('click', () => {
-                        backdrop.style.display = 'none';
-                    });
-                    backdrop.addEventListener('click', e => {
-                        if (e.target === backdrop) backdrop.style.display = 'none';
+                    const close = () => { backdrop.style.display = 'none'; };
+                    document.getElementById('tpl-modal-cancel').addEventListener('click', close);
+                    document.getElementById('tpl-modal-cancel2').addEventListener('click', close);
+                    // No cerrar al hacer click fuera del popup: solo con la X o Cancelar.
+
+                    // Enviar email de prueba (sin guardar)
+                    document.getElementById('tpl-modal-test-btn').addEventListener('click', async () => {
+                        const msg = document.getElementById('tpl-modal-test-msg');
+                        const to  = document.getElementById('tpl-modal-test-email').value.trim();
+                        msg.className = 'tplm-test-msg';
+                        msg.textContent = 'Enviando...';
+                        try {
+                            const r = await fetch('/setting/email-template/' + currentEvent + '/test', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ testEmail: to, subject: subject.value, body: body.value, format: formatIn.value })
+                            });
+                            const data = await r.json();
+                            if (data.ok) { msg.classList.add('ok'); msg.textContent = '✓ Enviado'; }
+                            else { msg.classList.add('err'); msg.textContent = data.error || 'Error'; }
+                        } catch { msg.classList.add('err'); msg.textContent = 'Error de red'; }
                     });
                 })();
             </script>

@@ -877,6 +877,18 @@ const markPackageFailed = async (req, res) => {
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PACKAGE_FAILED, shipment);
 
+        // US-E02: generar incidencia automática por paquete fallido (dedup interno).
+        try {
+            const { autoCreateIncident } = require('../services/incidentAutoGen');
+            await sequelize.transaction(async (t) => {
+                await autoCreateIncident({
+                    shipmentId:  Number(id),
+                    typeCode:    'PACKAGE_BROKEN',
+                    description: `Paquete fallido${comment ? `: ${comment}` : ''}.`
+                }, t);
+            });
+        } catch (e) { console.error('[shipment] autoCreateIncident:', e.message); }
+
         res.redirect(`/shipment/update/${id}?success=6`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
@@ -1105,16 +1117,25 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
         const secretCodeLine = secretCode
             ? `\n\nCódigo clave de entrega: ${secretCode}. Mostráselo al repartidor para confirmar la entrega.`
             : '';
+        // URLs accionables (US-N01/N02/N03). Base configurable por APP_URL/BASE_URL.
+        const base = (process.env.APP_URL || process.env.BASE_URL || 'https://logitrack-prototype.onrender.com').replace(/\/+$/, '');
+        const trackingUrl    = trackingCode ? `${base}/portal?q=${encodeURIComponent(trackingCode)}` : base;
+        const selfServiceUrl = shipment.portalToken ? `${base}/portal/self/${shipment.portalToken}` : trackingUrl;
+        const incidentUrl    = trackingCode ? `${base}/portal/incident/new?trackingId=${encodeURIComponent(trackingCode)}` : `${base}/portal/incident/new`;
         const fill = (s) => String(s || '')
             .replace(/\{\{fullName\}\}/g,       fullName)
             .replace(/\{\{trackingCode\}\}/g,   trackingCode)
             .replace(/\{\{secretCode\}\}/g,     secretCode)
-            .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine);
+            .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine)
+            .replace(/\{\{trackingUrl\}\}/g,    trackingUrl)
+            .replace(/\{\{selfServiceUrl\}\}/g, selfServiceUrl)
+            .replace(/\{\{incidentUrl\}\}/g,    incidentUrl);
 
         await queueEmail({
             recipient: recipients.join(','),
             subject:   fill(template.subject),
             body:      fill(template.body),
+            format:    template.format || 'text',
         });
     } catch (err) {
         console.error('notifyShipmentEvent error:', err.message);
@@ -1138,6 +1159,7 @@ async function notifyRecipient(eventCode, dataOrShipment) {
         recipient: dataOrShipment.recipientEmail,
         subject:   fill(template.subject),
         body:      fill(template.body),
+        format:    template.format || 'text',
     });
 }
 
