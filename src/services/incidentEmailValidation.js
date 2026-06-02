@@ -62,4 +62,4 @@ const validateReporterEmail = (shipment, reporterEmail) => {
     };
 };
 
-module.exports = { shipmentHasAnyEmail, validateReporterEmail };
+module.exports = { normalize, shipmentHasAnyEmail, validateReporterEmail };

@@ -20,6 +20,10 @@
             <span><%= support.nombre %></span>
         </a>
         <div class="portal-nav-right">
+            <a href="/portal/mis-envios" class="portal-nav-link">
+                <span class="material-symbols-outlined">inventory_2</span>
+                Mis envíos
+            </a>
             <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
                 <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
                 <span id="theme-label">Modo claro</span>
@@ -260,6 +264,41 @@
                                 <% } %>
                                 <span class="portal-history-to"><%= h.toStatus.description %></span>
                                 <% if (h.comment) { %><span class="portal-history-comment"><%= h.comment %></span><% } %>
+                            </li>
+                            <% }); %>
+                        </ul>
+                    </div>
+                    <% } %>
+
+                    <!-- US-E05: incidencias del envío -->
+                    <% if (s.incidents && s.incidents.length > 0) { %>
+                    <div class="portal-history portal-incidents">
+                        <span class="portal-history-title">Incidencias de tu envío</span>
+                        <ul class="portal-history-list">
+                            <% s.incidents.forEach(function(inc) { %>
+                            <li class="portal-history-item">
+                                <span class="portal-history-date"><%= inc.createdAtLabel %></span>
+                                <span class="portal-history-to"><%= inc.typeLabel %></span>
+                                <span class="portal-incident-state portal-incident-state--<%= inc.statusLabel === 'Cerrada' ? 'closed' : 'open' %>"><%= inc.statusLabel %></span>
+                                <% if (inc.resolutionLabel) { %><span class="portal-history-comment">Resolución: <%= inc.resolutionLabel %><% if (inc.closedAtLabel) { %> (<%= inc.closedAtLabel %>)<% } %></span><% } %>
+                            </li>
+                            <% }); %>
+                        </ul>
+                    </div>
+                    <% } %>
+
+                    <!-- US-C02: seguimiento de recuperación / reprogramación -->
+                    <% if (s.recovery && s.recovery.length > 0) { %>
+                    <div class="portal-history portal-recovery">
+                        <span class="portal-history-title">Seguimiento de recuperación</span>
+                        <ul class="portal-history-list">
+                            <% s.recovery.forEach(function(r) { %>
+                            <li class="portal-history-item">
+                                <span class="portal-history-date"><%= r.attemptDateLabel %></span>
+                                <span class="portal-history-to">Intento de entrega</span>
+                                <% if (r.reason) { %><span class="portal-history-comment">Motivo: <%= r.reason %></span><% } %>
+                                <% if (r.rescheduledDateLabel) { %><span class="portal-history-comment">Reprogramado para: <%= r.rescheduledDateLabel %></span>
+                                <% } else if (r.suggestedDateLabel) { %><span class="portal-history-comment">Fecha sugerida: <%= r.suggestedDateLabel %></span><% } %>
                             </li>
                             <% }); %>
                         </ul>

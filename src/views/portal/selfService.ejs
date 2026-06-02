@@ -24,8 +24,19 @@
         <h1>Tu envío <span class="pill"><%= shipment.trackingId %></span></h1>
         <p>Hola <%= shipment.recipient?.fullName || 'destinatario' %> — desde acá podés ajustar la franja horaria y modalidad de entrega, y dejarle al repartidor referencias de tu domicilio.</p>
 
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="lock"><%= error %></div>
+        <% } %>
         <% if (saved) { %>
-            <div class="ok">Cambios guardados. Te notificaremos novedades.</div>
+            <div class="ok">
+                <% if (pendingCount > 0 && appliedCount > 0) { %>
+                    Algunos cambios se aplicaron de inmediato y otros quedaron pendientes de revisión operativa.
+                <% } else if (pendingCount > 0) { %>
+                    Tu solicitud quedó pendiente de revisión operativa. Te notificaremos novedades.
+                <% } else { %>
+                    Cambios guardados. Te notificaremos novedades.
+                <% } %>
+            </div>
         <% } %>
         <% if (!editable) { %>
             <div class="lock">El envío está en estado "<%= shipment.status?.description %>" y ya no admite cambios desde autogestión.</div>
@@ -34,30 +45,24 @@
         <form method="POST" action="/portal/self/<%= shipment.portalToken %>">
             <div class="card">
                 <h2>Franja horaria preferida</h2>
-                <div class="grid2">
-                    <div>
-                        <label>Desde</label>
-                        <select name="windowFrom" <%= editable ? '' : 'disabled' %>>
-                            <option value="">— sin preferencia —</option>
-                            <% timeWindows.forEach(w => { %>
-                                <option value="<%= w.fromTime %>" <%= shipment.expectedDeliveryFrom === w.fromTime ? 'selected' : '' %>>
-                                    <%= w.label %> (<%= String(w.fromTime).slice(0,5) %>)
-                                </option>
-                            <% }) %>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Hasta</label>
-                        <select name="windowTo" <%= editable ? '' : 'disabled' %>>
-                            <option value="">— sin preferencia —</option>
-                            <% timeWindows.forEach(w => { %>
-                                <option value="<%= w.toTime %>" <%= shipment.expectedDeliveryTo === w.toTime ? 'selected' : '' %>>
-                                    <%= w.label %> (<%= String(w.toTime).slice(0,5) %>)
-                                </option>
-                            <% }) %>
-                        </select>
-                    </div>
-                </div>
+                <label for="timeWindowSelect">Elegí una franja</label>
+                <select id="timeWindowSelect" <%= editable ? '' : 'disabled' %>>
+                    <option value="">— sin preferencia —</option>
+                    <% timeWindows.forEach(w => {
+                        const fromVal = String(w.fromTime).slice(0, 8);
+                        const toVal = String(w.toTime).slice(0, 8);
+                        const fromLabel = String(w.fromTime).slice(0, 5);
+                        const toLabel = String(w.toTime).slice(0, 5);
+                        const selected = String(shipment.expectedDeliveryFrom || '').slice(0, 8) === fromVal
+                            && String(shipment.expectedDeliveryTo || '').slice(0, 8) === toVal;
+                    %>
+                        <option value="<%= fromVal %>|<%= toVal %>" <%= selected ? 'selected' : '' %>>
+                            <%= w.label %> (<%= fromLabel %> – <%= toLabel %>)
+                        </option>
+                    <% }) %>
+                </select>
+                <input type="hidden" name="windowFrom" id="windowFrom" value="<%= shipment.expectedDeliveryFrom ? String(shipment.expectedDeliveryFrom).slice(0, 8) : '' %>">
+                <input type="hidden" name="windowTo" id="windowTo" value="<%= shipment.expectedDeliveryTo ? String(shipment.expectedDeliveryTo).slice(0, 8) : '' %>">
             </div>
 
             <div class="card">
@@ -70,13 +75,15 @@
                     <input type="radio" name="deliveryMode" value="branch_pickup" <%= shipment.deliveryMode === 'branch_pickup' ? 'checked' : '' %> <%= editable ? '' : 'disabled' %>>
                     Retiro por sucursal
                 </label>
-                <label>Sucursal de retiro (sólo si elegís retiro)</label>
-                <select name="pickupBranchId" <%= editable ? '' : 'disabled' %>>
-                    <option value="">— ninguna —</option>
-                    <% branches.forEach(b => { %>
-                        <option value="<%= b.id %>" <%= shipment.pickupBranchId === b.id ? 'selected' : '' %>><%= b.name %> — <%= b.address || '' %></option>
-                    <% }) %>
-                </select>
+                <div id="pickup-branch-section" style="<%= shipment.deliveryMode === 'branch_pickup' ? '' : 'display:none;' %>">
+                    <label for="pickupBranchId">Sucursal de retiro</label>
+                    <select name="pickupBranchId" id="pickupBranchId" <%= editable && shipment.deliveryMode === 'branch_pickup' ? '' : 'disabled' %>>
+                        <option value="">— ninguna —</option>
+                        <% branches.forEach(b => { %>
+                            <option value="<%= b.id %>" <%= shipment.pickupBranchId === b.id ? 'selected' : '' %>><%= b.name %> — <%= b.address || '' %></option>
+                        <% }) %>
+                    </select>
+                </div>
             </div>
 
             <div class="card">
@@ -103,5 +110,6 @@
             <button class="btn" type="submit" <%= editable ? '' : 'disabled' %>>Guardar cambios</button>
         </form>
     </div>
+    <script src="/js/portal-manage-form.js" defer></script>
 </body>
 </html>

@@ -10,6 +10,11 @@ const branchModel          = require('../models/branch');
 const { sendEmail }        = require('../services/notification/emailSender');
 const incidentRules        = require('../services/incidentRules');
 const incidentNotifConfig  = require('../services/incidentNotifConfig');
+const { snapshotChecklist } = require('../services/incidentChecklist');
+const incidentTaskModel    = require('../models/incidentTask');
+const { IncidentTask }     = incidentTaskModel;
+const incidentAttachmentModel = require('../models/incidentAttachment');
+const { IncidentAttachment }  = incidentAttachmentModel;
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
     ShipmentHistoryEvent, NotificationEvent, Status
@@ -53,7 +58,10 @@ const computeActionFlags = (incident, user) => ({
     canChangeStatus: isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
     canEscalate:     isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
     canClose:        isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
-    canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED
+    canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED,
+    // Tareas del checklist y evidencias: staff o repartidor con visibilidad, mientras no este cerrada.
+    canManageTasks:  (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED,
+    canAttach:       (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED
 });
 
 // Acepta '200', 'INC-200', 'INC200', ' 200 '. Devuelve el numero o null si no se reconoce.
@@ -259,18 +267,26 @@ const create = async (req, res) => {
             transaction:  t
         });
 
+        await snapshotChecklist(created.id, type.id, t);
+
         return created;
     });
 
-    notifyIncidentCreated(incident.id, shipment, type, assignee, user)
+    notifyIncidentCreated(incident.id, shipment, type, { assignee, openedBy: user })
         .catch(e => console.error('[incident] notif:', e.message));
 
     res.redirect(`/incident/${incident.id}`);
 };
 
-const notifyIncidentCreated = async (incidentId, shipment, type, assignee, openedBy) => {
+// Notif al crear una incidencia. Se usa tanto desde el flujo interno (assignee
+// + openedBy son usuarios staff) como desde el confirm del portal publico
+// (assignee = null, openedBy = null, reporterEmail + matchedRole vienen del portal).
+const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
+    const { assignee = null, openedBy = null, reporterName = null, reporterEmail = null, matchedRole = null } = ctx;
     const cfg = await incidentNotifConfig.get();
-    const emails = await incidentNotifConfig.resolveRecipients(cfg, { shipment, assignee, openedBy });
+    const emails = await incidentNotifConfig.resolveRecipients(cfg, {
+        shipment, assignee, openedBy, reporterEmail, matchedRole
+    });
 
     if (cfg.notifyShipmentRecipient) {
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
@@ -278,15 +294,38 @@ const notifyIncidentCreated = async (incidentId, shipment, type, assignee, opene
     }
     if (emails.length === 0) { return; }
 
+    const reportedByLabel = openedBy
+        ? (openedBy.fullName || openedBy.email || 'usuario interno')
+        : (reporterName ? `${reporterName} (portal público)` : 'portal público');
+    const assigneeLabel = assignee ? assignee.fullName : 'sin asignar';
+
     const subject = `[LogiTrack] Nueva incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
     const body =
         `Se registró una nueva incidencia.\n\n` +
         `Incidencia: #${incidentId} (${type.code} - ${type.description})\n` +
         `Envío: ${shipment.trackingId || shipment.id}\n` +
-        `Asignada a: ${assignee.fullName}\n` +
-        `Reportada por: ${openedBy.fullName || openedBy.email || 'usuario interno'}\n\n` +
+        `Asignada a: ${assigneeLabel}\n` +
+        `Reportada por: ${reportedByLabel}\n\n` +
         `Acceder al detalle: /incident/${incidentId}`;
     await sendEmail(emails.join(','), subject, body);
+};
+
+// Notif a un usuario cuando es asignado o reasignado a una incidencia.
+// Se manda SIEMPRE (sin pasar por la config), porque es la accion intencional
+// del admin/supervisor al asignar. Si el target no tiene email, skip silencioso.
+const notifyIncidentAssigned = async (incidentId, shipment, type, targetUser, assignedBy) => {
+    if (!targetUser || !targetUser.email) { return; }
+    const assignedByLabel = assignedBy
+        ? (assignedBy.fullName || assignedBy.email || 'un admin')
+        : 'un admin';
+    const subject = `[LogiTrack] Te asignaron la incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
+    const body =
+        `${targetUser.fullName || ''},\n\n` +
+        `Te asignaron la incidencia #${incidentId} (${type.code} - ${type.description})\n` +
+        `Envío: ${shipment.trackingId || shipment.id}\n` +
+        `Asignada por: ${assignedByLabel}\n\n` +
+        `Acceder al detalle: /incident/${incidentId}`;
+    await sendEmail(targetUser.email, subject, body);
 };
 
 const getDetail = async (req, res) => {
@@ -300,14 +339,16 @@ const getDetail = async (req, res) => {
         return res.status(403).send('Acceso denegado');
     }
 
-    const [history, assignableUsers, branches] = await Promise.all([
+    const [history, assignableUsers, branches, tasks, attachments] = await Promise.all([
         incidentHistoryModel.getByIncidentId(id),
         isSupOrAdmin(user) ? User.findAll({
             where: { roleId: [RoleType.OPERATOR.id, RoleType.SUPERVISOR.id, RoleType.ADMIN.id], active: true },
             attributes: ['id', 'fullName', 'roleId', 'branchId'],
             order: [['fullName', 'ASC']]
         }) : Promise.resolve([]),
-        isSupOrAdmin(user) ? branchModel.getAll() : Promise.resolve([])
+        isSupOrAdmin(user) ? branchModel.getAll() : Promise.resolve([]),
+        incidentTaskModel.getByIncidentId(id),
+        incidentAttachmentModel.getMetaByIncidentId(id)
     ]);
 
     const assignableUsersPayload = assignableUsers.map(u => ({
@@ -318,11 +359,16 @@ const getDetail = async (req, res) => {
         branchId:        u.branchId
     }));
 
+    const pendingRequired = tasks.filter(tk => tk.required && !tk.done).length;
+
     res.render('incident/detail', {
         incident,
         history,
         assignableUsers: assignableUsersPayload,
         branches,
+        tasks,
+        attachments,
+        pendingRequired,
         flags: computeActionFlags(incident, user),
         query: req.query
     });
@@ -381,6 +427,18 @@ const assign = async (req, res) => {
             transaction: t
         });
     });
+
+    // Notif al asignado si efectivamente cambio el asignado (no spammear si re-guardan el mismo).
+    if (targetUser && targetUser.id !== previousId) {
+        // Necesito el incident + shipment + type para armar el mail. El findByPk de arriba
+        // no incluye relations; vuelvo a buscarlo con includes.
+        const fullIncident = await incidentModel.findByIdFull(id).catch(() => null);
+        if (fullIncident && fullIncident.shipment && fullIncident.type) {
+            notifyIncidentAssigned(id, fullIncident.shipment, fullIncident.type, targetUser, user)
+                .catch(e => console.error('[incident] notif assign:', e.message));
+        }
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
@@ -494,6 +552,12 @@ const close = async (req, res) => {
         return res.status(400).redirect(`/incident/${id}?error=already_closed`);
     }
 
+    // No se puede cerrar si quedan tareas obligatorias del checklist sin completar.
+    const pendingRequired = await incidentTaskModel.countPendingRequired(id);
+    if (pendingRequired > 0) {
+        return res.status(400).redirect(`/incident/${id}?error=checklist_incomplete`);
+    }
+
     const shipment = await shipmentModel.getById(incident.shipmentId);
     const TERMINAL = [Status.DELIVERED.id, Status.CANCELLED.id];
     if (action === 'cancel' && shipment && TERMINAL.includes(shipment.statusId)) {
@@ -568,6 +632,99 @@ const reopen = async (req, res) => {
     res.redirect(`/incident/${id}`);
 };
 
+// Marca/desmarca una tarea del checklist. RBAC: staff o repartidor con visibilidad.
+const toggleTask = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+    const taskId = Number(req.params.taskId);
+
+    const incident = await incidentModel.findByIdFull(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    if (incident.status === IncidentStatus.CLOSED) {
+        return res.status(400).redirect(`/incident/${id}?error=closed`);
+    }
+
+    const task = await IncidentTask.findOne({ where: { id: taskId, incidentId: id } });
+    if (!task) { return res.status(404).redirect(`/incident/${id}?error=task_not_found`); }
+
+    const nowDone = !task.done;
+    await sequelize.transaction(async (t) => {
+        await task.update({
+            done:         nowDone,
+            doneByUserId: nowDone ? user.id : null,
+            doneAt:       nowDone ? new Date() : null
+        }, { transaction: t });
+        await incidentHistoryModel.create({
+            incidentId: id,
+            eventType:  IncidentEventType.CHECKLIST_ITEM,
+            toValue:    nowDone ? 'DONE' : 'PENDING',
+            comment:    `${nowDone ? 'Completó' : 'Reabrió'} tarea: ${task.description}`,
+            userId:     user.id,
+            transaction: t
+        });
+    });
+    res.redirect(`/incident/${id}#checklist`);
+};
+
+// Carga de evidencia (foto/PDF) a una incidencia. Usa multer memoryStorage.
+const uploadAttachment = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+
+    const incident = await incidentModel.findByIdFull(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    if (incident.status === IncidentStatus.CLOSED) {
+        return res.status(400).redirect(`/incident/${id}?error=closed`);
+    }
+    if (!req.file) {
+        return res.status(400).redirect(`/incident/${id}?error=file_required`);
+    }
+    const ALLOWED = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!ALLOWED.includes(req.file.mimetype)) {
+        return res.status(400).redirect(`/incident/${id}?error=file_type`);
+    }
+
+    await sequelize.transaction(async (t) => {
+        await IncidentAttachment.create({
+            incidentId:       id,
+            fileName:         String(req.file.originalname || 'evidencia').slice(0, 200),
+            mimeType:         req.file.mimetype,
+            dataBase64:       req.file.buffer.toString('base64'),
+            source:           'INTERNAL',
+            uploadedByUserId: user.id,
+            createdAt:        new Date()
+        }, { transaction: t });
+        await incidentHistoryModel.create({
+            incidentId: id,
+            eventType:  IncidentEventType.EVIDENCE_ADDED,
+            comment:    `Evidencia adjuntada: ${String(req.file.originalname || 'archivo').slice(0, 120)}`,
+            userId:     user.id,
+            transaction: t
+        });
+    });
+    res.redirect(`/incident/${id}#evidencias`);
+};
+
+// Descarga/visualización de una evidencia.
+const downloadAttachment = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+    const attId = Number(req.params.attId);
+
+    const incident = await incidentModel.findByIdFull(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+
+    const att = await incidentAttachmentModel.getById(attId);
+    if (!att || att.incidentId !== id) { return res.status(404).send('Evidencia no encontrada'); }
+
+    const buffer = Buffer.from(att.dataBase64, 'base64');
+    res.setHeader('Content-Disposition', `inline; filename="${att.fileName.replace(/"/g, '')}"`);
+    res.type(att.mimeType).send(buffer);
+};
+
 // Autocomplete de envíos para el form de alta de incidencia.
 // Acepta `q` (tracking parcial, nombre destinatario, o ID exacto).
 // Respeta RBAC: el repartidor sólo ve envíos asignados a él.
@@ -639,5 +796,9 @@ const searchShipments = async (req, res) => {
 
 module.exports = {
     list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen, searchShipments
+    assign, changeStatus, escalate, close, reopen, searchShipments,
+    toggleTask, uploadAttachment, downloadAttachment,
+    // Exportadas para que portal.js (flujo publico de confirmacion) y otros
+    // controllers reutilicen el mismo pipeline de mails.
+    notifyIncidentCreated, notifyIncidentAssigned
 };

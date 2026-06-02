@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambios registrados - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-incident-section">
+        <div class="portal-incident-wrapper portal-incident-success">
+            <div class="portal-incident-success-body">
+                <span class="portal-incident-eyebrow">Gestión registrada</span>
+                <span class="material-symbols-outlined portal-incident-success-icon" style="color:#16a34a">check_circle</span>
+                <h1>Tus cambios fueron registrados</h1>
+                <p class="portal-incident-success-lead">Envío <strong><%= trackingId %></strong></p>
+
+                <% if (applied && applied.length) { %>
+                <div class="portal-result-block portal-result-applied">
+                    <h3>Aplicados directamente</h3>
+                    <ul>
+                        <% applied.forEach(function(item) { %>
+                        <li><%= item.summary %></li>
+                        <% }); %>
+                    </ul>
+                </div>
+                <% } %>
+
+                <% if (pending && pending.length) { %>
+                <div class="portal-result-block portal-result-pending">
+                    <h3>Pendientes de revisión operativa</h3>
+                    <ul>
+                        <% pending.forEach(function(item) { %>
+                        <li><%= item.summary %> — un operador revisará tu solicitud.</li>
+                        <% }); %>
+                    </ul>
+                </div>
+                <% } %>
+
+                <div class="portal-result-actions">
+                    <a href="/portal/mis-envios/envio/<%= shipmentId %>" class="btn-primary">Ver detalle del envío</a>
+                    <a href="/portal/mis-envios/lista" class="portal-mis-envios-back">Volver al listado</a>
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

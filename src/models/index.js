@@ -23,7 +23,11 @@ const { ReturnToBranchScan } = require('./returnToBranchScan');
 const { IncidentType }    = require('./incidentType');
 const { Incident }        = require('./incident');
 const { IncidentHistory } = require('./incidentHistory');
+const { IncidentTaskTemplate } = require('./incidentTaskTemplate');
+const { IncidentTask }         = require('./incidentTask');
+const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
+const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -156,6 +160,32 @@ const safeAssociate = () => {
         if (User)   { IncidentHistory.belongsTo(User,   { as: 'user',   foreignKey: 'userId' }); }
         if (Person) { IncidentHistory.belongsTo(Person, { as: 'person', foreignKey: 'personId' }); }
     }
+
+    // PR69 - solicitudes de modificación de envío (portal cliente)
+    if (ShipmentModificationRequest.belongsTo) {
+        if (Shipment) { ShipmentModificationRequest.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
+        if (User)     { ShipmentModificationRequest.belongsTo(User, { as: 'reviewedBy', foreignKey: 'reviewedByUserId' }); }
+    }
+    if (Shipment.hasMany && ShipmentModificationRequest) {
+        Shipment.hasMany(ShipmentModificationRequest, { as: 'modificationRequests', foreignKey: 'shipmentId' });
+    }
+
+    // Sprint 4 - checklist de tareas por tipo y adjuntos de incidencia
+    if (IncidentType.hasMany && IncidentTaskTemplate) {
+        IncidentType.hasMany(IncidentTaskTemplate, { as: 'taskTemplates', foreignKey: 'incidentTypeId' });
+        IncidentTaskTemplate.belongsTo(IncidentType, { as: 'type', foreignKey: 'incidentTypeId' });
+    }
+    if (Incident.hasMany && IncidentTask) {
+        Incident.hasMany(IncidentTask, { as: 'tasks', foreignKey: 'incidentId' });
+        IncidentTask.belongsTo(Incident, { as: 'incident', foreignKey: 'incidentId' });
+        if (User) { IncidentTask.belongsTo(User, { as: 'doneBy', foreignKey: 'doneByUserId' }); }
+    }
+    if (Incident.hasMany && IncidentAttachment) {
+        Incident.hasMany(IncidentAttachment, { as: 'attachments', foreignKey: 'incidentId' });
+        IncidentAttachment.belongsTo(Incident, { as: 'incident', foreignKey: 'incidentId' });
+        if (User)   { IncidentAttachment.belongsTo(User,   { as: 'uploadedByUser',   foreignKey: 'uploadedByUserId' }); }
+        if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
+    }
 };
 
 safeAssociate();
@@ -185,7 +215,11 @@ module.exports = {
     IncidentType,
     Incident,
     IncidentHistory,
+    IncidentTaskTemplate,
+    IncidentTask,
+    IncidentAttachment,
     IncidentPendingConfirmation,
+    ShipmentModificationRequest,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,

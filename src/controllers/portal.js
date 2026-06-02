@@ -1,5 +1,4 @@
 const { Shipment } = require('../models/shipment');
-const { ShipmentHistory } = require('../models/shipmentHistory');
 const { Person } = require('../models/person');
 const { Status } = require('../models/status');
 const { Address } = require('../models/address');
@@ -7,7 +6,10 @@ const { Province } = require('../models/province');
 const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
+const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
+const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
 const settingModel = require('../models/setting');
+const { URLSearchParams } = require('url');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -206,88 +208,12 @@ const getPortal = async (req, res) => {
             });
         }
 
-        const histories = await Promise.all(
-            shipments.map((shipment) => ShipmentHistory.findAll({
-                where: { shipmentId: shipment.id },
-                include: [
-                    { model: Status, as: 'fromStatus', attributes: ['description'] },
-                    { model: Status, as: 'toStatus', attributes: ['description'] },
-                    { model: Branch, as: 'branch', attributes: ['name', 'latitude', 'longitude'], required: false },
-                ],
-                order: [['changedAt', 'ASC']],
-            }))
-        );
-
-        const shipmentsWithHistory = await Promise.all(shipments.map(async (shipment, index) => {
-            const json = shipment.toJSON();
-            const history = histories[index].map((item) => item.toJSON());
-            const stops = [];
-            const firstBranch = history.find((item) => item.branch && item.branch.latitude);
-
-            if (firstBranch) {
-                stops.push({
-                    type: 'origin',
-                    lat: Number(firstBranch.branch.latitude),
-                    lng: Number(firstBranch.branch.longitude),
-                    label: firstBranch.branch.name.startsWith('Sucursal') ? firstBranch.branch.name : `Sucursal ${firstBranch.branch.name}`,
-                });
-            } else if (json.currentBranch && json.currentBranch.latitude) {
-                stops.push({
-                    type: 'origin',
-                    lat: Number(json.currentBranch.latitude),
-                    lng: Number(json.currentBranch.longitude),
-                    label: json.currentBranch.name.startsWith('Sucursal') ? json.currentBranch.name : `Sucursal ${json.currentBranch.name}`,
-                });
-            }
-
-            for (let stepIndex = 1; stepIndex < history.length; stepIndex++) {
-                const step = history[stepIndex];
-                if (step.branch && step.branch.latitude) {
-                    stops.push({
-                        type: 'transit',
-                        lat: Number(step.branch.latitude),
-                        lng: Number(step.branch.longitude),
-                        label: step.branch.name.startsWith('Sucursal') ? step.branch.name : `Sucursal ${step.branch.name}`,
-                        timestamp: step.changedAt,
-                    });
-                } else if (step.latitude && step.longitude && step.eventType === 'DELIVERED') {
-                    stops.push({
-                        type: 'pod',
-                        lat: Number(step.latitude),
-                        lng: Number(step.longitude),
-                        label: 'Entregado',
-                        timestamp: step.changedAt,
-                    });
-                }
-            }
-
-            if (json.address && json.address.lat && json.address.lng && !stops.find((step) => step.type === 'pod')) {
-                stops.push({
-                    type: 'destination',
-                    lat: Number(json.address.lat),
-                    lng: Number(json.address.lng),
-                    label: `${json.address.street || ''} ${json.address.number || ''}`.trim() || 'Destino',
-                });
-            }
-
-            let activeRouteId = null;
-            try {
-                const sequelize = require('../database/connection');
-                const { QueryTypes } = require('sequelize');
-                const routeRows = await sequelize.query(
-                    `SELECT r.id FROM logitrack.route r
-                       JOIN logitrack.route_stop rs ON rs.route_id=r.id
-                      WHERE rs."shipmentId"=:sid AND r."statusId" IN (1,2)
-                      ORDER BY r."createdAt" DESC LIMIT 1`,
-                    { replacements: { sid: json.id }, type: QueryTypes.SELECT }
-                );
-                activeRouteId = routeRows[0]?.id || null;
-            } catch {
-                // ignore live tracking lookup errors in public portal
-            }
-
-            return { ...json, history, mapStops: stops, activeRouteId };
-        }));
+        const shipmentsWithHistory = await enrichShipmentsForPortal(shipments);
+        // US-E05 / US-C02: trazabilidad de incidencias y seguimiento de recuperación (datos seguros).
+        for (const s of shipmentsWithHistory) {
+            s.incidents = await buildPublicIncidents(s.id);
+            s.recovery  = await buildRecovery(s.id);
+        }
 
         return res.render('portal', {
             support: supportInfo,
@@ -320,13 +246,58 @@ const incidentTypeModel    = require('../models/incidentType');
 const incidentHistoryModel = require('../models/incidentHistory');
 const incidentPendingModel = require('../models/incidentPendingConfirmation');
 const incidentRules        = require('../services/incidentRules');
+const { snapshotChecklist } = require('../services/incidentChecklist');
+const { IncidentAttachment } = require('../models/incidentAttachment');
+const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
 const incidentEmailValidation = require('../services/incidentEmailValidation');
 const { sendEmail }        = require('../services/notification/emailSender');
-const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
 
 const CONFIRMATION_TTL_HOURS = 24;
 const isDevMode = () => (process.env.NODE_ENV || 'development') !== 'production';
 const appBaseUrl = () => process.env.APP_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+const failedAttemptModel = require('../models/failedAttempt');
+
+// Estados de incidencia con etiqueta amigable para el portal.
+const INCIDENT_STATUS_LABEL = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
+const INCIDENT_RESOLUTION_LABEL = { PROCEDENTE: 'Procedente', NO_PROCEDENTE: 'No procedente' };
+
+// US-E05: incidencias del envío con campos seguros para el cliente (sin datos internos).
+const buildPublicIncidents = async (shipmentId) => {
+    const { IncidentType } = require('../models/incidentType');
+    const rows = await Incident.findAll({
+        where: { shipmentId },
+        attributes: ['id', 'status', 'resolution', 'createdAt', 'closedAt'],
+        include: [{ model: IncidentType, as: 'type', attributes: ['description'] }],
+        order: [['createdAt', 'DESC']],
+    });
+    return rows.map(r => {
+        const j = r.toJSON();
+        return {
+            id:             j.id,
+            typeLabel:      j.type ? j.type.description : 'Incidencia',
+            statusLabel:    INCIDENT_STATUS_LABEL[j.status] || j.status,
+            resolutionLabel: j.resolution ? (INCIDENT_RESOLUTION_LABEL[j.resolution] || j.resolution) : null,
+            createdAtLabel: formatDate(j.createdAt),
+            closedAtLabel:  j.closedAt ? formatDate(j.closedAt) : null,
+        };
+    });
+};
+
+// US-C02: seguimiento de recuperación / reprogramación (intentos fallidos), campos seguros.
+const buildRecovery = async (shipmentId) => {
+    const attempts = await failedAttemptModel.getByShipmentId(shipmentId);
+    return attempts.map(a => {
+        const j = a.toJSON ? a.toJSON() : a;
+        return {
+            attemptDateLabel:     formatDate(j.attemptDate),
+            reason:               j.reason || null,
+            suggestedDateLabel:   j.suggestedDate   ? formatDate(j.suggestedDate)   : null,
+            rescheduledDateLabel: j.rescheduledDate ? formatDate(j.rescheduledDate) : null,
+            status:               j.status || null,
+        };
+    });
+};
 
 const findShipmentByTracking = (trackingId) => {
     const t = (trackingId || '').trim();
@@ -371,7 +342,7 @@ const getPublicCreateForm = async (req, res) => {
 // Retorna:
 //   { ok: true, pending: { token, email, expiresAt, devLink? }, shipment, type }
 //   { ok: false, status, message }
-const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument }) => {
+const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, attachment }) => {
     const tracking = (trackingId || '').trim().toUpperCase();
     if (!tracking)                                                        { return { ok: false, status: 400, message: 'Código de seguimiento requerido.' }; }
     if (!incidentTypeId)                                                  { return { ok: false, status: 400, message: 'Seleccione un tipo de incidencia.' }; }
@@ -411,6 +382,9 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
         reporterDocument: reporterDocument ? String(reporterDocument).trim().slice(0, 20) : null,
         matchedPersonId:  emailCheck.matchedPersonId,
         matchedRole:      emailCheck.matchedRole,
+        attachmentName:   attachment && attachment.dataBase64 ? String(attachment.fileName || 'evidencia').slice(0, 200) : null,
+        attachmentMime:   attachment && attachment.dataBase64 ? attachment.mimeType : null,
+        attachmentData:   attachment && attachment.dataBase64 ? attachment.dataBase64 : null,
         expiresAt
     });
 
@@ -513,16 +487,61 @@ const confirmIncidentByToken = async (rawToken) => {
             transaction: t
         });
 
+        // Snapshot del checklist de tareas para la incidencia recién confirmada.
+        await snapshotChecklist(created.id, type.id, t);
+
+        // Si el reportante adjuntó evidencia en el alta, la promovemos a la incidencia.
+        if (pending.attachmentData) {
+            await IncidentAttachment.create({
+                incidentId:         created.id,
+                fileName:           pending.attachmentName || 'evidencia',
+                mimeType:           pending.attachmentMime || 'application/octet-stream',
+                dataBase64:         pending.attachmentData,
+                source:             'PORTAL',
+                uploadedByPersonId: pending.matchedPersonId,
+                createdAt:          new Date()
+            }, { transaction: t });
+            await incidentHistoryModel.create({
+                incidentId: created.id,
+                eventType:  IncidentEventType.EVIDENCE_ADDED,
+                comment:    `Evidencia adjuntada desde el portal: ${String(pending.attachmentName || 'archivo').slice(0, 120)}`,
+                personId:   pending.matchedPersonId,
+                transaction: t
+            });
+        }
+
         await incidentPendingModel.IncidentPendingConfirmation.destroy({ where: { token }, transaction: t });
 
         return created;
     });
 
+    // Disparar notificaciones (admin + otro extremo del envio, segun config y matchedRole).
+    // Fire-and-forget: no bloquear la confirmacion si el mail falla.
+    const { notifyIncidentCreated } = require('./incident');
+    notifyIncidentCreated(incident.id, shipment, type, {
+        assignee:      null,
+        openedBy:      null,
+        reporterName:  pending.reporterName,
+        reporterEmail: pending.reporterEmail,
+        matchedRole:   pending.matchedRole
+    }).catch(e => console.error('[portal] notif incidencia confirmada:', e.message));
+
     return { ok: true, incident, shipment, type };
 };
 
+const ALLOWED_ATTACHMENT_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+const buildAttachmentFromFile = (file) => {
+    if (!file || !ALLOWED_ATTACHMENT_MIME.includes(file.mimetype)) { return null; }
+    return {
+        fileName:   file.originalname,
+        mimeType:   file.mimetype,
+        dataBase64: file.buffer.toString('base64')
+    };
+};
+
 const createPublic = async (req, res) => {
-    const result = await createIncidentFromPortal(req.body);
+    const result = await createIncidentFromPortal({ ...req.body, attachment: buildAttachmentFromFile(req.file) });
     if (!result.ok) {
         const types = await incidentTypeModel.getActive();
         return res.status(result.status).render('portal/incidentNew', {
@@ -613,10 +632,18 @@ const getSelfServiceForm = async (req, res) => {
         });
         if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
-        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
+        const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
         const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
-        res.render('portal/selfService', { shipment, timeWindows, branches, editable, saved: req.query.saved === '1' });
+        res.render('portal/selfService', {
+            shipment,
+            timeWindows,
+            branches,
+            editable,
+            saved: req.query.saved === '1',
+            appliedCount: Number(req.query.applied) || 0,
+            pendingCount: Number(req.query.pending) || 0,
+        });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
         res.status(500).render('error', { message: 'Error al cargar autogestión' });
@@ -626,54 +653,42 @@ const getSelfServiceForm = async (req, res) => {
 const saveSelfService = async (req, res) => {
     try {
         const token = String(req.params.token || '');
-        const shipment = await Shipment.findOne({ where: { portalToken: token } });
+        const shipment = await Shipment.findOne({
+            where: { portalToken: token },
+            include: [
+                { model: Person, as: 'recipient', attributes: ['document'], required: false },
+                { model: Status, as: 'status', attributes: ['description'], required: false },
+                { model: Address, as: 'address', required: false },
+            ],
+        });
         if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
-        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
-        if (!editable) { return res.status(409).json({ error: 'El envío está en un estado que no permite autogestión.' }); }
 
-        const from = req.body.windowFrom || null;
-        const to   = req.body.windowTo   || null;
-        const deliveryMode    = req.body.deliveryMode    || shipment.deliveryMode;
-        const pickupBranchId  = req.body.pickupBranchId  ? Number(req.body.pickupBranchId) : null;
-        if (deliveryMode === 'branch_pickup' && !pickupBranchId) {
-            return res.status(400).json({ error: 'Seleccioná una sucursal de retiro.' });
-        }
+        const result = await submitPortalModification({
+            shipment,
+            client: {
+                document: shipment.recipient?.document ?? null,
+                email: null,
+            },
+            body: req.body,
+        });
 
-        await Shipment.update({
-            expectedDeliveryFrom: from,
-            expectedDeliveryTo:   to,
-            deliveryMode,
-            pickupBranchId: deliveryMode === 'branch_pickup' ? pickupBranchId : null,
-        }, { where: { id: shipment.id } });
-
-        // Sprint 3 - 3.3 comentarios estructurados de domicilio
-        if (shipment.addressId) {
-            await Address.update({
-                ringLabel:      (req.body.ringLabel      || '').trim() || null,
-                floorApt:       (req.body.floorApt       || '').trim() || null,
-                referencesTxt:  (req.body.referencesTxt  || '').trim() || null,
-                porterNote:     (req.body.porterNote     || '').trim() || null,
-                restrictions:   (req.body.restrictions   || '').trim() || null,
-            }, { where: { id: shipment.addressId } });
-        }
-
-        // History event RESCHEDULED + notif
-        try {
-            const shipmentHistoryModel = require('../models/shipmentHistory');
-            await shipmentHistoryModel.create({
-                shipmentId:   shipment.id,
-                fromStatusId: shipment.statusId,
-                toStatusId:   shipment.statusId,
-                comment:      `Autogestión destinatario: franja ${from || '-'}–${to || '-'}, modalidad ${deliveryMode}`,
-                userId:       null,
-                eventType:    'RESCHEDULED',
+        if (!result.ok) {
+            return res.status(result.status || 400).render('portal/selfService', {
+                shipment,
+                timeWindows: await require('../models/deliveryTimeWindow').getActive(),
+                branches: await Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+                editable: canModifyShipment(shipment),
+                saved: false,
+                appliedCount: 0,
+                pendingCount: 0,
+                error: result.message,
             });
-            const { NotificationEvent } = require('../constants/enums');
-            require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, shipment.id)
-                .catch(() => {});
-        } catch (e) { console.error('selfService history err:', e.message); }
+        }
 
-        res.redirect(`/portal/self/${token}?saved=1`);
+        const qs = new URLSearchParams({ saved: '1' });
+        if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
+        if (result.pending?.length) { qs.set('pending', String(result.pending.length)); }
+        res.redirect(`/portal/self/${token}?${qs.toString()}`);
     } catch (err) {
         console.error('saveSelfService:', err.message);
         res.status(500).json({ error: err.message });

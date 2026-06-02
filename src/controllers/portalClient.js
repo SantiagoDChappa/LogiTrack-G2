@@ -1,0 +1,251 @@
+const settingModel = require('../models/setting');
+const shipmentModel = require('../models/shipment');
+const {
+    COOKIE_NAME,
+    parseDocument,
+    assertClientOwnsShipment,
+    requestAccess,
+    confirmAccess,
+    splitActiveHistorical,
+} = require('../services/portalClientAccess');
+const { enrichShipmentRecord, canSelfService } = require('../services/portalShipmentView');
+const {
+    canModifyShipment,
+    submitPortalModification,
+    listByShipment,
+    changeTypeLabel,
+    statusLabel,
+    describeChanges,
+} = require('../services/portalModificationService');
+const { Branch } = require('../models/branch');
+const provinceModel = require('../models/province');
+
+const formatModificationsList = (rows) => rows.map((row) => {
+    const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
+    return {
+        id: json.id,
+        createdAt: json.createdAt,
+        changeType: json.changeType,
+        status: json.status,
+        typeLabel: changeTypeLabel(json.changeType),
+        statusLabel: statusLabel(json.status),
+        statusKey: String(json.status || '').toLowerCase().replace(/_/g, '-'),
+        summary: describeChanges(json.payload?.requested || {}),
+    };
+});
+
+const loadOwnedShipment = async (req, res, shipmentId) => {
+    if (!shipmentId) { return null; }
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment || !assertClientOwnsShipment(shipment, res.locals.portalClient)) {
+        return null;
+    }
+    return shipment;
+};
+
+const getSupportInfo = async () => {
+    const [nombreEmpresa, telefonoSoporte, emailSoporte] = await Promise.all([
+        settingModel.get('nombre_empresa'),
+        settingModel.get('telefono_soporte'),
+        settingModel.get('email_soporte'),
+    ]);
+    return {
+        nombre: nombreEmpresa || 'LogiTrack',
+        telefono: telefonoSoporte || '0800-555-5678',
+        email: emailSoporte || 'soporte@logitrack.com',
+        hours: 'Lunes a viernes, 9 a 18 hs',
+    };
+};
+
+const renderIdentify = async (req, res, extra = {}) => {
+    const support = await getSupportInfo();
+    res.render('portal/misEnviosIdentify', {
+        support,
+        form: extra.form || {},
+        error: extra.error || null,
+        info: extra.info || null,
+    });
+};
+
+const getIdentifyForm = async (req, res) => {
+    if (res.locals.portalClient) {
+        return res.redirect('/portal/mis-envios/lista');
+    }
+    return renderIdentify(req, res);
+};
+
+const postRequestAccess = async (req, res) => {
+    const document = req.body.document;
+    const email = req.body.email;
+    const result = await requestAccess({ document, email });
+
+    if (!result.ok) {
+        if (result.code === 'no_shipments') {
+            return renderIdentify(req, res, {
+                error: result.message,
+                form: { document, email },
+            });
+        }
+        return renderIdentify(req, res, {
+            error: result.message,
+            form: { document, email },
+        });
+    }
+
+    return res.render('portal/misEnviosPending', {
+        support: await getSupportInfo(),
+        email: result.pending.email,
+        expiresAt: result.pending.expiresAt,
+        mailDelivered: result.pending.mailDelivered,
+        devLink: result.pending.devLink,
+    });
+};
+
+const getConfirmAccess = async (req, res) => {
+    const result = await confirmAccess(req.query.token);
+    if (!result.ok) {
+        return res.status(result.status).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: result.message,
+        });
+    }
+
+    res.cookie(COOKIE_NAME, result.sessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 8 * 60 * 60 * 1000,
+    });
+
+    return res.redirect('/portal/mis-envios/lista');
+};
+
+const getShipmentList = async (req, res) => {
+    const { document, email } = res.locals.portalClient;
+    const shipments = await shipmentModel.findByClientIdentity({ document, email });
+    const { active, historical } = splitActiveHistorical(shipments);
+
+    res.render('portal/misEnviosList', {
+        support: await getSupportInfo(),
+        client: { document, email },
+        active,
+        historical,
+        tab: req.query.tab === 'historical' ? 'historical' : 'active',
+    });
+};
+
+const getShipmentDetail = async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    if (!shipmentId) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment || !assertClientOwnsShipment(shipment, res.locals.portalClient)) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const enriched = await enrichShipmentRecord(shipment);
+    const modifications = formatModificationsList(await listByShipment(shipmentId));
+
+    res.render('portal/misEnviosDetail', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        shipment: enriched,
+        canSelfService: canSelfService(enriched),
+        modifications,
+    });
+};
+
+const getManageForm = async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    const shipment = await loadOwnedShipment(req, res, shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const json = shipment.toJSON ? shipment.toJSON() : shipment;
+    const [timeWindows, branches, provinces] = await Promise.all([
+        require('../models/deliveryTimeWindow').getActive(),
+        Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+        provinceModel.getAll(),
+    ]);
+
+    res.render('portal/misEnviosManage', {
+        support: await getSupportInfo(),
+        shipment: json,
+        timeWindows,
+        branches,
+        provinces,
+        editable: canModifyShipment(shipment),
+        error: null,
+    });
+};
+
+const postManageForm = async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    const shipment = await loadOwnedShipment(req, res, shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const result = await submitPortalModification({
+        shipment,
+        client: res.locals.portalClient,
+        body: req.body,
+    });
+
+    if (!result.ok) {
+        const json = shipment.toJSON ? shipment.toJSON() : shipment;
+        const [timeWindows, branches, provinces] = await Promise.all([
+            require('../models/deliveryTimeWindow').getActive(),
+            Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+            provinceModel.getAll(),
+        ]);
+        return res.status(result.status).render('portal/misEnviosManage', {
+            support: await getSupportInfo(),
+            shipment: json,
+            timeWindows,
+            branches,
+            provinces,
+            editable: canModifyShipment(shipment),
+            error: result.message,
+        });
+    }
+
+    return res.render('portal/misEnviosManageResult', {
+        support: await getSupportInfo(),
+        shipmentId: result.shipmentId,
+        trackingId: result.trackingId,
+        applied: result.applied,
+        pending: result.pending,
+    });
+};
+
+const postLogout = (req, res) => {
+    res.clearCookie(COOKIE_NAME);
+    res.redirect('/portal/mis-envios');
+};
+
+module.exports = {
+    getIdentifyForm,
+    postRequestAccess,
+    getConfirmAccess,
+    getShipmentList,
+    getShipmentDetail,
+    getManageForm,
+    postManageForm,
+    postLogout,
+    formatModificationsList,
+};

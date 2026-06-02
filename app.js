@@ -11,7 +11,7 @@ const sequelize = require('./src/database/connection');
 require('./src/models/index');
 const { runMigrations } = require('./src/database/migrate');
 const swaggerSpec = require('./src/docs/swagger');
-const { requireAuth, requireSupervisor } = require('./src/middlewares/auth');
+const { requireAuth, requireSupervisor, requireSupervisorOrOperator } = require('./src/middlewares/auth');
 
 const homeRoutes        = require('./src/routes/home');
 const shipmentRoutes    = require('./src/routes/shipment');
@@ -38,6 +38,7 @@ const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
+const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
@@ -101,6 +102,7 @@ app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
 app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
 app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
+app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
 
 ;
