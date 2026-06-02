@@ -49,6 +49,13 @@ jest.mock('../src/services/portalShipmentView', () => ({
     canSelfService: jest.fn(),
 }));
 
+jest.mock('../src/services/portalModificationService', () => ({
+    listByShipment: jest.fn().mockResolvedValue([]),
+    changeTypeLabel: jest.fn(),
+    statusLabel: jest.fn(),
+    describeChanges: jest.fn(),
+}));
+
 const portalClientAccess = require('../src/services/portalClientAccess');
 const shipmentModel = require('../src/models/shipment');
 const { enrichShipmentRecord, canSelfService } = require('../src/services/portalShipmentView');

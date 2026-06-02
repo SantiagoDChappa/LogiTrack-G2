@@ -92,14 +92,36 @@ const NotificationEvent = Object.freeze({
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
 const ShipmentHistoryEvent = Object.freeze({
-    STATUS_CHANGE:        'STATUS_CHANGE',
-    OUT_FOR_DELIVERY:     'OUT_FOR_DELIVERY',
-    ARRIVED_DESTINATION:  'ARRIVED_DESTINATION',
-    RETRY_SAME_DAY:       'RETRY_SAME_DAY',
-    RESCHEDULED:          'RESCHEDULED',
-    RETURNED_TO_BRANCH:   'RETURNED_TO_BRANCH',
-    ROUTE_ASSIGNED:       'ROUTE_ASSIGNED',
-    INCIDENT_OPENED:      'INCIDENT_OPENED',
+    STATUS_CHANGE:           'STATUS_CHANGE',
+    OUT_FOR_DELIVERY:        'OUT_FOR_DELIVERY',
+    ARRIVED_DESTINATION:     'ARRIVED_DESTINATION',
+    RETRY_SAME_DAY:          'RETRY_SAME_DAY',
+    RESCHEDULED:             'RESCHEDULED',
+    RETURNED_TO_BRANCH:      'RETURNED_TO_BRANCH',
+    ROUTE_ASSIGNED:          'ROUTE_ASSIGNED',
+    INCIDENT_OPENED:         'INCIDENT_OPENED',
+    MODIFICATION_APPLIED:    'MODIFICATION_APPLIED',
+    MODIFICATION_REQUESTED:  'MODIFICATION_REQUESTED',
+    MODIFICATION_REJECTED:   'MODIFICATION_REJECTED',
+});
+
+const ModificationRequestStatus = Object.freeze({
+    PENDING_REVIEW: 'PENDING_REVIEW',
+    APPLIED:        'APPLIED',
+    REJECTED:       'REJECTED',
+});
+
+const ModificationChangeType = Object.freeze({
+    DELIVERY_WINDOW:     'DELIVERY_WINDOW',
+    DELIVERY_MODE:       'DELIVERY_MODE',
+    PICKUP_BRANCH:       'PICKUP_BRANCH',
+    DELIVERY_REFERENCES: 'DELIVERY_REFERENCES',
+    ADDRESS_CHANGE:      'ADDRESS_CHANGE',
+    MIXED:               'MIXED',
+});
+
+const ModificationChannel = Object.freeze({
+    PORTAL: 'PORTAL',
 });
 
 // Razones formales de falla de ruta PDF 2.4
@@ -136,5 +158,6 @@ module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
     IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority,
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
-    ShipmentHistoryEvent, RouteFailureReason
+    ShipmentHistoryEvent, RouteFailureReason,
+    ModificationRequestStatus, ModificationChangeType, ModificationChannel,
 };

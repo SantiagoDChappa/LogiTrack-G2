@@ -134,15 +134,17 @@
     </div>
     <% } %>
 
+    <%- include('portal-modifications-history', { modifications: typeof modifications !== 'undefined' ? modifications : [] }) %>
+
     <div class="portal-mis-envios-actions">
         <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(s.trackingId) %>" class="portal-card-incident-cta-link">
             <span class="material-symbols-outlined">report</span>
             Reportar incidencia
         </a>
-        <% if (typeof canSelfService !== 'undefined' && canSelfService && s.portalToken) { %>
-        <a href="/portal/self/<%= s.portalToken %>" class="portal-card-incident-cta-link">
+        <% if (typeof canSelfService !== 'undefined' && canSelfService) { %>
+        <a href="/portal/mis-envios/envio/<%= s.id %>/gestion" class="portal-card-incident-cta-link">
             <span class="material-symbols-outlined">edit</span>
-            Autogestión de entrega
+            Gestionar envío
         </a>
         <% } %>
     </div>

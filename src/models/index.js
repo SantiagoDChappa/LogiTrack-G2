@@ -24,6 +24,7 @@ const { IncidentType }    = require('./incidentType');
 const { Incident }        = require('./incident');
 const { IncidentHistory } = require('./incidentHistory');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
+const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -156,6 +157,14 @@ const safeAssociate = () => {
         if (User)   { IncidentHistory.belongsTo(User,   { as: 'user',   foreignKey: 'userId' }); }
         if (Person) { IncidentHistory.belongsTo(Person, { as: 'person', foreignKey: 'personId' }); }
     }
+
+    if (ShipmentModificationRequest.belongsTo) {
+        if (Shipment) { ShipmentModificationRequest.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
+        if (User)     { ShipmentModificationRequest.belongsTo(User, { as: 'reviewedBy', foreignKey: 'reviewedByUserId' }); }
+    }
+    if (Shipment.hasMany && ShipmentModificationRequest) {
+        Shipment.hasMany(ShipmentModificationRequest, { as: 'modificationRequests', foreignKey: 'shipmentId' });
+    }
 };
 
 safeAssociate();
@@ -186,6 +195,7 @@ module.exports = {
     Incident,
     IncidentHistory,
     IncidentPendingConfirmation,
+    ShipmentModificationRequest,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,

@@ -7,7 +7,7 @@ const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
 const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
-const settingModel = require('../models/setting');
+const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -543,10 +543,18 @@ const getSelfServiceForm = async (req, res) => {
         });
         if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
-        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
+        const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
         const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
-        res.render('portal/selfService', { shipment, timeWindows, branches, editable, saved: req.query.saved === '1' });
+        res.render('portal/selfService', {
+            shipment,
+            timeWindows,
+            branches,
+            editable,
+            saved: req.query.saved === '1',
+            appliedCount: Number(req.query.applied) || 0,
+            pendingCount: Number(req.query.pending) || 0,
+        });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
         res.status(500).render('error', { message: 'Error al cargar autogestión' });
@@ -556,54 +564,42 @@ const getSelfServiceForm = async (req, res) => {
 const saveSelfService = async (req, res) => {
     try {
         const token = String(req.params.token || '');
-        const shipment = await Shipment.findOne({ where: { portalToken: token } });
+        const shipment = await Shipment.findOne({
+            where: { portalToken: token },
+            include: [
+                { model: Person, as: 'recipient', attributes: ['document'], required: false },
+                { model: Status, as: 'status', attributes: ['description'], required: false },
+                { model: Address, as: 'address', required: false },
+            ],
+        });
         if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
-        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
-        if (!editable) { return res.status(409).json({ error: 'El envío está en un estado que no permite autogestión.' }); }
 
-        const from = req.body.windowFrom || null;
-        const to   = req.body.windowTo   || null;
-        const deliveryMode    = req.body.deliveryMode    || shipment.deliveryMode;
-        const pickupBranchId  = req.body.pickupBranchId  ? Number(req.body.pickupBranchId) : null;
-        if (deliveryMode === 'branch_pickup' && !pickupBranchId) {
-            return res.status(400).json({ error: 'Seleccioná una sucursal de retiro.' });
-        }
+        const result = await submitPortalModification({
+            shipment,
+            client: {
+                document: shipment.recipient?.document ?? null,
+                email: null,
+            },
+            body: req.body,
+        });
 
-        await Shipment.update({
-            expectedDeliveryFrom: from,
-            expectedDeliveryTo:   to,
-            deliveryMode,
-            pickupBranchId: deliveryMode === 'branch_pickup' ? pickupBranchId : null,
-        }, { where: { id: shipment.id } });
-
-        // Sprint 3 - 3.3 comentarios estructurados de domicilio
-        if (shipment.addressId) {
-            await Address.update({
-                ringLabel:      (req.body.ringLabel      || '').trim() || null,
-                floorApt:       (req.body.floorApt       || '').trim() || null,
-                referencesTxt:  (req.body.referencesTxt  || '').trim() || null,
-                porterNote:     (req.body.porterNote     || '').trim() || null,
-                restrictions:   (req.body.restrictions   || '').trim() || null,
-            }, { where: { id: shipment.addressId } });
-        }
-
-        // History event RESCHEDULED + notif
-        try {
-            const shipmentHistoryModel = require('../models/shipmentHistory');
-            await shipmentHistoryModel.create({
-                shipmentId:   shipment.id,
-                fromStatusId: shipment.statusId,
-                toStatusId:   shipment.statusId,
-                comment:      `Autogestión destinatario: franja ${from || '-'}–${to || '-'}, modalidad ${deliveryMode}`,
-                userId:       null,
-                eventType:    'RESCHEDULED',
+        if (!result.ok) {
+            return res.status(result.status || 400).render('portal/selfService', {
+                shipment,
+                timeWindows: await require('../models/deliveryTimeWindow').getActive(),
+                branches: await Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+                editable: canModifyShipment(shipment),
+                saved: false,
+                appliedCount: 0,
+                pendingCount: 0,
+                error: result.message,
             });
-            const { NotificationEvent } = require('../constants/enums');
-            require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, shipment.id)
-                .catch(() => {});
-        } catch (e) { console.error('selfService history err:', e.message); }
+        }
 
-        res.redirect(`/portal/self/${token}?saved=1`);
+        const qs = new URLSearchParams({ saved: '1' });
+        if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
+        if (result.pending?.length) { qs.set('pending', String(result.pending.length)); }
+        res.redirect(`/portal/self/${token}?${qs.toString()}`);
     } catch (err) {
         console.error('saveSelfService:', err.message);
         res.status(500).json({ error: err.message });

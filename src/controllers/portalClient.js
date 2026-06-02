@@ -9,6 +9,39 @@ const {
     splitActiveHistorical,
 } = require('../services/portalClientAccess');
 const { enrichShipmentRecord, canSelfService } = require('../services/portalShipmentView');
+const {
+    canModifyShipment,
+    submitPortalModification,
+    listByShipment,
+    changeTypeLabel,
+    statusLabel,
+    describeChanges,
+} = require('../services/portalModificationService');
+const { Branch } = require('../models/branch');
+const provinceModel = require('../models/province');
+
+const formatModificationsList = (rows) => rows.map((row) => {
+    const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
+    return {
+        id: json.id,
+        createdAt: json.createdAt,
+        changeType: json.changeType,
+        status: json.status,
+        typeLabel: changeTypeLabel(json.changeType),
+        statusLabel: statusLabel(json.status),
+        statusKey: String(json.status || '').toLowerCase().replace(/_/g, '-'),
+        summary: describeChanges(json.payload?.requested || {}),
+    };
+});
+
+const loadOwnedShipment = async (req, res, shipmentId) => {
+    if (!shipmentId) { return null; }
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment || !assertClientOwnsShipment(shipment, res.locals.portalClient)) {
+        return null;
+    }
+    return shipment;
+};
 
 const getSupportInfo = async () => {
     const [nombreEmpresa, telefonoSoporte, emailSoporte] = await Promise.all([
@@ -118,12 +151,85 @@ const getShipmentDetail = async (req, res) => {
     }
 
     const enriched = await enrichShipmentRecord(shipment);
+    const modifications = formatModificationsList(await listByShipment(shipmentId));
 
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
         shipment: enriched,
         canSelfService: canSelfService(enriched),
+        modifications,
+    });
+};
+
+const getManageForm = async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    const shipment = await loadOwnedShipment(req, res, shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const json = shipment.toJSON ? shipment.toJSON() : shipment;
+    const [timeWindows, branches, provinces] = await Promise.all([
+        require('../models/deliveryTimeWindow').getActive(),
+        Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+        provinceModel.getAll(),
+    ]);
+
+    res.render('portal/misEnviosManage', {
+        support: await getSupportInfo(),
+        shipment: json,
+        timeWindows,
+        branches,
+        provinces,
+        editable: canModifyShipment(shipment),
+        error: null,
+    });
+};
+
+const postManageForm = async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    const shipment = await loadOwnedShipment(req, res, shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const result = await submitPortalModification({
+        shipment,
+        client: res.locals.portalClient,
+        body: req.body,
+    });
+
+    if (!result.ok) {
+        const json = shipment.toJSON ? shipment.toJSON() : shipment;
+        const [timeWindows, branches, provinces] = await Promise.all([
+            require('../models/deliveryTimeWindow').getActive(),
+            Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+            provinceModel.getAll(),
+        ]);
+        return res.status(result.status).render('portal/misEnviosManage', {
+            support: await getSupportInfo(),
+            shipment: json,
+            timeWindows,
+            branches,
+            provinces,
+            editable: canModifyShipment(shipment),
+            error: result.message,
+        });
+    }
+
+    return res.render('portal/misEnviosManageResult', {
+        support: await getSupportInfo(),
+        shipmentId: result.shipmentId,
+        trackingId: result.trackingId,
+        applied: result.applied,
+        pending: result.pending,
     });
 };
 
@@ -138,5 +244,8 @@ module.exports = {
     getConfirmAccess,
     getShipmentList,
     getShipmentDetail,
+    getManageForm,
+    postManageForm,
     postLogout,
+    formatModificationsList,
 };

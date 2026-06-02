@@ -1479,7 +1479,7 @@ ul { list-style: none; }
     color: var(--c-primary); text-decoration: none; font-weight: 500; font-size: 0.9rem;
 }
 .portal-mis-envios-actions {
-    display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; padding-top: 1rem;
+    display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0; padding: 16px 24px 20px;
     border-top: 1px solid var(--c-border);
 }
 .portal-card-incident-cta-link {
@@ -1490,7 +1490,41 @@ ul { list-style: none; }
 }
 .portal-card-incident-cta-link:hover { border-color: var(--c-primary); color: var(--c-primary); }
 
+.portal-manage-form { gap: 1.25rem; }
+.portal-manage-card {
+    background: var(--c-surface, #fff);
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+}
+.portal-manage-card h2 { margin: 0 0 0.75rem; font-size: 1.05rem; color: var(--c-text); }
+.portal-manage-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.portal-manage-radio { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; font-size: 0.92rem; }
+.portal-manage-hint { font-size: 0.85rem; color: var(--c-text-2); margin: 0 0 0.75rem; }
+
+.portal-modifications-history .portal-mis-envios-table-wrap { margin-top: 0; }
+.portal-modifications-table th:first-child,
+.portal-modifications-table td:first-child { padding-left: 0; }
+.portal-mod-status {
+    display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600;
+}
+.portal-mod-status-pending-review { background: #fef3c7; color: #92400e; }
+.portal-mod-status-applied { background: #dcfce7; color: #166534; }
+.portal-mod-status-rejected { background: #fee2e2; color: #991b1b; }
+
+.portal-result-block {
+    text-align: left; margin: 1.25rem 0; padding: 1rem 1.15rem;
+    border-radius: 10px; border: 1px solid var(--c-border);
+}
+.portal-result-applied { background: #f0fdf4; border-color: #bbf7d0; }
+.portal-result-pending { background: #fffbeb; border-color: #fde68a; }
+.portal-result-block h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.portal-result-block ul { margin: 0; padding-left: 1.2rem; }
+.portal-result-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 1.5rem; }
+
 @media (max-width: 640px) {
+    .portal-manage-grid2 { grid-template-columns: 1fr; }
     .portal-mis-envios-wrapper { padding: 1.25rem; }
     .portal-mis-envios-table th:nth-child(2),
     .portal-mis-envios-table td:nth-child(2) { display: none; }

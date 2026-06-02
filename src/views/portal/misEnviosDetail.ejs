@@ -30,7 +30,7 @@
                 </form>
             </div>
 
-            <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService }) %>
+            <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [] }) %>
         </div>
     </section>
 
