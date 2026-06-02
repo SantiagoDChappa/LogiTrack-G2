@@ -1,5 +1,4 @@
 const { Shipment } = require('../models/shipment');
-const { ShipmentHistory } = require('../models/shipmentHistory');
 const { Person } = require('../models/person');
 const { Status } = require('../models/status');
 const { Address } = require('../models/address');
@@ -7,6 +6,7 @@ const { Province } = require('../models/province');
 const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
+const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
 const settingModel = require('../models/setting');
 
 const SUPPORT_INFO = {
@@ -206,88 +206,7 @@ const getPortal = async (req, res) => {
             });
         }
 
-        const histories = await Promise.all(
-            shipments.map((shipment) => ShipmentHistory.findAll({
-                where: { shipmentId: shipment.id },
-                include: [
-                    { model: Status, as: 'fromStatus', attributes: ['description'] },
-                    { model: Status, as: 'toStatus', attributes: ['description'] },
-                    { model: Branch, as: 'branch', attributes: ['name', 'latitude', 'longitude'], required: false },
-                ],
-                order: [['changedAt', 'ASC']],
-            }))
-        );
-
-        const shipmentsWithHistory = await Promise.all(shipments.map(async (shipment, index) => {
-            const json = shipment.toJSON();
-            const history = histories[index].map((item) => item.toJSON());
-            const stops = [];
-            const firstBranch = history.find((item) => item.branch && item.branch.latitude);
-
-            if (firstBranch) {
-                stops.push({
-                    type: 'origin',
-                    lat: Number(firstBranch.branch.latitude),
-                    lng: Number(firstBranch.branch.longitude),
-                    label: firstBranch.branch.name.startsWith('Sucursal') ? firstBranch.branch.name : `Sucursal ${firstBranch.branch.name}`,
-                });
-            } else if (json.currentBranch && json.currentBranch.latitude) {
-                stops.push({
-                    type: 'origin',
-                    lat: Number(json.currentBranch.latitude),
-                    lng: Number(json.currentBranch.longitude),
-                    label: json.currentBranch.name.startsWith('Sucursal') ? json.currentBranch.name : `Sucursal ${json.currentBranch.name}`,
-                });
-            }
-
-            for (let stepIndex = 1; stepIndex < history.length; stepIndex++) {
-                const step = history[stepIndex];
-                if (step.branch && step.branch.latitude) {
-                    stops.push({
-                        type: 'transit',
-                        lat: Number(step.branch.latitude),
-                        lng: Number(step.branch.longitude),
-                        label: step.branch.name.startsWith('Sucursal') ? step.branch.name : `Sucursal ${step.branch.name}`,
-                        timestamp: step.changedAt,
-                    });
-                } else if (step.latitude && step.longitude && step.eventType === 'DELIVERED') {
-                    stops.push({
-                        type: 'pod',
-                        lat: Number(step.latitude),
-                        lng: Number(step.longitude),
-                        label: 'Entregado',
-                        timestamp: step.changedAt,
-                    });
-                }
-            }
-
-            if (json.address && json.address.lat && json.address.lng && !stops.find((step) => step.type === 'pod')) {
-                stops.push({
-                    type: 'destination',
-                    lat: Number(json.address.lat),
-                    lng: Number(json.address.lng),
-                    label: `${json.address.street || ''} ${json.address.number || ''}`.trim() || 'Destino',
-                });
-            }
-
-            let activeRouteId = null;
-            try {
-                const sequelize = require('../database/connection');
-                const { QueryTypes } = require('sequelize');
-                const routeRows = await sequelize.query(
-                    `SELECT r.id FROM logitrack.route r
-                       JOIN logitrack.route_stop rs ON rs.route_id=r.id
-                      WHERE rs."shipmentId"=:sid AND r."statusId" IN (1,2)
-                      ORDER BY r."createdAt" DESC LIMIT 1`,
-                    { replacements: { sid: json.id }, type: QueryTypes.SELECT }
-                );
-                activeRouteId = routeRows[0]?.id || null;
-            } catch {
-                // ignore live tracking lookup errors in public portal
-            }
-
-            return { ...json, history, mapStops: stops, activeRouteId };
-        }));
+        const shipmentsWithHistory = await enrichShipmentsForPortal(shipments);
 
         return res.render('portal', {
             support: supportInfo,

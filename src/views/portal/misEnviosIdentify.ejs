@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis envíos - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper">
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Portal del cliente</span>
+                <h1>Mis envíos</h1>
+                <p class="portal-mis-envios-lead">
+                    Ingresá tu DNI y el email registrado en tus envíos. Te enviaremos un link de confirmación para acceder de forma segura.
+                </p>
+            </div>
+
+            <% if (error) { %>
+            <div class="portal-mis-envios-alert portal-mis-envios-alert-error">
+                <span class="material-symbols-outlined">error</span>
+                <%= error %>
+            </div>
+            <% } %>
+
+            <form class="portal-mis-envios-form" method="POST" action="/portal/mis-envios/acceso">
+                <div class="portal-search-field">
+                    <label for="document" class="portal-search-label">DNI</label>
+                    <input type="text" id="document" name="document" class="portal-search-input-field"
+                           placeholder="Ej: 12345678" value="<%= form.document || '' %>" autocomplete="off" required>
+                    <span class="portal-search-help">Sin puntos ni guiones</span>
+                </div>
+                <div class="portal-search-field">
+                    <label for="email" class="portal-search-label">Email registrado</label>
+                    <input type="email" id="email" name="email" class="portal-search-input-field"
+                           placeholder="tu@email.com" value="<%= form.email || '' %>" autocomplete="email" required>
+                    <span class="portal-search-help">Debe coincidir con remitente o destinatario de tus envíos</span>
+                </div>
+                <button type="submit" class="portal-search-panel-btn">
+                    <span class="material-symbols-outlined">mail</span>
+                    Enviar link de acceso
+                </button>
+            </form>
+
+            <p class="portal-mis-envios-footnote">
+                ¿Buscás un solo envío? <a href="/">Rastrear por código de seguimiento</a>
+            </p>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<%
+    const s = shipment;
+    const sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+    const statusLabels = {
+        pendiente: 'Pendiente', asignado: 'Asignado', en_preparacion: 'En Preparacion',
+        en_transito: 'En Transito', intento_fallido: 'Intento Fallido',
+        paquete_fallido: 'Paquete Fallido', entregado: 'Entregado', cancelado: 'Cancelado',
+        cancelada: 'Cancelada', en_sucursal: 'En Sucursal'
+    };
+    const statusLabel = statusLabels[sk] || s.status.description;
+    const isCancelled = sk === 'cancelado' || sk === 'cancelada';
+%>
+<div class="portal-card" id="portal-shipment-<%= s.id %>">
+    <div class="portal-card-header">
+        <div class="portal-card-tracking">
+            <span class="portal-card-tracking-label">N de seguimiento</span>
+            <span class="portal-card-tracking-id"><%= s.trackingId %></span>
+        </div>
+        <span class="portal-badge <%= sk %>"><%= statusLabel %></span>
+    </div>
+
+    <div class="portal-timeline">
+        <% const timelineSteps = isCancelled
+               ? ['pendiente', 'en_transito', 'en_sucursal', 'cancelado']
+               : ['pendiente', 'en_transito', 'en_sucursal', 'entregado'];
+           const timelineLabels = isCancelled
+               ? ['Confirmado', 'En Transito', 'En Sucursal', 'Cancelado']
+               : ['Confirmado', 'En Transito', 'En Sucursal', 'Entregado'];
+           const timelineIcons = isCancelled
+               ? ['check_circle', 'local_shipping', 'warehouse', 'cancel']
+               : ['check_circle', 'local_shipping', 'warehouse', 'home'];
+           const statusToStep = {
+               pendiente: 'pendiente', confirmado: 'pendiente', inicial: 'pendiente',
+               asignado: 'pendiente', en_preparacion: 'pendiente', en_transito: 'en_transito',
+               en_sucursal: 'en_sucursal', intento_fallido: 'en_transito',
+               paquete_fallido: 'en_transito', entregado: 'entregado',
+               cancelado: 'cancelado', cancelada: 'cancelado'
+           };
+           const currentStep = statusToStep[sk] || 'pendiente';
+           let activeIdx = timelineSteps.indexOf(currentStep);
+           if (activeIdx === -1) activeIdx = isCancelled ? timelineSteps.length - 1 : 0;
+           const stepDates = {};
+           if (s.history) {
+               s.history.forEach(function(h) {
+                   const desc = h.toStatus.description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
+                   const mapped = statusToStep[desc];
+                   if (mapped && !stepDates[mapped]) {
+                       stepDates[mapped] = new Date(h.changedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                   }
+               });
+           }
+        %>
+        <% timelineSteps.forEach(function(step, i) { %>
+        <% const stepClass = i < activeIdx ? 'done' : (i === activeIdx ? (isCancelled && i === timelineSteps.length - 1 ? 'cancelled' : 'active') : ''); %>
+        <div class="portal-timeline-step <%= stepClass %>">
+            <div class="portal-timeline-circle">
+                <span class="material-symbols-outlined"><%= timelineIcons[i] %></span>
+            </div>
+            <% if (i < timelineSteps.length - 1) { %>
+            <div class="portal-timeline-line <%= i < activeIdx ? 'done' : '' %>"></div>
+            <% } %>
+            <span class="portal-timeline-label"><%= timelineLabels[i] %></span>
+            <span class="portal-timeline-date"><%= stepDates[step] ? stepDates[step] : (i <= activeIdx ? '' : 'Pendiente') %></span>
+        </div>
+        <% }); %>
+    </div>
+
+    <div class="portal-card-grid">
+        <div class="portal-card-field">
+            <span class="portal-card-label">Destinatario</span>
+            <span class="portal-card-value"><%= s.recipient.fullName %></span>
+        </div>
+        <div class="portal-card-field">
+            <span class="portal-card-label">Tipo de envio</span>
+            <span class="portal-card-value"><%= s.shipmentType ? s.shipmentType.description : '-' %></span>
+        </div>
+        <div class="portal-card-field">
+            <span class="portal-card-label">Modalidad</span>
+            <span class="portal-card-value">
+                <%= s.deliveryMode === 'branch_pickup' ? 'Retiro por sucursal' : 'Envío a domicilio' %>
+            </span>
+        </div>
+        <% if (s.deliveryMode === 'branch_pickup' && s.pickupBranch) { %>
+        <div class="portal-card-field">
+            <span class="portal-card-label">Sucursal de retiro</span>
+            <span class="portal-card-value">
+                <strong><%= s.pickupBranch.name %></strong><br>
+                <%= s.pickupBranch.address %>
+                <% if (s.pickupBranch.phone) { %> · <%= s.pickupBranch.phone %><% } %>
+            </span>
+        </div>
+        <% } else if (s.address) { %>
+        <div class="portal-card-field">
+            <span class="portal-card-label">Destino</span>
+            <span class="portal-card-value">
+                <%= s.address.street %> <%= s.address.number %>
+                <% if (s.address.province) { %>, <%= s.address.province.description %><% } %>
+            </span>
+        </div>
+        <% } %>
+        <div class="portal-card-field">
+            <span class="portal-card-label">Fecha de ingreso</span>
+            <span class="portal-card-value"><%= new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }) %></span>
+        </div>
+        <div class="portal-card-field">
+            <span class="portal-card-label">Remitente</span>
+            <span class="portal-card-value"><%= s.sender.fullName %></span>
+        </div>
+    </div>
+
+    <% if (s.mapStops && s.mapStops.length >= 1) { %>
+    <div class="portal-map-section">
+        <span class="portal-history-title">Recorrido</span>
+        <div id="portal-map-<%= s.id %>" class="portal-map" style="height:300px;border-radius:10px;overflow:hidden;border:1px solid var(--color-border, #e2e8f0);margin-top:.5rem;"></div>
+    </div>
+    <% } %>
+
+    <% if (s.history && s.history.length > 0) { %>
+    <div class="portal-history">
+        <span class="portal-history-title">Historial de estados</span>
+        <ul class="portal-history-list">
+            <% s.history.forEach(function(h) { %>
+            <li class="portal-history-item">
+                <span class="portal-history-date"><%= new Date(h.changedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                <% if (h.fromStatus) { %>
+                    <span class="portal-history-from"><%= h.fromStatus.description %></span>
+                    <span class="material-symbols-outlined portal-history-arrow">arrow_forward</span>
+                <% } %>
+                <span class="portal-history-to"><%= h.toStatus.description %></span>
+                <% if (h.comment) { %><span class="portal-history-comment"><%= h.comment %></span><% } %>
+            </li>
+            <% }); %>
+        </ul>
+    </div>
+    <% } %>
+
+    <div class="portal-mis-envios-actions">
+        <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(s.trackingId) %>" class="portal-card-incident-cta-link">
+            <span class="material-symbols-outlined">report</span>
+            Reportar incidencia
+        </a>
+        <% if (typeof canSelfService !== 'undefined' && canSelfService && s.portalToken) { %>
+        <a href="/portal/self/<%= s.portalToken %>" class="portal-card-incident-cta-link">
+            <span class="material-symbols-outlined">edit</span>
+            Autogestión de entrega
+        </a>
+        <% } %>
+    </div>
+</div>

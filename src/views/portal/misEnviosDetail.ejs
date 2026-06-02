@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= shipment.trackingId %> - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/lista" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al listado
+                </a>
+                <form method="POST" action="/portal/mis-envios/salir" class="portal-mis-envios-logout-form">
+                    <button type="submit" class="portal-mis-envios-logout">
+                        <span class="material-symbols-outlined">logout</span>
+                        Cerrar sesión
+                    </button>
+                </form>
+            </div>
+
+            <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService }) %>
+        </div>
+    </section>
+
+    <script src="/js/theme.js" defer></script>
+    <% if (shipment.mapStops && shipment.mapStops.length >= 1) { %>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    (function(){
+        const item = <%- JSON.stringify({ id: shipment.id, stops: shipment.mapStops || [], activeRouteId: shipment.activeRouteId || null }) %>;
+        const el = document.getElementById('portal-map-' + item.id);
+        if (!el || !item.stops.length) return;
+        const map = L.map(el).setView([item.stops[0].lat, item.stops[0].lng], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        const bounds = [];
+        item.stops.forEach((stop, idx) => {
+            const marker = L.marker([stop.lat, stop.lng]).addTo(map);
+            marker.bindPopup(stop.label || ('Punto ' + (idx + 1)));
+            bounds.push([stop.lat, stop.lng]);
+        });
+        if (bounds.length > 1) { map.fitBounds(bounds, { padding: [30, 30] }); }
+    })();
+    </script>
+    <% } %>
+</body>
+</html>

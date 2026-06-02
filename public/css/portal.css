@@ -1384,3 +1384,114 @@ ul { list-style: none; }
         transform: none !important;
     }
 }
+
+/* ─── Mis envíos del cliente ─── */
+.portal-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--c-border);
+    border-radius: 9999px;
+    color: var(--c-text-2);
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background .18s, border-color .18s, color .18s;
+}
+.portal-nav-link:hover { background: var(--c-bg); color: var(--c-text); border-color: var(--c-text-2); }
+.portal-nav-link .material-symbols-outlined { font-size: 1rem; }
+
+.portal-mis-envios-section {
+    padding: 2rem 1rem 4rem;
+    background: var(--c-bg);
+    min-height: calc(100vh - 72px);
+}
+.portal-mis-envios-wrapper {
+    max-width: 560px;
+    margin: 0 auto;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+}
+.portal-mis-envios-list-wrapper,
+.portal-mis-envios-detail-wrapper { max-width: 960px; }
+.portal-mis-envios-header h1,
+.portal-mis-envios-list-header h1 { font-size: 1.75rem; margin: 0.35rem 0 0.75rem; color: var(--c-text); }
+.portal-mis-envios-lead { color: var(--c-text-2); line-height: 1.55; margin-bottom: 1.5rem; }
+.portal-mis-envios-form { display: flex; flex-direction: column; gap: 1rem; }
+.portal-mis-envios-alert {
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    padding: 0.85rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: 0.9rem;
+}
+.portal-mis-envios-alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+[data-theme="dark"] .portal-mis-envios-alert-error { background: #450a0a; color: #fecaca; border-color: #7f1d1d; }
+.portal-mis-envios-footnote { margin-top: 1.25rem; font-size: 0.85rem; color: var(--c-text-2); }
+.portal-mis-envios-footnote a { color: var(--c-primary); }
+
+.portal-mis-envios-list-header {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+    margin-bottom: 1.5rem; flex-wrap: wrap;
+}
+.portal-mis-envios-logout,
+.portal-mis-envios-logout-form button {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.45rem 0.85rem; border: 1px solid var(--c-border); border-radius: 9999px;
+    background: transparent; color: var(--c-text-2); font-size: 0.78rem; cursor: pointer;
+    font-family: inherit;
+}
+.portal-mis-envios-logout:hover { background: var(--c-bg); color: var(--c-text); }
+
+.portal-mis-envios-tabs {
+    display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--c-border);
+}
+.portal-mis-envios-tab {
+    padding: 0.65rem 1rem; text-decoration: none; color: var(--c-text-2);
+    font-size: 0.9rem; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.portal-mis-envios-tab.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+.portal-mis-envios-tab:hover { color: var(--c-text); }
+
+.portal-mis-envios-table-wrap { overflow-x: auto; }
+.portal-mis-envios-table {
+    width: 100%; border-collapse: collapse; font-size: 0.88rem;
+}
+.portal-mis-envios-table th,
+.portal-mis-envios-table td {
+    padding: 0.75rem 0.65rem; text-align: left; border-bottom: 1px solid var(--c-border);
+}
+.portal-mis-envios-table th { color: var(--c-text-2); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.portal-mis-envios-link {
+    display: inline-flex; align-items: center; gap: 0.15rem;
+    color: var(--c-primary); text-decoration: none; font-weight: 500; white-space: nowrap;
+}
+.portal-mis-envios-link .material-symbols-outlined { font-size: 1.1rem; }
+
+.portal-empty-compact { padding: 2rem 1rem; }
+.portal-mis-envios-detail-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;
+}
+.portal-mis-envios-back {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    color: var(--c-primary); text-decoration: none; font-weight: 500; font-size: 0.9rem;
+}
+.portal-mis-envios-actions {
+    display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; padding-top: 1rem;
+    border-top: 1px solid var(--c-border);
+}
+.portal-card-incident-cta-link {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.55rem 1rem; border-radius: 8px; border: 1px solid var(--c-border);
+    color: var(--c-text); text-decoration: none; font-size: 0.88rem; font-weight: 500;
+    background: var(--c-bg);
+}
+.portal-card-incident-cta-link:hover { border-color: var(--c-primary); color: var(--c-primary); }
+
+@media (max-width: 640px) {
+    .portal-mis-envios-wrapper { padding: 1.25rem; }
+    .portal-mis-envios-table th:nth-child(2),
+    .portal-mis-envios-table td:nth-child(2) { display: none; }
+}
