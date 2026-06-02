@@ -10,6 +10,11 @@ const branchModel          = require('../models/branch');
 const { sendEmail }        = require('../services/notification/emailSender');
 const incidentRules        = require('../services/incidentRules');
 const incidentNotifConfig  = require('../services/incidentNotifConfig');
+const { snapshotChecklist } = require('../services/incidentChecklist');
+const incidentTaskModel    = require('../models/incidentTask');
+const { IncidentTask }     = incidentTaskModel;
+const incidentAttachmentModel = require('../models/incidentAttachment');
+const { IncidentAttachment }  = incidentAttachmentModel;
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
     ShipmentHistoryEvent, NotificationEvent, Status
@@ -53,7 +58,10 @@ const computeActionFlags = (incident, user) => ({
     canChangeStatus: isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
     canEscalate:     isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
     canClose:        isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
-    canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED
+    canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED,
+    // Tareas del checklist y evidencias: staff o repartidor con visibilidad, mientras no este cerrada.
+    canManageTasks:  (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED,
+    canAttach:       (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED
 });
 
 // Acepta '200', 'INC-200', 'INC200', ' 200 '. Devuelve el numero o null si no se reconoce.
@@ -259,6 +267,8 @@ const create = async (req, res) => {
             transaction:  t
         });
 
+        await snapshotChecklist(created.id, type.id, t);
+
         return created;
     });
 
@@ -329,14 +339,16 @@ const getDetail = async (req, res) => {
         return res.status(403).send('Acceso denegado');
     }
 
-    const [history, assignableUsers, branches] = await Promise.all([
+    const [history, assignableUsers, branches, tasks, attachments] = await Promise.all([
         incidentHistoryModel.getByIncidentId(id),
         isSupOrAdmin(user) ? User.findAll({
             where: { roleId: [RoleType.OPERATOR.id, RoleType.SUPERVISOR.id, RoleType.ADMIN.id], active: true },
             attributes: ['id', 'fullName', 'roleId', 'branchId'],
             order: [['fullName', 'ASC']]
         }) : Promise.resolve([]),
-        isSupOrAdmin(user) ? branchModel.getAll() : Promise.resolve([])
+        isSupOrAdmin(user) ? branchModel.getAll() : Promise.resolve([]),
+        incidentTaskModel.getByIncidentId(id),
+        incidentAttachmentModel.getMetaByIncidentId(id)
     ]);
 
     const assignableUsersPayload = assignableUsers.map(u => ({
@@ -347,11 +359,16 @@ const getDetail = async (req, res) => {
         branchId:        u.branchId
     }));
 
+    const pendingRequired = tasks.filter(tk => tk.required && !tk.done).length;
+
     res.render('incident/detail', {
         incident,
         history,
         assignableUsers: assignableUsersPayload,
         branches,
+        tasks,
+        attachments,
+        pendingRequired,
         flags: computeActionFlags(incident, user),
         query: req.query
     });
@@ -535,6 +552,12 @@ const close = async (req, res) => {
         return res.status(400).redirect(`/incident/${id}?error=already_closed`);
     }
 
+    // No se puede cerrar si quedan tareas obligatorias del checklist sin completar.
+    const pendingRequired = await incidentTaskModel.countPendingRequired(id);
+    if (pendingRequired > 0) {
+        return res.status(400).redirect(`/incident/${id}?error=checklist_incomplete`);
+    }
+
     const shipment = await shipmentModel.getById(incident.shipmentId);
     const TERMINAL = [Status.DELIVERED.id, Status.CANCELLED.id];
     if (action === 'cancel' && shipment && TERMINAL.includes(shipment.statusId)) {
@@ -609,6 +632,99 @@ const reopen = async (req, res) => {
     res.redirect(`/incident/${id}`);
 };
 
+// Marca/desmarca una tarea del checklist. RBAC: staff o repartidor con visibilidad.
+const toggleTask = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+    const taskId = Number(req.params.taskId);
+
+    const incident = await incidentModel.findByIdFull(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    if (incident.status === IncidentStatus.CLOSED) {
+        return res.status(400).redirect(`/incident/${id}?error=closed`);
+    }
+
+    const task = await IncidentTask.findOne({ where: { id: taskId, incidentId: id } });
+    if (!task) { return res.status(404).redirect(`/incident/${id}?error=task_not_found`); }
+
+    const nowDone = !task.done;
+    await sequelize.transaction(async (t) => {
+        await task.update({
+            done:         nowDone,
+            doneByUserId: nowDone ? user.id : null,
+            doneAt:       nowDone ? new Date() : null
+        }, { transaction: t });
+        await incidentHistoryModel.create({
+            incidentId: id,
+            eventType:  IncidentEventType.CHECKLIST_ITEM,
+            toValue:    nowDone ? 'DONE' : 'PENDING',
+            comment:    `${nowDone ? 'Completó' : 'Reabrió'} tarea: ${task.description}`,
+            userId:     user.id,
+            transaction: t
+        });
+    });
+    res.redirect(`/incident/${id}#checklist`);
+};
+
+// Carga de evidencia (foto/PDF) a una incidencia. Usa multer memoryStorage.
+const uploadAttachment = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+
+    const incident = await incidentModel.findByIdFull(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    if (incident.status === IncidentStatus.CLOSED) {
+        return res.status(400).redirect(`/incident/${id}?error=closed`);
+    }
+    if (!req.file) {
+        return res.status(400).redirect(`/incident/${id}?error=file_required`);
+    }
+    const ALLOWED = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!ALLOWED.includes(req.file.mimetype)) {
+        return res.status(400).redirect(`/incident/${id}?error=file_type`);
+    }
+
+    await sequelize.transaction(async (t) => {
+        await IncidentAttachment.create({
+            incidentId:       id,
+            fileName:         String(req.file.originalname || 'evidencia').slice(0, 200),
+            mimeType:         req.file.mimetype,
+            dataBase64:       req.file.buffer.toString('base64'),
+            source:           'INTERNAL',
+            uploadedByUserId: user.id,
+            createdAt:        new Date()
+        }, { transaction: t });
+        await incidentHistoryModel.create({
+            incidentId: id,
+            eventType:  IncidentEventType.EVIDENCE_ADDED,
+            comment:    `Evidencia adjuntada: ${String(req.file.originalname || 'archivo').slice(0, 120)}`,
+            userId:     user.id,
+            transaction: t
+        });
+    });
+    res.redirect(`/incident/${id}#evidencias`);
+};
+
+// Descarga/visualización de una evidencia.
+const downloadAttachment = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+    const attId = Number(req.params.attId);
+
+    const incident = await incidentModel.findByIdFull(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+
+    const att = await incidentAttachmentModel.getById(attId);
+    if (!att || att.incidentId !== id) { return res.status(404).send('Evidencia no encontrada'); }
+
+    const buffer = Buffer.from(att.dataBase64, 'base64');
+    res.setHeader('Content-Disposition', `inline; filename="${att.fileName.replace(/"/g, '')}"`);
+    res.type(att.mimeType).send(buffer);
+};
+
 // Autocomplete de envíos para el form de alta de incidencia.
 // Acepta `q` (tracking parcial, nombre destinatario, o ID exacto).
 // Respeta RBAC: el repartidor sólo ve envíos asignados a él.
@@ -681,6 +797,7 @@ const searchShipments = async (req, res) => {
 module.exports = {
     list, getCreateForm, create, getDetail, addComment,
     assign, changeStatus, escalate, close, reopen, searchShipments,
+    toggleTask, uploadAttachment, downloadAttachment,
     // Exportadas para que portal.js (flujo publico de confirmacion) y otros
     // controllers reutilicen el mismo pipeline de mails.
     notifyIncidentCreated, notifyIncidentAssigned

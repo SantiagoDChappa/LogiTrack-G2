@@ -48,6 +48,7 @@ const IncidentResolution = Object.freeze({
 const IncidentChannel = Object.freeze({
     PORTAL:   'PORTAL',
     INTERNAL: 'INTERNAL',
+    SYSTEM:   'SYSTEM',
 });
 
 const IncidentEventType = Object.freeze({
@@ -60,6 +61,10 @@ const IncidentEventType = Object.freeze({
     COMMENT:         'COMMENT',
     CLOSED:          'CLOSED',
     REOPENED:        'REOPENED',
+    CHECKLIST_ITEM:  'CHECKLIST_ITEM',
+    EVIDENCE_ADDED:  'EVIDENCE_ADDED',
+    AUTO_CREATED:    'AUTO_CREATED',
+    AUTO_CLOSED:     'AUTO_CLOSED',
 });
 
 const IncidentPriority = Object.freeze({

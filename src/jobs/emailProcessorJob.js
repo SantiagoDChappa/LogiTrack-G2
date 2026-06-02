@@ -8,7 +8,7 @@ async function processPendingEmails() {
     console.log("----------------------------------")
     for (const email of emails) {
         try {
-            await emailSender.sendEmail(email.recipient, email.subject, email.body);
+            await emailSender.sendEmail(email.recipient, email.subject, email.body, email.format);
             await NotificationEmail.markAsSent(email.id);
         } catch (error) {
             console.error('emailProcessorJob send error:', error.message);

@@ -5,6 +5,9 @@ const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 const NotificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
+const notificationVariableModel = require('../models/notificationVariable');
+const emailSnippetModel = require('../models/emailSnippet');
+const placeholders = require('../services/notificationPlaceholders');
 const settingLogModel = require('../models/settingLog');
 const { expireShipments } = require('../utils/expireShipments');
 // Sprint 3 - 2.5 parámetros configurables
@@ -16,7 +19,8 @@ const incidentNotifConfig = require('../services/incidentNotifConfig');
 
 const getSettings = async (req, res) => {
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
-           failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif] = await Promise.all([
+           failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
+           customVariables, emailSnippets] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
@@ -30,18 +34,35 @@ const getSettings = async (req, res) => {
         deliveryWindowModel.getAll().catch(() => []),
         incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
         incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
+        notificationVariableModel.getAll().catch(() => []),
+        emailSnippetModel.getAll().catch(() => []),
     ]);
 
+    // Variantes de plantilla agrupadas por evento (lista). La 1ra es la predeterminada.
     const templatesByEvent = {};
     for (const t of emailTemplates) {
-        templatesByEvent[t.eventCode] = { subject: t.subject, body: t.body };
+        const item = { id: t.id, name: t.name || 'Principal', subject: t.subject, body: t.body, format: t.format || 'text', isDefault: !!t.isDefault };
+        (templatesByEvent[t.eventCode] = templatesByEvent[t.eventCode] || []).push(item);
     }
+    for (const ev of Object.keys(templatesByEvent)) {
+        templatesByEvent[ev].sort((a, b) => (b.isDefault - a.isDefault) || (a.id - b.id));
+    }
+
+    // Catálogo de placeholders de datos (agrupado) para los chips del editor.
+    const placeholderGroups = {};
+    for (const p of placeholders.catalogMeta()) {
+        (placeholderGroups[p.group] = placeholderGroups[p.group] || []).push(p);
+    }
+    // Valores de ejemplo (datos del envío de muestra + variables custom) para la preview/prueba.
+    const sampleVars = { ...placeholders.buildVars(placeholders.sampleShipment()) };
+    for (const v of customVariables) { sampleVars[v.key] = v.value; }
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
     res.render('setting/index', {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
+        placeholderGroups, customVariables, emailSnippets, sampleVars,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -95,20 +116,178 @@ const saveNotificationConfig = async (req, res) => {
     }
 };
 
+// Edita la plantilla predeterminada del evento (compatibilidad).
 const saveEmailTemplate = async (req, res) => {
     try {
         const { eventCode } = req.params;
         const subject = (req.body.subject || '').trim();
         const body    = (req.body.body    || '').trim();
-        if (!subject || !body) {
-            return res.redirect('/setting?error=template_empty');
-        }
-        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body });
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        const name    = (req.body.name || '').trim() || undefined;
+        if (!subject || !body) { return res.redirect('/setting?error=template_empty'); }
+        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body, format, name });
         if (!updated) { return res.redirect('/setting?error=template_not_found'); }
         res.redirect('/setting?success=tpl');
     } catch (err) {
         console.error('saveEmailTemplate:', err.message);
         res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+// Edita una variante puntual por id.
+const updateEmailTemplateById = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const subject = (req.body.subject || '').trim();
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        const name    = (req.body.name || '').trim() || undefined;
+        if (!subject || !body) { return res.redirect('/setting?error=template_empty'); }
+        const updated = await emailTemplateModel.updateById(id, { subject, body, format, name });
+        if (!updated) { return res.redirect('/setting?error=template_not_found'); }
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('updateEmailTemplateById:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const createEmailTemplateVariant = async (req, res) => {
+    try {
+        const { eventCode } = req.params;
+        const name    = (req.body.name || '').trim() || 'Variante';
+        const subject = (req.body.subject || '').trim() || '(sin asunto)';
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        await emailTemplateModel.createVariant(eventCode, { name, subject, body, format });
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('createEmailTemplateVariant:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const setDefaultEmailTemplate = async (req, res) => {
+    try {
+        await emailTemplateModel.setDefault(Number(req.params.id));
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('setDefaultEmailTemplate:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const deleteEmailTemplate = async (req, res) => {
+    try {
+        const r = await emailTemplateModel.deleteVariant(Number(req.params.id));
+        if (!r.ok && r.reason === 'last') { return res.redirect('/setting?error=tpl_last'); }
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('deleteEmailTemplate:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+// Render de prueba/preview con shipment de ejemplo + variables custom (usa el catálogo real).
+const sampleFill = async (s) => {
+    const vars = { ...placeholders.buildVars(placeholders.sampleShipment()), ...await notificationVariableModel.getAllAsMap() };
+    return placeholders.render(s, vars);
+};
+
+// Envía un email de prueba del template (sin persistir cambios) usando datos de ejemplo.
+const sendTestTemplate = async (req, res) => {
+    try {
+        const { sendEmail } = require('../services/notification/emailSender');
+        const to      = (req.body.testEmail || '').trim();
+        const subject = (req.body.subject || '').trim();
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        if (!isValidEmail(to)) { return res.status(400).json({ ok: false, error: 'Email de prueba inválido.' }); }
+        if (!subject || !body) { return res.status(400).json({ ok: false, error: 'Asunto y cuerpo son obligatorios.' }); }
+
+        await sendEmail(to, `[PRUEBA] ${await sampleFill(subject)}`, await sampleFill(body), format);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('sendTestTemplate:', err.message);
+        res.status(500).json({ ok: false, error: 'No se pudo enviar el email de prueba.' });
+    }
+};
+
+// ===== Variables custom de notificación (ABM) =====
+const VAR_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+const saveNotificationVariable = async (req, res) => {
+    try {
+        const { NotificationVariable } = notificationVariableModel;
+        const id = req.params.id ? Number(req.params.id) : null;
+        const key   = (req.body.key   || '').trim();
+        const label = (req.body.label || '').trim();
+        const value = (req.body.value || '');
+        const description = (req.body.description || '').trim() || null;
+        if (!label || !key) { return res.redirect('/setting?error=var_empty'); }
+        if (!VAR_KEY_RE.test(key)) { return res.redirect('/setting?error=var_key'); }
+
+        if (id) {
+            const row = await notificationVariableModel.getById(id);
+            if (!row) { return res.redirect('/setting?error=var_not_found'); }
+            await row.update({ key, label, value, description });
+        } else {
+            await NotificationVariable.create({ key, label, value, description });
+        }
+        res.redirect('/setting?success=var');
+    } catch (err) {
+        console.error('saveNotificationVariable:', err.message);
+        res.status(500).redirect('/setting?error=var_save');
+    }
+};
+
+const deleteNotificationVariable = async (req, res) => {
+    try {
+        const row = await notificationVariableModel.getById(Number(req.params.id));
+        if (row) { await row.destroy(); }
+        res.redirect('/setting?success=var');
+    } catch (err) {
+        console.error('deleteNotificationVariable:', err.message);
+        res.status(500).redirect('/setting?error=var_save');
+    }
+};
+
+// ===== Snippets / bloques de email (ABM) =====
+const saveEmailSnippet = async (req, res) => {
+    try {
+        const { EmailSnippet } = emailSnippetModel;
+        const id = req.params.id ? Number(req.params.id) : null;
+        const label = (req.body.label || '').trim();
+        const icon  = (req.body.icon  || '').trim() || null;
+        const html  = (req.body.html  || '');
+        const text  = (req.body.text  || '');
+        if (!label) { return res.redirect('/setting?error=snip_empty'); }
+
+        if (id) {
+            const row = await emailSnippetModel.getById(id);
+            if (!row) { return res.redirect('/setting?error=snip_not_found'); }
+            // builtin: solo se editan textos/label/icon, no la key.
+            await row.update({ label, icon, html, text });
+        } else {
+            const key = (req.body.key || '').trim() || ('snip_' + Date.now());
+            if (!VAR_KEY_RE.test(key)) { return res.redirect('/setting?error=snip_key'); }
+            await EmailSnippet.create({ key, label, icon, html, text, builtin: false });
+        }
+        res.redirect('/setting?success=snip');
+    } catch (err) {
+        console.error('saveEmailSnippet:', err.message);
+        res.status(500).redirect('/setting?error=snip_save');
+    }
+};
+
+const deleteEmailSnippet = async (req, res) => {
+    try {
+        const row = await emailSnippetModel.getById(Number(req.params.id));
+        if (row && row.builtin) { return res.redirect('/setting?error=snip_builtin'); }
+        if (row) { await row.destroy(); }
+        res.redirect('/setting?success=snip');
+    } catch (err) {
+        console.error('deleteEmailSnippet:', err.message);
+        res.status(500).redirect('/setting?error=snip_save');
     }
 };
 
@@ -428,7 +607,9 @@ const saveIncidentNotifConfig = async (req, res) => {
 
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
-    saveParams, saveNotificationConfig, saveEmailTemplate, saveTestEmailOverride,
+    saveParams, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
+    updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
+    saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
     saveIncidentNotifConfig,
 };

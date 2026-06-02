@@ -9,6 +9,7 @@ const INCIDENT_TYPE_BLOCKED_STATUSES = Object.freeze({
     MISSING_ITEM:   [Status.PENDING.id, Status.IN_TRANSIT.id, Status.CANCELLED.id],
     WRONG_ADDRESS:  [Status.DELIVERED.id, Status.CANCELLED.id, Status.PACKAGE_FAILED.id],
     LOST:           [Status.PENDING.id, Status.DELIVERED.id, Status.CANCELLED.id, Status.IN_PREPARATION.id],
+    DELIVERY_FAILED: [],
     OTHER:          []
 });
 

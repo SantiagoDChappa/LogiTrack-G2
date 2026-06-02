@@ -15,4 +15,6 @@ const getActive = () => IncidentType.findAll({
 
 const getById = (id) => IncidentType.findOne({ where: { id } });
 
-module.exports = { IncidentType, getActive, getById };
+const getByCode = (code) => IncidentType.findOne({ where: { code } });
+
+module.exports = { IncidentType, getActive, getById, getByCode };

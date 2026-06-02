@@ -23,6 +23,8 @@ const { resolveZone } = require('../services/zoneResolver.service');
 const { sendEmail } = require('../services/notification/emailSender');
 const notificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
+const notificationVariableModel = require('../models/notificationVariable');
+const placeholders = require('../services/notificationPlaceholders');
 const notificationEventModel = require('../models/notificationEvents')
 const { queueEmail } = require('../services/notification/notificationEmailService');
 const sequelize = require('../database/connection');
@@ -881,6 +883,18 @@ const markPackageFailed = async (req, res) => {
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PACKAGE_FAILED, shipment);
 
+        // US-E02: generar incidencia automática por paquete fallido (dedup interno).
+        try {
+            const { autoCreateIncident } = require('../services/incidentAutoGen');
+            await sequelize.transaction(async (t) => {
+                await autoCreateIncident({
+                    shipmentId:  Number(id),
+                    typeCode:    'PACKAGE_BROKEN',
+                    description: `Paquete fallido${comment ? `: ${comment}` : ''}.`
+                }, t);
+            });
+        } catch (e) { console.error('[shipment] autoCreateIncident:', e.message); }
+
         res.redirect(`/shipment/update/${id}?success=6`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
@@ -1103,22 +1117,15 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
             return;
         }
 
-        const fullName = shipment.recipient?.fullName || '';
-        const trackingCode = shipment.trackingId || '';
-        const secretCode = shipment.deliverySecretCode || '';
-        const secretCodeLine = secretCode
-            ? `\n\nCódigo clave de entrega: ${secretCode}. Mostráselo al repartidor para confirmar la entrega.`
-            : '';
-        const fill = (s) => String(s || '')
-            .replace(/\{\{fullName\}\}/g,       fullName)
-            .replace(/\{\{trackingCode\}\}/g,   trackingCode)
-            .replace(/\{\{secretCode\}\}/g,     secretCode)
-            .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine);
+        // Catálogo de datos del envío + variables custom del cliente.
+        const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap() };
+        const fill = (s) => placeholders.render(s, vars);
 
         await queueEmail({
             recipient: recipients.join(','),
             subject:   fill(template.subject),
             body:      fill(template.body),
+            format:    template.format || 'text',
         });
     } catch (err) {
         console.error('notifyShipmentEvent error:', err.message);
@@ -1135,13 +1142,17 @@ async function notifyRecipient(eventCode, dataOrShipment) {
     if (!cfg || !cfg.enabled) { return; }
     const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
     if (!template || !dataOrShipment?.recipientEmail) { return; }
-    const fill = (s) => String(s || '')
-        .replace(/\{\{fullName\}\}/g,     dataOrShipment.recipientFullName || '')
-        .replace(/\{\{trackingCode\}\}/g, dataOrShipment.shipmentTrackingCode || '');
+    const vars = {
+        ...await notificationVariableModel.getAllAsMap(),
+        fullName:     dataOrShipment.recipientFullName || '',
+        trackingCode: dataOrShipment.shipmentTrackingCode || '',
+    };
+    const fill = (s) => placeholders.render(s, vars);
     await queueEmail({
         recipient: dataOrShipment.recipientEmail,
         subject:   fill(template.subject),
         body:      fill(template.body),
+        format:    template.format || 'text',
     });
 }
 

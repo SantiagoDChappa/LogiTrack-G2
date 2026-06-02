@@ -8,6 +8,8 @@ const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
 const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
 const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
+const settingModel = require('../models/setting');
+const { URLSearchParams } = require('url');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -207,6 +209,11 @@ const getPortal = async (req, res) => {
         }
 
         const shipmentsWithHistory = await enrichShipmentsForPortal(shipments);
+        // US-E05 / US-C02: trazabilidad de incidencias y seguimiento de recuperación (datos seguros).
+        for (const s of shipmentsWithHistory) {
+            s.incidents = await buildPublicIncidents(s.id);
+            s.recovery  = await buildRecovery(s.id);
+        }
 
         return res.render('portal', {
             support: supportInfo,
@@ -239,13 +246,58 @@ const incidentTypeModel    = require('../models/incidentType');
 const incidentHistoryModel = require('../models/incidentHistory');
 const incidentPendingModel = require('../models/incidentPendingConfirmation');
 const incidentRules        = require('../services/incidentRules');
+const { snapshotChecklist } = require('../services/incidentChecklist');
+const { IncidentAttachment } = require('../models/incidentAttachment');
+const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
 const incidentEmailValidation = require('../services/incidentEmailValidation');
 const { sendEmail }        = require('../services/notification/emailSender');
-const { IncidentStatus, IncidentChannel, IncidentEventType } = require('../constants/enums');
 
 const CONFIRMATION_TTL_HOURS = 24;
 const isDevMode = () => (process.env.NODE_ENV || 'development') !== 'production';
 const appBaseUrl = () => process.env.APP_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+const failedAttemptModel = require('../models/failedAttempt');
+
+// Estados de incidencia con etiqueta amigable para el portal.
+const INCIDENT_STATUS_LABEL = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
+const INCIDENT_RESOLUTION_LABEL = { PROCEDENTE: 'Procedente', NO_PROCEDENTE: 'No procedente' };
+
+// US-E05: incidencias del envío con campos seguros para el cliente (sin datos internos).
+const buildPublicIncidents = async (shipmentId) => {
+    const { IncidentType } = require('../models/incidentType');
+    const rows = await Incident.findAll({
+        where: { shipmentId },
+        attributes: ['id', 'status', 'resolution', 'createdAt', 'closedAt'],
+        include: [{ model: IncidentType, as: 'type', attributes: ['description'] }],
+        order: [['createdAt', 'DESC']],
+    });
+    return rows.map(r => {
+        const j = r.toJSON();
+        return {
+            id:             j.id,
+            typeLabel:      j.type ? j.type.description : 'Incidencia',
+            statusLabel:    INCIDENT_STATUS_LABEL[j.status] || j.status,
+            resolutionLabel: j.resolution ? (INCIDENT_RESOLUTION_LABEL[j.resolution] || j.resolution) : null,
+            createdAtLabel: formatDate(j.createdAt),
+            closedAtLabel:  j.closedAt ? formatDate(j.closedAt) : null,
+        };
+    });
+};
+
+// US-C02: seguimiento de recuperación / reprogramación (intentos fallidos), campos seguros.
+const buildRecovery = async (shipmentId) => {
+    const attempts = await failedAttemptModel.getByShipmentId(shipmentId);
+    return attempts.map(a => {
+        const j = a.toJSON ? a.toJSON() : a;
+        return {
+            attemptDateLabel:     formatDate(j.attemptDate),
+            reason:               j.reason || null,
+            suggestedDateLabel:   j.suggestedDate   ? formatDate(j.suggestedDate)   : null,
+            rescheduledDateLabel: j.rescheduledDate ? formatDate(j.rescheduledDate) : null,
+            status:               j.status || null,
+        };
+    });
+};
 
 const findShipmentByTracking = (trackingId) => {
     const t = (trackingId || '').trim();
@@ -290,7 +342,7 @@ const getPublicCreateForm = async (req, res) => {
 // Retorna:
 //   { ok: true, pending: { token, email, expiresAt, devLink? }, shipment, type }
 //   { ok: false, status, message }
-const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument }) => {
+const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, attachment }) => {
     const tracking = (trackingId || '').trim().toUpperCase();
     if (!tracking)                                                        { return { ok: false, status: 400, message: 'Código de seguimiento requerido.' }; }
     if (!incidentTypeId)                                                  { return { ok: false, status: 400, message: 'Seleccione un tipo de incidencia.' }; }
@@ -330,6 +382,9 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
         reporterDocument: reporterDocument ? String(reporterDocument).trim().slice(0, 20) : null,
         matchedPersonId:  emailCheck.matchedPersonId,
         matchedRole:      emailCheck.matchedRole,
+        attachmentName:   attachment && attachment.dataBase64 ? String(attachment.fileName || 'evidencia').slice(0, 200) : null,
+        attachmentMime:   attachment && attachment.dataBase64 ? attachment.mimeType : null,
+        attachmentData:   attachment && attachment.dataBase64 ? attachment.dataBase64 : null,
         expiresAt
     });
 
@@ -432,6 +487,29 @@ const confirmIncidentByToken = async (rawToken) => {
             transaction: t
         });
 
+        // Snapshot del checklist de tareas para la incidencia recién confirmada.
+        await snapshotChecklist(created.id, type.id, t);
+
+        // Si el reportante adjuntó evidencia en el alta, la promovemos a la incidencia.
+        if (pending.attachmentData) {
+            await IncidentAttachment.create({
+                incidentId:         created.id,
+                fileName:           pending.attachmentName || 'evidencia',
+                mimeType:           pending.attachmentMime || 'application/octet-stream',
+                dataBase64:         pending.attachmentData,
+                source:             'PORTAL',
+                uploadedByPersonId: pending.matchedPersonId,
+                createdAt:          new Date()
+            }, { transaction: t });
+            await incidentHistoryModel.create({
+                incidentId: created.id,
+                eventType:  IncidentEventType.EVIDENCE_ADDED,
+                comment:    `Evidencia adjuntada desde el portal: ${String(pending.attachmentName || 'archivo').slice(0, 120)}`,
+                personId:   pending.matchedPersonId,
+                transaction: t
+            });
+        }
+
         await incidentPendingModel.IncidentPendingConfirmation.destroy({ where: { token }, transaction: t });
 
         return created;
@@ -451,8 +529,19 @@ const confirmIncidentByToken = async (rawToken) => {
     return { ok: true, incident, shipment, type };
 };
 
+const ALLOWED_ATTACHMENT_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+const buildAttachmentFromFile = (file) => {
+    if (!file || !ALLOWED_ATTACHMENT_MIME.includes(file.mimetype)) { return null; }
+    return {
+        fileName:   file.originalname,
+        mimeType:   file.mimetype,
+        dataBase64: file.buffer.toString('base64')
+    };
+};
+
 const createPublic = async (req, res) => {
-    const result = await createIncidentFromPortal(req.body);
+    const result = await createIncidentFromPortal({ ...req.body, attachment: buildAttachmentFromFile(req.file) });
     if (!result.ok) {
         const types = await incidentTypeModel.getActive();
         return res.status(result.status).render('portal/incidentNew', {

@@ -12,6 +12,9 @@ const IncidentPendingConfirmation = sequelize.define('incident_pending_confirmat
     reporterDocument: { type: DataTypes.STRING(20),  allowNull: true },
     matchedPersonId:  { type: DataTypes.INTEGER,     allowNull: true },
     matchedRole:      { type: DataTypes.STRING(20),  allowNull: true },
+    attachmentName:   { type: DataTypes.STRING(200), allowNull: true },
+    attachmentMime:   { type: DataTypes.STRING(80),  allowNull: true },
+    attachmentData:   { type: DataTypes.TEXT,        allowNull: true },
     expiresAt:        { type: DataTypes.DATE,        allowNull: false },
     createdAt:        { type: DataTypes.DATE }
 }, { tableName: 'incident_pending_confirmation', timestamps: false });

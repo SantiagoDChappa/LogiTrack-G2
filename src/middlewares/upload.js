@@ -21,4 +21,22 @@ const csvUpload = multer({
     fileFilter: csvFileFilter,
 });
 
-module.exports = { csvUpload, MAX_BYTES };
+// Evidencias de incidencia: imágenes y PDF, hasta 5 MB, en memoria (se guardan en base64).
+const EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
+const ALLOWED_EVIDENCE_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+const evidenceFileFilter = (req, file, cb) => {
+    if (ALLOWED_EVIDENCE_MIME.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Solo se aceptan imágenes (JPG/PNG) o PDF'));
+    }
+};
+
+const evidenceUpload = multer({
+    storage: multer.memoryStorage(),
+    limits:  { fileSize: EVIDENCE_MAX_BYTES },
+    fileFilter: evidenceFileFilter,
+});
+
+module.exports = { csvUpload, evidenceUpload, MAX_BYTES, EVIDENCE_MAX_BYTES };

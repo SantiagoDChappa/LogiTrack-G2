@@ -20,6 +20,11 @@ const NotificationEmail = sequelize.define('NotificationEmail', {
         type: DataTypes.TEXT,
         allowNull: false
     },
+    format: {
+        type: DataTypes.STRING(8),
+        allowNull: false,
+        defaultValue: 'text'
+    },
     status: {
         type: DataTypes.ENUM(...Object.values(EmailQueueStatus)),
         allowNull: false,
