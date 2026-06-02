@@ -498,6 +498,48 @@
                 </form>
             </div>
 
+            <!-- Card: Prueba de notificaciones por email (PR68) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">forward_to_inbox</span>
+                    Prueba de notificaciones por email
+                </h2>
+                <p class="settings-subtitle">
+                    Enviá un mail de prueba a uno o varios destinatarios para verificar la configuración sin generar eventos reales.
+                    Podés usar el template de un evento o escribir uno libre. Los placeholders se resuelven con datos de ejemplo.
+                </p>
+                <form method="POST" action="/setting/test-shipment-notification">
+                    <div class="field" style="max-width:520px">
+                        <label for="emailRecipients">Emails de destinatarios</label>
+                        <input type="text" id="emailRecipients" name="emailRecipients"
+                            placeholder="correo1@dominio.com, correo2@dominio.com" required>
+                        <small style="color:var(--color-text-secondary)">Separar por coma. Se ignoran direcciones inválidas.</small>
+                    </div>
+                    <div class="field" style="max-width:520px">
+                        <label for="shipmentEventCode">Evento (opcional)</label>
+                        <select id="shipmentEventCode" name="shipmentEventCode">
+                            <option value="">— Sin evento (uso el texto de abajo) —</option>
+                            <% notifConfig.forEach(config => { %>
+                                <option value="<%= config.eventCode %>"><%= config.description || config.eventCode %></option>
+                            <% }) %>
+                        </select>
+                        <small style="color:var(--color-text-secondary)">Si elegís un evento, usa el template predeterminado de ese evento.</small>
+                    </div>
+                    <div class="field">
+                        <label for="template">Template libre (opcional)</label>
+                        <input type="text" name="template" id="template"
+                            placeholder="Hola {{fullName}}, tu envío {{trackingCode}} cambió de estado.">
+                        <small style="color:var(--color-text-secondary)">Si no elegís evento, se usa este texto como cuerpo.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">send</span>
+                            Enviar prueba
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card: Email de prueba (override) -->
             <div class="settings-card">
                 <h2 class="settings-card-title">

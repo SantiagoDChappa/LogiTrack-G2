@@ -8,6 +8,7 @@ const emailTemplateModel = require('../models/emailTemplate');
 const notificationVariableModel = require('../models/notificationVariable');
 const emailSnippetModel = require('../models/emailSnippet');
 const placeholders = require('../services/notificationPlaceholders');
+const { queueEmail } = require('../services/notification/notificationEmailService');
 const settingLogModel = require('../models/settingLog');
 const { expireShipments } = require('../utils/expireShipments');
 // Sprint 3 - 2.5 parámetros configurables
@@ -210,6 +211,42 @@ const sendTestTemplate = async (req, res) => {
     } catch (err) {
         console.error('sendTestTemplate:', err.message);
         res.status(500).json({ ok: false, error: 'No se pudo enviar el email de prueba.' });
+    }
+};
+
+// Prueba de notificaciones por email (PR68): envía a varios destinatarios usando
+// el template de un evento (opcional) o un texto libre. Resuelve placeholders con
+// datos de ejemplo + variables custom y encola los mails.
+const testShipmentNotification = async (req, res) => {
+    try {
+        const recipients = String(req.body.emailRecipients || '')
+            .split(',').map(e => e.trim()).filter(isValidEmail);
+        if (recipients.length === 0) {
+            return res.redirect('/setting?error=test_notif_recipients');
+        }
+
+        const eventCode = (req.body.shipmentEventCode || '').trim();
+        let subject = 'Notificación de prueba — LogiTrack';
+        let body    = (req.body.template || '').trim();
+        let format  = 'text';
+
+        if (eventCode) {
+            const tpl = await emailTemplateModel.getDefaultByEventCode(eventCode);
+            if (tpl) { subject = tpl.subject; body = body || tpl.body; format = tpl.format || 'text'; }
+        }
+        if (!body) {
+            return res.redirect('/setting?error=test_notif_empty');
+        }
+
+        const subjectFilled = await sampleFill(subject);
+        const bodyFilled    = await sampleFill(body);
+        for (const recipient of recipients) {
+            await queueEmail({ recipient, subject: subjectFilled, body: bodyFilled, format });
+        }
+        res.redirect('/setting?success=test_notif');
+    } catch (err) {
+        console.error('testShipmentNotification:', err.message);
+        res.status(500).redirect('/setting?error=test_notif');
     }
 };
 
@@ -611,5 +648,5 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig,
+    saveIncidentNotifConfig, testShipmentNotification,
 };
