@@ -354,4 +354,74 @@ const getActiveShipments = () => {
     });
 };
 
-module.exports = { Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId, findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId, updatePriority, getActiveShipments };
+const TERMINAL_STATUS_IDS = [4, 5];
+
+const clientIdentityIncludes = (full = false) => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Province } = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { Branch } = require('./branch');
+
+    const personAttrs = full
+        ? ['id', 'fullName', 'document', 'email', 'phone']
+        : ['fullName', 'document', 'email'];
+
+    return [
+        { model: Person, as: 'sender', attributes: personAttrs },
+        { model: Person, as: 'recipient', attributes: personAttrs },
+        { model: Status, as: 'status', attributes: ['id', 'description'] },
+        {
+            model: Address,
+            as: 'address',
+            attributes: full ? ['street', 'number', 'postalCode', 'lat', 'lng'] : [],
+            required: false,
+            include: full ? [{ model: Province, as: 'province', attributes: ['description'] }] : [],
+        },
+        { model: TypeShipment, as: 'shipmentType', attributes: ['description'], required: false },
+        { model: Branch, as: 'currentBranch', attributes: ['name', 'latitude', 'longitude'], required: false },
+        { model: Branch, as: 'pickupBranch', attributes: ['name', 'address', 'phone', 'latitude', 'longitude'], required: false },
+    ];
+};
+
+// Envíos donde el cliente es remitente o destinatario con DNI + email coincidentes.
+const findByClientIdentity = async ({ document, email }, { full = false } = {}) => {
+    const { normalize } = require('../services/incidentEmailValidation');
+    const docNum = Number(document);
+    const emailNorm = normalize(email);
+
+    if (!docNum || !emailNorm) { return []; }
+
+    const rows = await sequelize.query(
+        `SELECT s.id
+           FROM logitrack.shipment s
+           JOIN logitrack.person sender ON s."senderId" = sender.id
+           JOIN logitrack.person recipient ON s."recipientId" = recipient.id
+          WHERE (sender.document = :doc AND LOWER(TRIM(sender.email)) = :email)
+             OR (recipient.document = :doc AND LOWER(TRIM(recipient.email)) = :email)
+          ORDER BY s."createdAt" DESC`,
+        { replacements: { doc: docNum, email: emailNorm }, type: sequelize.QueryTypes.SELECT }
+    );
+
+    const ids = rows.map((r) => r.id);
+    if (!ids.length) { return []; }
+
+    return Shipment.findAll({
+        where: { id: { [Op.in]: ids } },
+        include: clientIdentityIncludes(full),
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+const countByClientIdentity = async ({ document, email }) => {
+    const list = await findByClientIdentity({ document, email });
+    return list.length;
+};
+
+module.exports = {
+    Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId,
+    findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId,
+    updatePriority, getActiveShipments, findByClientIdentity, countByClientIdentity,
+    clientIdentityIncludes, TERMINAL_STATUS_IDS,
+};

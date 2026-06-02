@@ -27,6 +27,7 @@ const { IncidentTaskTemplate } = require('./incidentTaskTemplate');
 const { IncidentTask }         = require('./incidentTask');
 const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
+const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -160,6 +161,15 @@ const safeAssociate = () => {
         if (Person) { IncidentHistory.belongsTo(Person, { as: 'person', foreignKey: 'personId' }); }
     }
 
+    // PR69 - solicitudes de modificación de envío (portal cliente)
+    if (ShipmentModificationRequest.belongsTo) {
+        if (Shipment) { ShipmentModificationRequest.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
+        if (User)     { ShipmentModificationRequest.belongsTo(User, { as: 'reviewedBy', foreignKey: 'reviewedByUserId' }); }
+    }
+    if (Shipment.hasMany && ShipmentModificationRequest) {
+        Shipment.hasMany(ShipmentModificationRequest, { as: 'modificationRequests', foreignKey: 'shipmentId' });
+    }
+
     // Sprint 4 - checklist de tareas por tipo y adjuntos de incidencia
     if (IncidentType.hasMany && IncidentTaskTemplate) {
         IncidentType.hasMany(IncidentTaskTemplate, { as: 'taskTemplates', foreignKey: 'incidentTypeId' });
@@ -209,6 +219,7 @@ module.exports = {
     IncidentTask,
     IncidentAttachment,
     IncidentPendingConfirmation,
+    ShipmentModificationRequest,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,

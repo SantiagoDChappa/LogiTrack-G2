@@ -1,5 +1,4 @@
 const { Shipment } = require('../models/shipment');
-const { ShipmentHistory } = require('../models/shipmentHistory');
 const { Person } = require('../models/person');
 const { Status } = require('../models/status');
 const { Address } = require('../models/address');
@@ -7,7 +6,10 @@ const { Province } = require('../models/province');
 const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
+const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
+const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
 const settingModel = require('../models/setting');
+const { URLSearchParams } = require('url');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -206,92 +208,12 @@ const getPortal = async (req, res) => {
             });
         }
 
-        const histories = await Promise.all(
-            shipments.map((shipment) => ShipmentHistory.findAll({
-                where: { shipmentId: shipment.id },
-                include: [
-                    { model: Status, as: 'fromStatus', attributes: ['description'] },
-                    { model: Status, as: 'toStatus', attributes: ['description'] },
-                    { model: Branch, as: 'branch', attributes: ['name', 'latitude', 'longitude'], required: false },
-                ],
-                order: [['changedAt', 'ASC']],
-            }))
-        );
-
-        const shipmentsWithHistory = await Promise.all(shipments.map(async (shipment, index) => {
-            const json = shipment.toJSON();
-            const history = histories[index].map((item) => item.toJSON());
-            const stops = [];
-            const firstBranch = history.find((item) => item.branch && item.branch.latitude);
-
-            if (firstBranch) {
-                stops.push({
-                    type: 'origin',
-                    lat: Number(firstBranch.branch.latitude),
-                    lng: Number(firstBranch.branch.longitude),
-                    label: firstBranch.branch.name.startsWith('Sucursal') ? firstBranch.branch.name : `Sucursal ${firstBranch.branch.name}`,
-                });
-            } else if (json.currentBranch && json.currentBranch.latitude) {
-                stops.push({
-                    type: 'origin',
-                    lat: Number(json.currentBranch.latitude),
-                    lng: Number(json.currentBranch.longitude),
-                    label: json.currentBranch.name.startsWith('Sucursal') ? json.currentBranch.name : `Sucursal ${json.currentBranch.name}`,
-                });
-            }
-
-            for (let stepIndex = 1; stepIndex < history.length; stepIndex++) {
-                const step = history[stepIndex];
-                if (step.branch && step.branch.latitude) {
-                    stops.push({
-                        type: 'transit',
-                        lat: Number(step.branch.latitude),
-                        lng: Number(step.branch.longitude),
-                        label: step.branch.name.startsWith('Sucursal') ? step.branch.name : `Sucursal ${step.branch.name}`,
-                        timestamp: step.changedAt,
-                    });
-                } else if (step.latitude && step.longitude && step.eventType === 'DELIVERED') {
-                    stops.push({
-                        type: 'pod',
-                        lat: Number(step.latitude),
-                        lng: Number(step.longitude),
-                        label: 'Entregado',
-                        timestamp: step.changedAt,
-                    });
-                }
-            }
-
-            if (json.address && json.address.lat && json.address.lng && !stops.find((step) => step.type === 'pod')) {
-                stops.push({
-                    type: 'destination',
-                    lat: Number(json.address.lat),
-                    lng: Number(json.address.lng),
-                    label: `${json.address.street || ''} ${json.address.number || ''}`.trim() || 'Destino',
-                });
-            }
-
-            let activeRouteId = null;
-            try {
-                const sequelize = require('../database/connection');
-                const { QueryTypes } = require('sequelize');
-                const routeRows = await sequelize.query(
-                    `SELECT r.id FROM logitrack.route r
-                       JOIN logitrack.route_stop rs ON rs.route_id=r.id
-                      WHERE rs."shipmentId"=:sid AND r."statusId" IN (1,2)
-                      ORDER BY r."createdAt" DESC LIMIT 1`,
-                    { replacements: { sid: json.id }, type: QueryTypes.SELECT }
-                );
-                activeRouteId = routeRows[0]?.id || null;
-            } catch {
-                // ignore live tracking lookup errors in public portal
-            }
-
-            // US-E05 / US-C02: trazabilidad de incidencias y seguimiento de recuperación (datos seguros).
-            const publicIncidents = await buildPublicIncidents(json.id);
-            const recovery        = await buildRecovery(json.id);
-
-            return { ...json, history, mapStops: stops, activeRouteId, incidents: publicIncidents, recovery };
-        }));
+        const shipmentsWithHistory = await enrichShipmentsForPortal(shipments);
+        // US-E05 / US-C02: trazabilidad de incidencias y seguimiento de recuperación (datos seguros).
+        for (const s of shipmentsWithHistory) {
+            s.incidents = await buildPublicIncidents(s.id);
+            s.recovery  = await buildRecovery(s.id);
+        }
 
         return res.render('portal', {
             support: supportInfo,
@@ -710,10 +632,18 @@ const getSelfServiceForm = async (req, res) => {
         });
         if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
-        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
+        const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
         const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
-        res.render('portal/selfService', { shipment, timeWindows, branches, editable, saved: req.query.saved === '1' });
+        res.render('portal/selfService', {
+            shipment,
+            timeWindows,
+            branches,
+            editable,
+            saved: req.query.saved === '1',
+            appliedCount: Number(req.query.applied) || 0,
+            pendingCount: Number(req.query.pending) || 0,
+        });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
         res.status(500).render('error', { message: 'Error al cargar autogestión' });
@@ -723,54 +653,42 @@ const getSelfServiceForm = async (req, res) => {
 const saveSelfService = async (req, res) => {
     try {
         const token = String(req.params.token || '');
-        const shipment = await Shipment.findOne({ where: { portalToken: token } });
+        const shipment = await Shipment.findOne({
+            where: { portalToken: token },
+            include: [
+                { model: Person, as: 'recipient', attributes: ['document'], required: false },
+                { model: Status, as: 'status', attributes: ['description'], required: false },
+                { model: Address, as: 'address', required: false },
+            ],
+        });
         if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
-        const editable = [1, 3, 6, 7].includes(Number(shipment.statusId));
-        if (!editable) { return res.status(409).json({ error: 'El envío está en un estado que no permite autogestión.' }); }
 
-        const from = req.body.windowFrom || null;
-        const to   = req.body.windowTo   || null;
-        const deliveryMode    = req.body.deliveryMode    || shipment.deliveryMode;
-        const pickupBranchId  = req.body.pickupBranchId  ? Number(req.body.pickupBranchId) : null;
-        if (deliveryMode === 'branch_pickup' && !pickupBranchId) {
-            return res.status(400).json({ error: 'Seleccioná una sucursal de retiro.' });
-        }
+        const result = await submitPortalModification({
+            shipment,
+            client: {
+                document: shipment.recipient?.document ?? null,
+                email: null,
+            },
+            body: req.body,
+        });
 
-        await Shipment.update({
-            expectedDeliveryFrom: from,
-            expectedDeliveryTo:   to,
-            deliveryMode,
-            pickupBranchId: deliveryMode === 'branch_pickup' ? pickupBranchId : null,
-        }, { where: { id: shipment.id } });
-
-        // Sprint 3 - 3.3 comentarios estructurados de domicilio
-        if (shipment.addressId) {
-            await Address.update({
-                ringLabel:      (req.body.ringLabel      || '').trim() || null,
-                floorApt:       (req.body.floorApt       || '').trim() || null,
-                referencesTxt:  (req.body.referencesTxt  || '').trim() || null,
-                porterNote:     (req.body.porterNote     || '').trim() || null,
-                restrictions:   (req.body.restrictions   || '').trim() || null,
-            }, { where: { id: shipment.addressId } });
-        }
-
-        // History event RESCHEDULED + notif
-        try {
-            const shipmentHistoryModel = require('../models/shipmentHistory');
-            await shipmentHistoryModel.create({
-                shipmentId:   shipment.id,
-                fromStatusId: shipment.statusId,
-                toStatusId:   shipment.statusId,
-                comment:      `Autogestión destinatario: franja ${from || '-'}–${to || '-'}, modalidad ${deliveryMode}`,
-                userId:       null,
-                eventType:    'RESCHEDULED',
+        if (!result.ok) {
+            return res.status(result.status || 400).render('portal/selfService', {
+                shipment,
+                timeWindows: await require('../models/deliveryTimeWindow').getActive(),
+                branches: await Branch.findAll({ where: { pickupEnabled: true, closed: false } }),
+                editable: canModifyShipment(shipment),
+                saved: false,
+                appliedCount: 0,
+                pendingCount: 0,
+                error: result.message,
             });
-            const { NotificationEvent } = require('../constants/enums');
-            require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, shipment.id)
-                .catch(() => {});
-        } catch (e) { console.error('selfService history err:', e.message); }
+        }
 
-        res.redirect(`/portal/self/${token}?saved=1`);
+        const qs = new URLSearchParams({ saved: '1' });
+        if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
+        if (result.pending?.length) { qs.set('pending', String(result.pending.length)); }
+        res.redirect(`/portal/self/${token}?${qs.toString()}`);
     } catch (err) {
         console.error('saveSelfService:', err.message);
         res.status(500).json({ error: err.message });

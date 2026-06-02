@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso no disponible - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-incident-section">
+        <div class="portal-incident-wrapper portal-incident-success">
+            <div class="portal-incident-success-body">
+                <span class="portal-incident-eyebrow">Acceso denegado</span>
+                <span class="material-symbols-outlined portal-incident-success-icon" style="color:#dc2626">error</span>
+                <h1>No pudimos completar la operación</h1>
+                <p class="portal-incident-success-lead"><%= error %></p>
+                <a href="/portal/mis-envios" class="btn-primary">Volver a Mis envíos</a>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

@@ -246,7 +246,11 @@ const getDetail = async (req, res) => {
     })();
 
 
-    res.render('shipment/detail', { shipment, history, mapData, returnUrl, returnLabel, sla, costClient });
+    res.render('shipment/detail', {
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
+        modifications: (await require('../services/portalModificationService').listByShipment(id))
+            .map(require('../controllers/shipmentModification').formatRow),
+    });
 };
 
 const getNewShipmentForm = async (req, res) => {

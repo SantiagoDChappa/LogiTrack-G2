@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmá tu acceso - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-incident-section">
+        <div class="portal-incident-wrapper portal-incident-success">
+            <div class="portal-incident-success-body">
+                <span class="portal-incident-eyebrow">Confirmación pendiente</span>
+                <span class="material-symbols-outlined portal-incident-success-icon" style="color:#f59e0b">mark_email_unread</span>
+                <h1>Revisá tu casilla de email</h1>
+
+                <p class="portal-incident-success-lead">
+                    Te enviamos un mail a <strong><%= email %></strong> con un link para acceder a tus envíos de forma segura.
+                </p>
+
+                <p class="portal-incident-success-copy">
+                    El link expira <strong><%= new Date(expiresAt).toLocaleString('es-AR') %></strong>.
+                    Si no encontrás el mail, revisá tu carpeta de spam.
+                </p>
+
+                <% if (!mailDelivered && devLink) { %>
+                <div class="alert alert-error" style="text-align:left; margin-top:1rem;">
+                    <strong>Modo desarrollo:</strong> SMTP no configurado. Link de prueba:<br>
+                    <a href="<%= devLink %>" style="word-break: break-all;"><%= devLink %></a>
+                </div>
+                <% } %>
+
+                <a href="/portal/mis-envios" class="btn-primary" style="margin-top:1rem;">Volver</a>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

@@ -12,7 +12,21 @@ const DeliveryTimeWindow = sequelize.define('deliveryTimeWindow', {
     active:   { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
 }, { tableName: 'delivery_time_window', timestamps: false });
 
-const getActive = () => DeliveryTimeWindow.findAll({ where: { active: true }, order: [['fromTime', 'ASC']] });
-const getAll    = () => DeliveryTimeWindow.findAll({ order: [['fromTime', 'ASC']] });
+const dedupeWindows = (rows) => {
+    const seen = new Set();
+    return rows.filter((w) => {
+        const key = `${w.label}|${String(w.fromTime).slice(0, 8)}|${String(w.toTime).slice(0, 8)}`;
+        if (seen.has(key)) { return false; }
+        seen.add(key);
+        return true;
+    });
+};
+
+const getActive = async () => dedupeWindows(
+    await DeliveryTimeWindow.findAll({ where: { active: true }, order: [['fromTime', 'ASC']] })
+);
+const getAll = async () => dedupeWindows(
+    await DeliveryTimeWindow.findAll({ order: [['fromTime', 'ASC']] })
+);
 
 module.exports = { DeliveryTimeWindow, getActive, getAll };

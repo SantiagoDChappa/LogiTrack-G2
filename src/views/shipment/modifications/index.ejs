@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../../partials/head') %>
+    <title>Modificaciones portal - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/portal.css">
+</head>
+<body>
+    <%- include('../../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Modificaciones desde portal</h1>
+        </div>
+
+        <% if (flash === 'approved') { %>
+        <div class="alert alert-success">Solicitud aprobada y aplicada.</div>
+        <% } else if (flash === 'rejected') { %>
+        <div class="alert alert-success">Solicitud rechazada.</div>
+        <% } %>
+        <% if (error) { %>
+        <div class="alert alert-error"><%= error %></div>
+        <% } %>
+
+        <form method="GET" action="/shipment/modifications" class="incident-filters" style="margin-bottom:1rem;">
+            <div class="incident-filter">
+                <label for="status">Estado</label>
+                <select id="status" name="status">
+                    <option value="PENDING_REVIEW" <%= filters.status === 'PENDING_REVIEW' ? 'selected' : '' %>>Pendiente de revisión</option>
+                    <option value="APPLIED" <%= filters.status === 'APPLIED' ? 'selected' : '' %>>Aplicadas</option>
+                    <option value="REJECTED" <%= filters.status === 'REJECTED' ? 'selected' : '' %>>Rechazadas</option>
+                    <option value="ALL" <%= filters.status === 'ALL' ? 'selected' : '' %>>Todas</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-secondary">Filtrar</button>
+        </form>
+
+        <% if (!requests.length) { %>
+        <p>No hay solicitudes para mostrar.</p>
+        <% } else { %>
+        <div class="portal-mis-envios-table-wrap">
+            <table class="portal-mis-envios-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Envío</th>
+                        <th>Destinatario</th>
+                        <th>Tipo</th>
+                        <th>Estado envío</th>
+                        <th>Detalle</th>
+                        <th>Estado solicitud</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% requests.forEach(function(r) { %>
+                    <tr>
+                        <td><%= new Date(r.createdAt).toLocaleString('es-AR') %></td>
+                        <td><a href="/shipment/<%= r.shipmentId %>"><%= r.trackingId %></a></td>
+                        <td><%= r.recipientName || '-' %></td>
+                        <td><%= r.typeLabel %></td>
+                        <td><%= r.shipmentStatus || '-' %></td>
+                        <td><%= r.summary %></td>
+                        <td><%= r.statusLabel %></td>
+                        <td>
+                            <% if (r.status === 'PENDING_REVIEW') { %>
+                            <form method="POST" action="/shipment/modifications/<%= r.id %>/approve" style="display:inline">
+                                <button type="submit" class="btn-primary" style="padding:.3rem .6rem;font-size:.8rem;">Aprobar</button>
+                            </form>
+                            <form method="POST" action="/shipment/modifications/<%= r.id %>/reject" style="display:inline;margin-left:.35rem;">
+                                <input type="hidden" name="reviewComment" value="Rechazada en revisión operativa">
+                                <button type="submit" class="btn-secondary" style="padding:.3rem .6rem;font-size:.8rem;">Rechazar</button>
+                            </form>
+                            <% } else { %>
+                            —
+                            <% } %>
+                        </td>
+                    </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+        <% } %>
+    </main>
+</body>
+</html>
