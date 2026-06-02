@@ -23,6 +23,8 @@ const { resolveZone } = require('../services/zoneResolver.service');
 const { sendEmail } = require('../services/notification/emailSender');
 const notificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
+const notificationVariableModel = require('../models/notificationVariable');
+const placeholders = require('../services/notificationPlaceholders');
 const notificationEventModel = require('../models/notificationEvents')
 const { queueEmail } = require('../services/notification/notificationEmailService');
 const sequelize = require('../database/connection');
@@ -1111,25 +1113,9 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
             return;
         }
 
-        const fullName = shipment.recipient?.fullName || '';
-        const trackingCode = shipment.trackingId || '';
-        const secretCode = shipment.deliverySecretCode || '';
-        const secretCodeLine = secretCode
-            ? `\n\nCódigo clave de entrega: ${secretCode}. Mostráselo al repartidor para confirmar la entrega.`
-            : '';
-        // URLs accionables (US-N01/N02/N03). Base configurable por APP_URL/BASE_URL.
-        const base = (process.env.APP_URL || process.env.BASE_URL || 'https://logitrack-prototype.onrender.com').replace(/\/+$/, '');
-        const trackingUrl    = trackingCode ? `${base}/portal?q=${encodeURIComponent(trackingCode)}` : base;
-        const selfServiceUrl = shipment.portalToken ? `${base}/portal/self/${shipment.portalToken}` : trackingUrl;
-        const incidentUrl    = trackingCode ? `${base}/portal/incident/new?trackingId=${encodeURIComponent(trackingCode)}` : `${base}/portal/incident/new`;
-        const fill = (s) => String(s || '')
-            .replace(/\{\{fullName\}\}/g,       fullName)
-            .replace(/\{\{trackingCode\}\}/g,   trackingCode)
-            .replace(/\{\{secretCode\}\}/g,     secretCode)
-            .replace(/\{\{secretCodeLine\}\}/g, secretCodeLine)
-            .replace(/\{\{trackingUrl\}\}/g,    trackingUrl)
-            .replace(/\{\{selfServiceUrl\}\}/g, selfServiceUrl)
-            .replace(/\{\{incidentUrl\}\}/g,    incidentUrl);
+        // Catálogo de datos del envío + variables custom del cliente.
+        const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap() };
+        const fill = (s) => placeholders.render(s, vars);
 
         await queueEmail({
             recipient: recipients.join(','),
@@ -1152,9 +1138,12 @@ async function notifyRecipient(eventCode, dataOrShipment) {
     if (!cfg || !cfg.enabled) { return; }
     const template = await emailTemplateModel.getTemplateByEventCode(eventCode);
     if (!template || !dataOrShipment?.recipientEmail) { return; }
-    const fill = (s) => String(s || '')
-        .replace(/\{\{fullName\}\}/g,     dataOrShipment.recipientFullName || '')
-        .replace(/\{\{trackingCode\}\}/g, dataOrShipment.shipmentTrackingCode || '');
+    const vars = {
+        ...await notificationVariableModel.getAllAsMap(),
+        fullName:     dataOrShipment.recipientFullName || '',
+        trackingCode: dataOrShipment.shipmentTrackingCode || '',
+    };
+    const fill = (s) => placeholders.render(s, vars);
     await queueEmail({
         recipient: dataOrShipment.recipientEmail,
         subject:   fill(template.subject),

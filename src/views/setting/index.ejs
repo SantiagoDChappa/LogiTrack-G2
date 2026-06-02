@@ -136,6 +136,30 @@
         .tplm-chip:active { cursor:grabbing; }
         .tplm-chip--link { background:rgba(124,58,237,.10); color:#7c3aed; border-color:rgba(124,58,237,.25); }
         .tplm-chip--link:hover { background:#7c3aed; color:#fff; }
+        .tplm-chip--var { background:rgba(22,163,74,.10); color:#16a34a; border-color:rgba(22,163,74,.25); }
+        .tplm-chip--var:hover { background:#16a34a; color:#fff; }
+        .tplm-chip-group { display:flex; flex-wrap:wrap; gap:.35rem; align-items:center; margin-bottom:.3rem; }
+        .tplm-chip-group-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-secondary); margin-right:.25rem; min-width:5rem; }
+        /* Selector de variante */
+        .tplm-variant-row { gap:.5rem; }
+        .tplm-variant-select { flex:1; padding:.4rem .6rem; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; }
+        .tplm-icon-action { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text-secondary); cursor:pointer; }
+        .tplm-icon-action:hover { color:var(--color-primary,#2563eb); border-color:var(--color-primary,#2563eb); }
+        .tplm-icon-action--danger:hover { color:#dc2626; border-color:#dc2626; }
+        .tplm-icon-action .material-symbols-outlined { font-size:1.1rem; }
+        /* ABM cards (variables / snippets) */
+        .abm-list { display:flex; flex-direction:column; gap:.5rem; }
+        .abm-row { display:flex; align-items:center; gap:.5rem; }
+        .abm-form { display:flex; align-items:center; gap:.5rem; flex:1; flex-wrap:wrap; }
+        .abm-in { padding:.4rem .6rem; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; font-size:.85rem; min-width:7rem; }
+        .abm-in--key { font-family:ui-monospace,Menlo,Consolas,monospace; max-width:11rem; }
+        .abm-in--grow { flex:1; min-width:9rem; }
+        .abm-add { margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--color-border); flex-wrap:wrap; }
+        .abm-snip { border:1px solid var(--color-border); border-radius:10px; padding:.6rem .7rem; display:flex; gap:.5rem; align-items:flex-start; }
+        .abm-snip-form { flex:1; display:flex; flex-direction:column; gap:.4rem; min-width:0; }
+        .abm-snip-head { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+        .abm-snip-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-secondary); }
+        .abm-badge { font-size:.68rem; background:var(--color-bg-secondary,#eef2ff); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:999px; padding:.1rem .5rem; }
         .tplm-hint { display:block; margin-top:.4rem; font-size:.78rem; color:var(--color-text-secondary); line-height:1.4; }
         .tplm-ph-desc { display:flex; align-items:flex-start; gap:.45rem; margin-top:.5rem;
             padding:.5rem .65rem; border:1px solid var(--color-border); border-radius:8px;
@@ -499,6 +523,83 @@
                 </form>
             </div>
 
+            <!-- Card: Variables de notificación (ABM) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">data_object</span>
+                    Variables de notificación
+                </h2>
+                <p class="settings-subtitle">
+                    Variables con valor fijo reutilizables en cualquier plantilla (ej. <code>{{empresaTelefono}}</code>). Se reemplazan al enviar y aparecen como chips en el editor.
+                </p>
+                <div class="abm-list">
+                    <% (customVariables || []).forEach(v => { %>
+                        <div class="abm-row">
+                            <form method="POST" action="/setting/notification-variable/<%= v.id %>" class="abm-form">
+                                <input type="text" name="key"   value="<%= v.key %>"   placeholder="clave" class="abm-in abm-in--key" required>
+                                <input type="text" name="label" value="<%= v.label %>" placeholder="etiqueta" class="abm-in" required>
+                                <input type="text" name="value" value="<%= v.value %>" placeholder="valor" class="abm-in abm-in--grow">
+                                <input type="text" name="description" value="<%= v.description || '' %>" placeholder="descripción" class="abm-in">
+                                <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                            </form>
+                            <form method="POST" action="/setting/notification-variable/<%= v.id %>/delete">
+                                <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                            </form>
+                        </div>
+                    <% }) %>
+                </div>
+                <form method="POST" action="/setting/notification-variable" class="abm-row abm-add">
+                    <input type="text" name="key"   placeholder="clave (ej: empresaTelefono)" class="abm-in abm-in--key" required>
+                    <input type="text" name="label" placeholder="etiqueta" class="abm-in" required>
+                    <input type="text" name="value" placeholder="valor" class="abm-in abm-in--grow">
+                    <input type="text" name="description" placeholder="descripción (opcional)" class="abm-in">
+                    <button type="submit" class="btn-primary btn-sm"><span class="material-symbols-outlined">add</span> Agregar</button>
+                </form>
+            </div>
+
+            <!-- Card: Bloques de email (snippets, ABM) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">smart_button</span>
+                    Bloques de email
+                </h2>
+                <p class="settings-subtitle">
+                    Botones y bloques reutilizables que aparecen en "Bloques rápidos" del editor. Definí la versión HTML y la de texto; pueden usar placeholders. Los predefinidos no se borran.
+                </p>
+                <div class="abm-list">
+                    <% (emailSnippets || []).forEach(s => { %>
+                        <div class="abm-snip">
+                            <form method="POST" action="/setting/email-snippet/<%= s.id %>" class="abm-snip-form">
+                                <div class="abm-snip-head">
+                                    <input type="text" name="label" value="<%= s.label %>" placeholder="etiqueta" class="abm-in" required>
+                                    <input type="text" name="icon" value="<%= s.icon || '' %>" placeholder="ícono (material symbol)" class="abm-in abm-in--key">
+                                    <% if (s.builtin) { %><span class="abm-badge">predefinido</span><% } %>
+                                    <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                                </div>
+                                <label class="abm-snip-label">HTML</label>
+                                <textarea name="html" rows="2" class="abm-in tplm-textarea"><%= s.html %></textarea>
+                                <label class="abm-snip-label">Texto</label>
+                                <textarea name="text" rows="2" class="abm-in tplm-textarea"><%= s.text %></textarea>
+                            </form>
+                            <% if (!s.builtin) { %>
+                                <form method="POST" action="/setting/email-snippet/<%= s.id %>/delete" class="abm-snip-del">
+                                    <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                                </form>
+                            <% } %>
+                        </div>
+                    <% }) %>
+                </div>
+                <form method="POST" action="/setting/email-snippet" class="abm-snip abm-add">
+                    <div class="abm-snip-head">
+                        <input type="text" name="label" placeholder="etiqueta del bloque" class="abm-in" required>
+                        <input type="text" name="icon" placeholder="ícono (ej: link)" class="abm-in abm-in--key">
+                        <button type="submit" class="btn-primary btn-sm"><span class="material-symbols-outlined">add</span> Agregar bloque</button>
+                    </div>
+                    <textarea name="html" rows="2" class="abm-in tplm-textarea" placeholder="Versión HTML (ej: <a href=&quot;{{trackingUrl}}&quot;>Ver envío</a>)"></textarea>
+                    <textarea name="text" rows="2" class="abm-in tplm-textarea" placeholder="Versión texto (ej: Seguí tu envío: {{trackingUrl}})"></textarea>
+                </form>
+            </div>
+
             <!-- Modal: Editar template de email (interactivo) -->
             <div id="tpl-modal-backdrop" class="tplm-backdrop">
                 <div class="tplm-dialog">
@@ -516,6 +617,14 @@
                         <form id="tpl-modal-form" method="POST" action="" class="tplm-editor">
                             <input type="hidden" name="format" id="tpl-modal-format" value="text">
 
+                            <div class="tplm-row tplm-variant-row">
+                                <span class="tplm-label">Variante</span>
+                                <select id="tpl-variant-select" class="tplm-variant-select"></select>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-new" title="Nueva variante"><span class="material-symbols-outlined">add</span></button>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-default" title="Marcar como predeterminada"><span class="material-symbols-outlined">star</span></button>
+                                <button type="button" class="tplm-icon-action tplm-icon-action--danger" id="tpl-variant-delete" title="Eliminar variante"><span class="material-symbols-outlined">delete</span></button>
+                            </div>
+
                             <div class="tplm-row">
                                 <span class="tplm-label">Formato</span>
                                 <div class="tplm-segmented" id="tpl-format-toggle">
@@ -529,28 +638,18 @@
                             </div>
 
                             <div class="field">
+                                <label for="tpl-modal-name">Nombre de la variante</label>
+                                <input type="text" id="tpl-modal-name" name="name" maxlength="80" placeholder="Ej: Principal">
+                            </div>
+
+                            <div class="field">
                                 <label for="tpl-modal-subject">Asunto</label>
                                 <input type="text" id="tpl-modal-subject" name="subject" required>
                             </div>
 
                             <div class="field">
                                 <label>Placeholders <small>(click para insertar · o arrastrá al texto)</small></label>
-                                <div class="tplm-chips" id="tpl-placeholders">
-                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{fullName}}"
-                                        data-desc="Nombre completo del destinatario del envío." data-sample="Juan Pérez">{{fullName}}</button>
-                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{trackingCode}}"
-                                        data-desc="Código de seguimiento del envío." data-sample="ENV-001234">{{trackingCode}}</button>
-                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{secretCode}}"
-                                        data-desc="Código clave de entrega que el destinatario muestra al repartidor." data-sample="4827">{{secretCode}}</button>
-                                    <button type="button" class="tplm-chip" draggable="true" data-token="{{secretCodeLine}}"
-                                        data-desc="Frase completa con el código clave (incluye el texto explicativo). Útil cuando el envío tiene código." data-sample="Código clave de entrega: 4827. Mostráselo al repartidor…">{{secretCodeLine}}</button>
-                                    <button type="button" class="tplm-chip tplm-chip--link" draggable="true" data-token="{{trackingUrl}}"
-                                        data-desc="🔗 Acción: ver el seguimiento del envío en el portal." data-sample="https://…/portal?q=ENV-001234">{{trackingUrl}}</button>
-                                    <button type="button" class="tplm-chip tplm-chip--link" draggable="true" data-token="{{selfServiceUrl}}"
-                                        data-desc="🔗 Acción: reprogramar la entrega o elegir retiro en sucursal (autogestión sin login)." data-sample="https://…/portal/self/&lt;token&gt;">{{selfServiceUrl}}</button>
-                                    <button type="button" class="tplm-chip tplm-chip--link" draggable="true" data-token="{{incidentUrl}}"
-                                        data-desc="🔗 Acción: reportar o responder una incidencia del envío." data-sample="https://…/portal/incident/new?trackingId=ENV-001234">{{incidentUrl}}</button>
-                                </div>
+                                <div class="tplm-chips" id="tpl-placeholders"></div>
                                 <div class="tplm-ph-desc" id="tpl-ph-desc">
                                     <span class="material-symbols-outlined">touch_app</span>
                                     <span class="tplm-ph-desc-text">Pasá el cursor o tabulá sobre un placeholder para ver qué inserta.</span>
@@ -559,13 +658,7 @@
 
                             <div class="field">
                                 <label>Bloques rápidos <small>(insertan contenido listo según el formato)</small></label>
-                                <div class="tplm-snippets" id="tpl-snippets">
-                                    <button type="button" class="tplm-snip" data-snip="reprogramar"><span class="material-symbols-outlined">event_repeat</span> Botón reprogramar</button>
-                                    <button type="button" class="tplm-snip" data-snip="seguimiento"><span class="material-symbols-outlined">local_shipping</span> Botón seguimiento</button>
-                                    <button type="button" class="tplm-snip" data-snip="incidencia"><span class="material-symbols-outlined">report</span> Botón incidencia</button>
-                                    <button type="button" class="tplm-snip" data-snip="saludo"><span class="material-symbols-outlined">waving_hand</span> Saludo</button>
-                                    <button type="button" class="tplm-snip" data-snip="firma"><span class="material-symbols-outlined">draw</span> Firma</button>
-                                </div>
+                                <div class="tplm-snippets" id="tpl-snippets"></div>
                             </div>
 
                             <div class="field">
@@ -604,8 +697,22 @@
                 </div>
             </div>
 
+            <script id="tpl-data" type="application/json"><%- JSON.stringify({
+                placeholderGroups,
+                customVariables: (customVariables||[]).map(v => ({ key:v.key, label:v.label, value:v.value, description:v.description })),
+                snippets: (emailSnippets||[]).map(s => ({ key:s.key, label:s.label, icon:s.icon, html:s.html, text:s.text })),
+                templatesByEvent,
+                sampleVars
+            }) %></script>
             <script>
                 (function setupNotifConfig() {
+                    const DATA = JSON.parse(document.getElementById('tpl-data').textContent || '{}');
+                    const PH_GROUPS  = DATA.placeholderGroups || {};
+                    const CUSTOM_VARS= DATA.customVariables || [];
+                    const SNIPPETS   = DATA.snippets || [];
+                    const TPL        = DATA.templatesByEvent || {};
+                    const SAMPLE     = DATA.sampleVars || {};
+
                     document.querySelectorAll('.notif-mode-select').forEach(sel => {
                         sel.addEventListener('change', e => {
                             const ev = e.target.dataset.event;
@@ -616,21 +723,13 @@
                         });
                     });
 
-                    const SAMPLE = {
-                        '{{fullName}}': 'Juan Pérez',
-                        '{{trackingCode}}': 'ENV-001234',
-                        '{{secretCode}}': '4827',
-                        '{{secretCodeLine}}': '\n\nCódigo clave de entrega: 4827. Mostráselo al repartidor para confirmar la entrega.',
-                        '{{trackingUrl}}': 'https://logitrack.app/portal?q=ENV-001234',
-                        '{{selfServiceUrl}}': 'https://logitrack.app/portal/self/demo-token-1234',
-                        '{{incidentUrl}}': 'https://logitrack.app/portal/incident/new?trackingId=ENV-001234'
-                    };
-                    const fillSample = (s) => String(s || '').replace(/\{\{fullName\}\}|\{\{trackingCode\}\}|\{\{secretCode\}\}|\{\{secretCodeLine\}\}|\{\{trackingUrl\}\}|\{\{selfServiceUrl\}\}|\{\{incidentUrl\}\}/g, m => SAMPLE[m] ?? m);
+                    const fillSample = (s) => String(s || '').replace(/\{\{\s*([\w]+)\s*\}\}/g, (m, k) => (SAMPLE[k] !== undefined ? SAMPLE[k] : m));
                     const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
                     const backdrop = document.getElementById('tpl-modal-backdrop');
                     const form     = document.getElementById('tpl-modal-form');
                     const eventLbl = document.getElementById('tpl-modal-event');
+                    const nameIn   = document.getElementById('tpl-modal-name');
                     const subject  = document.getElementById('tpl-modal-subject');
                     const body     = document.getElementById('tpl-modal-body');
                     const formatIn = document.getElementById('tpl-modal-format');
@@ -638,6 +737,9 @@
                     const pvSubject= document.getElementById('tpl-preview-subject');
                     const pvText   = document.getElementById('tpl-preview-text');
                     const pvHtml   = document.getElementById('tpl-preview-html');
+                    const variantSel = document.getElementById('tpl-variant-select');
+                    const chipsBox = document.getElementById('tpl-placeholders');
+                    const snipsBox = document.getElementById('tpl-snippets');
                     let currentEvent = '';
 
                     function setFormat(fmt) {
@@ -653,8 +755,6 @@
                         if (fmt === 'html') {
                             pvText.style.display = 'none';
                             pvHtml.style.display = 'block';
-                            // Si ya es un documento HTML completo, se usa tal cual (como lo recibirá el cliente).
-                            // Si es un fragmento, se envuelve en un documento mínimo acorde al tema.
                             const isFullDoc = /<!doctype/i.test(filled) || /<html[\s>]/i.test(filled);
                             if (isFullDoc) {
                                 pvHtml.srcdoc = filled;
@@ -670,75 +770,152 @@
                         }
                     }
 
-                    function insertToken(token) {
+                    function insertText(str) {
                         const start = body.selectionStart ?? body.value.length;
                         const end   = body.selectionEnd   ?? body.value.length;
-                        body.value = body.value.slice(0, start) + token + body.value.slice(end);
-                        const pos = start + token.length;
+                        body.value = body.value.slice(0, start) + str + body.value.slice(end);
+                        const pos = start + str.length;
                         body.focus();
                         body.setSelectionRange(pos, pos);
                         renderPreview();
                     }
 
-                    // Panel descriptivo del placeholder enfocado / con hover
+                    // ---- Panel descriptivo del placeholder ----
                     const phDescBox  = document.getElementById('tpl-ph-desc');
                     const phDescText = phDescBox.querySelector('.tplm-ph-desc-text');
                     const phDefault  = phDescText.textContent;
                     const showDesc = (chip) => {
-                        phDescText.innerHTML = '<strong>' + chip.dataset.token + '</strong> — ' + (chip.dataset.desc || '')
-                            + (chip.dataset.sample ? ' <em>Ej.: ' + chip.dataset.sample + '</em>' : '');
+                        const sample = SAMPLE[chip.dataset.key];
+                        phDescText.innerHTML = '<strong>' + escapeHtml(chip.dataset.token) + '</strong> — ' + escapeHtml(chip.dataset.desc || '')
+                            + (sample ? ' <em>Ej.: ' + escapeHtml(String(sample).slice(0, 60)) + '</em>' : '');
                         phDescBox.classList.add('is-active');
                     };
                     const clearDesc = () => { phDescText.textContent = phDefault; phDescBox.classList.remove('is-active'); };
 
-                    // Chips: click para insertar + descripción al hover/focus
-                    document.querySelectorAll('.tplm-chip').forEach(chip => {
-                        chip.addEventListener('click', () => insertToken(chip.dataset.token));
-                        chip.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', chip.dataset.token));
-                        chip.addEventListener('mouseenter', () => showDesc(chip));
-                        chip.addEventListener('focus', () => showDesc(chip));
-                        chip.addEventListener('mouseleave', clearDesc);
-                        chip.addEventListener('blur', clearDesc);
-                    });
-                    // Textarea: aceptar drop de chips en la posición del cursor
+                    // ---- Construir chips de placeholders (catálogo + variables custom) ----
+                    function buildChips() {
+                        chipsBox.innerHTML = '';
+                        const groups = Object.assign({}, PH_GROUPS);
+                        if (CUSTOM_VARS.length) {
+                            groups['Variables'] = CUSTOM_VARS.map(v => ({ token: v.key, label: v.label, description: v.description || ('Valor: ' + v.value), group: 'Variables' }));
+                        }
+                        Object.keys(groups).forEach(group => {
+                            const wrap = document.createElement('div');
+                            wrap.className = 'tplm-chip-group';
+                            wrap.innerHTML = '<span class="tplm-chip-group-label">' + escapeHtml(group) + '</span>';
+                            groups[group].forEach(p => {
+                                const token = '{{' + p.token + '}}';
+                                const b = document.createElement('button');
+                                b.type = 'button';
+                                b.className = 'tplm-chip' + (group === 'Enlaces' ? ' tplm-chip--link' : (group === 'Variables' ? ' tplm-chip--var' : ''));
+                                b.draggable = true;
+                                b.textContent = token;
+                                b.dataset.token = token;
+                                b.dataset.key = p.token;
+                                b.dataset.desc = p.description || '';
+                                b.addEventListener('click', () => insertText(token));
+                                b.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', token));
+                                b.addEventListener('mouseenter', () => showDesc(b));
+                                b.addEventListener('focus', () => showDesc(b));
+                                b.addEventListener('mouseleave', clearDesc);
+                                b.addEventListener('blur', clearDesc);
+                                wrap.appendChild(b);
+                            });
+                            chipsBox.appendChild(wrap);
+                        });
+                    }
+
+                    // ---- Construir bloques rápidos (snippets) ----
+                    function buildSnippets() {
+                        snipsBox.innerHTML = '';
+                        SNIPPETS.forEach(s => {
+                            const b = document.createElement('button');
+                            b.type = 'button';
+                            b.className = 'tplm-snip';
+                            b.innerHTML = (s.icon ? '<span class="material-symbols-outlined">' + escapeHtml(s.icon) + '</span> ' : '') + escapeHtml(s.label);
+                            b.addEventListener('click', () => {
+                                const content = formatIn.value === 'html' ? (s.html || '') : (s.text || '');
+                                insertText((body.value && !body.value.endsWith('\n') ? '\n' : '') + content + '\n');
+                            });
+                            snipsBox.appendChild(b);
+                        });
+                    }
+
                     body.addEventListener('dragover', e => e.preventDefault());
                     body.addEventListener('drop', e => {
                         e.preventDefault();
                         const token = e.dataTransfer.getData('text/plain');
-                        if (token) { insertToken(token); }
+                        if (token) { insertText(token); }
                     });
-
-                    // Bloques rápidos: versión HTML (botón inline email-safe) y versión texto.
-                    const btnHtml = (url, label) => '<a href="' + url + '" style="display:inline-block;background:#2563eb;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-family:sans-serif;font-weight:600">' + label + '</a>';
-                    const SNIPPETS = {
-                        reprogramar: { html: btnHtml('{{selfServiceUrl}}', 'Reprogramar entrega'), text: 'Reprogramá tu entrega o elegí retiro en sucursal: {{selfServiceUrl}}' },
-                        seguimiento: { html: btnHtml('{{trackingUrl}}', 'Ver seguimiento'),       text: 'Seguí tu envío: {{trackingUrl}}' },
-                        incidencia:  { html: btnHtml('{{incidentUrl}}', 'Reportar incidencia'),    text: 'Reportá un problema con tu envío: {{incidentUrl}}' },
-                        saludo:      { html: '<p>Hola <strong>{{fullName}}</strong>,</p>',         text: 'Hola {{fullName}},' },
-                        firma:       { html: '<p style="color:#64748b;font-size:13px">Equipo LogiTrack · Ante dudas, respondé este correo.</p>', text: '\n— Equipo LogiTrack\nAnte dudas, respondé este correo.' }
-                    };
-                    document.querySelectorAll('.tplm-snip').forEach(b => {
-                        b.addEventListener('click', () => {
-                            const snip = SNIPPETS[b.dataset.snip];
-                            if (!snip) { return; }
-                            const isHtml = formatIn.value === 'html';
-                            const content = isHtml ? snip.html : snip.text;
-                            insertToken((body.value && !body.value.endsWith('\n') ? '\n' : '') + content + '\n');
-                        });
-                    });
-
                     toggle.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setFormat(b.dataset.format)));
                     subject.addEventListener('input', renderPreview);
                     body.addEventListener('input', renderPreview);
 
+                    // ---- Variantes ----
+                    function loadVariant(v) {
+                        if (!v) { // nueva variante
+                            form.action = '/setting/email-template/variant/' + currentEvent;
+                            nameIn.value = ''; subject.value = ''; body.value = '';
+                            setFormat('text');
+                            return;
+                        }
+                        form.action = '/setting/email-template/update/' + v.id;
+                        nameIn.value = v.name || '';
+                        subject.value = v.subject || '';
+                        body.value = v.body || '';
+                        setFormat(v.format === 'html' ? 'html' : 'text');
+                    }
+
+                    function fillVariantSelect(selectedId) {
+                        const list = TPL[currentEvent] || [];
+                        variantSel.innerHTML = '';
+                        list.forEach(v => {
+                            const o = document.createElement('option');
+                            o.value = String(v.id);
+                            o.textContent = v.name + (v.isDefault ? ' ★' : '');
+                            variantSel.appendChild(o);
+                        });
+                        if (selectedId != null) { variantSel.value = String(selectedId); }
+                    }
+
+                    variantSel.addEventListener('change', () => {
+                        const list = TPL[currentEvent] || [];
+                        const v = list.find(x => String(x.id) === variantSel.value);
+                        loadVariant(v);
+                    });
+
+                    document.getElementById('tpl-variant-new').addEventListener('click', () => {
+                        variantSel.value = '';
+                        loadVariant(null);
+                        nameIn.focus();
+                    });
+
+                    const postForm = (action) => {
+                        const f = document.createElement('form');
+                        f.method = 'POST'; f.action = action;
+                        document.body.appendChild(f); f.submit();
+                    };
+                    document.getElementById('tpl-variant-default').addEventListener('click', () => {
+                        if (variantSel.value) { postForm('/setting/email-template/default/' + variantSel.value); }
+                    });
+                    document.getElementById('tpl-variant-delete').addEventListener('click', () => {
+                        const list = TPL[currentEvent] || [];
+                        if (!variantSel.value) { return; }
+                        if (list.length <= 1) { alert('No se puede eliminar la única variante del evento.'); return; }
+                        if (confirm('¿Eliminar esta variante?')) { postForm('/setting/email-template/delete/' + variantSel.value); }
+                    });
+
+                    // ---- Abrir modal ----
+                    buildChips();
+                    buildSnippets();
                     document.querySelectorAll('.notif-edit-tpl-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
                             currentEvent = btn.dataset.event;
-                            form.action = '/setting/email-template/' + currentEvent;
                             eventLbl.textContent = btn.dataset.description;
-                            subject.value = btn.dataset.subject || '';
-                            body.value    = btn.dataset.body    || '';
-                            setFormat(btn.dataset.format === 'html' ? 'html' : 'text');
+                            const list = TPL[currentEvent] || [];
+                            const def = list.find(v => v.isDefault) || list[0] || null;
+                            fillVariantSelect(def ? def.id : null);
+                            loadVariant(def);
                             document.getElementById('tpl-modal-test-msg').textContent = '';
                             backdrop.style.display = 'flex';
                         });
@@ -749,7 +926,6 @@
                     document.getElementById('tpl-modal-cancel2').addEventListener('click', close);
                     // No cerrar al hacer click fuera del popup: solo con la X o Cancelar.
 
-                    // Enviar email de prueba (sin guardar)
                     document.getElementById('tpl-modal-test-btn').addEventListener('click', async () => {
                         const msg = document.getElementById('tpl-modal-test-msg');
                         const to  = document.getElementById('tpl-modal-test-email').value.trim();
