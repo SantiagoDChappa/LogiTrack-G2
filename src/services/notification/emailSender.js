@@ -23,10 +23,14 @@ const htmlToText = (html) => String(html || '')
     .trim();
 
 // `format` opcional: 'html' envía cuerpo HTML (con fallback de texto); cualquier otro valor = texto plano.
-async function sendEmail(to, subject, content, format = 'text') {
+// `opts.allowOverride` (default false): solo los envíos de PRUEBA aplican el redirect
+// `test_email_override`. Las notificaciones reales (destinatario/remitente/parametrizado)
+// NUNCA se redirigen: van siempre al destinatario configurado.
+async function sendEmail(to, subject, content, format = 'text', opts = {}) {
     try {
-        const override = (await settingModel.get('test_email_override')) || '';
-        const useOverride = isValidEmail(override);
+        const allowOverride = opts.allowOverride === true;
+        const override = allowOverride ? ((await settingModel.get('test_email_override')) || '') : '';
+        const useOverride = allowOverride && isValidEmail(override);
 
         const recipients = []
             .concat(to || [])

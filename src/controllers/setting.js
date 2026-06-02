@@ -206,7 +206,8 @@ const sendTestTemplate = async (req, res) => {
         if (!isValidEmail(to)) { return res.status(400).json({ ok: false, error: 'Email de prueba inválido.' }); }
         if (!subject || !body) { return res.status(400).json({ ok: false, error: 'Asunto y cuerpo son obligatorios.' }); }
 
-        await sendEmail(to, `[PRUEBA] ${await sampleFill(subject)}`, await sampleFill(body), format);
+        // Envío de prueba: sí aplica el redirect test_email_override (es testeo, no flujo real).
+        await sendEmail(to, `[PRUEBA] ${await sampleFill(subject)}`, await sampleFill(body), format, { allowOverride: true });
         res.json({ ok: true });
     } catch (err) {
         console.error('sendTestTemplate:', err.message);
