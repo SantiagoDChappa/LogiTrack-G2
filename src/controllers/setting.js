@@ -13,24 +13,25 @@ const standardMessageModel = require('../models/standardMessage');
 const deliveryWindowModel = require('../models/deliveryTimeWindow');
 const incidentTypeModel = require('../models/incidentType');
 const incidentNotifConfig = require('../services/incidentNotifConfig');
+const { queueEmail } = require('../services/notification/notificationEmailService');
 
 const getSettings = async (req, res) => {
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
-           failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif] = await Promise.all([
-        settingModel.getAll(),
-        provinceModel.getAll(),
-        branchModel.getAll(),
-        userModel.getAll(),
-        getRouteOptimizerSettings(),
-        NotificationConfigModel.getAllConfigs(),
-        emailTemplateModel.getAll(),
-        settingLogModel.getAll(),
-        failedReasonModel.getAll().catch(() => []),
-        standardMessageModel.getAll().catch(() => []),
-        deliveryWindowModel.getAll().catch(() => []),
-        incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
-        incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
-    ]);
+        failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif] = await Promise.all([
+            settingModel.getAll(),
+            provinceModel.getAll(),
+            branchModel.getAll(),
+            userModel.getAll(),
+            getRouteOptimizerSettings(),
+            NotificationConfigModel.getAllConfigs(),
+            emailTemplateModel.getAll(),
+            settingLogModel.getAll(),
+            failedReasonModel.getAll().catch(() => []),
+            standardMessageModel.getAll().catch(() => []),
+            deliveryWindowModel.getAll().catch(() => []),
+            incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
+            incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
+        ]);
 
     const templatesByEvent = {};
     for (const t of emailTemplates) {
@@ -44,24 +45,24 @@ const getSettings = async (req, res) => {
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
-            reschedule_default_days:  settings.reschedule_default_days  || '1',
+            reschedule_default_days: settings.reschedule_default_days || '1',
             reschedule_max_per_envio: settings.reschedule_max_per_envio || '3',
-            max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
-            dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
-            notificaciones_activas:   settings.notificaciones_activas   || 'true',
-            horario_entrega_inicio:   settings.horario_entrega_inicio   || '08:00',
-            horario_entrega_fin:      settings.horario_entrega_fin      || '20:00',
-            peso_maximo_envio:        settings.peso_maximo_envio        || '50',
+            max_intentos_fallidos: settings.max_intentos_fallidos || '3',
+            dias_expiracion_envio: settings.dias_expiracion_envio || '30',
+            notificaciones_activas: settings.notificaciones_activas || 'true',
+            horario_entrega_inicio: settings.horario_entrega_inicio || '08:00',
+            horario_entrega_fin: settings.horario_entrega_fin || '20:00',
+            peso_maximo_envio: settings.peso_maximo_envio || '50',
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
-            costo_base_envio:         settings.costo_base_envio         || '500',
-            nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
-            telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
-            email_soporte:            settings.email_soporte            || 'soporte@logitrack.com',
-            proceso_revisar_expirados_hora:    settings.proceso_revisar_expirados_hora    || '02:00',
-            proceso_revisar_prioridades_hora:  settings.proceso_revisar_prioridades_hora  || '03:00',
-            proceso_generar_reportes_hora:     settings.proceso_generar_reportes_hora     || '04:00',
-            proceso_notificaciones_hora:       settings.proceso_notificaciones_hora       || '05:00',
-            test_email_override:               settings.test_email_override               || '',
+            costo_base_envio: settings.costo_base_envio || '500',
+            nombre_empresa: settings.nombre_empresa || 'LogiTrack',
+            telefono_soporte: settings.telefono_soporte || '0800-555-5678',
+            email_soporte: settings.email_soporte || 'soporte@logitrack.com',
+            proceso_revisar_expirados_hora: settings.proceso_revisar_expirados_hora || '02:00',
+            proceso_revisar_prioridades_hora: settings.proceso_revisar_prioridades_hora || '03:00',
+            proceso_generar_reportes_hora: settings.proceso_generar_reportes_hora || '04:00',
+            proceso_notificaciones_hora: settings.proceso_notificaciones_hora || '05:00',
+            test_email_override: settings.test_email_override || '',
         }
     });
 };
@@ -74,8 +75,8 @@ const saveNotificationConfig = async (req, res) => {
         const configs = await NotificationConfigModel.getAllConfigs();
         for (const cfg of configs) {
             const enabled = req.body[`enabled_${cfg.eventCode}`] === 'on';
-            let mode      = req.body[`mode_${cfg.eventCode}`] || 'recipient';
-            let custom    = (req.body[`custom_${cfg.eventCode}`] || '').trim();
+            let mode = req.body[`mode_${cfg.eventCode}`] || 'recipient';
+            let custom = (req.body[`custom_${cfg.eventCode}`] || '').trim();
 
             if (!VALID_RECIPIENT_MODES.includes(mode)) { mode = 'recipient'; }
             if (mode === 'custom' && !isValidEmail(custom)) {
@@ -99,7 +100,7 @@ const saveEmailTemplate = async (req, res) => {
     try {
         const { eventCode } = req.params;
         const subject = (req.body.subject || '').trim();
-        const body    = (req.body.body    || '').trim();
+        const body = (req.body.body || '').trim();
         if (!subject || !body) {
             return res.redirect('/setting?error=template_empty');
         }
@@ -412,12 +413,12 @@ const saveIncidentType = async (req, res) => {
 const saveIncidentNotifConfig = async (req, res) => {
     try {
         await incidentNotifConfig.set({
-            notifySupervisorBranch:  req.body.notifySupervisorBranch  === 'on',
-            notifyAssignedOperator:  req.body.notifyAssignedOperator  === 'on',
-            notifyAdmins:            req.body.notifyAdmins            === 'on',
-            notifyReporter:          req.body.notifyReporter          === 'on',
+            notifySupervisorBranch: req.body.notifySupervisorBranch === 'on',
+            notifyAssignedOperator: req.body.notifyAssignedOperator === 'on',
+            notifyAdmins: req.body.notifyAdmins === 'on',
+            notifyReporter: req.body.notifyReporter === 'on',
             notifyShipmentRecipient: req.body.notifyShipmentRecipient === 'on',
-            customEmails:            req.body.customEmails || ''
+            customEmails: req.body.customEmails || ''
         });
         res.redirect('/setting?success=incident_notif');
     } catch (err) {
@@ -426,9 +427,62 @@ const saveIncidentNotifConfig = async (req, res) => {
     }
 };
 
+function isValidEmail(email) {
+    return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+const testShipmentNotification = async (req, res) => {
+    const { emailRecipients, shipmentEventCode, template } = req.body;
+
+
+    const recipients = emailRecipients.split(',').map(e => e.trim()).filter(e => isValidEmail(e));
+    if (recipients.length === 0) {
+        return res.status(400).json({ success: false, message: 'No valid email addresses provided.' });
+    };
+
+    template.body = template.body.replace('{{fullName}}', 'Sujeto123').replace('{{trackingCode}}', 'TRACK123456');
+
+    for (const recipient of recipients) {
+        try {
+            await queueEmail({ recipient: recipient, subject: template.subject, body: template.body });
+        } catch (error) {
+            console.error(`Error sending email to ${recipient}:`, error);
+        }
+    };
+};
+
+const testShipmentNotificationV2 = async (req, res) => {
+    const { emailRecipients, shipmentEventCode, template, placeHolders} = req.body;
+
+    const recipients = emailRecipients.split(',').map(e => e.trim()).filter(e => isValidEmail(e));
+    if (recipients.length === 0) {
+        return res.status(400).json({ success: false, message: 'No valid email addresses provided.' });
+    };
+
+    if (shipmentEventCode) {
+        template = await emailTemplateModel.getByEventCode(shipmentEventCode);
+    }
+    
+    for (const [key, value] of Object.entries(placeHolders)) {
+        template.body = template.body.replace(new RegExp(`{{${key}}}`, 'g'), value);
+        template.subject = template.subject.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    }
+
+    const regex = /{{\s*[\s\S]*?\s*}}/g;
+    template.body = template.body.replace(regex, "--invalid placeholder--");
+
+    for (const recipient of recipients) {
+        try {
+            await queueEmail({ recipient: recipient, subject: template.subject, body: template.body });
+        } catch (error) {
+            console.error(`Error sending email to ${recipient}:`, error);
+        }
+    }
+};
+
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
     saveParams, saveNotificationConfig, saveEmailTemplate, saveTestEmailOverride,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig,
+    saveIncidentNotifConfig, testShipmentNotification
 };
