@@ -5,6 +5,10 @@ const userModel = require('../models/user');
 const { PROVINCES } = require('../utils/provinces');
 const NotificationConfigModel = require('../models/notificationConfig');
 const emailTemplateModel = require('../models/emailTemplate');
+const notificationVariableModel = require('../models/notificationVariable');
+const emailSnippetModel = require('../models/emailSnippet');
+const placeholders = require('../services/notificationPlaceholders');
+const { queueEmail } = require('../services/notification/notificationEmailService');
 const settingLogModel = require('../models/settingLog');
 const { expireShipments } = require('../utils/expireShipments');
 // Sprint 3 - 2.5 parámetros configurables
@@ -13,56 +17,73 @@ const standardMessageModel = require('../models/standardMessage');
 const deliveryWindowModel = require('../models/deliveryTimeWindow');
 const incidentTypeModel = require('../models/incidentType');
 const incidentNotifConfig = require('../services/incidentNotifConfig');
-const { queueEmail } = require('../services/notification/notificationEmailService');
 
 const getSettings = async (req, res) => {
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
-        failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif] = await Promise.all([
-            settingModel.getAll(),
-            provinceModel.getAll(),
-            branchModel.getAll(),
-            userModel.getAll(),
-            getRouteOptimizerSettings(),
-            NotificationConfigModel.getAllConfigs(),
-            emailTemplateModel.getAll(),
-            settingLogModel.getAll(),
-            failedReasonModel.getAll().catch(() => []),
-            standardMessageModel.getAll().catch(() => []),
-            deliveryWindowModel.getAll().catch(() => []),
-            incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
-            incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
-        ]);
+           failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
+           customVariables, emailSnippets] = await Promise.all([
+        settingModel.getAll(),
+        provinceModel.getAll(),
+        branchModel.getAll(),
+        userModel.getAll(),
+        getRouteOptimizerSettings(),
+        NotificationConfigModel.getAllConfigs(),
+        emailTemplateModel.getAll(),
+        settingLogModel.getAll(),
+        failedReasonModel.getAll().catch(() => []),
+        standardMessageModel.getAll().catch(() => []),
+        deliveryWindowModel.getAll().catch(() => []),
+        incidentTypeModel.IncidentType?.findAll?.({ order: [['description', 'ASC']] }).catch(() => []) || [],
+        incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
+        notificationVariableModel.getAll().catch(() => []),
+        emailSnippetModel.getAll().catch(() => []),
+    ]);
 
+    // Variantes de plantilla agrupadas por evento (lista). La 1ra es la predeterminada.
     const templatesByEvent = {};
     for (const t of emailTemplates) {
-        templatesByEvent[t.eventCode] = { subject: t.subject, body: t.body };
+        const item = { id: t.id, name: t.name || 'Principal', subject: t.subject, body: t.body, format: t.format || 'text', isDefault: !!t.isDefault };
+        (templatesByEvent[t.eventCode] = templatesByEvent[t.eventCode] || []).push(item);
     }
+    for (const ev of Object.keys(templatesByEvent)) {
+        templatesByEvent[ev].sort((a, b) => (b.isDefault - a.isDefault) || (a.id - b.id));
+    }
+
+    // Catálogo de placeholders de datos (agrupado) para los chips del editor.
+    const placeholderGroups = {};
+    for (const p of placeholders.catalogMeta()) {
+        (placeholderGroups[p.group] = placeholderGroups[p.group] || []).push(p);
+    }
+    // Valores de ejemplo (datos del envío de muestra + variables custom) para la preview/prueba.
+    const sampleVars = { ...placeholders.buildVars(placeholders.sampleShipment()) };
+    for (const v of customVariables) { sampleVars[v.key] = v.value; }
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
     res.render('setting/index', {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
+        placeholderGroups, customVariables, emailSnippets, sampleVars,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
-            reschedule_default_days: settings.reschedule_default_days || '1',
+            reschedule_default_days:  settings.reschedule_default_days  || '1',
             reschedule_max_per_envio: settings.reschedule_max_per_envio || '3',
-            max_intentos_fallidos: settings.max_intentos_fallidos || '3',
-            dias_expiracion_envio: settings.dias_expiracion_envio || '30',
-            notificaciones_activas: settings.notificaciones_activas || 'true',
-            horario_entrega_inicio: settings.horario_entrega_inicio || '08:00',
-            horario_entrega_fin: settings.horario_entrega_fin || '20:00',
-            peso_maximo_envio: settings.peso_maximo_envio || '50',
+            max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
+            dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
+            notificaciones_activas:   settings.notificaciones_activas   || 'true',
+            horario_entrega_inicio:   settings.horario_entrega_inicio   || '08:00',
+            horario_entrega_fin:      settings.horario_entrega_fin      || '20:00',
+            peso_maximo_envio:        settings.peso_maximo_envio        || '50',
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
-            costo_base_envio: settings.costo_base_envio || '500',
-            nombre_empresa: settings.nombre_empresa || 'LogiTrack',
-            telefono_soporte: settings.telefono_soporte || '0800-555-5678',
-            email_soporte: settings.email_soporte || 'soporte@logitrack.com',
-            proceso_revisar_expirados_hora: settings.proceso_revisar_expirados_hora || '02:00',
-            proceso_revisar_prioridades_hora: settings.proceso_revisar_prioridades_hora || '03:00',
-            proceso_generar_reportes_hora: settings.proceso_generar_reportes_hora || '04:00',
-            proceso_notificaciones_hora: settings.proceso_notificaciones_hora || '05:00',
-            test_email_override: settings.test_email_override || '',
+            costo_base_envio:         settings.costo_base_envio         || '500',
+            nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
+            telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
+            email_soporte:            settings.email_soporte            || 'soporte@logitrack.com',
+            proceso_revisar_expirados_hora:    settings.proceso_revisar_expirados_hora    || '02:00',
+            proceso_revisar_prioridades_hora:  settings.proceso_revisar_prioridades_hora  || '03:00',
+            proceso_generar_reportes_hora:     settings.proceso_generar_reportes_hora     || '04:00',
+            proceso_notificaciones_hora:       settings.proceso_notificaciones_hora       || '05:00',
+            test_email_override:               settings.test_email_override               || '',
         }
     });
 };
@@ -75,8 +96,8 @@ const saveNotificationConfig = async (req, res) => {
         const configs = await NotificationConfigModel.getAllConfigs();
         for (const cfg of configs) {
             const enabled = req.body[`enabled_${cfg.eventCode}`] === 'on';
-            let mode = req.body[`mode_${cfg.eventCode}`] || 'recipient';
-            let custom = (req.body[`custom_${cfg.eventCode}`] || '').trim();
+            let mode      = req.body[`mode_${cfg.eventCode}`] || 'recipient';
+            let custom    = (req.body[`custom_${cfg.eventCode}`] || '').trim();
 
             if (!VALID_RECIPIENT_MODES.includes(mode)) { mode = 'recipient'; }
             if (mode === 'custom' && !isValidEmail(custom)) {
@@ -96,20 +117,214 @@ const saveNotificationConfig = async (req, res) => {
     }
 };
 
+// Edita la plantilla predeterminada del evento (compatibilidad).
 const saveEmailTemplate = async (req, res) => {
     try {
         const { eventCode } = req.params;
         const subject = (req.body.subject || '').trim();
-        const body = (req.body.body || '').trim();
-        if (!subject || !body) {
-            return res.redirect('/setting?error=template_empty');
-        }
-        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body });
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        const name    = (req.body.name || '').trim() || undefined;
+        if (!subject || !body) { return res.redirect('/setting?error=template_empty'); }
+        const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body, format, name });
         if (!updated) { return res.redirect('/setting?error=template_not_found'); }
         res.redirect('/setting?success=tpl');
     } catch (err) {
         console.error('saveEmailTemplate:', err.message);
         res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+// Edita una variante puntual por id.
+const updateEmailTemplateById = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const subject = (req.body.subject || '').trim();
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        const name    = (req.body.name || '').trim() || undefined;
+        if (!subject || !body) { return res.redirect('/setting?error=template_empty'); }
+        const updated = await emailTemplateModel.updateById(id, { subject, body, format, name });
+        if (!updated) { return res.redirect('/setting?error=template_not_found'); }
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('updateEmailTemplateById:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const createEmailTemplateVariant = async (req, res) => {
+    try {
+        const { eventCode } = req.params;
+        const name    = (req.body.name || '').trim() || 'Variante';
+        const subject = (req.body.subject || '').trim() || '(sin asunto)';
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        await emailTemplateModel.createVariant(eventCode, { name, subject, body, format });
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('createEmailTemplateVariant:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const setDefaultEmailTemplate = async (req, res) => {
+    try {
+        await emailTemplateModel.setDefault(Number(req.params.id));
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('setDefaultEmailTemplate:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+const deleteEmailTemplate = async (req, res) => {
+    try {
+        const r = await emailTemplateModel.deleteVariant(Number(req.params.id));
+        if (!r.ok && r.reason === 'last') { return res.redirect('/setting?error=tpl_last'); }
+        res.redirect('/setting?success=tpl');
+    } catch (err) {
+        console.error('deleteEmailTemplate:', err.message);
+        res.status(500).redirect('/setting?error=tpl_save');
+    }
+};
+
+// Render de prueba/preview con shipment de ejemplo + variables custom (usa el catálogo real).
+const sampleFill = async (s) => {
+    const vars = { ...placeholders.buildVars(placeholders.sampleShipment()), ...await notificationVariableModel.getAllAsMap() };
+    return placeholders.render(s, vars);
+};
+
+// Envía un email de prueba del template (sin persistir cambios) usando datos de ejemplo.
+const sendTestTemplate = async (req, res) => {
+    try {
+        const { sendEmail } = require('../services/notification/emailSender');
+        const to      = (req.body.testEmail || '').trim();
+        const subject = (req.body.subject || '').trim();
+        const body    = (req.body.body    || '').trim();
+        const format  = req.body.format === 'html' ? 'html' : 'text';
+        if (!isValidEmail(to)) { return res.status(400).json({ ok: false, error: 'Email de prueba inválido.' }); }
+        if (!subject || !body) { return res.status(400).json({ ok: false, error: 'Asunto y cuerpo son obligatorios.' }); }
+
+        await sendEmail(to, `[PRUEBA] ${await sampleFill(subject)}`, await sampleFill(body), format);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('sendTestTemplate:', err.message);
+        res.status(500).json({ ok: false, error: 'No se pudo enviar el email de prueba.' });
+    }
+};
+
+// Prueba de notificaciones por email (PR68): envía a varios destinatarios usando
+// el template de un evento (opcional) o un texto libre. Resuelve placeholders con
+// datos de ejemplo + variables custom y encola los mails.
+const testShipmentNotification = async (req, res) => {
+    try {
+        const recipients = String(req.body.emailRecipients || '')
+            .split(',').map(e => e.trim()).filter(isValidEmail);
+        if (recipients.length === 0) {
+            return res.redirect('/setting?error=test_notif_recipients');
+        }
+
+        const eventCode = (req.body.shipmentEventCode || '').trim();
+        let subject = 'Notificación de prueba — LogiTrack';
+        let body    = (req.body.template || '').trim();
+        let format  = 'text';
+
+        if (eventCode) {
+            const tpl = await emailTemplateModel.getDefaultByEventCode(eventCode);
+            if (tpl) { subject = tpl.subject; body = body || tpl.body; format = tpl.format || 'text'; }
+        }
+        if (!body) {
+            return res.redirect('/setting?error=test_notif_empty');
+        }
+
+        const subjectFilled = await sampleFill(subject);
+        const bodyFilled    = await sampleFill(body);
+        for (const recipient of recipients) {
+            await queueEmail({ recipient, subject: subjectFilled, body: bodyFilled, format });
+        }
+        res.redirect('/setting?success=test_notif');
+    } catch (err) {
+        console.error('testShipmentNotification:', err.message);
+        res.status(500).redirect('/setting?error=test_notif');
+    }
+};
+
+// ===== Variables custom de notificación (ABM) =====
+const VAR_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+const saveNotificationVariable = async (req, res) => {
+    try {
+        const { NotificationVariable } = notificationVariableModel;
+        const id = req.params.id ? Number(req.params.id) : null;
+        const key   = (req.body.key   || '').trim();
+        const label = (req.body.label || '').trim();
+        const value = (req.body.value || '');
+        const description = (req.body.description || '').trim() || null;
+        if (!label || !key) { return res.redirect('/setting?error=var_empty'); }
+        if (!VAR_KEY_RE.test(key)) { return res.redirect('/setting?error=var_key'); }
+
+        if (id) {
+            const row = await notificationVariableModel.getById(id);
+            if (!row) { return res.redirect('/setting?error=var_not_found'); }
+            await row.update({ key, label, value, description });
+        } else {
+            await NotificationVariable.create({ key, label, value, description });
+        }
+        res.redirect('/setting?success=var');
+    } catch (err) {
+        console.error('saveNotificationVariable:', err.message);
+        res.status(500).redirect('/setting?error=var_save');
+    }
+};
+
+const deleteNotificationVariable = async (req, res) => {
+    try {
+        const row = await notificationVariableModel.getById(Number(req.params.id));
+        if (row) { await row.destroy(); }
+        res.redirect('/setting?success=var');
+    } catch (err) {
+        console.error('deleteNotificationVariable:', err.message);
+        res.status(500).redirect('/setting?error=var_save');
+    }
+};
+
+// ===== Snippets / bloques de email (ABM) =====
+const saveEmailSnippet = async (req, res) => {
+    try {
+        const { EmailSnippet } = emailSnippetModel;
+        const id = req.params.id ? Number(req.params.id) : null;
+        const label = (req.body.label || '').trim();
+        const icon  = (req.body.icon  || '').trim() || null;
+        const html  = (req.body.html  || '');
+        const text  = (req.body.text  || '');
+        if (!label) { return res.redirect('/setting?error=snip_empty'); }
+
+        if (id) {
+            const row = await emailSnippetModel.getById(id);
+            if (!row) { return res.redirect('/setting?error=snip_not_found'); }
+            // builtin: solo se editan textos/label/icon, no la key.
+            await row.update({ label, icon, html, text });
+        } else {
+            const key = (req.body.key || '').trim() || ('snip_' + Date.now());
+            if (!VAR_KEY_RE.test(key)) { return res.redirect('/setting?error=snip_key'); }
+            await EmailSnippet.create({ key, label, icon, html, text, builtin: false });
+        }
+        res.redirect('/setting?success=snip');
+    } catch (err) {
+        console.error('saveEmailSnippet:', err.message);
+        res.status(500).redirect('/setting?error=snip_save');
+    }
+};
+
+const deleteEmailSnippet = async (req, res) => {
+    try {
+        const row = await emailSnippetModel.getById(Number(req.params.id));
+        if (row && row.builtin) { return res.redirect('/setting?error=snip_builtin'); }
+        if (row) { await row.destroy(); }
+        res.redirect('/setting?success=snip');
+    } catch (err) {
+        console.error('deleteEmailSnippet:', err.message);
+        res.status(500).redirect('/setting?error=snip_save');
     }
 };
 
@@ -413,12 +628,12 @@ const saveIncidentType = async (req, res) => {
 const saveIncidentNotifConfig = async (req, res) => {
     try {
         await incidentNotifConfig.set({
-            notifySupervisorBranch: req.body.notifySupervisorBranch === 'on',
-            notifyAssignedOperator: req.body.notifyAssignedOperator === 'on',
-            notifyAdmins: req.body.notifyAdmins === 'on',
-            notifyReporter: req.body.notifyReporter === 'on',
+            notifySupervisorBranch:  req.body.notifySupervisorBranch  === 'on',
+            notifyAssignedOperator:  req.body.notifyAssignedOperator  === 'on',
+            notifyAdmins:            req.body.notifyAdmins            === 'on',
+            notifyReporter:          req.body.notifyReporter          === 'on',
             notifyShipmentRecipient: req.body.notifyShipmentRecipient === 'on',
-            customEmails: req.body.customEmails || ''
+            customEmails:            req.body.customEmails || ''
         });
         res.redirect('/setting?success=incident_notif');
     } catch (err) {
@@ -427,62 +642,11 @@ const saveIncidentNotifConfig = async (req, res) => {
     }
 };
 
-function isValidEmail(email) {
-    return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-const testShipmentNotification = async (req, res) => {
-    const { emailRecipients, shipmentEventCode, template } = req.body;
-
-
-    const recipients = emailRecipients.split(',').map(e => e.trim()).filter(e => isValidEmail(e));
-    if (recipients.length === 0) {
-        return res.status(400).json({ success: false, message: 'No valid email addresses provided.' });
-    };
-
-    template.body = template.body.replace('{{fullName}}', 'Sujeto123').replace('{{trackingCode}}', 'TRACK123456');
-
-    for (const recipient of recipients) {
-        try {
-            await queueEmail({ recipient: recipient, subject: template.subject, body: template.body });
-        } catch (error) {
-            console.error(`Error sending email to ${recipient}:`, error);
-        }
-    };
-};
-
-const testShipmentNotificationV2 = async (req, res) => {
-    const { emailRecipients, shipmentEventCode, template, placeHolders} = req.body;
-
-    const recipients = emailRecipients.split(',').map(e => e.trim()).filter(e => isValidEmail(e));
-    if (recipients.length === 0) {
-        return res.status(400).json({ success: false, message: 'No valid email addresses provided.' });
-    };
-
-    if (shipmentEventCode) {
-        template = await emailTemplateModel.getByEventCode(shipmentEventCode);
-    }
-    
-    for (const [key, value] of Object.entries(placeHolders)) {
-        template.body = template.body.replace(new RegExp(`{{${key}}}`, 'g'), value);
-        template.subject = template.subject.replace(new RegExp(`{{${key}}}`, 'g'), value);
-    }
-
-    const regex = /{{\s*[\s\S]*?\s*}}/g;
-    template.body = template.body.replace(regex, "--invalid placeholder--");
-
-    for (const recipient of recipients) {
-        try {
-            await queueEmail({ recipient: recipient, subject: template.subject, body: template.body });
-        } catch (error) {
-            console.error(`Error sending email to ${recipient}:`, error);
-        }
-    }
-};
-
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
-    saveParams, saveNotificationConfig, saveEmailTemplate, saveTestEmailOverride,
+    saveParams, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
+    updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
+    saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification
+    saveIncidentNotifConfig, testShipmentNotification,
 };

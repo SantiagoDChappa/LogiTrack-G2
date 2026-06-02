@@ -9,7 +9,21 @@ router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 router.post('/params',          requireAdmin, settingController.saveParams);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
-router.post('/email-template/:eventCode',   requireAdmin, settingController.saveEmailTemplate);
+// Variantes de plantilla (rutas específicas antes de las genéricas por :eventCode)
+router.post('/email-template/variant/:eventCode', requireAdmin, settingController.createEmailTemplateVariant);
+router.post('/email-template/update/:id',         requireAdmin, settingController.updateEmailTemplateById);
+router.post('/email-template/default/:id',        requireAdmin, settingController.setDefaultEmailTemplate);
+router.post('/email-template/delete/:id',         requireAdmin, settingController.deleteEmailTemplate);
+router.post('/email-template/:eventCode/test',    requireAdmin, settingController.sendTestTemplate);
+router.post('/email-template/:eventCode',         requireAdmin, settingController.saveEmailTemplate);
+
+// Variables custom y snippets de email
+router.post('/notification-variable',          requireAdmin, settingController.saveNotificationVariable);
+router.post('/notification-variable/:id',      requireAdmin, settingController.saveNotificationVariable);
+router.post('/notification-variable/:id/delete', requireAdmin, settingController.deleteNotificationVariable);
+router.post('/email-snippet',                  requireAdmin, settingController.saveEmailSnippet);
+router.post('/email-snippet/:id',              requireAdmin, settingController.saveEmailSnippet);
+router.post('/email-snippet/:id/delete',       requireAdmin, settingController.deleteEmailSnippet);
 router.post('/test-email-override',         requireAdmin, settingController.saveTestEmailOverride);
 // Sprint 3 - 2.5 parámetros configurables nuevos
 router.post('/failed-reason',          requireAdmin, settingController.saveFailedReason);

@@ -43,7 +43,7 @@
                     <div class="alert alert-error"><%= error %></div>
                 <% } %>
 
-                <form method="POST" action="/portal/incident" class="portal-incident-form">
+                <form method="POST" action="/portal/incident" class="portal-incident-form" enctype="multipart/form-data">
                     <section class="portal-incident-block">
                         <% const currentTrackingId = String(form.trackingId || trackingId || (shipment ? shipment.trackingId : '') || '').trim(); %>
                         <% const trackingLocked = Boolean(currentTrackingId); %>
@@ -110,6 +110,12 @@
                                 <label for="description">Descripcion del problema</label>
                                 <textarea id="description" name="description" rows="5" maxlength="2000" required placeholder="Ej: el envio llego con demora, el paquete estaba danado o la direccion no fue encontrada."><%= form.description || '' %></textarea>
                                 <small>Puede incluir fechas, observaciones y cualquier dato util para la revision.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="evidence">Adjuntar evidencia (opcional)</label>
+                                <input type="file" id="evidence" name="evidence" accept="image/jpeg,image/png,application/pdf">
+                                <small>Foto o PDF (JPG, PNG o PDF), hasta 5 MB.</small>
                             </div>
                         </div>
                     </section>
