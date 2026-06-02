@@ -26,6 +26,7 @@ const { IncidentHistory } = require('./incidentHistory');
 const { IncidentTaskTemplate } = require('./incidentTaskTemplate');
 const { IncidentTask }         = require('./incidentTask');
 const { IncidentAttachment }   = require('./incidentAttachment');
+const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -207,6 +208,7 @@ module.exports = {
     IncidentTaskTemplate,
     IncidentTask,
     IncidentAttachment,
+    IncidentPendingConfirmation,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,
