@@ -27,24 +27,20 @@
                             <input type="date" id="to" name="to" value="<%= dateTo %>" required>
                         </div>
                         <div class="filter-actions">
-                            <button type="submit" class="btn-primary">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
                                 <span class="material-symbols-outlined">search</span>
-                                Consultar
                             </button>
                             <% if (hasQuery) { %>
-                                <a href="/report/delivery-performance" class="btn-outline">
+                                <a href="/report/delivery-performance" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
                                     <span class="material-symbols-outlined">refresh</span>
-                                    Limpiar
                                 </a>
                             <% } %>
                             <% if (!error) { %>
-                                <a href="/report/delivery-performance/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="btn-outline">
+                                <a href="/report/delivery-performance/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
                                     <span class="material-symbols-outlined">download</span>
-                                    Exportar CSV
                                 </a>
-                                <a href="/report/delivery-performance/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="btn-outline">
+                                <a href="/report/delivery-performance/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="action-btn action-btn--lg neutro" data-tooltip="Exportar PDF" aria-label="Exportar PDF">
                                     <span class="material-symbols-outlined">picture_as_pdf</span>
-                                    Exportar PDF
                                 </a>
                             <% } %>
                         </div>

@@ -13,12 +13,12 @@
             <h1>Administrador de envios</h1>
             <div class="page-header__actions">
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
-                    <a href="/shipment/export" class="btn-secondary" download>
-                        <span class="material-symbols-outlined">download</span>Exportar CSV
+                    <a href="/shipment/export" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV" download>
+                        <span class="material-symbols-outlined">download</span>
                     </a>
                 <% } %>
-                <a href="/shipment/new" class="btn-primary">
-                    <span class="material-symbols-outlined">add</span>Alta
+                <a href="/shipment/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Alta de envío" aria-label="Alta de envío">
+                    <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
         </div>
@@ -67,8 +67,8 @@
                     <input type="text" id="recipientDocument" name="recipientDocument" placeholder="Ej: 45034934" value="<%= query.recipientDocument || '' %>" class="search-input">
                 </div>
 
-                <button type="submit" class="btn-primary search-btn">
-                    <span class="material-symbols-outlined">search</span>Buscar
+                <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                    <span class="material-symbols-outlined">search</span>
                 </button>
                 <% const _hasBranchFilter = isAdmin && query.currentBranchId; %>
                 <% const _hasStatusFilter = query.statusIds && query.statusIds.length > 0; %>
