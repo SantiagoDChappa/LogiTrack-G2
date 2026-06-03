@@ -17,6 +17,8 @@ const standardMessageModel = require('../models/standardMessage');
 const deliveryWindowModel = require('../models/deliveryTimeWindow');
 const incidentTypeModel = require('../models/incidentType');
 const incidentNotifConfig = require('../services/incidentNotifConfig');
+const statusModel = require('../models/status');
+const statusColors = require('../services/statusColors');
 
 const getSettings = async (req, res) => {
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
@@ -38,6 +40,14 @@ const getSettings = async (req, res) => {
         notificationVariableModel.getAll().catch(() => []),
         emailSnippetModel.getAll().catch(() => []),
     ]);
+
+    // LGT-173: estados con su color configurado (o vacío) para la tarjeta de colores.
+    const statusList = await statusModel.getAll().catch(() => []);
+    const statusColorList = statusList.map(s => ({
+        id: s.id,
+        description: s.description,
+        color: settings[statusColors.keyFor(s.id)] || '',
+    }));
 
     // Variantes de plantilla agrupadas por evento (lista). La 1ra es la predeterminada.
     const templatesByEvent = {};
@@ -64,6 +74,7 @@ const getSettings = async (req, res) => {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         placeholderGroups, customVariables, emailSnippets, sampleVars,
+        statusColorList,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -342,6 +353,29 @@ const saveTestEmailOverride = async (req, res) => {
     } catch (err) {
         console.error('saveTestEmailOverride:', err.message);
         res.status(500).redirect('/setting?error=override_save');
+    }
+};
+
+// LGT-173: guarda el color personalizado de cada estado de envío.
+const saveStatusColors = async (req, res) => {
+    try {
+        const statuses = await statusModel.getAll();
+        for (const s of statuses) {
+            const key        = statusColors.keyFor(s.id);
+            const useDefault = req.body[`default_${s.id}`] === 'on';
+            // Checkbox "usar color del tema" tildado => se borra la personalización.
+            const value = useDefault ? '' : (req.body[key] || '').trim();
+            if (value && !statusColors.isValidHex(value)) {
+                return res.redirect('/setting?error=color_invalido');
+            }
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect('/setting?success=status_colors');
+    } catch (err) {
+        console.error('saveStatusColors:', err.message);
+        res.status(500).redirect('/setting?error=status_colors_save');
     }
 };
 
@@ -649,5 +683,5 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification,
+    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors,
 };

@@ -8,6 +8,7 @@ router.post('/',             requireAdmin, settingController.saveSettings);
 router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 router.post('/params',          requireAdmin, settingController.saveParams);
+router.post('/status-colors',   requireAdmin, settingController.saveStatusColors);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
 // Variantes de plantilla (rutas específicas antes de las genéricas por :eventCode)
 router.post('/email-template/variant/:eventCode', requireAdmin, settingController.createEmailTemplateVariant);

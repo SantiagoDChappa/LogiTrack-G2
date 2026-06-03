@@ -259,6 +259,55 @@
                 </form>
             </div>
 
+            <!-- LGT-173: Colores de estados -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">format_color_fill</span>
+                    Colores de estados
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el color de cada estado de envío. Se aplica en los listados, el detalle y el seguimiento. Dejá tildado "Color del tema" para usar el predeterminado.
+                </p>
+                <form method="POST" action="/setting/status-colors">
+                    <div class="status-colors-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem">
+                        <% (statusColorList || []).forEach(function(st) { %>
+                            <% var _scolor = st.color || '#64748b'; %>
+                            <div class="status-color-row" style="display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-alt)">
+                                <input type="color" name="status_color_<%= st.id %>" value="<%= _scolor %>"
+                                       style="width:38px;height:38px;border:none;background:none;cursor:pointer;flex-shrink:0"
+                                       data-status-preview="<%= st.id %>">
+                                <div style="flex:1;min-width:0">
+                                    <span class="status-badge" id="status-preview-<%= st.id %>"
+                                          style="background-color:<%= _scolor %>22;color:<%= _scolor %>"><%= st.description %></span>
+                                    <label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;font-size:var(--font-size-xs);text-transform:none;font-weight:500;color:var(--color-text-secondary)">
+                                        <input type="checkbox" name="default_<%= st.id %>" <%= st.color ? '' : 'checked' %> style="width:auto">
+                                        Color del tema
+                                    </label>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar colores
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    document.querySelectorAll('[data-status-preview]').forEach(function (inp) {
+                        var id = inp.getAttribute('data-status-preview');
+                        var badge = document.getElementById('status-preview-' + id);
+                        var chk = inp.closest('.status-color-row').querySelector('input[type="checkbox"]');
+                        inp.addEventListener('input', function () {
+                            badge.style.backgroundColor = inp.value + '22';
+                            badge.style.color = inp.value;
+                            if (chk) chk.checked = false;
+                        });
+                    });
+                </script>
+            </div>
+
             <!-- Card 2: Parámetros del sistema -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
