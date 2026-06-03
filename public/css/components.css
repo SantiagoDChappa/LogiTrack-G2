@@ -1,0 +1,169 @@
+/* ============================================================
+   COMPONENTES COMPARTIDOS — Sistema visual LogiTrack
+   Botón-icono universal (solo icono + tooltip + aria-label).
+   LGT-171: acciones representadas únicamente con icono.
+   ============================================================ */
+
+/* ---- Botón-icono base ---- */
+.icon-btn,
+.action-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0 0.2rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none !important;
+  cursor: pointer;
+  border: none;
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  transition: filter var(--transition), transform var(--transition),
+              background-color var(--transition), color var(--transition);
+}
+
+.icon-btn:hover,
+.action-btn:hover {
+  filter: brightness(0.92);
+  transform: translateY(-1px);
+  text-decoration: none !important;
+}
+
+.icon-btn .material-symbols-outlined,
+.action-btn .material-symbols-outlined {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* ---- Tamaño grande (CTAs de cabecera) ---- */
+.icon-btn--lg,
+.action-btn--lg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.icon-btn--lg .material-symbols-outlined,
+.action-btn--lg .material-symbols-outlined {
+  font-size: 1.45rem;
+}
+
+/* ---- Tooltip (descripción de la acción) ---- */
+.icon-btn::after,
+.action-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background-color: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10;
+}
+
+.icon-btn:not([data-tooltip])::after,
+.action-btn:not([data-tooltip])::after {
+  content: none;
+}
+
+.icon-btn::before,
+.action-btn::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #1e293b;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.icon-btn:hover::after,
+.icon-btn:hover::before,
+.action-btn:hover::after,
+.action-btn:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* ---- Variantes semánticas (color por tipo de acción) ---- */
+.action-btn.crear,
+.action-btn.guardar {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.action-btn.buscar,
+.action-btn.estado {
+  background-color: var(--btn-estado-bg);
+  color: var(--btn-estado-text);
+}
+
+.action-btn.modificar {
+  background-color: var(--btn-modificar-bg);
+  color: var(--btn-modificar-text);
+}
+
+.action-btn.detalle {
+  background-color: var(--btn-detalle-bg);
+  color: var(--btn-detalle-text);
+}
+
+.action-btn.eliminar,
+.action-btn.cancelar {
+  background-color: var(--btn-eliminar-bg);
+  color: var(--btn-eliminar-text);
+}
+
+.action-btn.volver,
+.action-btn.neutro {
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+}
+
+/* ---- Estado deshabilitado ---- */
+.icon-btn.action-btn--disabled,
+.action-btn.action-btn--disabled,
+.icon-btn:disabled,
+.action-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.action-btn.action-btn--disabled:hover {
+  filter: none;
+  transform: none;
+}
+
+/* ---- Mobile: ocultar tooltip flotante (evita desbordes) ---- */
+@media (max-width: 600px) {
+  .icon-btn,
+  .action-btn {
+    width: 1.9rem;
+    height: 1.9rem;
+    margin: 0 0.1rem;
+  }
+  .icon-btn .material-symbols-outlined,
+  .action-btn .material-symbols-outlined {
+    font-size: 1.05rem;
+  }
+  .icon-btn::after,
+  .icon-btn::before,
+  .action-btn::after,
+  .action-btn::before {
+    display: none;
+  }
+}
