@@ -120,7 +120,7 @@ const enrichShipmentsForPortal = async (shipments) => Promise.all(
     shipments.map((shipment) => enrichShipmentRecord(shipment))
 );
 
-const SELF_SERVICE_STATUS_IDS = [1, 3, 6, 7];
+const SELF_SERVICE_STATUS_IDS = [1, 3, 6, 7, 9];
 
 const canSelfService = (shipment) => SELF_SERVICE_STATUS_IDS.includes(Number(shipment.statusId ?? shipment.status?.id));
 

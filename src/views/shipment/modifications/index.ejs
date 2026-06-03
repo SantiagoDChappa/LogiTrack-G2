@@ -56,7 +56,7 @@
                     <% requests.forEach(function(r) { %>
                     <tr>
                         <td><%= new Date(r.createdAt).toLocaleString('es-AR') %></td>
-                        <td><a href="/shipment/<%= r.shipmentId %>"><%= r.trackingId %></a></td>
+                        <td><a href="/shipment/detail/<%= r.shipmentId %>"><%= r.trackingId %></a></td>
                         <td><%= r.recipientName || '-' %></td>
                         <td><%= r.typeLabel %></td>
                         <td><%= r.shipmentStatus || '-' %></td>
