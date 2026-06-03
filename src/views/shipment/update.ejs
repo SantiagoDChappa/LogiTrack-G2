@@ -54,7 +54,9 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Modificación de envío</h1>
-            <a href="<%= returnUrl %>" class="btn-secondary">Volver</a>
+            <a href="<%= returnUrl %>" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
         </div>
 
         <div class="page-update-wrapper">
@@ -353,8 +355,12 @@
                                 </select>
                             </div>
                             <div class="app-modal-actions">
-                                <button type="button" class="btn-secondary" id="btn-close-assign-modal">Cancelar</button>
-                                <button type="submit" class="btn-primary">Confirmar</button>
+                                <button type="button" class="action-btn action-btn--lg cancelar" id="btn-close-assign-modal" data-tooltip="Cancelar" aria-label="Cancelar">
+                                    <span class="material-symbols-outlined">close</span>
+                                </button>
+                                <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Confirmar" aria-label="Confirmar">
+                                    <span class="material-symbols-outlined">check</span>
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -425,8 +431,12 @@
                                                   placeholder="Motivo obligatorio..."></textarea>
                                     </div>
                                     <div class="app-modal-actions">
-                                        <button type="button" class="btn-secondary" id="comment-modal-cancel">Cancelar</button>
-                                        <button type="submit" class="btn-primary">Confirmar</button>
+                                        <button type="button" class="action-btn action-btn--lg cancelar" id="comment-modal-cancel" data-tooltip="Cancelar" aria-label="Cancelar">
+                                            <span class="material-symbols-outlined">close</span>
+                                        </button>
+                                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Confirmar" aria-label="Confirmar">
+                                            <span class="material-symbols-outlined">check</span>
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -438,7 +448,9 @@
             <!-- ══════════ FIN FORM ══════════ -->
 
             <div class="update-form-actions">
-                <button type="submit" form="main-update-form" class="btn-primary" id="btn-save-changes" <%= isGlobalNonEditable ? 'disabled' : '' %>>Guardar cambios</button>
+                <button type="submit" form="main-update-form" class="action-btn action-btn--lg guardar" id="btn-save-changes" data-tooltip="Guardar cambios" aria-label="Guardar cambios" <%= isGlobalNonEditable ? 'disabled' : '' %>>
+                    <span class="material-symbols-outlined">save</span>
+                </button>
             </div>
 
         </div>
