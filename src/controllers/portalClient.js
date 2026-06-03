@@ -19,6 +19,11 @@ const {
 } = require('../services/portalModificationService');
 const { Branch } = require('../models/branch');
 const provinceModel = require('../models/province');
+const {
+    listClientIncidents,
+    formatIncidentDetail,
+    loadOwnedIncident,
+} = require('../services/portalIncidentView');
 
 const formatModificationsList = (rows) => rows.map((row) => {
     const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
@@ -238,6 +243,36 @@ const postLogout = (req, res) => {
     res.redirect('/portal/mis-envios');
 };
 
+const getIncidentList = async (req, res) => {
+    const { open, closed } = await listClientIncidents(res.locals.portalClient);
+    const tab = req.query.tab === 'closed' ? 'closed' : 'open';
+
+    res.render('portal/misEnviosIncidentsList', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        open,
+        closed,
+        tab,
+    });
+};
+
+const getIncidentDetail = async (req, res) => {
+    const incidentId = Number(req.params.id);
+    const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
+    if (!incident) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Incidencia no encontrada.',
+        });
+    }
+
+    res.render('portal/misEnviosIncidentDetail', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        incident: formatIncidentDetail(incident),
+    });
+};
+
 module.exports = {
     getIdentifyForm,
     postRequestAccess,
@@ -246,6 +281,8 @@ module.exports = {
     getShipmentDetail,
     getManageForm,
     postManageForm,
+    getIncidentList,
+    getIncidentDetail,
     postLogout,
     formatModificationsList,
 };

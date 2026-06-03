@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis incidencias - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-list-wrapper">
+            <div class="portal-mis-envios-list-header">
+                <div>
+                    <span class="portal-incident-eyebrow">Tus incidencias</span>
+                    <h1>Mis incidencias</h1>
+                    <p class="portal-mis-envios-lead">Consultá los problemas registrados sobre tus envíos y su estado de resolución.</p>
+                </div>
+                <form method="POST" action="/portal/mis-envios/salir">
+                    <button type="submit" class="portal-mis-envios-logout">
+                        <span class="material-symbols-outlined">logout</span>
+                        Cerrar sesión
+                    </button>
+                </form>
+            </div>
+
+            <% const currentList = tab === 'closed' ? closed : open; %>
+            <% const totalCount = open.length + closed.length; %>
+
+            <% if (totalCount === 0) { %>
+            <div class="portal-empty">
+                <span class="material-symbols-outlined portal-empty-icon">report</span>
+                <h2>No existen incidencias registradas</h2>
+                <p>No hay incidencias asociadas a tus envíos en este momento.</p>
+                <a href="/portal/mis-envios/lista" class="btn-primary">Ver mis envíos</a>
+            </div>
+            <% } else { %>
+            <div class="portal-mis-envios-tabs">
+                <a href="/portal/mis-envios/incidencias?tab=open" class="portal-mis-envios-tab <%= tab !== 'closed' ? 'active' : '' %>">
+                    Abiertas (<%= open.length %>)
+                </a>
+                <a href="/portal/mis-envios/incidencias?tab=closed" class="portal-mis-envios-tab <%= tab === 'closed' ? 'active' : '' %>">
+                    Cerradas (<%= closed.length %>)
+                </a>
+            </div>
+
+            <% if (currentList.length === 0) { %>
+            <div class="portal-empty portal-empty-compact">
+                <span class="material-symbols-outlined portal-empty-icon">inbox</span>
+                <h2>No hay incidencias en esta categoría</h2>
+                <p>Probá la otra pestaña para ver <%= tab === 'closed' ? 'incidencias abiertas' : 'incidencias cerradas' %>.</p>
+            </div>
+            <% } else { %>
+            <div class="portal-mis-envios-table-wrap">
+                <table class="portal-mis-envios-table">
+                    <thead>
+                        <tr>
+                            <th># Incidencia</th>
+                            <th>Envío</th>
+                            <th>Tipo</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% currentList.forEach(function(i) { %>
+                        <tr>
+                            <td><strong>#<%= i.id %></strong></td>
+                            <td><%= i.trackingId || '-' %></td>
+                            <td><%= i.typeLabel %></td>
+                            <td><%= new Date(i.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+                            <td><span class="incident-badge incident-badge--<%= i.statusKey %>"><%= i.statusLabel %></span></td>
+                            <td>
+                                <a href="/portal/mis-envios/incidencia/<%= i.id %>" class="portal-mis-envios-link">
+                                    Ver detalle
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+            <% } %>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incidencia #<%= incident.id %> - Mis incidencias</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/incidencias" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al listado
+                </a>
+            </div>
+
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Incidencia #<%= incident.id %></span>
+                <h1><%= incident.typeLabel %></h1>
+                <p class="portal-mis-envios-lead">
+                    Envío asociado:
+                    <a href="/portal/mis-envios/envio/<%= incident.shipmentId %>" class="portal-mis-envios-link" style="display:inline-flex;">
+                        <%= incident.trackingId %>
+                    </a>
+                </p>
+            </div>
+
+            <div class="portal-incident-detail-card">
+                <div class="portal-incident-detail-row">
+                    <span class="portal-card-label">Estado</span>
+                    <span class="portal-card-value">
+                        <span class="incident-badge incident-badge--<%= incident.statusKey %>"><%= incident.statusLabel %></span>
+                    </span>
+                </div>
+                <div class="portal-incident-detail-row">
+                    <span class="portal-card-label">Fecha de creación</span>
+                    <span class="portal-card-value">
+                        <%= new Date(incident.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %>
+                    </span>
+                </div>
+                <div class="portal-incident-detail-row">
+                    <span class="portal-card-label">Envío</span>
+                    <span class="portal-card-value"><%= incident.trackingId %></span>
+                </div>
+                <% if (incident.resolutionLabel) { %>
+                <div class="portal-incident-detail-row">
+                    <span class="portal-card-label">Resolución</span>
+                    <span class="portal-card-value"><%= incident.resolutionLabel %></span>
+                </div>
+                <% } %>
+                <div class="portal-incident-detail-row portal-incident-detail-row--block">
+                    <span class="portal-card-label">Descripción del problema</span>
+                    <p class="portal-incident-description"><%= incident.description %></p>
+                </div>
+            </div>
+
+            <div class="portal-mis-envios-actions" style="border-top:none;padding-top:0;">
+                <a href="/portal/mis-envios/envio/<%= incident.shipmentId %>" class="portal-card-incident-cta-link">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    Ver envío asociado
+                </a>
+                <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(incident.trackingId) %>" class="portal-card-incident-cta-link">
+                    <span class="material-symbols-outlined">report</span>
+                    Reportar otra incidencia
+                </a>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

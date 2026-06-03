@@ -108,4 +108,27 @@ const findOpenByShipment = (shipmentId) => Incident.findAll({
     attributes: ['id', 'incidentTypeId', 'status']
 });
 
-module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment };
+const findByShipmentIds = (shipmentIds, { statusIn, limit = 200 } = {}) => {
+    const { Op } = require('sequelize');
+    const ids = Array.isArray(shipmentIds) ? shipmentIds.filter(Boolean) : [];
+    if (!ids.length) { return Promise.resolve([]); }
+
+    const where = { shipmentId: { [Op.in]: ids } };
+    if (statusIn?.length) { where.status = { [Op.in]: statusIn }; }
+
+    const { Shipment } = require('./shipment');
+    const { IncidentType } = require('./incidentType');
+
+    return Incident.findAll({
+        where,
+        include: [
+            { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'], required: true },
+            { model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'], required: true },
+        ],
+        attributes: ['id', 'shipmentId', 'status', 'resolution', 'description', 'createdAt'],
+        order: [['createdAt', 'DESC']],
+        limit,
+    });
+};
+
+module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment, findByShipmentIds };
