@@ -268,6 +268,29 @@
         <div class="settings-content">
 
             <span class="settings-anchor" id="sec-general"></span>
+            <style>
+                /* LGT-174: organización de ajustes por categorías */
+                .settings-category {
+                    display: flex; align-items: center; gap: .75rem;
+                    margin: 2.25rem 0 1rem; padding-bottom: .6rem;
+                    border-bottom: 2px solid var(--color-border);
+                    scroll-margin-top: 90px;
+                }
+                .settings-category:first-of-type { margin-top: .25rem; }
+                .settings-category > .material-symbols-outlined {
+                    font-size: 1.6rem; color: var(--color-primary);
+                    background: var(--color-primary-light); border-radius: var(--radius-md);
+                    padding: .35rem; flex-shrink: 0;
+                }
+                .settings-category h3 { margin: 0; font-size: var(--font-size-lg); }
+                .settings-category p  { margin: .1rem 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+            </style>
+
+            <section class="settings-category" id="cat-general">
+                <span class="material-symbols-outlined">tune</span>
+                <div><h3>General</h3><p>Datos base y parámetros operativos del sistema.</p></div>
+            </section>
+
             <!-- Card 1: Dirección de origen -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -358,6 +381,55 @@
             </div>
 
             <!-- Card 2: Parámetros del sistema -->
+            <!-- LGT-172: Identidad visual (nombre + logo de la empresa) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">palette</span>
+                    Identidad visual
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el nombre y el logo de tu organización. Se aplican en el encabezado, el login, las notificaciones y el portal público.
+                </p>
+                <form method="POST" action="/setting/identity" enctype="multipart/form-data">
+                    <div class="settings-addr">
+                        <div class="field span-full">
+                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
+                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
+                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
+                        </div>
+
+                        <div class="field span-full">
+                            <label for="logo">Logo institucional</label>
+                            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                                <img id="logo-preview"
+                                     src="<%= params.logo_empresa || '/images/logo.png' %>"
+                                     alt="Logo actual"
+                                     style="height:56px;width:auto;max-width:180px;object-fit:contain;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:6px">
+                                <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+                            </div>
+                            <small style="color:var(--color-text-secondary)">PNG, JPG, SVG o WEBP. Máximo 2&nbsp;MB. Dejá el campo vacío para conservar el logo actual.</small>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar identidad
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    (function () {
+                        var input = document.getElementById('logo');
+                        var preview = document.getElementById('logo-preview');
+                        if (!input || !preview) return;
+                        input.addEventListener('change', function () {
+                            var file = this.files && this.files[0];
+                            if (file) preview.src = URL.createObjectURL(file);
+                        });
+                    })();
+                </script>
+            </div>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">tune</span>
@@ -410,11 +482,7 @@
                             <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
                         </div>
 
-                        <div class="field span-full">
-                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
-                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
-                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
-                        </div>
+                        <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
                             <label for="telefono_soporte">Teléfono de soporte</label>
@@ -495,6 +563,11 @@
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
             <span class="settings-anchor" id="sec-comunicaciones"></span>
+            <section class="settings-category" id="cat-comunicaciones">
+                <span class="material-symbols-outlined">mark_email_read</span>
+                <div><h3>Comunicaciones</h3><p>Notificaciones por evento, incidencias y pruebas de email.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">mark_email_read</span>
@@ -661,6 +734,11 @@
 
             <!-- Card: Variables de notificación (ABM) -->
             <span class="settings-anchor" id="sec-plantillas"></span>
+            <section class="settings-category" id="cat-plantillas">
+                <span class="material-symbols-outlined">smart_button</span>
+                <div><h3>Plantillas y contenido</h3><p>Variables y bloques reutilizables para los emails.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">data_object</span>
@@ -1090,6 +1168,11 @@
 
             <!-- Card 3: Optimización de ruteo -->
             <span class="settings-anchor" id="sec-ruteo"></span>
+            <section class="settings-category" id="cat-ruteo">
+                <span class="material-symbols-outlined">local_shipping</span>
+                <div><h3>Ruteo y sucursales</h3><p>Optimización de rutas y asignación de sucursales.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">alt_route</span>
@@ -1200,6 +1283,11 @@
 
             <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
             <span class="settings-anchor" id="sec-catalogos"></span>
+            <section class="settings-category" id="cat-catalogos">
+                <span class="material-symbols-outlined">category</span>
+                <div><h3>Catálogos operativos</h3><p>Motivos, tipos de incidencia y franjas horarias editables.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">cancel</span>
@@ -1366,6 +1454,11 @@
 
             <!-- Card 5: Historial de cambios -->
             <span class="settings-anchor" id="sec-auditoria"></span>
+            <section class="settings-category" id="cat-auditoria">
+                <span class="material-symbols-outlined">history</span>
+                <div><h3>Auditoría</h3><p>Registro de cambios de configuración.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">history</span>

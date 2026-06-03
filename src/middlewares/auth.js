@@ -32,6 +32,8 @@ const requireAuth = async (req, res, next) => {
             statusModel.getAll().catch(() => []),
         ]);
         res.locals.nombreEmpresa   = allSettings.nombre_empresa || 'LogiTrack';
+        // LGT-172: logo institucional configurable.
+        res.locals.logoEmpresa     = allSettings.logo_empresa || '/images/logo.png';
         // LGT-173: CSS de colores de estados configurados (se inyecta en el <head>).
         res.locals.statusColorsCss = statusColors.buildCss(allSettings, statuses);
         next();
