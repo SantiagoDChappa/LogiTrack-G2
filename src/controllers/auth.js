@@ -13,24 +13,32 @@ const getLogin = async (req, res) => {
         }
     }
     const settingModel = require('../models/setting');
-    const nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
+    const [nombreEmpresa, logoEmpresa] = await Promise.all([
+        settingModel.get('nombre_empresa'),
+        settingModel.get('logo_empresa'),
+    ]);
     const returnTo = req.query.returnTo || '';
-    return res.render('login', { returnTo, nombreEmpresa });
+    return res.render('login', { returnTo, nombreEmpresa: nombreEmpresa || 'LogiTrack', logoEmpresa: logoEmpresa || '/images/logo.png' });
 };
 
 const login = async (req, res) => {
     const settingModel = require('../models/setting');
-    const nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
+    const [nombreEmpresaRaw, logoEmpresaRaw] = await Promise.all([
+        settingModel.get('nombre_empresa'),
+        settingModel.get('logo_empresa'),
+    ]);
+    const nombreEmpresa = nombreEmpresaRaw || 'LogiTrack';
+    const logoEmpresa   = logoEmpresaRaw || '/images/logo.png';
     const {email, password} = req.body;
 
     const user = await userModel.findByEmail(email);
     if(!user){
-        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa });
+        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if(!match){
-        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa });
+        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa });
     }
 
     const branch = user.branchId ? await branchModel.getById(user.branchId) : null;

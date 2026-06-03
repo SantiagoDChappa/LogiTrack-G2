@@ -109,7 +109,7 @@
             align-items:center; justify-content:center; padding:1rem; }
         .tplm-dialog { background:var(--color-bg,#fff); border:1px solid var(--color-border,#e2e8f0);
             border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.32);
-            width:min(960px,96vw); height:min(720px,92vh); display:flex; flex-direction:column; overflow:hidden; }
+            width:min(1320px,97vw); height:min(760px,93vh); display:flex; flex-direction:column; overflow:hidden; }
         .tplm-head { display:flex; align-items:flex-start; justify-content:space-between;
             padding:1rem 1.25rem; border-bottom:1px solid var(--color-border); }
         .tplm-title { margin:0; font-size:1.05rem; }
@@ -117,9 +117,13 @@
         .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
             display:inline-flex; padding:.2rem; border-radius:6px; }
         .tplm-close:hover { background:var(--color-bg-secondary,#f1f3f5); color:var(--color-text); }
-        .tplm-body { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;
-            padding:1.1rem 1.25rem; overflow:auto; }
-        .tplm-editor { display:flex; flex-direction:column; gap:.85rem; min-width:0; }
+        .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
+            padding:1.1rem 1.25rem; overflow:hidden; }
+        .tplm-editor { display:contents; }
+        .tplm-col { display:flex; flex-direction:column; gap:.85rem; min-width:0; min-height:0; overflow:auto; }
+        .tplm-col-body { gap:.6rem; }
+        .tplm-col-body .field { flex:1; display:flex; flex-direction:column; min-height:0; }
+        .tplm-col-body .tplm-textarea { flex:1; min-height:240px; }
         .tplm-row { display:flex; align-items:center; gap:.75rem; }
         .tplm-label { font-size:.8rem; font-weight:600; color:var(--color-text-secondary); }
         .tplm-segmented { display:inline-flex; border:1px solid var(--color-border); border-radius:999px; overflow:hidden; }
@@ -204,6 +208,9 @@
         .tplm-preview-body iframe { flex:1; min-height:0; width:100%; border:none; background:var(--pv-bg); display:none; }
         .tplm-foot { display:flex; justify-content:flex-end; gap:.6rem;
             padding:.85rem 1.25rem; border-top:1px solid var(--color-border); }
+        .tplm-preview { min-height:0; overflow:auto; }
+        @media (max-width:1100px) { .tplm-body { grid-template-columns:1fr 1fr; overflow:auto; }
+            .tplm-col, .tplm-preview { overflow:visible; } }
         @media (max-width:760px) { .tplm-body { grid-template-columns:1fr; } }
     </style>
     <link rel="stylesheet" href="/css/settings.css">
@@ -216,7 +223,34 @@
             <h1>Ajustes</h1>
         </div>
 
+        <!-- LGT-174: cada categoría es su propia página (navegada desde el menú superior) -->
+        <div class="settings-layout">
         <div class="settings-content">
+
+            <span class="settings-anchor" id="sec-general"></span>
+            <style>
+                /* LGT-174: organización de ajustes por categorías */
+                .settings-category {
+                    display: flex; align-items: center; gap: .75rem;
+                    margin: 2.25rem 0 1rem; padding-bottom: .6rem;
+                    border-bottom: 2px solid var(--color-border);
+                    scroll-margin-top: 90px;
+                }
+                .settings-category:first-of-type { margin-top: .25rem; }
+                .settings-category > .material-symbols-outlined {
+                    font-size: 1.6rem; color: var(--color-primary);
+                    background: var(--color-primary-light); border-radius: var(--radius-md);
+                    padding: .35rem; flex-shrink: 0;
+                }
+                .settings-category h3 { margin: 0; font-size: var(--font-size-lg); }
+                .settings-category p  { margin: .1rem 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+            </style>
+
+            <% if (activeSection === 'general') { %>
+            <section class="settings-category" id="cat-general">
+                <span class="material-symbols-outlined">tune</span>
+                <div><h3>General</h3><p>Datos base y parámetros operativos del sistema.</p></div>
+            </section>
 
             <!-- Card 1: Dirección de origen -->
             <div class="settings-card">
@@ -251,15 +285,112 @@
                         <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full"></div>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar ajustes
                         </button>
                     </div>
                 </form>
             </div>
 
+            <!-- LGT-173: Colores de estados -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">format_color_fill</span>
+                    Colores de estados
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el color de cada estado de envío. Se aplica en los listados, el detalle y el seguimiento. Dejá tildado "Color del tema" para usar el predeterminado.
+                </p>
+                <form method="POST" action="/setting/status-colors">
+                    <div class="status-colors-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem">
+                        <% (statusColorList || []).forEach(function(st) { %>
+                            <% var _scolor = st.color || '#64748b'; %>
+                            <div class="status-color-row" style="display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-alt)">
+                                <input type="color" name="status_color_<%= st.id %>" value="<%= _scolor %>"
+                                       style="width:38px;height:38px;border:none;background:none;cursor:pointer;flex-shrink:0"
+                                       data-status-preview="<%= st.id %>">
+                                <div style="flex:1;min-width:0">
+                                    <span class="status-badge" id="status-preview-<%= st.id %>"
+                                          style="background-color:<%= _scolor %>22;color:<%= _scolor %>"><%= st.description %></span>
+                                    <label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;font-size:var(--font-size-xs);text-transform:none;font-weight:500;color:var(--color-text-secondary)">
+                                        <input type="checkbox" name="default_<%= st.id %>" <%= st.color ? '' : 'checked' %> style="width:auto">
+                                        Color del tema
+                                    </label>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar colores
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    document.querySelectorAll('[data-status-preview]').forEach(function (inp) {
+                        var id = inp.getAttribute('data-status-preview');
+                        var badge = document.getElementById('status-preview-' + id);
+                        var chk = inp.closest('.status-color-row').querySelector('input[type="checkbox"]');
+                        inp.addEventListener('input', function () {
+                            badge.style.backgroundColor = inp.value + '22';
+                            badge.style.color = inp.value;
+                            if (chk) chk.checked = false;
+                        });
+                    });
+                </script>
+            </div>
+
             <!-- Card 2: Parámetros del sistema -->
+            <!-- LGT-172: Identidad visual (nombre + logo de la empresa) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">palette</span>
+                    Identidad visual
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el nombre y el logo de tu organización. Se aplican en el encabezado, el login, las notificaciones y el portal público.
+                </p>
+                <form method="POST" action="/setting/identity" enctype="multipart/form-data">
+                    <div class="settings-addr">
+                        <div class="field span-full">
+                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
+                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
+                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
+                        </div>
+
+                        <div class="field span-full">
+                            <label for="logo">Logo institucional</label>
+                            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                                <img id="logo-preview"
+                                     src="<%= params.logo_empresa || '/images/logo.png' %>"
+                                     alt="Logo actual"
+                                     style="height:56px;width:auto;max-width:180px;object-fit:contain;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:6px">
+                                <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+                            </div>
+                            <small style="color:var(--color-text-secondary)">PNG, JPG, SVG o WEBP. Máximo 2&nbsp;MB. Dejá el campo vacío para conservar el logo actual.</small>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar identidad
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    (function () {
+                        var input = document.getElementById('logo');
+                        var preview = document.getElementById('logo-preview');
+                        if (!input || !preview) return;
+                        input.addEventListener('change', function () {
+                            var file = this.files && this.files[0];
+                            if (file) preview.src = URL.createObjectURL(file);
+                        });
+                    })();
+                </script>
+            </div>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">tune</span>
@@ -312,11 +443,7 @@
                             <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
                         </div>
 
-                        <div class="field span-full">
-                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
-                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
-                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
-                        </div>
+                        <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
                             <label for="telefono_soporte">Teléfono de soporte</label>
@@ -388,15 +515,22 @@
                     </div>
 
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar parámetros" aria-label="Guardar parámetros">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar parámetros
                         </button>
                     </div>
                 </form>
             </div>
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <% } %>
+            <% if (activeSection === 'comunicaciones') { %>
+            <span class="settings-anchor" id="sec-comunicaciones"></span>
+            <section class="settings-category" id="cat-comunicaciones">
+                <span class="material-symbols-outlined">mark_email_read</span>
+                <div><h3>Comunicaciones</h3><p>Notificaciones por evento, incidencias y pruebas de email.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">mark_email_read</span>
@@ -429,22 +563,21 @@
                                     class="notif-custom-input"
                                     <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
 
-                                <button type="button" class="btn-secondary notif-edit-tpl-btn"
+                                <button type="button" class="action-btn modificar notif-edit-tpl-btn"
                                     data-event="<%= config.eventCode %>"
                                     data-description="<%= config.description %>"
                                     data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
                                     data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
-                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>">
+                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
+                                    data-tooltip="Editar mail" aria-label="Editar mail">
                                     <span class="material-symbols-outlined">edit_note</span>
-                                    Editar mail
                                 </button>
                             </div>
                         <% }) %>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones" aria-label="Guardar notificaciones">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar notificaciones
                         </button>
                     </div>
                 </form>
@@ -490,9 +623,8 @@
                         <small style="color:var(--color-text-secondary)">Separar por coma, espacio o punto y coma. Se ignoran direcciones inválidas.</small>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones de incidencias" aria-label="Guardar notificaciones de incidencias">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar notificaciones de incidencias
                         </button>
                     </div>
                 </form>
@@ -532,9 +664,8 @@
                         <small style="color:var(--color-text-secondary)">Si no elegís evento, se usa este texto como cuerpo.</small>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
                             <span class="material-symbols-outlined">send</span>
-                            Enviar prueba
                         </button>
                     </div>
                 </form>
@@ -547,7 +678,7 @@
                     Email de prueba (override)
                 </h2>
                 <p class="settings-subtitle">
-                    Si se configura un email aquí, <strong>todos</strong> los mails del sistema se redirigen a esta dirección (en vez de ir al destinatario/remitente real). Útil para testeo. Dejar vacío para operar normal.
+                    Si se configura un email aquí, los <strong>envíos de prueba</strong> (botón "Enviar prueba" del editor) se redirigen a esta dirección. Las notificaciones reales (destinatario/remitente/parametrizado) <strong>no</strong> se ven afectadas: siempre van al destinatario configurado. Dejar vacío para no redirigir.
                 </p>
                 <form method="POST" action="/setting/test-email-override">
                     <div class="field" style="max-width:520px">
@@ -557,15 +688,22 @@
                         <small style="color:var(--color-text-secondary)">El asunto recibirá un prefijo <code>[TEST → destinatarios reales]</code>.</small>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar override" aria-label="Guardar override">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar override
                         </button>
                     </div>
                 </form>
             </div>
 
             <!-- Card: Variables de notificación (ABM) -->
+            <% } %>
+            <% if (activeSection === 'plantillas') { %>
+            <span class="settings-anchor" id="sec-plantillas"></span>
+            <section class="settings-category" id="cat-plantillas">
+                <span class="material-symbols-outlined">smart_button</span>
+                <div><h3>Plantillas y contenido</h3><p>Variables y bloques reutilizables para los emails.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">data_object</span>
@@ -582,7 +720,7 @@
                                 <input type="text" name="label" value="<%= v.label %>" placeholder="etiqueta" class="abm-in" required>
                                 <input type="text" name="value" value="<%= v.value %>" placeholder="valor" class="abm-in abm-in--grow">
                                 <input type="text" name="description" value="<%= v.description || '' %>" placeholder="descripción" class="abm-in">
-                                <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                                <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                             </form>
                             <form method="POST" action="/setting/notification-variable/<%= v.id %>/delete">
                                 <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
@@ -595,7 +733,7 @@
                     <input type="text" name="label" placeholder="etiqueta" class="abm-in" required>
                     <input type="text" name="value" placeholder="valor" class="abm-in abm-in--grow">
                     <input type="text" name="description" placeholder="descripción (opcional)" class="abm-in">
-                    <button type="submit" class="btn-primary btn-sm"><span class="material-symbols-outlined">add</span> Agregar</button>
+                    <button type="submit" class="action-btn crear" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button>
                 </form>
             </div>
 
@@ -616,7 +754,7 @@
                                     <input type="text" name="label" value="<%= s.label %>" placeholder="etiqueta" class="abm-in" required>
                                     <input type="text" name="icon" value="<%= s.icon || '' %>" placeholder="ícono (material symbol)" class="abm-in abm-in--key">
                                     <% if (s.builtin) { %><span class="abm-badge">predefinido</span><% } %>
-                                    <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                                    <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                                 </div>
                                 <label class="abm-snip-label">HTML</label>
                                 <textarea name="html" rows="2" class="abm-in tplm-textarea"><%= s.html %></textarea>
@@ -635,7 +773,7 @@
                     <div class="abm-snip-head">
                         <input type="text" name="label" placeholder="etiqueta del bloque" class="abm-in" required>
                         <input type="text" name="icon" placeholder="ícono (ej: link)" class="abm-in abm-in--key">
-                        <button type="submit" class="btn-primary btn-sm"><span class="material-symbols-outlined">add</span> Agregar bloque</button>
+                        <button type="submit" class="action-btn crear" data-tooltip="Agregar bloque" aria-label="Agregar bloque"><span class="material-symbols-outlined">add</span></button>
                     </div>
                     <textarea name="html" rows="2" class="abm-in tplm-textarea" placeholder="Versión HTML (ej: <a href=&quot;{{trackingUrl}}&quot;>Ver envío</a>)"></textarea>
                     <textarea name="text" rows="2" class="abm-in tplm-textarea" placeholder="Versión texto (ej: Seguí tu envío: {{trackingUrl}})"></textarea>
@@ -659,6 +797,7 @@
                         <form id="tpl-modal-form" method="POST" action="" class="tplm-editor">
                             <input type="hidden" name="format" id="tpl-modal-format" value="text">
 
+                            <div class="tplm-col tplm-col-controls">
                             <div class="tplm-row tplm-variant-row">
                                 <span class="tplm-label">Variante</span>
                                 <select id="tpl-variant-select" class="tplm-variant-select"></select>
@@ -702,7 +841,9 @@
                                 <label>Bloques rápidos <small>(insertan contenido listo según el formato)</small></label>
                                 <div class="tplm-snippets" id="tpl-snippets"></div>
                             </div>
+                            </div><!-- /tplm-col-controls -->
 
+                            <div class="tplm-col tplm-col-body">
                             <div class="field">
                                 <label for="tpl-modal-body">Cuerpo del mensaje</label>
                                 <textarea id="tpl-modal-body" name="body" rows="10" required class="tplm-textarea"></textarea>
@@ -710,11 +851,12 @@
 
                             <div class="tplm-test">
                                 <input type="email" id="tpl-modal-test-email" placeholder="email@dominio.com para enviar prueba">
-                                <button type="button" class="btn-secondary" id="tpl-modal-test-btn">
-                                    <span class="material-symbols-outlined">send</span> Enviar prueba
+                                <button type="button" class="action-btn buscar" id="tpl-modal-test-btn" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
+                                    <span class="material-symbols-outlined">send</span>
                                 </button>
                                 <span class="tplm-test-msg" id="tpl-modal-test-msg"></span>
                             </div>
+                            </div><!-- /tplm-col-body -->
                         </form>
 
                         <div class="tplm-preview">
@@ -731,9 +873,11 @@
                     </div>
 
                     <footer class="tplm-foot">
-                        <button type="button" class="btn-secondary" id="tpl-modal-cancel2">Cancelar</button>
-                        <button type="submit" form="tpl-modal-form" class="btn-primary">
-                            <span class="material-symbols-outlined">save</span> Guardar mail
+                        <button type="button" class="action-btn action-btn--lg cancelar" id="tpl-modal-cancel2" data-tooltip="Cancelar" aria-label="Cancelar">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                        <button type="submit" form="tpl-modal-form" class="action-btn action-btn--lg guardar" data-tooltip="Guardar mail" aria-label="Guardar mail">
+                            <span class="material-symbols-outlined">save</span>
                         </button>
                     </footer>
                 </div>
@@ -988,6 +1132,14 @@
             </script>
 
             <!-- Card 3: Optimización de ruteo -->
+            <% } %>
+            <% if (activeSection === 'ruteo') { %>
+            <span class="settings-anchor" id="sec-ruteo"></span>
+            <section class="settings-category" id="cat-ruteo">
+                <span class="material-symbols-outlined">local_shipping</span>
+                <div><h3>Ruteo y sucursales</h3><p>Optimización de rutas y asignación de sucursales.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">alt_route</span>
@@ -1032,9 +1184,8 @@
                         </div>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar ajustes
                         </button>
                     </div>
                 </form>
@@ -1089,9 +1240,8 @@
                     </table>
                 </div>
                 <div class="settings-actions">
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                         <span class="material-symbols-outlined">save</span>
-                        Guardar ajustes
                     </button>
                 </div>
                 </form>
@@ -1099,6 +1249,14 @@
             </div>
 
             <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <% } %>
+            <% if (activeSection === 'catalogos') { %>
+            <span class="settings-anchor" id="sec-catalogos"></span>
+            <section class="settings-category" id="cat-catalogos">
+                <span class="material-symbols-outlined">category</span>
+                <div><h3>Catálogos operativos</h3><p>Motivos, tipos de incidencia y franjas horarias editables.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">cancel</span>
@@ -1120,8 +1278,8 @@
                                 <td><input type="checkbox" name="active" <%= r.active ? 'checked' : '' %>></td>
                                 <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
                                 <td>
-                                    <button class="btn-primary" type="submit">Guardar</button>
-                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')">Borrar</button>
+                                    <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1133,7 +1291,7 @@
                                 <td><input type="number" name="retryDays" min="0" max="30" value="1" style="width:70px"></td>
                                 <td><input type="checkbox" name="active" checked></td>
                                 <td><input type="checkbox" name="createsIncident"></td>
-                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                                <td><button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button></td>
                             </form>
                         </tr>
                     </tbody>
@@ -1159,8 +1317,8 @@
                                 <td><input type="text" name="label" value="<%= t.description %>" required></td>
                                 <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
                                 <td>
-                                    <button class="btn-primary" type="submit">Guardar</button>
-                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')">Desactivar</button>
+                                    <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1170,7 +1328,7 @@
                                 <td><input type="text" name="code" placeholder="CODIGO" required></td>
                                 <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
                                 <td><input type="checkbox" name="active" checked></td>
-                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                                <td><button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button></td>
                             </form>
                         </tr>
                     </tbody>
@@ -1228,8 +1386,8 @@
                                 <input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>> Activo
                             </label>
                             <div class="tw-actions">
-                                <button class="btn-primary" type="submit">Guardar</button>
-                                <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')">Borrar</button>
+                                <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                             </div>
                         </form>
                     <% }) %>
@@ -1241,7 +1399,7 @@
                             <input type="checkbox" name="active" checked> Activo
                         </label>
                         <div class="tw-actions">
-                            <button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button>
+                            <button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button>
                         </div>
                     </form>
                 </div>
@@ -1258,12 +1416,20 @@
                 <form method="POST" action="/setting/standard-message/<%= m.code %>" style="margin-bottom:1rem">
                     <label style="font-weight:600"><%= m.label %> <code style="font-size:.75rem;color:#64748b">(<%= m.code %>)</code></label>
                     <textarea name="body" rows="2" style="width:100%;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px"><%= m.body %></textarea>
-                    <button class="btn-primary" type="submit" style="margin-top:.25rem">Guardar</button>
+                    <button class="action-btn action-btn--lg guardar" type="submit" style="margin-top:.25rem" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                 </form>
                 <% }) %>
             </div>
 
             <!-- Card 5: Historial de cambios -->
+            <% } %>
+            <% if (activeSection === 'auditoria') { %>
+            <span class="settings-anchor" id="sec-auditoria"></span>
+            <section class="settings-category" id="cat-auditoria">
+                <span class="material-symbols-outlined">history</span>
+                <div><h3>Auditoría</h3><p>Registro de cambios de configuración.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">history</span>
@@ -1301,7 +1467,9 @@
                 </div>
                 <% } %>
             </div>
+            <% } %>
         </div>
+        </div><!-- /.settings-layout -->
     </main>
 
     <% const _currentProv = provinces.find(p => p.id == settings.origin_province_id); %>
@@ -1350,7 +1518,7 @@
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color:      isDark ? '#f1f5f9' : '#1e293b',
-            }).then(() => { history.replaceState(null, '', '/setting'); });
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
         }
     </script>
 </body>

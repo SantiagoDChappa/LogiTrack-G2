@@ -12,9 +12,8 @@
         <div class="page-header">
             <h1>Checklist por tipo de incidencia</h1>
             <div class="page-header__actions">
-                <a href="/incident" class="btn-secondary">
+                <a href="/incident" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
                     <span class="material-symbols-outlined">arrow_back</span>
-                    Volver
                 </a>
             </div>
         </div>
@@ -66,7 +65,7 @@
                                         <input type="checkbox" name="active" <%= tpl.active ? 'checked' : '' %>>
                                         <span class="tpl-switch__track"></span>
                                     </label>
-                                    <button type="submit" class="btn-secondary btn-sm tpl-col-actions" title="Guardar cambios">
+                                    <button type="submit" class="action-btn guardar tpl-col-actions" data-tooltip="Guardar cambios" aria-label="Guardar cambios">
                                         <span class="material-symbols-outlined">save</span>
                                     </button>
                                 </form>
@@ -88,9 +87,8 @@
                         <input type="checkbox" name="required" checked>
                         <span class="tpl-switch__track"></span>
                     </label>
-                    <button type="submit" class="btn-primary btn-sm tpl-col-actions">
+                    <button type="submit" class="action-btn crear tpl-col-actions" data-tooltip="Agregar" aria-label="Agregar">
                         <span class="material-symbols-outlined">add</span>
-                        Agregar
                     </button>
                 </form>
             </section>

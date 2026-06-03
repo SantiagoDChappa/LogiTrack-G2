@@ -11,7 +11,9 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Salida de Ruta</h1>
-            <a href="/route" class="btn-secondary">Volver</a>
+            <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
         </div>
 
         <div class="page-update-wrapper">
@@ -24,7 +26,7 @@
                     <h3><span class="material-symbols-outlined">check_circle</span> Ruta despachada</h3>
                     <% if (summary) { %><p><%= decodeURIComponent(summary) %></p><% } %>
                     <p>Los envíos asignados pasaron a <strong>En Tránsito</strong>.</p>
-                    <a href="/shipment/kanban" class="btn-primary"><span class="material-symbols-outlined">view_kanban</span> Ver Kanban</a>
+                    <a href="/shipment/kanban" class="action-btn action-btn--lg buscar" data-tooltip="Ver Kanban" aria-label="Ver Kanban"><span class="material-symbols-outlined">view_kanban</span></a>
                 </div>
             <% } else if (route) { %>
                 <div class="update-card">
@@ -35,9 +37,8 @@
                     <div class="detail-field"><span class="detail-label">Entregas</span><span class="detail-value"><%= (route.stops || []).filter(s => s.stopType === 'delivery').length %></span></div>
 
                     <form method="POST" action="/route/scan/<%= route.id %>/dispatch" style="margin-top:var(--space-4)">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Confirmar salida (pasar envíos a En Tránsito)" aria-label="Confirmar salida (pasar envíos a En Tránsito)">
                             <span class="material-symbols-outlined">play_arrow</span>
-                            Confirmar salida (pasar envíos a En Tránsito)
                         </button>
                     </form>
                 </div>
