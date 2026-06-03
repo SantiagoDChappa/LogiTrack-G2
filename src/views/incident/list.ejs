@@ -14,12 +14,12 @@
             <div class="page-header__actions">
                 <% const _role = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.roleId : null; %>
                 <% if (_role === 1 || _role === 4) { %>
-                    <a href="/incident/config/templates" class="btn-secondary">
-                        <span class="material-symbols-outlined">checklist</span>Checklist por tipo
+                    <a href="/incident/config/templates" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Checklist por tipo" aria-label="Checklist por tipo">
+                        <span class="material-symbols-outlined">checklist</span>
                     </a>
                 <% } %>
-                <a href="/incident/new" class="btn-primary">
-                    <span class="material-symbols-outlined">add</span>Nueva incidencia
+                <a href="/incident/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva incidencia" aria-label="Nueva incidencia">
+                    <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
         </div>
@@ -91,13 +91,11 @@
                 <label for="shipmentId"><span class="material-symbols-outlined incident-filter-icon">local_shipping</span> Envío (ID)</label>
                 <input type="number" id="shipmentId" name="shipmentId" value="<%= filters.shipmentId || '' %>">
             </div>
-            <button type="submit" class="btn-primary">
+            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Filtrar" aria-label="Filtrar">
                 <span class="material-symbols-outlined">filter_alt</span>
-                Filtrar
             </button>
-            <a href="/incident" class="btn-secondary">
+            <a href="/incident" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
                 <span class="material-symbols-outlined">refresh</span>
-                Limpiar
             </a>
         </form>
 
@@ -147,7 +145,7 @@
                             <td><%= i.escalated ? '🔥' : '—' %></td>
                             <td><%= i.assignedTo ? i.assignedTo.fullName : '—' %></td>
                             <td><%= new Date(i.createdAt).toLocaleString('es-AR') %></td>
-                            <td><a href="/incident/<%= i.id %>" class="btn-link">Ver</a></td>
+                            <td><a href="/incident/<%= i.id %>" class="action-btn detalle" data-tooltip="Ver detalle" aria-label="Ver detalle"><span class="material-symbols-outlined">visibility</span></a></td>
                         </tr>
                     <% }) %>
                 </tbody>

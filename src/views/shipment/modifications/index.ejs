@@ -32,7 +32,9 @@
                     <option value="ALL" <%= filters.status === 'ALL' ? 'selected' : '' %>>Todas</option>
                 </select>
             </div>
-            <button type="submit" class="btn-secondary">Filtrar</button>
+            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Filtrar" aria-label="Filtrar">
+                <span class="material-symbols-outlined">filter_alt</span>
+            </button>
         </form>
 
         <% if (!requests.length) { %>
@@ -65,11 +67,11 @@
                         <td>
                             <% if (r.status === 'PENDING_REVIEW') { %>
                             <form method="POST" action="/shipment/modifications/<%= r.id %>/approve" style="display:inline">
-                                <button type="submit" class="btn-primary" style="padding:.3rem .6rem;font-size:.8rem;">Aprobar</button>
+                                <button type="submit" class="action-btn guardar" data-tooltip="Aprobar" aria-label="Aprobar"><span class="material-symbols-outlined">check</span></button>
                             </form>
                             <form method="POST" action="/shipment/modifications/<%= r.id %>/reject" style="display:inline;margin-left:.35rem;">
                                 <input type="hidden" name="reviewComment" value="Rechazada en revisión operativa">
-                                <button type="submit" class="btn-secondary" style="padding:.3rem .6rem;font-size:.8rem;">Rechazar</button>
+                                <button type="submit" class="action-btn eliminar" data-tooltip="Rechazar" aria-label="Rechazar"><span class="material-symbols-outlined">close</span></button>
                             </form>
                             <% } else { %>
                             —

@@ -54,7 +54,7 @@ const NotificationEmail = sequelize.define('NotificationEmail', {
 );
 
 const findPending = async () => {
- return NotificationEmail.findAll({
+    return NotificationEmail.findAll({
         where: {
             status: 'PENDING',
             [Op.or]: [
@@ -81,10 +81,25 @@ const markAsSent = async (id) => {
         }, {
         where: {
             id,
-            status: 'PENDING'
+            status: 'PROCESSING'
         }
     }
     )
+}
+
+const claimEmailForProcessing = async (id) => {
+    const [updatedRows] = await NotificationEmail.update(
+        {
+            status: 'PROCESSING'
+        },
+        {
+            where: {
+                id,
+                status: 'PENDING'
+            }
+        }
+    );
+    return updatedRows === 1;
 }
 
 
@@ -110,7 +125,10 @@ const scheduleRetry = async (id, currentAttempts, errorMessaje) => {
             lastError: errorMessaje,
             nextRetryAt: calculateNextRetry(attempts)
         }, {
-        where: { id }
+        where: {
+            id,
+            status: 'PROCESSING'
+        }
     }
     );
 };

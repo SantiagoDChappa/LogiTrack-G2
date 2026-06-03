@@ -21,7 +21,7 @@ const htmlToText = (html) => String(html || '')
     .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-
+/*
 // `format` opcional: 'html' envía cuerpo HTML (con fallback de texto); cualquier otro valor = texto plano.
 // `opts.allowOverride` (default false): solo los envíos de PRUEBA aplican el redirect
 // `test_email_override`. Las notificaciones reales (destinatario/remitente/parametrizado)
@@ -50,7 +50,7 @@ async function sendEmail(to, subject, content, format = 'text', opts = {}) {
 
         const message = {
             from: process.env.EMAIL_USER,
-            to:   finalTo,
+            to: finalTo,
             subject: finalSubject,
         };
         if (format === 'html') {
@@ -67,6 +67,31 @@ async function sendEmail(to, subject, content, format = 'text', opts = {}) {
         console.error('Error sending email:', error);
         return false;
     }
+}*/
+
+async function sendEmail(to, subject, content, format = 'text') {
+    const recipients = []
+        .concat(to || [])
+        .flatMap(v => String(v).split(','))
+        .map(v => v.trim());
+    if (recipients.length === 0) {
+        throw new Error('No valid recipients provided');
+        return;
+    }
+
+    const data = {
+        from: process.env.EMAIL_USER,
+        to: recipients.join(', '),
+        subject,
+        text: format === 'html' ? htmlToText(content) : content,
+    };
+
+    try {
+        await transporter.sendMail(data);
+    }catch (error) {
+        throw error;
+    }
+
 }
 
 module.exports = { sendEmail };

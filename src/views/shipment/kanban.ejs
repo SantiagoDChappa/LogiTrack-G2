@@ -49,7 +49,7 @@
                     </select>
                 </form>
                 <% } %>
-                <button class="btn-secondary btn-sm" id="k-refresh-btn" onclick="kanban.refresh()" title="Actualizar tablero">
+                <button class="action-btn neutro" id="k-refresh-btn" onclick="kanban.refresh()" data-tooltip="Actualizar tablero" aria-label="Actualizar tablero">
                     <span class="material-symbols-outlined">refresh</span>
                 </button>
             </div>
@@ -305,8 +305,12 @@
                 </div>
                 <div id="k-modal-body"></div>
                 <div class="app-modal-actions">
-                    <button class="btn-secondary btn-sm" onclick="kanban.closeModal()">Cancelar</button>
-                    <button class="btn-primary btn-sm" id="k-modal-confirm" onclick="kanban.confirmModal()">Confirmar</button>
+                    <button class="action-btn action-btn--lg cancelar" onclick="kanban.closeModal()" data-tooltip="Cancelar" aria-label="Cancelar">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <button class="action-btn action-btn--lg guardar" id="k-modal-confirm" onclick="kanban.confirmModal()" data-tooltip="Confirmar" aria-label="Confirmar">
+                        <span class="material-symbols-outlined">check</span>
+                    </button>
                 </div>
             </div>
         </div>

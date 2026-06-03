@@ -25,7 +25,17 @@ const requireAuth = async (req, res, next) => {
         }
         res.locals.currentUser = decoded;
         const settingModel = require('../models/setting');
-        res.locals.nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
+        const statusModel  = require('../models/status');
+        const statusColors = require('../services/statusColors');
+        const [allSettings, statuses] = await Promise.all([
+            settingModel.getAll(),
+            statusModel.getAll().catch(() => []),
+        ]);
+        res.locals.nombreEmpresa   = allSettings.nombre_empresa || 'LogiTrack';
+        // LGT-172: logo institucional configurable.
+        res.locals.logoEmpresa     = allSettings.logo_empresa || '/images/logo.png';
+        // LGT-173: CSS de colores de estados configurados (se inyecta en el <head>).
+        res.locals.statusColorsCss = statusColors.buildCss(allSettings, statuses);
         next();
     } catch {
         const returnTo = req.originalUrl;
