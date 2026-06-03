@@ -11,7 +11,9 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Editar Transporte</h1>
-            <a href="/transport" class="btn-secondary">Volver</a>
+            <a href="/transport" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
         </div>
 
         <div class="form-new">
@@ -71,9 +73,8 @@
                                 <option value="<%= z.id %>" <%= selectedZoneIds.includes(z.id) ? 'selected' : '' %>><%= z.name %></option>
                             <% }) %>
                         </select>
-                        <button type="button" id="clear-zones" class="btn-secondary" style="margin-top:0.5rem;font-size:var(--font-size-xs)">
-                            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">backspace</span>
-                            Limpiar zonas seleccionadas
+                        <button type="button" id="clear-zones" class="action-btn neutro" style="margin-top:0.5rem;" data-tooltip="Limpiar zonas seleccionadas" aria-label="Limpiar zonas seleccionadas">
+                            <span class="material-symbols-outlined">backspace</span>
                         </button>
                     </div>
                     <script>
@@ -89,9 +90,11 @@
                 </div>
 
                 <div class="form-actions">
-                    <a href="/transport" class="btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn-primary">
-                        <span class="material-symbols-outlined">save</span>Actualizar
+                    <a href="/transport" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                        <span class="material-symbols-outlined">close</span>
+                    </a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Actualizar" aria-label="Actualizar">
+                        <span class="material-symbols-outlined">save</span>
                     </button>
                 </div>
             </form>

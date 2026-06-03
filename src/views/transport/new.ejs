@@ -11,7 +11,9 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Nuevo Transporte</h1>
-            <a href="/transport" class="btn-secondary">Volver</a>
+            <a href="/transport" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
         </div>
 
         <div class="form-new">
@@ -79,9 +81,11 @@
                 </div>
 
                 <div class="form-actions">
-                    <a href="/transport" class="btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn-primary">
-                        <span class="material-symbols-outlined">save</span>Guardar
+                    <a href="/transport" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                        <span class="material-symbols-outlined">close</span>
+                    </a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar" aria-label="Guardar">
+                        <span class="material-symbols-outlined">save</span>
                     </button>
                 </div>
             </form>

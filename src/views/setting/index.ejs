@@ -109,7 +109,7 @@
             align-items:center; justify-content:center; padding:1rem; }
         .tplm-dialog { background:var(--color-bg,#fff); border:1px solid var(--color-border,#e2e8f0);
             border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.32);
-            width:min(960px,96vw); height:min(720px,92vh); display:flex; flex-direction:column; overflow:hidden; }
+            width:min(1320px,97vw); height:min(760px,93vh); display:flex; flex-direction:column; overflow:hidden; }
         .tplm-head { display:flex; align-items:flex-start; justify-content:space-between;
             padding:1rem 1.25rem; border-bottom:1px solid var(--color-border); }
         .tplm-title { margin:0; font-size:1.05rem; }
@@ -117,9 +117,13 @@
         .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
             display:inline-flex; padding:.2rem; border-radius:6px; }
         .tplm-close:hover { background:var(--color-bg-secondary,#f1f3f5); color:var(--color-text); }
-        .tplm-body { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;
-            padding:1.1rem 1.25rem; overflow:auto; }
-        .tplm-editor { display:flex; flex-direction:column; gap:.85rem; min-width:0; }
+        .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
+            padding:1.1rem 1.25rem; overflow:hidden; }
+        .tplm-editor { display:contents; }
+        .tplm-col { display:flex; flex-direction:column; gap:.85rem; min-width:0; min-height:0; overflow:auto; }
+        .tplm-col-body { gap:.6rem; }
+        .tplm-col-body .field { flex:1; display:flex; flex-direction:column; min-height:0; }
+        .tplm-col-body .tplm-textarea { flex:1; min-height:240px; }
         .tplm-row { display:flex; align-items:center; gap:.75rem; }
         .tplm-label { font-size:.8rem; font-weight:600; color:var(--color-text-secondary); }
         .tplm-segmented { display:inline-flex; border:1px solid var(--color-border); border-radius:999px; overflow:hidden; }
@@ -204,6 +208,9 @@
         .tplm-preview-body iframe { flex:1; min-height:0; width:100%; border:none; background:var(--pv-bg); display:none; }
         .tplm-foot { display:flex; justify-content:flex-end; gap:.6rem;
             padding:.85rem 1.25rem; border-top:1px solid var(--color-border); }
+        .tplm-preview { min-height:0; overflow:auto; }
+        @media (max-width:1100px) { .tplm-body { grid-template-columns:1fr 1fr; overflow:auto; }
+            .tplm-col, .tplm-preview { overflow:visible; } }
         @media (max-width:760px) { .tplm-body { grid-template-columns:1fr; } }
     </style>
     <link rel="stylesheet" href="/css/settings.css">
@@ -216,8 +223,51 @@
             <h1>Ajustes</h1>
         </div>
 
+        <!-- LGT-175: navegación lateral del módulo de configuración -->
+        <style>
+            .settings-layout { display: flex; align-items: flex-start; gap: 1.5rem; }
+            .settings-layout .settings-content { flex: 1; min-width: 0; }
+            .settings-sidenav {
+                position: sticky; top: 84px; flex-shrink: 0; width: 220px;
+                background: var(--color-surface); border: 1px solid var(--color-border);
+                border-radius: var(--radius-md); padding: .5rem; box-shadow: var(--shadow-sm);
+            }
+            .settings-sidenav__title {
+                font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .06em;
+                color: var(--color-text-muted); font-weight: var(--font-weight-semibold);
+                padding: .4rem .6rem;
+            }
+            .settings-sidenav a {
+                display: flex; align-items: center; gap: .55rem;
+                padding: .5rem .6rem; border-radius: var(--radius-sm);
+                color: var(--color-text-secondary); font-size: var(--font-size-sm);
+                font-weight: var(--font-weight-medium); text-decoration: none;
+            }
+            .settings-sidenav a .material-symbols-outlined { font-size: 1.15rem; }
+            .settings-sidenav a:hover { background: var(--color-surface-alt); color: var(--color-text); text-decoration: none; }
+            .settings-sidenav a.active { background: var(--color-primary-light); color: var(--color-primary); }
+            .settings-anchor { display: block; position: relative; top: -76px; visibility: hidden; }
+            @media (max-width: 900px) {
+                .settings-layout { flex-direction: column; }
+                .settings-sidenav { position: static; width: 100%; display: flex; flex-wrap: wrap; gap: .25rem; }
+                .settings-sidenav__title { width: 100%; }
+            }
+        </style>
+
+        <div class="settings-layout">
+            <aside class="settings-sidenav" id="settings-sidenav">
+                <div class="settings-sidenav__title">Secciones</div>
+                <a href="#sec-general"        data-target="sec-general"><span class="material-symbols-outlined">tune</span>General</a>
+                <a href="#sec-comunicaciones" data-target="sec-comunicaciones"><span class="material-symbols-outlined">mark_email_read</span>Comunicaciones</a>
+                <a href="#sec-plantillas"     data-target="sec-plantillas"><span class="material-symbols-outlined">smart_button</span>Plantillas</a>
+                <a href="#sec-ruteo"          data-target="sec-ruteo"><span class="material-symbols-outlined">local_shipping</span>Ruteo y sucursales</a>
+                <a href="#sec-catalogos"      data-target="sec-catalogos"><span class="material-symbols-outlined">category</span>Catálogos</a>
+                <a href="#sec-auditoria"      data-target="sec-auditoria"><span class="material-symbols-outlined">history</span>Auditoría</a>
+            </aside>
+
         <div class="settings-content">
 
+            <span class="settings-anchor" id="sec-general"></span>
             <!-- Card 1: Dirección de origen -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -251,9 +301,8 @@
                         <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full"></div>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar ajustes
                         </button>
                     </div>
                 </form>
@@ -433,15 +482,15 @@
                     </div>
 
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar parámetros" aria-label="Guardar parámetros">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar parámetros
                         </button>
                     </div>
                 </form>
             </div>
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <span class="settings-anchor" id="sec-comunicaciones"></span>
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">mark_email_read</span>
@@ -474,22 +523,21 @@
                                     class="notif-custom-input"
                                     <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
 
-                                <button type="button" class="btn-secondary notif-edit-tpl-btn"
+                                <button type="button" class="action-btn modificar notif-edit-tpl-btn"
                                     data-event="<%= config.eventCode %>"
                                     data-description="<%= config.description %>"
                                     data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
                                     data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
-                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>">
+                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
+                                    data-tooltip="Editar mail" aria-label="Editar mail">
                                     <span class="material-symbols-outlined">edit_note</span>
-                                    Editar mail
                                 </button>
                             </div>
                         <% }) %>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones" aria-label="Guardar notificaciones">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar notificaciones
                         </button>
                     </div>
                 </form>
@@ -535,9 +583,8 @@
                         <small style="color:var(--color-text-secondary)">Separar por coma, espacio o punto y coma. Se ignoran direcciones inválidas.</small>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones de incidencias" aria-label="Guardar notificaciones de incidencias">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar notificaciones de incidencias
                         </button>
                     </div>
                 </form>
@@ -577,9 +624,8 @@
                         <small style="color:var(--color-text-secondary)">Si no elegís evento, se usa este texto como cuerpo.</small>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
                             <span class="material-symbols-outlined">send</span>
-                            Enviar prueba
                         </button>
                     </div>
                 </form>
@@ -602,15 +648,15 @@
                         <small style="color:var(--color-text-secondary)">El asunto recibirá un prefijo <code>[TEST → destinatarios reales]</code>.</small>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar override" aria-label="Guardar override">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar override
                         </button>
                     </div>
                 </form>
             </div>
 
             <!-- Card: Variables de notificación (ABM) -->
+            <span class="settings-anchor" id="sec-plantillas"></span>
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">data_object</span>
@@ -627,7 +673,7 @@
                                 <input type="text" name="label" value="<%= v.label %>" placeholder="etiqueta" class="abm-in" required>
                                 <input type="text" name="value" value="<%= v.value %>" placeholder="valor" class="abm-in abm-in--grow">
                                 <input type="text" name="description" value="<%= v.description || '' %>" placeholder="descripción" class="abm-in">
-                                <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                                <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                             </form>
                             <form method="POST" action="/setting/notification-variable/<%= v.id %>/delete">
                                 <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
@@ -640,7 +686,7 @@
                     <input type="text" name="label" placeholder="etiqueta" class="abm-in" required>
                     <input type="text" name="value" placeholder="valor" class="abm-in abm-in--grow">
                     <input type="text" name="description" placeholder="descripción (opcional)" class="abm-in">
-                    <button type="submit" class="btn-primary btn-sm"><span class="material-symbols-outlined">add</span> Agregar</button>
+                    <button type="submit" class="action-btn crear" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button>
                 </form>
             </div>
 
@@ -661,7 +707,7 @@
                                     <input type="text" name="label" value="<%= s.label %>" placeholder="etiqueta" class="abm-in" required>
                                     <input type="text" name="icon" value="<%= s.icon || '' %>" placeholder="ícono (material symbol)" class="abm-in abm-in--key">
                                     <% if (s.builtin) { %><span class="abm-badge">predefinido</span><% } %>
-                                    <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                                    <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                                 </div>
                                 <label class="abm-snip-label">HTML</label>
                                 <textarea name="html" rows="2" class="abm-in tplm-textarea"><%= s.html %></textarea>
@@ -680,7 +726,7 @@
                     <div class="abm-snip-head">
                         <input type="text" name="label" placeholder="etiqueta del bloque" class="abm-in" required>
                         <input type="text" name="icon" placeholder="ícono (ej: link)" class="abm-in abm-in--key">
-                        <button type="submit" class="btn-primary btn-sm"><span class="material-symbols-outlined">add</span> Agregar bloque</button>
+                        <button type="submit" class="action-btn crear" data-tooltip="Agregar bloque" aria-label="Agregar bloque"><span class="material-symbols-outlined">add</span></button>
                     </div>
                     <textarea name="html" rows="2" class="abm-in tplm-textarea" placeholder="Versión HTML (ej: <a href=&quot;{{trackingUrl}}&quot;>Ver envío</a>)"></textarea>
                     <textarea name="text" rows="2" class="abm-in tplm-textarea" placeholder="Versión texto (ej: Seguí tu envío: {{trackingUrl}})"></textarea>
@@ -704,6 +750,7 @@
                         <form id="tpl-modal-form" method="POST" action="" class="tplm-editor">
                             <input type="hidden" name="format" id="tpl-modal-format" value="text">
 
+                            <div class="tplm-col tplm-col-controls">
                             <div class="tplm-row tplm-variant-row">
                                 <span class="tplm-label">Variante</span>
                                 <select id="tpl-variant-select" class="tplm-variant-select"></select>
@@ -747,7 +794,9 @@
                                 <label>Bloques rápidos <small>(insertan contenido listo según el formato)</small></label>
                                 <div class="tplm-snippets" id="tpl-snippets"></div>
                             </div>
+                            </div><!-- /tplm-col-controls -->
 
+                            <div class="tplm-col tplm-col-body">
                             <div class="field">
                                 <label for="tpl-modal-body">Cuerpo del mensaje</label>
                                 <textarea id="tpl-modal-body" name="body" rows="10" required class="tplm-textarea"></textarea>
@@ -755,11 +804,12 @@
 
                             <div class="tplm-test">
                                 <input type="email" id="tpl-modal-test-email" placeholder="email@dominio.com para enviar prueba">
-                                <button type="button" class="btn-secondary" id="tpl-modal-test-btn">
-                                    <span class="material-symbols-outlined">send</span> Enviar prueba
+                                <button type="button" class="action-btn buscar" id="tpl-modal-test-btn" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
+                                    <span class="material-symbols-outlined">send</span>
                                 </button>
                                 <span class="tplm-test-msg" id="tpl-modal-test-msg"></span>
                             </div>
+                            </div><!-- /tplm-col-body -->
                         </form>
 
                         <div class="tplm-preview">
@@ -776,9 +826,11 @@
                     </div>
 
                     <footer class="tplm-foot">
-                        <button type="button" class="btn-secondary" id="tpl-modal-cancel2">Cancelar</button>
-                        <button type="submit" form="tpl-modal-form" class="btn-primary">
-                            <span class="material-symbols-outlined">save</span> Guardar mail
+                        <button type="button" class="action-btn action-btn--lg cancelar" id="tpl-modal-cancel2" data-tooltip="Cancelar" aria-label="Cancelar">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                        <button type="submit" form="tpl-modal-form" class="action-btn action-btn--lg guardar" data-tooltip="Guardar mail" aria-label="Guardar mail">
+                            <span class="material-symbols-outlined">save</span>
                         </button>
                     </footer>
                 </div>
@@ -1033,6 +1085,7 @@
             </script>
 
             <!-- Card 3: Optimización de ruteo -->
+            <span class="settings-anchor" id="sec-ruteo"></span>
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">alt_route</span>
@@ -1077,9 +1130,8 @@
                         </div>
                     </div>
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar ajustes
                         </button>
                     </div>
                 </form>
@@ -1134,9 +1186,8 @@
                     </table>
                 </div>
                 <div class="settings-actions">
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                         <span class="material-symbols-outlined">save</span>
-                        Guardar ajustes
                     </button>
                 </div>
                 </form>
@@ -1144,6 +1195,7 @@
             </div>
 
             <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <span class="settings-anchor" id="sec-catalogos"></span>
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">cancel</span>
@@ -1165,8 +1217,8 @@
                                 <td><input type="checkbox" name="active" <%= r.active ? 'checked' : '' %>></td>
                                 <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
                                 <td>
-                                    <button class="btn-primary" type="submit">Guardar</button>
-                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')">Borrar</button>
+                                    <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1178,7 +1230,7 @@
                                 <td><input type="number" name="retryDays" min="0" max="30" value="1" style="width:70px"></td>
                                 <td><input type="checkbox" name="active" checked></td>
                                 <td><input type="checkbox" name="createsIncident"></td>
-                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                                <td><button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button></td>
                             </form>
                         </tr>
                     </tbody>
@@ -1204,8 +1256,8 @@
                                 <td><input type="text" name="label" value="<%= t.description %>" required></td>
                                 <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
                                 <td>
-                                    <button class="btn-primary" type="submit">Guardar</button>
-                                    <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')">Desactivar</button>
+                                    <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1215,7 +1267,7 @@
                                 <td><input type="text" name="code" placeholder="CODIGO" required></td>
                                 <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
                                 <td><input type="checkbox" name="active" checked></td>
-                                <td><button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button></td>
+                                <td><button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button></td>
                             </form>
                         </tr>
                     </tbody>
@@ -1273,8 +1325,8 @@
                                 <input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>> Activo
                             </label>
                             <div class="tw-actions">
-                                <button class="btn-primary" type="submit">Guardar</button>
-                                <button class="btn-danger" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')">Borrar</button>
+                                <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                             </div>
                         </form>
                     <% }) %>
@@ -1286,7 +1338,7 @@
                             <input type="checkbox" name="active" checked> Activo
                         </label>
                         <div class="tw-actions">
-                            <button class="btn-primary" type="submit" name="_action" value="create">+ Agregar</button>
+                            <button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button>
                         </div>
                     </form>
                 </div>
@@ -1303,12 +1355,13 @@
                 <form method="POST" action="/setting/standard-message/<%= m.code %>" style="margin-bottom:1rem">
                     <label style="font-weight:600"><%= m.label %> <code style="font-size:.75rem;color:#64748b">(<%= m.code %>)</code></label>
                     <textarea name="body" rows="2" style="width:100%;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px"><%= m.body %></textarea>
-                    <button class="btn-primary" type="submit" style="margin-top:.25rem">Guardar</button>
+                    <button class="action-btn action-btn--lg guardar" type="submit" style="margin-top:.25rem" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                 </form>
                 <% }) %>
             </div>
 
             <!-- Card 5: Historial de cambios -->
+            <span class="settings-anchor" id="sec-auditoria"></span>
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">history</span>
@@ -1347,6 +1400,7 @@
                 <% } %>
             </div>
         </div>
+        </div><!-- /.settings-layout -->
     </main>
 
     <% const _currentProv = provinces.find(p => p.id == settings.origin_province_id); %>
@@ -1360,6 +1414,40 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
+    <script>
+        // LGT-175: navegación lateral — scroll suave y resaltado de la sección activa.
+        (function () {
+            var nav = document.getElementById('settings-sidenav');
+            if (!nav) return;
+            var links = Array.prototype.slice.call(nav.querySelectorAll('a[data-target]'));
+            var sections = links
+                .map(function (a) { return document.getElementById(a.dataset.target); })
+                .filter(Boolean);
+
+            links.forEach(function (a) {
+                a.addEventListener('click', function (e) {
+                    var target = document.getElementById(a.dataset.target);
+                    if (!target) return;
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    history.replaceState(null, '', '#' + a.dataset.target);
+                });
+            });
+
+            function setActive() {
+                var pos = window.scrollY + 120;
+                var currentId = sections.length ? sections[0].id : null;
+                sections.forEach(function (sec) {
+                    if (sec.offsetTop <= pos) { currentId = sec.id; }
+                });
+                links.forEach(function (a) {
+                    a.classList.toggle('active', a.dataset.target === currentId);
+                });
+            }
+            window.addEventListener('scroll', setActive, { passive: true });
+            setActive();
+        })();
+    </script>
     <script>
         const _addr = JSON.parse(document.getElementById('setting-addr-data').textContent);
         if (_addr.street && _addr.number) {
