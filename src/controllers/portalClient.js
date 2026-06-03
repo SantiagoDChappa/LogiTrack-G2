@@ -21,9 +21,11 @@ const { Branch } = require('../models/branch');
 const provinceModel = require('../models/province');
 const {
     listClientIncidents,
-    formatIncidentDetail,
+    loadIncidentDetailViewModel,
     loadOwnedIncident,
 } = require('../services/portalIncidentView');
+const { submitClientResponse } = require('../services/portalIncidentResponseService');
+const incidentAttachmentModel = require('../models/incidentAttachment');
 
 const formatModificationsList = (rows) => rows.map((row) => {
     const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
@@ -269,8 +271,56 @@ const getIncidentDetail = async (req, res) => {
     res.render('portal/misEnviosIncidentDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
-        incident: formatIncidentDetail(incident),
+        incident: await loadIncidentDetailViewModel(incident),
+        flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.' : null,
+        error: req.query.error ? String(req.query.error) : null,
     });
+};
+
+const postIncidentResponse = async (req, res) => {
+    const incidentId = Number(req.params.id);
+    const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
+    if (!incident) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Incidencia no encontrada.',
+        });
+    }
+
+    if (req.uploadError) {
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?error=${encodeURIComponent(req.uploadError)}`);
+    }
+
+    const result = await submitClientResponse({
+        incident,
+        client: res.locals.portalClient,
+        comment: req.body.comment,
+        file: req.file,
+    });
+
+    if (!result.ok) {
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?error=${encodeURIComponent(result.message)}`);
+    }
+
+    return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?ok=1`);
+};
+
+const getIncidentAttachment = async (req, res) => {
+    const incidentId = Number(req.params.id);
+    const attId = Number(req.params.attId);
+    const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
+    if (!incident) {
+        return res.status(404).send('Incidencia no encontrada.');
+    }
+
+    const att = await incidentAttachmentModel.getById(attId);
+    if (!att || att.incidentId !== incidentId) {
+        return res.status(404).send('Archivo no encontrado.');
+    }
+
+    const buffer = Buffer.from(att.dataBase64, 'base64');
+    res.setHeader('Content-Disposition', `inline; filename="${String(att.fileName).replace(/"/g, '')}"`);
+    return res.type(att.mimeType).send(buffer);
 };
 
 module.exports = {
@@ -283,6 +333,8 @@ module.exports = {
     postManageForm,
     getIncidentList,
     getIncidentDetail,
+    postIncidentResponse,
+    getIncidentAttachment,
     postLogout,
     formatModificationsList,
 };

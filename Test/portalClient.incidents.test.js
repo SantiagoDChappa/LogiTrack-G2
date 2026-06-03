@@ -39,12 +39,22 @@ jest.mock('../src/services/portalClientAccess', () => ({
 
 jest.mock('../src/services/portalIncidentView', () => ({
     listClientIncidents: jest.fn(),
-    formatIncidentDetail: jest.fn(),
+    loadIncidentDetailViewModel: jest.fn(),
     loadOwnedIncident: jest.fn(),
+}));
+
+jest.mock('../src/services/portalIncidentResponseService', () => ({
+    submitClientResponse: jest.fn(),
+}));
+
+jest.mock('../src/models/incidentAttachment', () => ({
+    getById: jest.fn(),
 }));
 
 const portalClientAccess = require('../src/services/portalClientAccess');
 const portalIncidentView = require('../src/services/portalIncidentView');
+const portalIncidentResponseService = require('../src/services/portalIncidentResponseService');
+const incidentAttachmentModel = require('../src/models/incidentAttachment');
 const portalRoutes = require('../src/routes/portal');
 
 process.env.JWT_SECRET = 'test-secret';
@@ -138,7 +148,7 @@ describe('GET /portal/mis-envios/incidencia/:id', () => {
 
     test('muestra detalle básico de incidencia propia', async () => {
         portalIncidentView.loadOwnedIncident.mockResolvedValueOnce({ id: 1 });
-        portalIncidentView.formatIncidentDetail.mockReturnValueOnce({
+        portalIncidentView.loadIncidentDetailViewModel.mockResolvedValueOnce({
             id: 1,
             shipmentId: 10,
             trackingId: 'ENV-010',
@@ -148,8 +158,9 @@ describe('GET /portal/mis-envios/incidencia/:id', () => {
             statusLabel: 'Abierta',
             statusKey: 'open',
             description: 'Llegó tarde el paquete',
-            resolution: null,
-            resolutionLabel: null,
+            canInteract: true,
+            history: [],
+            attachments: [],
         });
 
         const res = await request(app)
@@ -159,7 +170,120 @@ describe('GET /portal/mis-envios/incidencia/:id', () => {
         expect(res.status).toBe(200);
         expect(res.text).toContain('Llegó tarde el paquete');
         expect(res.text).toContain('ENV-010');
-        expect(res.text).toContain('Abierta');
+        expect(res.text).toContain('Responder incidencia');
         expect(portalIncidentView.loadOwnedIncident).toHaveBeenCalledWith(1, expect.objectContaining({ document: 12345678 }));
+    });
+});
+
+describe('POST /portal/mis-envios/incidencia/:id/responder', () => {
+    test('redirige con confirmación cuando la respuesta es válida', async () => {
+        portalIncidentView.loadOwnedIncident.mockResolvedValueOnce({ id: 1 });
+        portalIncidentResponseService.submitClientResponse.mockResolvedValueOnce({ ok: true, incidentId: 1 });
+
+        const res = await request(app)
+            .post('/portal/mis-envios/incidencia/1/responder')
+            .set('Cookie', makeSessionCookie())
+            .type('form')
+            .send({ comment: 'Adjunto la info solicitada' });
+
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toBe('/portal/mis-envios/incidencia/1?ok=1');
+    });
+
+    test('devuelve 404 para incidencia ajena', async () => {
+        portalIncidentView.loadOwnedIncident.mockResolvedValueOnce(null);
+
+        const res = await request(app)
+            .post('/portal/mis-envios/incidencia/99/responder')
+            .set('Cookie', makeSessionCookie())
+            .type('form')
+            .send({ comment: 'Hola' });
+
+        expect(res.status).toBe(404);
+    });
+});
+
+describe('GET /portal/mis-envios/incidencia/:id (seguimiento completo)', () => {
+    test('muestra última actualización y resolución para incidencia cerrada', async () => {
+        portalIncidentView.loadOwnedIncident.mockResolvedValueOnce({ id: 2 });
+        portalIncidentView.loadIncidentDetailViewModel.mockResolvedValueOnce({
+            id: 2,
+            shipmentId: 10,
+            trackingId: 'ENV-010',
+            typeLabel: 'Paquete dañado',
+            createdAt: new Date('2026-06-01'),
+            status: 'CLOSED',
+            statusLabel: 'Cerrada',
+            statusKey: 'closed',
+            description: 'Caja rota',
+            canInteract: false,
+            closedMessage: 'Esta incidencia ya no admite nuevas interacciones.',
+            resolution: 'PROCEDENTE',
+            resolutionLabel: 'Procedente',
+            closedAt: new Date('2026-06-03T18:00:00Z'),
+            lastUpdatedAt: new Date('2026-06-03T18:00:00Z'),
+            history: [
+                { eventLabel: 'Incidencia cerrada', changedAt: '2026-06-03T18:00:00Z', authorLabel: 'Operador', isClient: false, detail: 'Procedente' },
+                { eventLabel: 'Incidencia registrada', changedAt: '2026-06-01T10:00:00Z', authorLabel: 'Sistema', isClient: false, detail: '' },
+            ],
+            attachments: [],
+        });
+
+        const res = await request(app)
+            .get('/portal/mis-envios/incidencia/2')
+            .set('Cookie', makeSessionCookie());
+
+        expect(res.status).toBe(200);
+        expect(res.text).toContain('Última actualización');
+        expect(res.text).toContain('Resolución de la incidencia');
+        expect(res.text).toContain('Procedente');
+        expect(res.text).toContain('Fecha de cierre');
+        expect(res.text).toContain('Cerrada');
+        expect(res.text).toContain('ya no admite nuevas interacciones');
+    });
+
+    test('no muestra bloque de resolución para incidencia abierta', async () => {
+        portalIncidentView.loadOwnedIncident.mockResolvedValueOnce({ id: 3 });
+        portalIncidentView.loadIncidentDetailViewModel.mockResolvedValueOnce({
+            id: 3,
+            shipmentId: 10,
+            trackingId: 'ENV-010',
+            typeLabel: 'Demora',
+            createdAt: new Date('2026-06-01'),
+            status: 'OPEN',
+            statusLabel: 'Abierta',
+            statusKey: 'open',
+            description: 'Aún no llegó',
+            canInteract: true,
+            closedMessage: null,
+            resolution: null,
+            resolutionLabel: null,
+            closedAt: null,
+            lastUpdatedAt: null,
+            history: [],
+            attachments: [],
+        });
+
+        const res = await request(app)
+            .get('/portal/mis-envios/incidencia/3')
+            .set('Cookie', makeSessionCookie());
+
+        expect(res.status).toBe(200);
+        expect(res.text).not.toContain('Resolución de la incidencia');
+        expect(res.text).not.toContain('Fecha de cierre');
+        expect(res.text).not.toContain('Última actualización');
+    });
+});
+
+describe('GET /portal/mis-envios/incidencia/:id/adjunto/:attId', () => {
+    test('devuelve 404 si el adjunto no pertenece a la incidencia', async () => {
+        portalIncidentView.loadOwnedIncident.mockResolvedValueOnce({ id: 1 });
+        incidentAttachmentModel.getById.mockResolvedValueOnce({ id: 9, incidentId: 2, dataBase64: 'aGk=', mimeType: 'text/plain', fileName: 'x.txt' });
+
+        const res = await request(app)
+            .get('/portal/mis-envios/incidencia/1/adjunto/9')
+            .set('Cookie', makeSessionCookie());
+
+        expect(res.status).toBe(404);
     });
 });

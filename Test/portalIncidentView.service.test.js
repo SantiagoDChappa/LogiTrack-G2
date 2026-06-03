@@ -8,13 +8,30 @@ jest.mock('../src/models/incident', () => ({
     findByShipmentIds: jest.fn(),
 }));
 
+jest.mock('../src/models/incidentHistory', () => ({
+    getByIncidentId: jest.fn(),
+}));
+
+jest.mock('../src/models/incidentAttachment', () => ({
+    getMetaByIncidentId: jest.fn(),
+}));
+
 jest.mock('../src/services/portalClientAccess', () => ({
     assertClientOwnsShipment: jest.fn(),
+}));
+
+jest.mock('../src/services/portalIncidentResponseService', () => ({
+    canClientInteract: jest.fn((incident) => {
+        const status = incident?.status;
+        return status === 'OPEN' || status === 'IN_REVIEW';
+    }),
 }));
 
 const shipmentModel = require('../src/models/shipment');
 const incidentModel = require('../src/models/incident');
 const { assertClientOwnsShipment } = require('../src/services/portalClientAccess');
+const incidentHistoryModel = require('../src/models/incidentHistory');
+const incidentAttachmentModel = require('../src/models/incidentAttachment');
 const {
     statusLabel,
     resolutionLabel,
@@ -23,6 +40,8 @@ const {
     listClientIncidents,
     assertClientOwnsIncident,
     loadOwnedIncident,
+    computeLastUpdatedAt,
+    loadIncidentDetailViewModel,
 } = require('../src/services/portalIncidentView');
 const { IncidentStatus, IncidentResolution } = require('../src/constants/enums');
 
@@ -151,5 +170,78 @@ describe('assertClientOwnsIncident() / loadOwnedIncident()', () => {
         assertClientOwnsShipment.mockReturnValueOnce(true);
         const result = await loadOwnedIncident(5, client);
         expect(result).toEqual(sampleIncident);
+    });
+});
+
+describe('computeLastUpdatedAt()', () => {
+    test('retorna null si no hay datos', () => {
+        expect(computeLastUpdatedAt([], [], null)).toBeNull();
+    });
+
+    test('retorna la fecha más reciente del historial', () => {
+        const history = [
+            { changedAt: '2026-06-03T10:00:00Z' },
+            { changedAt: '2026-06-01T08:00:00Z' },
+        ];
+        const result = computeLastUpdatedAt(history, [], null);
+        expect(result).toEqual(new Date('2026-06-03T10:00:00Z'));
+    });
+
+    test('retorna closedAt cuando es la más reciente', () => {
+        const history = [{ changedAt: '2026-06-01T08:00:00Z' }];
+        const attachments = [{ createdAt: '2026-06-02T09:00:00Z' }];
+        const closedAt = '2026-06-05T18:00:00Z';
+        const result = computeLastUpdatedAt(history, attachments, closedAt);
+        expect(result).toEqual(new Date(closedAt));
+    });
+
+    test('retorna la fecha del último adjunto cuando es la más reciente', () => {
+        const history = [{ changedAt: '2026-06-01T08:00:00Z' }];
+        const attachments = [
+            { createdAt: '2026-06-01T09:00:00Z' },
+            { createdAt: '2026-06-04T12:00:00Z' },
+        ];
+        const result = computeLastUpdatedAt(history, attachments, null);
+        expect(result).toEqual(new Date('2026-06-04T12:00:00Z'));
+    });
+});
+
+describe('loadIncidentDetailViewModel() – lastUpdatedAt y resolución', () => {
+    test('incluye lastUpdatedAt calculado del historial', async () => {
+        const incident = {
+            ...sampleIncident,
+            closedAt: null,
+        };
+        incidentHistoryModel.getByIncidentId.mockResolvedValueOnce([
+            { eventType: 'STATUS_CHANGE', changedAt: '2026-06-02T14:00:00Z', toJSON() { return this; } },
+            { eventType: 'CREATED', changedAt: '2026-06-01T10:00:00Z', toJSON() { return this; } },
+        ]);
+        incidentAttachmentModel.getMetaByIncidentId.mockResolvedValueOnce([]);
+
+        const vm = await loadIncidentDetailViewModel(incident);
+
+        expect(vm.lastUpdatedAt).toEqual(new Date('2026-06-02T14:00:00Z'));
+        expect(vm.closedAt).toBeNull();
+        expect(vm.resolutionLabel).toBeNull();
+    });
+
+    test('incluye closedAt y resolutionLabel para incidencia cerrada', async () => {
+        const closedIncident = {
+            ...sampleIncident,
+            status: 'CLOSED',
+            resolution: 'PROCEDENTE',
+            closedAt: '2026-06-03T18:00:00Z',
+        };
+        incidentHistoryModel.getByIncidentId.mockResolvedValueOnce([
+            { eventType: 'CLOSED', changedAt: '2026-06-03T18:00:00Z', toValue: 'PROCEDENTE', toJSON() { return this; } },
+        ]);
+        incidentAttachmentModel.getMetaByIncidentId.mockResolvedValueOnce([]);
+
+        const vm = await loadIncidentDetailViewModel(closedIncident);
+
+        expect(vm.closedAt).toBe('2026-06-03T18:00:00Z');
+        expect(vm.resolutionLabel).toBe('Procedente');
+        expect(vm.lastUpdatedAt).toEqual(new Date('2026-06-03T18:00:00Z'));
+        expect(vm.closedMessage).toBe('Esta incidencia ya no admite nuevas interacciones.');
     });
 });

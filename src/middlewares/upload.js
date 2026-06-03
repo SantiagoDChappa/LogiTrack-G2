@@ -71,4 +71,4 @@ const logoUpload = multer({
     fileFilter: logoFileFilter,
 });
 
-module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES };
+module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES, ALLOWED_EVIDENCE_MIME };
