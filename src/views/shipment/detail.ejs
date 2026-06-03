@@ -125,14 +125,14 @@
         <div class="page-header">
             <h1>Detalle de Envío</h1>
             <div style="display:flex;gap:var(--space-3)">
-                <a href="<%= returnUrl %>" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver">
+                <a href="<%= returnUrl %>" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
                     <span class="material-symbols-outlined">arrow_back</span>
                 </a>
-                <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia">
+                <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia">
                     <span class="material-symbols-outlined">report</span>
                 </a>
                 <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
-                <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="action-btn action-btn--lg modificar" data-tooltip="Modificar" aria-label="Modificar">
+                <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom modificar" data-tooltip="Modificar" aria-label="Modificar">
                     <span class="material-symbols-outlined">edit</span>
                 </a>
                 <% } %>
@@ -169,9 +169,8 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
                     <h3 style="margin:0"><span class="material-symbols-outlined">timeline</span> Últimos eventos</h3>
                     <% if (history.length > 0) { %>
-                        <button type="button" class="action-btn neutro" data-tooltip="Ver historial completo" aria-label="Ver historial completo" onclick="document.getElementById('history-modal-backdrop').classList.add('open')">
+                        <button type="button" class="action-btn action-btn--tip-bottom neutro" data-tooltip="Ver historial completo<% if (history.length > 3) { %> (+<%= history.length - 3 %>)<% } %>" aria-label="Ver historial completo" onclick="document.getElementById('history-modal-backdrop').classList.add('open')">
                             <span class="material-symbols-outlined">history</span>
-                            <% if (history.length > 3) { %><span style="opacity:.65;">(+<%= history.length - 3 %>)</span><% } %>
                         </button>
                     <% } %>
                 </div>

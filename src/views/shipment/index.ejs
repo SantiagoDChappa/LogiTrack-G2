@@ -13,11 +13,11 @@
             <h1>Administrador de envios</h1>
             <div class="page-header__actions">
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
-                    <a href="/shipment/export" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV" download>
+                    <a href="/shipment/export" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV" download>
                         <span class="material-symbols-outlined">download</span>
                     </a>
                 <% } %>
-                <a href="/shipment/new" class="action-btn action-btn--lg crear" data-tooltip="Alta de envío" aria-label="Alta de envío">
+                <a href="/shipment/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Alta de envío" aria-label="Alta de envío">
                     <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
