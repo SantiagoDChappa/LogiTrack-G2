@@ -12,7 +12,9 @@
     <main class="main-content">
         <div class="page-header">
             <h1>Optimizar Ruteo</h1>
-            <a href="/route" class="btn-secondary">Volver</a>
+            <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
         </div>
 
         <div class="shipments-wrapper">
@@ -99,9 +101,8 @@
                 <div class="update-card" style="margin-bottom:var(--space-5)">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
                         <h3><span class="material-symbols-outlined">local_shipping</span> Transportes de la sucursal</h3>
-                        <button type="button" id="toggle-manual-tx" class="btn-secondary" style="font-size:var(--font-size-xs)">
-                            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">tune</span>
-                            Elegir transporte manualmente
+                        <button type="button" id="toggle-manual-tx" class="action-btn neutro" data-tooltip="Elegir transporte manualmente" aria-label="Elegir transporte manualmente">
+                            <span class="material-symbols-outlined">tune</span>
                         </button>
                     </div>
                     <p id="tx-help-auto" style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
@@ -188,9 +189,8 @@
                 </div>
 
                 <div style="display:flex;justify-content:flex-end;padding-bottom:var(--space-6)">
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Calcular ruta óptima" aria-label="Calcular ruta óptima">
                         <span class="material-symbols-outlined">alt_route</span>
-                        Calcular ruta óptima
                     </button>
                 </div>
             </form>

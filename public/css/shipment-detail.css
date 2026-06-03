@@ -348,18 +348,27 @@ html[data-theme="dark"] {
     gap: 1rem;
 }
 
-.shipment-timeline-item { position: relative; padding-left: 1rem; }
+.shipment-timeline-item { position: relative; padding-left: 1.4rem; }
 
 .shipment-timeline-dot {
     position: absolute;
-    left: -1.65rem;
-    top: .2rem;
-    width: 12px;
-    height: 12px;
+    left: -2.35rem;
+    top: -.1rem;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
     background: var(--shp-blue);
     border: 3px solid var(--shp-surface);
     box-shadow: 0 0 0 1px var(--shp-blue);
+}
+
+.shipment-timeline-dot .material-symbols-outlined {
+    font-size: 18px;
+    line-height: 1;
 }
 
 .shipment-timeline-dot.delivered     { background: var(--shp-green); box-shadow: 0 0 0 1px var(--shp-green); }

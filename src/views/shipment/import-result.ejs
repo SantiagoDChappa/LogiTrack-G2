@@ -13,10 +13,12 @@
         <div class="page-header">
             <h1>Resultado de la importación</h1>
             <div class="page-header__actions">
-                <a href="/shipment/import/history" class="btn-secondary">
-                    <span class="material-symbols-outlined">history</span>Historial
+                <a href="/shipment/import/history" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Historial" aria-label="Historial">
+                    <span class="material-symbols-outlined">history</span>
                 </a>
-                <a href="/shipment" class="btn-secondary">Volver al listado</a>
+                <a href="/shipment" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver al listado" aria-label="Volver al listado">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
             </div>
         </div>
 
@@ -36,8 +38,8 @@
                     </div>
                 </div>
                 <div class="import-actions" style="border-top:none">
-                    <a href="/shipment/import" class="btn-primary">
-                        <span class="material-symbols-outlined">upload_file</span>Probar de nuevo
+                    <a href="/shipment/import" class="action-btn action-btn--lg buscar" data-tooltip="Probar de nuevo" aria-label="Probar de nuevo">
+                        <span class="material-symbols-outlined">upload_file</span>
                     </a>
                 </div>
 
@@ -126,8 +128,8 @@
                                 Filas con errores (<%= result.errors.length %>)
                             </h2>
                             <% if (reportId) { %>
-                                <a href="/shipment/import/report/<%= reportId %>" class="btn-secondary" download>
-                                    <span class="material-symbols-outlined">download</span>Descargar reporte CSV
+                                <a href="/shipment/import/report/<%= reportId %>" class="action-btn action-btn--lg neutro" download data-tooltip="Descargar reporte CSV" aria-label="Descargar reporte CSV">
+                                    <span class="material-symbols-outlined">download</span>
                                 </a>
                             <% } %>
                         </div>
@@ -156,11 +158,11 @@
 
                 <!-- Acciones -->
                 <div class="import-actions">
-                    <a href="/shipment/import" class="btn-secondary">
-                        <span class="material-symbols-outlined">upload_file</span>Importar otro archivo
+                    <a href="/shipment/import" class="action-btn action-btn--lg neutro" data-tooltip="Importar otro archivo" aria-label="Importar otro archivo">
+                        <span class="material-symbols-outlined">upload_file</span>
                     </a>
-                    <a href="/shipment" class="btn-primary">
-                        <span class="material-symbols-outlined">list</span>Ir al listado
+                    <a href="/shipment" class="action-btn action-btn--lg buscar" data-tooltip="Ir al listado" aria-label="Ir al listado">
+                        <span class="material-symbols-outlined">list</span>
                     </a>
                 </div>
 
