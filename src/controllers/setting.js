@@ -77,6 +77,7 @@ const getSettings = async (req, res) => {
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
             costo_base_envio:         settings.costo_base_envio         || '500',
             nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
+            logo_empresa:             settings.logo_empresa             || '',
             telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
             email_soporte:            settings.email_soporte            || 'soporte@logitrack.com',
             proceso_revisar_expirados_hora:    settings.proceso_revisar_expirados_hora    || '02:00',
@@ -345,6 +346,47 @@ const saveTestEmailOverride = async (req, res) => {
     }
 };
 
+// LGT-172: Identidad visual (nombre + logo institucional).
+const saveIdentity = async (req, res) => {
+    try {
+        // El middleware logoUpload deja un error de validación en req.uploadError (formato/tamaño).
+        if (req.uploadError) {
+            return res.redirect('/setting?error=logo_formato');
+        }
+
+        const nombre = (req.body.nombre_empresa || '').trim();
+        if (!nombre || nombre.length > 100) {
+            return res.redirect('/setting?error=nombre_empresa');
+        }
+
+        const oldNombre = await settingModel.get('nombre_empresa');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'nombre_empresa', oldNombre, nombre);
+        await settingModel.set('nombre_empresa', nombre);
+
+        // Logo opcional: si se subió un archivo válido, guardar su ruta pública y borrar el anterior.
+        if (req.file) {
+            const fs        = require('fs');
+            const path      = require('path');
+            const publicUrl = `/images/brand/${req.file.filename}`;
+            const oldLogo   = await settingModel.get('logo_empresa');
+
+            await settingLogModel.logChange(res.locals.currentUser?.id, 'logo_empresa', oldLogo, publicUrl);
+            await settingModel.set('logo_empresa', publicUrl);
+
+            // Limpieza del logo previo (solo si vivía en el directorio de marca).
+            if (oldLogo && oldLogo.startsWith('/images/brand/')) {
+                const oldPath = path.join(__dirname, '..', '..', 'public', oldLogo);
+                fs.promises.unlink(oldPath).catch(() => { /* ya no existe */ });
+            }
+        }
+
+        res.redirect('/setting?success=identity');
+    } catch (err) {
+        console.error('saveIdentity:', err.message);
+        res.status(500).redirect('/setting?error=identity_save');
+    }
+};
+
 const GEOREF = 'https://apis.datos.gob.ar/georef/api';
 
 async function geocodeOrigin(street, number, province) {
@@ -456,7 +498,7 @@ const saveParams = async (req, res) => {
             'peso_maximo_envio',
             'cantidad_maxima_paquetes',
             'costo_base_envio',
-            'nombre_empresa',
+            // 'nombre_empresa' se gestiona en la tarjeta "Identidad visual" (/setting/identity) — LGT-172
             'telefono_soporte',
             'email_soporte',
             'proceso_revisar_expirados_hora',
@@ -645,7 +687,7 @@ const saveIncidentNotifConfig = async (req, res) => {
 
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
-    saveParams, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
+    saveParams, saveIdentity, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,

@@ -4,7 +4,7 @@
             <span class="material-symbols-outlined">close</span>
         </button>
         <a href="<%= currentUser.roleId === 3 ? '/delivery' : '/home' %>" class="logo">
-            <img src="/images/logo.png" alt="<%= nombreEmpresa %> logo">
+            <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %> logo">
             <h1><%= nombreEmpresa %></h1>
         </a>
         <div class="nav">
@@ -62,7 +62,7 @@
             <span class="material-symbols-outlined">menu</span>
         </button>
         <a href="<%= currentUser.roleId === 3 ? '/delivery' : '/home' %>" class="logo-mobile">
-            <img src="/images/logo.png" alt="<%= nombreEmpresa %>">
+            <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %>">
             <span><%= nombreEmpresa %></span>
         </a>
         <i><span class="material-symbols-outlined">notifications</span></i>

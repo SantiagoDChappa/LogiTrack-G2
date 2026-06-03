@@ -2,9 +2,20 @@ const express           = require('express');
 const router            = express.Router();
 const settingController = require('../controllers/setting');
 const { requireAdmin }  = require('../middlewares/auth');
+const { logoUpload }    = require('../middlewares/upload');
+
+// LGT-172: subida tolerante del logo. Si multer falla (formato/tamaño) seguimos
+// y el controller responde con el error apropiado vía req.uploadError.
+const optionalLogo = (req, res, next) => {
+    logoUpload.single('logo')(req, res, (err) => {
+        if (err) { req.file = undefined; req.uploadError = err; }
+        next();
+    });
+};
 
 router.get('/',              requireAdmin, settingController.getSettings);
 router.post('/',             requireAdmin, settingController.saveSettings);
+router.post('/identity',     requireAdmin, optionalLogo, settingController.saveIdentity);
 router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 router.post('/params',          requireAdmin, settingController.saveParams);
