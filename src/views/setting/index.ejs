@@ -218,6 +218,29 @@
 
         <div class="settings-content">
 
+            <style>
+                /* LGT-174: organización de ajustes por categorías */
+                .settings-category {
+                    display: flex; align-items: center; gap: .75rem;
+                    margin: 2.25rem 0 1rem; padding-bottom: .6rem;
+                    border-bottom: 2px solid var(--color-border);
+                    scroll-margin-top: 90px;
+                }
+                .settings-category:first-of-type { margin-top: .25rem; }
+                .settings-category > .material-symbols-outlined {
+                    font-size: 1.6rem; color: var(--color-primary);
+                    background: var(--color-primary-light); border-radius: var(--radius-md);
+                    padding: .35rem; flex-shrink: 0;
+                }
+                .settings-category h3 { margin: 0; font-size: var(--font-size-lg); }
+                .settings-category p  { margin: .1rem 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+            </style>
+
+            <section class="settings-category" id="cat-general">
+                <span class="material-symbols-outlined">tune</span>
+                <div><h3>General</h3><p>Datos base y parámetros operativos del sistema.</p></div>
+            </section>
+
             <!-- Card 1: Dirección de origen -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -397,6 +420,11 @@
             </div>
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <section class="settings-category" id="cat-comunicaciones">
+                <span class="material-symbols-outlined">mark_email_read</span>
+                <div><h3>Comunicaciones</h3><p>Notificaciones por evento, incidencias y pruebas de email.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">mark_email_read</span>
@@ -566,6 +594,11 @@
             </div>
 
             <!-- Card: Variables de notificación (ABM) -->
+            <section class="settings-category" id="cat-plantillas">
+                <span class="material-symbols-outlined">smart_button</span>
+                <div><h3>Plantillas y contenido</h3><p>Variables y bloques reutilizables para los emails.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">data_object</span>
@@ -988,6 +1021,11 @@
             </script>
 
             <!-- Card 3: Optimización de ruteo -->
+            <section class="settings-category" id="cat-ruteo">
+                <span class="material-symbols-outlined">local_shipping</span>
+                <div><h3>Ruteo y sucursales</h3><p>Optimización de rutas y asignación de sucursales.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">alt_route</span>
@@ -1099,6 +1137,11 @@
             </div>
 
             <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <section class="settings-category" id="cat-catalogos">
+                <span class="material-symbols-outlined">category</span>
+                <div><h3>Catálogos operativos</h3><p>Motivos, tipos de incidencia y franjas horarias editables.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">cancel</span>
@@ -1264,6 +1307,11 @@
             </div>
 
             <!-- Card 5: Historial de cambios -->
+            <section class="settings-category" id="cat-auditoria">
+                <span class="material-symbols-outlined">history</span>
+                <div><h3>Auditoría</h3><p>Registro de cambios de configuración.</p></div>
+            </section>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">history</span>
