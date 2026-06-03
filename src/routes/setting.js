@@ -14,6 +14,8 @@ const optionalLogo = (req, res, next) => {
 };
 
 router.get('/',              requireAdmin, settingController.getSettings);
+// LGT-174: cada categoría de ajustes es su propia página (navegada desde el menú).
+router.get('/:section', requireAdmin, settingController.getSettings);
 router.post('/',             requireAdmin, settingController.saveSettings);
 router.post('/identity',     requireAdmin, optionalLogo, settingController.saveIdentity);
 router.post('/assign-branch', requireAdmin, settingController.assignBranch);

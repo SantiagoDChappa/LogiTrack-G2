@@ -20,6 +20,16 @@ const incidentNotifConfig = require('../services/incidentNotifConfig');
 const statusModel = require('../models/status');
 const statusColors = require('../services/statusColors');
 
+// LGT-174: secciones de Ajustes (cada una es su propia página, navegada desde el menú).
+const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'auditoria'];
+
+// Tras guardar, vuelve a la sección desde la que se envió el formulario (vía Referer).
+function settingBack(req, suffix = '') {
+    const ref = req.get('Referer') || '';
+    const m = ref.match(/\/setting\/(general|comunicaciones|plantillas|ruteo|catalogos|auditoria)\b/);
+    return `/setting/${m ? m[1] : 'general'}${suffix}`;
+}
+
 const getSettings = async (req, res) => {
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
            failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
@@ -70,11 +80,13 @@ const getSettings = async (req, res) => {
 
     if (!settings.origin_province_id) { settings.origin_province_id = '24'; }
 
+    const activeSection = SETTING_SECTIONS.includes(req.params.section) ? req.params.section : 'general';
+
     res.render('setting/index', {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         placeholderGroups, customVariables, emailSnippets, sampleVars,
-        statusColorList,
+        statusColorList, activeSection,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -113,7 +125,7 @@ const saveNotificationConfig = async (req, res) => {
 
             if (!VALID_RECIPIENT_MODES.includes(mode)) { mode = 'recipient'; }
             if (mode === 'custom' && !isValidEmail(custom)) {
-                return res.redirect('/setting?error=custom_email_invalid');
+                return res.redirect(settingBack(req, '?error=custom_email_invalid'));
             }
             if (mode !== 'custom') { custom = null; }
 
@@ -122,10 +134,10 @@ const saveNotificationConfig = async (req, res) => {
                 { where: { id: cfg.id } }
             );
         }
-        res.redirect('/setting?success=notif');
+        res.redirect(settingBack(req, '?success=notif'));
     } catch (err) {
         console.error('saveNotificationConfig:', err.message);
-        res.status(500).redirect('/setting?error=notif_save');
+        res.status(500).redirect(settingBack(req, '?error=notif_save'));
     }
 };
 
@@ -137,13 +149,13 @@ const saveEmailTemplate = async (req, res) => {
         const body    = (req.body.body    || '').trim();
         const format  = req.body.format === 'html' ? 'html' : 'text';
         const name    = (req.body.name || '').trim() || undefined;
-        if (!subject || !body) { return res.redirect('/setting?error=template_empty'); }
+        if (!subject || !body) { return res.redirect(settingBack(req, '?error=template_empty')); }
         const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body, format, name });
-        if (!updated) { return res.redirect('/setting?error=template_not_found'); }
-        res.redirect('/setting?success=tpl');
+        if (!updated) { return res.redirect(settingBack(req, '?error=template_not_found')); }
+        res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
         console.error('saveEmailTemplate:', err.message);
-        res.status(500).redirect('/setting?error=tpl_save');
+        res.status(500).redirect(settingBack(req, '?error=tpl_save'));
     }
 };
 
@@ -155,13 +167,13 @@ const updateEmailTemplateById = async (req, res) => {
         const body    = (req.body.body    || '').trim();
         const format  = req.body.format === 'html' ? 'html' : 'text';
         const name    = (req.body.name || '').trim() || undefined;
-        if (!subject || !body) { return res.redirect('/setting?error=template_empty'); }
+        if (!subject || !body) { return res.redirect(settingBack(req, '?error=template_empty')); }
         const updated = await emailTemplateModel.updateById(id, { subject, body, format, name });
-        if (!updated) { return res.redirect('/setting?error=template_not_found'); }
-        res.redirect('/setting?success=tpl');
+        if (!updated) { return res.redirect(settingBack(req, '?error=template_not_found')); }
+        res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
         console.error('updateEmailTemplateById:', err.message);
-        res.status(500).redirect('/setting?error=tpl_save');
+        res.status(500).redirect(settingBack(req, '?error=tpl_save'));
     }
 };
 
@@ -173,31 +185,31 @@ const createEmailTemplateVariant = async (req, res) => {
         const body    = (req.body.body    || '').trim();
         const format  = req.body.format === 'html' ? 'html' : 'text';
         await emailTemplateModel.createVariant(eventCode, { name, subject, body, format });
-        res.redirect('/setting?success=tpl');
+        res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
         console.error('createEmailTemplateVariant:', err.message);
-        res.status(500).redirect('/setting?error=tpl_save');
+        res.status(500).redirect(settingBack(req, '?error=tpl_save'));
     }
 };
 
 const setDefaultEmailTemplate = async (req, res) => {
     try {
         await emailTemplateModel.setDefault(Number(req.params.id));
-        res.redirect('/setting?success=tpl');
+        res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
         console.error('setDefaultEmailTemplate:', err.message);
-        res.status(500).redirect('/setting?error=tpl_save');
+        res.status(500).redirect(settingBack(req, '?error=tpl_save'));
     }
 };
 
 const deleteEmailTemplate = async (req, res) => {
     try {
         const r = await emailTemplateModel.deleteVariant(Number(req.params.id));
-        if (!r.ok && r.reason === 'last') { return res.redirect('/setting?error=tpl_last'); }
-        res.redirect('/setting?success=tpl');
+        if (!r.ok && r.reason === 'last') { return res.redirect(settingBack(req, '?error=tpl_last')); }
+        res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
         console.error('deleteEmailTemplate:', err.message);
-        res.status(500).redirect('/setting?error=tpl_save');
+        res.status(500).redirect(settingBack(req, '?error=tpl_save'));
     }
 };
 
@@ -235,7 +247,7 @@ const testShipmentNotification = async (req, res) => {
         const recipients = String(req.body.emailRecipients || '')
             .split(',').map(e => e.trim()).filter(isValidEmail);
         if (recipients.length === 0) {
-            return res.redirect('/setting?error=test_notif_recipients');
+            return res.redirect(settingBack(req, '?error=test_notif_recipients'));
         }
 
         const eventCode = (req.body.shipmentEventCode || '').trim();
@@ -248,7 +260,7 @@ const testShipmentNotification = async (req, res) => {
             if (tpl) { subject = tpl.subject; body = body || tpl.body; format = tpl.format || 'text'; }
         }
         if (!body) {
-            return res.redirect('/setting?error=test_notif_empty');
+            return res.redirect(settingBack(req, '?error=test_notif_empty'));
         }
 
         const subjectFilled = await sampleFill(subject);
@@ -256,10 +268,10 @@ const testShipmentNotification = async (req, res) => {
         for (const recipient of recipients) {
             await queueEmail({ recipient, subject: subjectFilled, body: bodyFilled, format });
         }
-        res.redirect('/setting?success=test_notif');
+        res.redirect(settingBack(req, '?success=test_notif'));
     } catch (err) {
         console.error('testShipmentNotification:', err.message);
-        res.status(500).redirect('/setting?error=test_notif');
+        res.status(500).redirect(settingBack(req, '?error=test_notif'));
     }
 };
 
@@ -273,20 +285,20 @@ const saveNotificationVariable = async (req, res) => {
         const label = (req.body.label || '').trim();
         const value = (req.body.value || '');
         const description = (req.body.description || '').trim() || null;
-        if (!label || !key) { return res.redirect('/setting?error=var_empty'); }
-        if (!VAR_KEY_RE.test(key)) { return res.redirect('/setting?error=var_key'); }
+        if (!label || !key) { return res.redirect(settingBack(req, '?error=var_empty')); }
+        if (!VAR_KEY_RE.test(key)) { return res.redirect(settingBack(req, '?error=var_key')); }
 
         if (id) {
             const row = await notificationVariableModel.getById(id);
-            if (!row) { return res.redirect('/setting?error=var_not_found'); }
+            if (!row) { return res.redirect(settingBack(req, '?error=var_not_found')); }
             await row.update({ key, label, value, description });
         } else {
             await NotificationVariable.create({ key, label, value, description });
         }
-        res.redirect('/setting?success=var');
+        res.redirect(settingBack(req, '?success=var'));
     } catch (err) {
         console.error('saveNotificationVariable:', err.message);
-        res.status(500).redirect('/setting?error=var_save');
+        res.status(500).redirect(settingBack(req, '?error=var_save'));
     }
 };
 
@@ -294,10 +306,10 @@ const deleteNotificationVariable = async (req, res) => {
     try {
         const row = await notificationVariableModel.getById(Number(req.params.id));
         if (row) { await row.destroy(); }
-        res.redirect('/setting?success=var');
+        res.redirect(settingBack(req, '?success=var'));
     } catch (err) {
         console.error('deleteNotificationVariable:', err.message);
-        res.status(500).redirect('/setting?error=var_save');
+        res.status(500).redirect(settingBack(req, '?error=var_save'));
     }
 };
 
@@ -310,34 +322,34 @@ const saveEmailSnippet = async (req, res) => {
         const icon  = (req.body.icon  || '').trim() || null;
         const html  = (req.body.html  || '');
         const text  = (req.body.text  || '');
-        if (!label) { return res.redirect('/setting?error=snip_empty'); }
+        if (!label) { return res.redirect(settingBack(req, '?error=snip_empty')); }
 
         if (id) {
             const row = await emailSnippetModel.getById(id);
-            if (!row) { return res.redirect('/setting?error=snip_not_found'); }
+            if (!row) { return res.redirect(settingBack(req, '?error=snip_not_found')); }
             // builtin: solo se editan textos/label/icon, no la key.
             await row.update({ label, icon, html, text });
         } else {
             const key = (req.body.key || '').trim() || ('snip_' + Date.now());
-            if (!VAR_KEY_RE.test(key)) { return res.redirect('/setting?error=snip_key'); }
+            if (!VAR_KEY_RE.test(key)) { return res.redirect(settingBack(req, '?error=snip_key')); }
             await EmailSnippet.create({ key, label, icon, html, text, builtin: false });
         }
-        res.redirect('/setting?success=snip');
+        res.redirect(settingBack(req, '?success=snip'));
     } catch (err) {
         console.error('saveEmailSnippet:', err.message);
-        res.status(500).redirect('/setting?error=snip_save');
+        res.status(500).redirect(settingBack(req, '?error=snip_save'));
     }
 };
 
 const deleteEmailSnippet = async (req, res) => {
     try {
         const row = await emailSnippetModel.getById(Number(req.params.id));
-        if (row && row.builtin) { return res.redirect('/setting?error=snip_builtin'); }
+        if (row && row.builtin) { return res.redirect(settingBack(req, '?error=snip_builtin')); }
         if (row) { await row.destroy(); }
-        res.redirect('/setting?success=snip');
+        res.redirect(settingBack(req, '?success=snip'));
     } catch (err) {
         console.error('deleteEmailSnippet:', err.message);
-        res.status(500).redirect('/setting?error=snip_save');
+        res.status(500).redirect(settingBack(req, '?error=snip_save'));
     }
 };
 
@@ -345,15 +357,15 @@ const saveTestEmailOverride = async (req, res) => {
     try {
         const value = (req.body.test_email_override || '').trim();
         if (value && !isValidEmail(value)) {
-            return res.redirect('/setting?error=override_invalid');
+            return res.redirect(settingBack(req, '?error=override_invalid'));
         }
         const oldValue = await settingModel.get('test_email_override');
         await settingLogModel.logChange(res.locals.currentUser?.id, 'test_email_override', oldValue, value);
         await settingModel.set('test_email_override', value);
-        res.redirect('/setting?success=override');
+        res.redirect(settingBack(req, '?success=override'));
     } catch (err) {
         console.error('saveTestEmailOverride:', err.message);
-        res.status(500).redirect('/setting?error=override_save');
+        res.status(500).redirect(settingBack(req, '?error=override_save'));
     }
 };
 
@@ -367,16 +379,16 @@ const saveStatusColors = async (req, res) => {
             // Checkbox "usar color del tema" tildado => se borra la personalización.
             const value = useDefault ? '' : (req.body[key] || '').trim();
             if (value && !statusColors.isValidHex(value)) {
-                return res.redirect('/setting?error=color_invalido');
+                return res.redirect(settingBack(req, '?error=color_invalido'));
             }
             const oldValue = await settingModel.get(key);
             await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
             await settingModel.set(key, value);
         }
-        res.redirect('/setting?success=status_colors');
+        res.redirect(settingBack(req, '?success=status_colors'));
     } catch (err) {
         console.error('saveStatusColors:', err.message);
-        res.status(500).redirect('/setting?error=status_colors_save');
+        res.status(500).redirect(settingBack(req, '?error=status_colors_save'));
     }
 };
 
@@ -385,12 +397,12 @@ const saveIdentity = async (req, res) => {
     try {
         // El middleware logoUpload deja un error de validación en req.uploadError (formato/tamaño).
         if (req.uploadError) {
-            return res.redirect('/setting?error=logo_formato');
+            return res.redirect(settingBack(req, '?error=logo_formato'));
         }
 
         const nombre = (req.body.nombre_empresa || '').trim();
         if (!nombre || nombre.length > 100) {
-            return res.redirect('/setting?error=nombre_empresa');
+            return res.redirect(settingBack(req, '?error=nombre_empresa'));
         }
 
         const oldNombre = await settingModel.get('nombre_empresa');
@@ -414,10 +426,10 @@ const saveIdentity = async (req, res) => {
             }
         }
 
-        res.redirect('/setting?success=identity');
+        res.redirect(settingBack(req, '?success=identity'));
     } catch (err) {
         console.error('saveIdentity:', err.message);
-        res.status(500).redirect('/setting?error=identity_save');
+        res.status(500).redirect(settingBack(req, '?error=identity_save'));
     }
 };
 
@@ -442,7 +454,7 @@ const saveSettings = async (req, res) => {
     const provinceId = parseInt(origin_province_id);
     const province = PROVINCES[provinceId];
 
-    if (!province) { return res.redirect('/setting'); }
+    if (!province) { return res.redirect(settingBack(req)); }
 
     // Intenta geocodificar la dirección exacta; si falla usa el centroide de la provincia
     let lat = province.lat;
@@ -466,7 +478,7 @@ const saveSettings = async (req, res) => {
         settingModel.set('origin_postal_code', (origin_postal_code || '').trim()),
     ]);
 
-    res.redirect('/setting?success=1');
+    res.redirect(settingBack(req, '?success=1'));
 };
 
 const ROUTE_SETTINGS = {
@@ -501,14 +513,14 @@ const saveRouteOptimizerSettings = async (req, res) => {
         settingModel.set('urgent_combine_max_km', String(Math.max(0, Number(body.urgent_combine_max_km) || 0))),
         settingModel.set('cluster_merge_radius_km', String(Math.max(0, Number(body.cluster_merge_radius_km) || 0))),
     ]);
-    res.redirect('/setting?success=3');
+    res.redirect(settingBack(req, '?success=3'));
 };
 
 const assignBranch = async (req, res) => {
     const userIds = [].concat(req.body['userId[]'] || req.body.userId || []);
     const branchIds = [].concat(req.body['branchId[]'] || req.body.branchId || []);
 
-    if (userIds.length === 0) { return res.redirect('/setting'); }
+    if (userIds.length === 0) { return res.redirect(settingBack(req)); }
 
     await Promise.all(
         userIds.map((uid, i) => {
@@ -518,7 +530,7 @@ const assignBranch = async (req, res) => {
         })
     );
 
-    res.redirect('/setting?success=2');
+    res.redirect(settingBack(req, '?success=2'));
 };
 
 const saveParams = async (req, res) => {
@@ -547,32 +559,32 @@ const saveParams = async (req, res) => {
         // Validaciones
         const maxIntentos = parseInt(req.body.max_intentos_fallidos);
         if (isNaN(maxIntentos) || maxIntentos < 1 || maxIntentos > 10) {
-            return res.redirect('/setting?error=max_intentos');
+            return res.redirect(settingBack(req, '?error=max_intentos'));
         }
 
         const diasExpiracion = parseInt(req.body.dias_expiracion_envio);
         if (isNaN(diasExpiracion) || diasExpiracion < 1 || diasExpiracion > 365) {
-            return res.redirect('/setting?error=dias_expiracion');
+            return res.redirect(settingBack(req, '?error=dias_expiracion'));
         }
         const pesoMax = parseFloat(req.body.peso_maximo_envio);
         if (isNaN(pesoMax) || pesoMax < 1 || pesoMax > 999) {
-            return res.redirect('/setting?error=peso_maximo');
+            return res.redirect(settingBack(req, '?error=peso_maximo'));
         }
 
         const cantMax = parseInt(req.body.cantidad_maxima_paquetes);
         if (isNaN(cantMax) || cantMax < 1 || cantMax > 999) {
-            return res.redirect('/setting?error=cantidad_maxima');
+            return res.redirect(settingBack(req, '?error=cantidad_maxima'));
         }
 
         const costoBase = parseFloat(req.body.costo_base_envio);
         if (isNaN(costoBase) || costoBase < 0) {
-            return res.redirect('/setting?error=costo_base');
+            return res.redirect(settingBack(req, '?error=costo_base'));
         }
 
         const horaInicio = req.body.horario_entrega_inicio;
         const horaFin = req.body.horario_entrega_fin;
         if (horaInicio >= horaFin) {
-            return res.redirect('/setting?error=horario');
+            return res.redirect(settingBack(req, '?error=horario'));
         }
 
         const currentSettings = await settingModel.getAll();
@@ -593,7 +605,7 @@ const saveParams = async (req, res) => {
 
         // Ejecutar proceso automático de expiración
         expireShipments();
-        res.redirect('/setting?success=4');
+        res.redirect(settingBack(req, '?success=4'));
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
@@ -627,10 +639,10 @@ const saveFailedReason = async (req, res) => {
                 createsIncident: req.body.createsIncident === 'on',
             }, { where: { id } });
         }
-        res.redirect('/setting?success=failed_reason');
+        res.redirect(settingBack(req, '?success=failed_reason'));
     } catch (err) {
         console.error('saveFailedReason:', err.message);
-        res.redirect('/setting?error=failed_reason');
+        res.redirect(settingBack(req, '?error=failed_reason'));
     }
 };
 
@@ -638,13 +650,13 @@ const saveStandardMessage = async (req, res) => {
     try {
         const { code } = req.params;
         const body = (req.body.body || '').trim();
-        if (!code || !body) { return res.redirect('/setting?error=std_msg_empty'); }
+        if (!code || !body) { return res.redirect(settingBack(req, '?error=std_msg_empty')); }
         const updated = await standardMessageModel.updateByCode(code, body);
-        if (!updated) { return res.redirect('/setting?error=std_msg_not_found'); }
-        res.redirect('/setting?success=std_msg');
+        if (!updated) { return res.redirect(settingBack(req, '?error=std_msg_not_found')); }
+        res.redirect(settingBack(req, '?success=std_msg'));
     } catch (err) {
         console.error('saveStandardMessage:', err.message);
-        res.redirect('/setting?error=std_msg');
+        res.redirect(settingBack(req, '?error=std_msg'));
     }
 };
 
@@ -669,10 +681,10 @@ const saveTimeWindow = async (req, res) => {
                 active: req.body.active === 'on',
             }, { where: { id } });
         }
-        res.redirect('/setting?success=time_window');
+        res.redirect(settingBack(req, '?success=time_window'));
     } catch (err) {
         console.error('saveTimeWindow:', err.message);
-        res.redirect('/setting?error=time_window');
+        res.redirect(settingBack(req, '?error=time_window'));
     }
 };
 
@@ -680,7 +692,7 @@ const saveIncidentType = async (req, res) => {
     try {
         const { IncidentType } = require('../models/incidentType');
         const { id } = req.params;
-        if (!IncidentType) { return res.redirect('/setting?error=inc_type_model'); }
+        if (!IncidentType) { return res.redirect(settingBack(req, '?error=inc_type_model')); }
         if (req.body._action === 'create') {
             await IncidentType.create({
                 code: (req.body.code || '').trim().toUpperCase().replace(/\s+/g, '_'),
@@ -695,10 +707,10 @@ const saveIncidentType = async (req, res) => {
                 active: req.body.active === 'on',
             }, { where: { id } });
         }
-        res.redirect('/setting?success=inc_type');
+        res.redirect(settingBack(req, '?success=inc_type'));
     } catch (err) {
         console.error('saveIncidentType:', err.message);
-        res.redirect('/setting?error=inc_type');
+        res.redirect(settingBack(req, '?error=inc_type'));
     }
 };
 
@@ -712,10 +724,10 @@ const saveIncidentNotifConfig = async (req, res) => {
             notifyShipmentRecipient: req.body.notifyShipmentRecipient === 'on',
             customEmails:            req.body.customEmails || ''
         });
-        res.redirect('/setting?success=incident_notif');
+        res.redirect(settingBack(req, '?success=incident_notif'));
     } catch (err) {
         console.error('saveIncidentNotifConfig:', err.message);
-        res.status(500).redirect('/setting?error=incident_notif');
+        res.status(500).redirect(settingBack(req, '?error=incident_notif'));
     }
 };
 

@@ -46,7 +46,21 @@
                     </div>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>
-                    <a href="/setting"><ul><span class="material-symbols-outlined">settings</span>Ajustes</ul></a>
+                    <div class="nav-group" id="nav-group-ajustes">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-ajustes')" aria-expanded="false">
+                            <span class="material-symbols-outlined">settings</span>
+                            Ajustes
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/setting/general"><ul><span class="material-symbols-outlined">tune</span>General</ul></a>
+                            <a href="/setting/comunicaciones"><ul><span class="material-symbols-outlined">mark_email_read</span>Comunicaciones</ul></a>
+                            <a href="/setting/plantillas"><ul><span class="material-symbols-outlined">smart_button</span>Plantillas</ul></a>
+                            <a href="/setting/ruteo"><ul><span class="material-symbols-outlined">local_shipping</span>Ruteo y sucursales</ul></a>
+                            <a href="/setting/catalogos"><ul><span class="material-symbols-outlined">category</span>Catálogos</ul></a>
+                            <a href="/setting/auditoria"><ul><span class="material-symbols-outlined">history</span>Auditoría</ul></a>
+                        </div>
+                    </div>
                 <% } %>
             </li>
         </div>

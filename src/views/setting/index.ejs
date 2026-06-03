@@ -223,48 +223,8 @@
             <h1>Ajustes</h1>
         </div>
 
-        <!-- LGT-175: navegación lateral del módulo de configuración -->
-        <style>
-            .settings-layout { display: flex; align-items: flex-start; gap: 1.5rem; }
-            .settings-layout .settings-content { flex: 1; min-width: 0; }
-            .settings-sidenav {
-                position: sticky; top: 84px; flex-shrink: 0; width: 220px;
-                background: var(--color-surface); border: 1px solid var(--color-border);
-                border-radius: var(--radius-md); padding: .5rem; box-shadow: var(--shadow-sm);
-            }
-            .settings-sidenav__title {
-                font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .06em;
-                color: var(--color-text-muted); font-weight: var(--font-weight-semibold);
-                padding: .4rem .6rem;
-            }
-            .settings-sidenav a {
-                display: flex; align-items: center; gap: .55rem;
-                padding: .5rem .6rem; border-radius: var(--radius-sm);
-                color: var(--color-text-secondary); font-size: var(--font-size-sm);
-                font-weight: var(--font-weight-medium); text-decoration: none;
-            }
-            .settings-sidenav a .material-symbols-outlined { font-size: 1.15rem; }
-            .settings-sidenav a:hover { background: var(--color-surface-alt); color: var(--color-text); text-decoration: none; }
-            .settings-sidenav a.active { background: var(--color-primary-light); color: var(--color-primary); }
-            .settings-anchor { display: block; position: relative; top: -76px; visibility: hidden; }
-            @media (max-width: 900px) {
-                .settings-layout { flex-direction: column; }
-                .settings-sidenav { position: static; width: 100%; display: flex; flex-wrap: wrap; gap: .25rem; }
-                .settings-sidenav__title { width: 100%; }
-            }
-        </style>
-
+        <!-- LGT-174: cada categoría es su propia página (navegada desde el menú superior) -->
         <div class="settings-layout">
-            <aside class="settings-sidenav" id="settings-sidenav">
-                <div class="settings-sidenav__title">Secciones</div>
-                <a href="#sec-general"        data-target="sec-general"><span class="material-symbols-outlined">tune</span>General</a>
-                <a href="#sec-comunicaciones" data-target="sec-comunicaciones"><span class="material-symbols-outlined">mark_email_read</span>Comunicaciones</a>
-                <a href="#sec-plantillas"     data-target="sec-plantillas"><span class="material-symbols-outlined">smart_button</span>Plantillas</a>
-                <a href="#sec-ruteo"          data-target="sec-ruteo"><span class="material-symbols-outlined">local_shipping</span>Ruteo y sucursales</a>
-                <a href="#sec-catalogos"      data-target="sec-catalogos"><span class="material-symbols-outlined">category</span>Catálogos</a>
-                <a href="#sec-auditoria"      data-target="sec-auditoria"><span class="material-symbols-outlined">history</span>Auditoría</a>
-            </aside>
-
         <div class="settings-content">
 
             <span class="settings-anchor" id="sec-general"></span>
@@ -286,6 +246,7 @@
                 .settings-category p  { margin: .1rem 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
             </style>
 
+            <% if (activeSection === 'general') { %>
             <section class="settings-category" id="cat-general">
                 <span class="material-symbols-outlined">tune</span>
                 <div><h3>General</h3><p>Datos base y parámetros operativos del sistema.</p></div>
@@ -562,6 +523,8 @@
             </div>
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <% } %>
+            <% if (activeSection === 'comunicaciones') { %>
             <span class="settings-anchor" id="sec-comunicaciones"></span>
             <section class="settings-category" id="cat-comunicaciones">
                 <span class="material-symbols-outlined">mark_email_read</span>
@@ -733,6 +696,8 @@
             </div>
 
             <!-- Card: Variables de notificación (ABM) -->
+            <% } %>
+            <% if (activeSection === 'plantillas') { %>
             <span class="settings-anchor" id="sec-plantillas"></span>
             <section class="settings-category" id="cat-plantillas">
                 <span class="material-symbols-outlined">smart_button</span>
@@ -1167,6 +1132,8 @@
             </script>
 
             <!-- Card 3: Optimización de ruteo -->
+            <% } %>
+            <% if (activeSection === 'ruteo') { %>
             <span class="settings-anchor" id="sec-ruteo"></span>
             <section class="settings-category" id="cat-ruteo">
                 <span class="material-symbols-outlined">local_shipping</span>
@@ -1282,6 +1249,8 @@
             </div>
 
             <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <% } %>
+            <% if (activeSection === 'catalogos') { %>
             <span class="settings-anchor" id="sec-catalogos"></span>
             <section class="settings-category" id="cat-catalogos">
                 <span class="material-symbols-outlined">category</span>
@@ -1453,6 +1422,8 @@
             </div>
 
             <!-- Card 5: Historial de cambios -->
+            <% } %>
+            <% if (activeSection === 'auditoria') { %>
             <span class="settings-anchor" id="sec-auditoria"></span>
             <section class="settings-category" id="cat-auditoria">
                 <span class="material-symbols-outlined">history</span>
@@ -1496,6 +1467,7 @@
                 </div>
                 <% } %>
             </div>
+            <% } %>
         </div>
         </div><!-- /.settings-layout -->
     </main>
@@ -1511,40 +1483,6 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
-    <script>
-        // LGT-175: navegación lateral — scroll suave y resaltado de la sección activa.
-        (function () {
-            var nav = document.getElementById('settings-sidenav');
-            if (!nav) return;
-            var links = Array.prototype.slice.call(nav.querySelectorAll('a[data-target]'));
-            var sections = links
-                .map(function (a) { return document.getElementById(a.dataset.target); })
-                .filter(Boolean);
-
-            links.forEach(function (a) {
-                a.addEventListener('click', function (e) {
-                    var target = document.getElementById(a.dataset.target);
-                    if (!target) return;
-                    e.preventDefault();
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    history.replaceState(null, '', '#' + a.dataset.target);
-                });
-            });
-
-            function setActive() {
-                var pos = window.scrollY + 120;
-                var currentId = sections.length ? sections[0].id : null;
-                sections.forEach(function (sec) {
-                    if (sec.offsetTop <= pos) { currentId = sec.id; }
-                });
-                links.forEach(function (a) {
-                    a.classList.toggle('active', a.dataset.target === currentId);
-                });
-            }
-            window.addEventListener('scroll', setActive, { passive: true });
-            setActive();
-        })();
-    </script>
     <script>
         const _addr = JSON.parse(document.getElementById('setting-addr-data').textContent);
         if (_addr.street && _addr.number) {
@@ -1580,7 +1518,7 @@
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color:      isDark ? '#f1f5f9' : '#1e293b',
-            }).then(() => { history.replaceState(null, '', '/setting'); });
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
         }
     </script>
 </body>
