@@ -25,7 +25,12 @@ const requireAuth = async (req, res, next) => {
         }
         res.locals.currentUser = decoded;
         const settingModel = require('../models/setting');
-        res.locals.nombreEmpresa = await settingModel.get('nombre_empresa') || 'LogiTrack';
+        const [nombreEmpresa, logoEmpresa] = await Promise.all([
+            settingModel.get('nombre_empresa'),
+            settingModel.get('logo_empresa'),
+        ]);
+        res.locals.nombreEmpresa = nombreEmpresa || 'LogiTrack';
+        res.locals.logoEmpresa   = logoEmpresa || '/images/logo.png';
         next();
     } catch {
         const returnTo = req.originalUrl;

@@ -1,4 +1,6 @@
 const multer = require('multer');
+const fs     = require('fs');
+const path   = require('path');
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -39,4 +41,34 @@ const evidenceUpload = multer({
     fileFilter: evidenceFileFilter,
 });
 
-module.exports = { csvUpload, evidenceUpload, MAX_BYTES, EVIDENCE_MAX_BYTES };
+// LGT-172: Logo institucional. Imágenes hasta 2 MB, guardado en disco (public/images/brand).
+const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
+const LOGO_DIR = path.join(__dirname, '..', '..', 'public', 'images', 'brand');
+
+const logoFileFilter = (req, file, cb) => {
+    if (ALLOWED_LOGO_MIME.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Formato no válido. Subí una imagen PNG, JPG, SVG o WEBP.'));
+    }
+};
+
+const logoStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        fs.mkdirSync(LOGO_DIR, { recursive: true });
+        cb(null, LOGO_DIR);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
+        cb(null, `logo-${Date.now()}${ext}`);
+    },
+});
+
+const logoUpload = multer({
+    storage: logoStorage,
+    limits:  { fileSize: LOGO_MAX_BYTES },
+    fileFilter: logoFileFilter,
+});
+
+module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES };

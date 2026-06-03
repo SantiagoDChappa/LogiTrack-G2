@@ -260,6 +260,55 @@
             </div>
 
             <!-- Card 2: Parámetros del sistema -->
+            <!-- LGT-172: Identidad visual (nombre + logo de la empresa) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">palette</span>
+                    Identidad visual
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el nombre y el logo de tu organización. Se aplican en el encabezado, el login, las notificaciones y el portal público.
+                </p>
+                <form method="POST" action="/setting/identity" enctype="multipart/form-data">
+                    <div class="settings-addr">
+                        <div class="field span-full">
+                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
+                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
+                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
+                        </div>
+
+                        <div class="field span-full">
+                            <label for="logo">Logo institucional</label>
+                            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                                <img id="logo-preview"
+                                     src="<%= params.logo_empresa || '/images/logo.png' %>"
+                                     alt="Logo actual"
+                                     style="height:56px;width:auto;max-width:180px;object-fit:contain;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:6px">
+                                <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+                            </div>
+                            <small style="color:var(--color-text-secondary)">PNG, JPG, SVG o WEBP. Máximo 2&nbsp;MB. Dejá el campo vacío para conservar el logo actual.</small>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar identidad
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    (function () {
+                        var input = document.getElementById('logo');
+                        var preview = document.getElementById('logo-preview');
+                        if (!input || !preview) return;
+                        input.addEventListener('change', function () {
+                            var file = this.files && this.files[0];
+                            if (file) preview.src = URL.createObjectURL(file);
+                        });
+                    })();
+                </script>
+            </div>
+
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">tune</span>
@@ -312,11 +361,7 @@
                             <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
                         </div>
 
-                        <div class="field span-full">
-                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
-                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
-                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
-                        </div>
+                        <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
                             <label for="telefono_soporte">Teléfono de soporte</label>
