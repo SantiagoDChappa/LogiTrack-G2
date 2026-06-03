@@ -109,7 +109,7 @@
             align-items:center; justify-content:center; padding:1rem; }
         .tplm-dialog { background:var(--color-bg,#fff); border:1px solid var(--color-border,#e2e8f0);
             border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.32);
-            width:min(960px,96vw); height:min(720px,92vh); display:flex; flex-direction:column; overflow:hidden; }
+            width:min(1320px,97vw); height:min(760px,93vh); display:flex; flex-direction:column; overflow:hidden; }
         .tplm-head { display:flex; align-items:flex-start; justify-content:space-between;
             padding:1rem 1.25rem; border-bottom:1px solid var(--color-border); }
         .tplm-title { margin:0; font-size:1.05rem; }
@@ -117,9 +117,13 @@
         .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
             display:inline-flex; padding:.2rem; border-radius:6px; }
         .tplm-close:hover { background:var(--color-bg-secondary,#f1f3f5); color:var(--color-text); }
-        .tplm-body { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;
-            padding:1.1rem 1.25rem; overflow:auto; }
-        .tplm-editor { display:flex; flex-direction:column; gap:.85rem; min-width:0; }
+        .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
+            padding:1.1rem 1.25rem; overflow:hidden; }
+        .tplm-editor { display:contents; }
+        .tplm-col { display:flex; flex-direction:column; gap:.85rem; min-width:0; min-height:0; overflow:auto; }
+        .tplm-col-body { gap:.6rem; }
+        .tplm-col-body .field { flex:1; display:flex; flex-direction:column; min-height:0; }
+        .tplm-col-body .tplm-textarea { flex:1; min-height:240px; }
         .tplm-row { display:flex; align-items:center; gap:.75rem; }
         .tplm-label { font-size:.8rem; font-weight:600; color:var(--color-text-secondary); }
         .tplm-segmented { display:inline-flex; border:1px solid var(--color-border); border-radius:999px; overflow:hidden; }
@@ -204,6 +208,9 @@
         .tplm-preview-body iframe { flex:1; min-height:0; width:100%; border:none; background:var(--pv-bg); display:none; }
         .tplm-foot { display:flex; justify-content:flex-end; gap:.6rem;
             padding:.85rem 1.25rem; border-top:1px solid var(--color-border); }
+        .tplm-preview { min-height:0; overflow:auto; }
+        @media (max-width:1100px) { .tplm-body { grid-template-columns:1fr 1fr; overflow:auto; }
+            .tplm-col, .tplm-preview { overflow:visible; } }
         @media (max-width:760px) { .tplm-body { grid-template-columns:1fr; } }
     </style>
     <link rel="stylesheet" href="/css/settings.css">
@@ -659,6 +666,7 @@
                         <form id="tpl-modal-form" method="POST" action="" class="tplm-editor">
                             <input type="hidden" name="format" id="tpl-modal-format" value="text">
 
+                            <div class="tplm-col tplm-col-controls">
                             <div class="tplm-row tplm-variant-row">
                                 <span class="tplm-label">Variante</span>
                                 <select id="tpl-variant-select" class="tplm-variant-select"></select>
@@ -702,7 +710,9 @@
                                 <label>Bloques rápidos <small>(insertan contenido listo según el formato)</small></label>
                                 <div class="tplm-snippets" id="tpl-snippets"></div>
                             </div>
+                            </div><!-- /tplm-col-controls -->
 
+                            <div class="tplm-col tplm-col-body">
                             <div class="field">
                                 <label for="tpl-modal-body">Cuerpo del mensaje</label>
                                 <textarea id="tpl-modal-body" name="body" rows="10" required class="tplm-textarea"></textarea>
@@ -715,6 +725,7 @@
                                 </button>
                                 <span class="tplm-test-msg" id="tpl-modal-test-msg"></span>
                             </div>
+                            </div><!-- /tplm-col-body -->
                         </form>
 
                         <div class="tplm-preview">
