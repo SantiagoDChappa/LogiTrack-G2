@@ -34,8 +34,8 @@
                         <label for="sender-email">Email</label>
                         <input id="sender-email" type="email" name="senderEmail" maxlength="100" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
                     </div>
-                    <button type="button" id="sender-edit" class="btn-secondary btn-edit-persona">
-                        <span class="material-symbols-outlined">edit</span>Editar
+                    <button type="button" id="sender-edit" class="action-btn modificar btn-edit-persona" data-tooltip="Editar" aria-label="Editar remitente">
+                        <span class="material-symbols-outlined">edit</span>
                     </button>
                 </div>
 
@@ -57,8 +57,8 @@
                         <label for="recipient-email">Email</label>
                         <input id="recipient-email" type="email" name="recipientEmail" maxlength="100" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
                     </div>
-                    <button type="button" id="recipient-edit" class="btn-secondary btn-edit-persona">
-                        <span class="material-symbols-outlined">edit</span>Editar
+                    <button type="button" id="recipient-edit" class="action-btn modificar btn-edit-persona" data-tooltip="Editar" aria-label="Editar destinatario">
+                        <span class="material-symbols-outlined">edit</span>
                     </button>
                 </div>
 
@@ -199,8 +199,12 @@
                 </div>
 
                 <div class="form-actions">
-                    <a href="/shipment" class="btn-secondary">Volver</a>
-                    <button type="submit" class="btn-primary">Guardar envío</button>
+                    <a href="/shipment" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar envío" aria-label="Guardar envío">
+                        <span class="material-symbols-outlined">save</span>
+                    </button>
                 </div>
             </form>
         </div>

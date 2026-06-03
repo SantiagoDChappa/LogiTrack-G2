@@ -13,10 +13,12 @@
         <div class="page-header">
             <h1>Importación masiva de envíos</h1>
             <div class="page-header__actions">
-                <a href="/shipment/import/history" class="btn-secondary">
-                    <span class="material-symbols-outlined">history</span>Historial
+                <a href="/shipment/import/history" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Historial" aria-label="Historial">
+                    <span class="material-symbols-outlined">history</span>
                 </a>
-                <a href="/shipment" class="btn-secondary">Volver</a>
+                <a href="/shipment" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
             </div>
         </div>
 
@@ -50,8 +52,8 @@
                 <p class="import-hint" style="margin-bottom:var(--space-4)">
                     Usá este archivo como base. Mantené los nombres de las columnas exactos; el orden de columnas no importa.
                 </p>
-                <a href="/templates/shipments-import-template.csv" class="btn-secondary" download>
-                    <span class="material-symbols-outlined">download</span>Descargar template CSV
+                <a href="/templates/shipments-import-template.csv" class="action-btn action-btn--lg neutro" download data-tooltip="Descargar template CSV" aria-label="Descargar template CSV">
+                    <span class="material-symbols-outlined">download</span>
                 </a>
             </div>
 
@@ -81,9 +83,11 @@
                     </div>
 
                     <div class="import-actions" style="border-top:none;padding-top:var(--space-4)">
-                        <a href="/shipment" class="btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn-primary" id="btn-submit" disabled>
-                            <span class="material-symbols-outlined">upload</span>Subir e importar
+                        <a href="/shipment" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                            <span class="material-symbols-outlined">close</span>
+                        </a>
+                        <button type="submit" class="action-btn action-btn--lg guardar" id="btn-submit" disabled data-tooltip="Subir e importar" aria-label="Subir e importar">
+                            <span class="material-symbols-outlined">upload</span>
                         </button>
                     </div>
                 </form>

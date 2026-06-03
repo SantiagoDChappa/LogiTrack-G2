@@ -18,7 +18,7 @@
 
             <!-- Logo -->
             <div class="login-brand">
-                <img src="/images/logo.png" alt="<%= nombreEmpresa %>" class="login-logo">
+                <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %>" class="login-logo">
                 <h1><%= nombreEmpresa %></h1>
                 <p>Sistema de gestión de envíos</p>
             </div>

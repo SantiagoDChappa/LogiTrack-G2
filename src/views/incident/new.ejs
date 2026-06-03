@@ -37,8 +37,8 @@
                     </div>
                     <div class="ship-selected-row" id="ship-selected-row" style="display:none;">
                         <div class="ship-chip" id="ship-chip"></div>
-                        <button type="button" id="shipment-clear" class="btn-secondary btn-sm">
-                            <span class="material-symbols-outlined">close</span>Cambiar
+                        <button type="button" id="shipment-clear" class="action-btn neutro" data-tooltip="Cambiar envío" aria-label="Cambiar envío">
+                            <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
                     <small>Buscá por tracking (ej: ENV-001), ID numérico o nombre del destinatario.</small>
@@ -212,8 +212,12 @@
             </div>
 
             <div class="form-actions">
-                <a href="/incident" class="btn-secondary">Cancelar</a>
-                <button type="submit" class="btn-primary">Crear incidencia</button>
+                <a href="/incident" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                    <span class="material-symbols-outlined">close</span>
+                </a>
+                <button type="submit" class="action-btn action-btn--lg crear" data-tooltip="Crear incidencia" aria-label="Crear incidencia">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
             </div>
         </form>
 

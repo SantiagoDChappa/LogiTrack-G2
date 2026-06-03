@@ -13,11 +13,17 @@
         <div class="page-header">
             <h1>Ruta #<%= route.id %></h1>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-                <button id="btn-print-labels" class="btn-secondary">🖨️ Imprimir todas las etiquetas</button>
+                <button id="btn-print-labels" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Imprimir todas las etiquetas" aria-label="Imprimir todas las etiquetas">
+                    <span class="material-symbols-outlined">print</span>
+                </button>
                 <% if (route.statusId === 1) { %>
-                    <button id="btn-revert-route" class="btn-secondary" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" title="Cancela la ruta y devuelve los envios a su estado anterior. Solo disponible mientras la ruta este Planificada y ningun envio haya salido.">↩️ Deshabilitar ruteo</button>
+                    <button id="btn-revert-route" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Deshabilitar ruteo" aria-label="Deshabilitar ruteo">
+                        <span class="material-symbols-outlined">undo</span>
+                    </button>
                 <% } %>
-                <a href="/route" class="btn-secondary">Volver</a>
+                <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
             </div>
             <script>
             document.getElementById('btn-print-labels')?.addEventListener('click', () => {
@@ -82,7 +88,7 @@
                     <p style="color:var(--color-text-secondary);max-width:340px;margin:0 0 var(--space-3);">
                         El repartidor escanea este QR al salir. Todos los envíos asignados a esta ruta pasan automáticamente a <strong>En Tránsito</strong>.
                     </p>
-                    <a href="/route/scan/<%= route.id %>" class="btn-secondary"><span class="material-symbols-outlined">open_in_new</span> Abrir pantalla de salida</a>
+                    <a href="/route/scan/<%= route.id %>" class="action-btn action-btn--lg neutro" data-tooltip="Abrir pantalla de salida" aria-label="Abrir pantalla de salida"><span class="material-symbols-outlined">open_in_new</span></a>
                 </div>
                 <img src="/route/<%= route.id %>/qr" alt="QR ruta <%= route.id %>" style="width:200px;height:200px;background:#fff;border-radius:8px;padding:8px;">
             </div>

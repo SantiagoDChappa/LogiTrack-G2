@@ -13,7 +13,9 @@
         <div class="page-header">
             <h1>Preview de importación</h1>
             <div class="page-header__actions">
-                <a href="/shipment/import" class="btn-secondary">Cancelar</a>
+                <a href="/shipment/import" class="action-btn action-btn--lg action-btn--tip-bottom cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                    <span class="material-symbols-outlined">close</span>
+                </a>
             </div>
         </div>
 
@@ -35,8 +37,8 @@
                     </div>
                 </div>
                 <div class="import-actions" style="border-top:none">
-                    <a href="/shipment/import" class="btn-primary">
-                        <span class="material-symbols-outlined">upload_file</span>Probar de nuevo
+                    <a href="/shipment/import" class="action-btn action-btn--lg buscar" data-tooltip="Probar de nuevo" aria-label="Probar de nuevo">
+                        <span class="material-symbols-outlined">upload_file</span>
                     </a>
                 </div>
 
@@ -200,15 +202,16 @@
 
                 <!-- Acciones -->
                 <div class="import-actions">
-                    <a href="/shipment/import" class="btn-secondary">Cancelar</a>
+                    <a href="/shipment/import" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                        <span class="material-symbols-outlined">close</span>
+                    </a>
 
                     <% if (analysis.summary.duplicates > 0) { %>
                         <form id="force-form" action="/shipment/import/commit" method="post" style="display:contents">
                             <input type="hidden" name="previewId" value="<%= previewId %>">
                             <input type="hidden" name="force" value="true">
-                            <button type="button" id="btn-force" class="btn-secondary">
+                            <button type="button" id="btn-force" class="action-btn action-btn--lg modificar" data-tooltip="Importar todo (<%= analysis.summary.ok + analysis.summary.duplicates %> filas)" aria-label="Importar todo (<%= analysis.summary.ok + analysis.summary.duplicates %> filas)">
                                 <span class="material-symbols-outlined">warning</span>
-                                Importar todo (<%= analysis.summary.ok + analysis.summary.duplicates %> filas)
                             </button>
                         </form>
                     <% } %>
@@ -217,9 +220,8 @@
                         <form action="/shipment/import/commit" method="post" style="display:contents">
                             <input type="hidden" name="previewId" value="<%= previewId %>">
                             <input type="hidden" name="force" value="false">
-                            <button type="submit" class="btn-primary">
+                            <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Importar válidas (<%= analysis.summary.ok %>)" aria-label="Importar válidas (<%= analysis.summary.ok %>)">
                                 <span class="material-symbols-outlined">check</span>
-                                Importar válidas (<%= analysis.summary.ok %>)
                             </button>
                         </form>
                     <% } %>

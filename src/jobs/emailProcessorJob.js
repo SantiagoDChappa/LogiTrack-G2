@@ -6,10 +6,21 @@ async function processPendingEmails() {
     console.log("----------------------------------")
     console.log("info del emails: ", emails);
     console.log("----------------------------------")
+    
     for (const email of emails) {
+        const claimed = await NotificationEmail.claimEmailForProcessing(email.id);
+
+        if (!claimed) {
+            continue; // Otro proceso ya lo está manejando
+        }
         try {
-            await emailSender.sendEmail(email.recipient, email.subject, email.body, email.format);
-            await NotificationEmail.markAsSent(email.id);
+            const ok = await emailSender.sendEmail(email.recipient, email.subject, email.body, email.format);
+            if (ok) {
+                await NotificationEmail.markAsSent(email.id);
+            } else {
+                // sendEmail captura sus errores y devuelve false: reintentar en vez de marcar SENT.
+                await NotificationEmail.scheduleRetry(email.id, email.attempts, 'sendEmail devolvió false (sin destinatarios válidos o fallo de envío)');
+            }
         } catch (error) {
             console.error('emailProcessorJob send error:', error.message);
             await NotificationEmail.scheduleRetry(email.id, email.attempts, error.message);
