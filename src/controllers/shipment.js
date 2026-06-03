@@ -683,7 +683,7 @@ const updateShipment = async (req, res) => {
                 const newPriority = await calcutaleUpdatePriority(shipment.id, shipment.basePriority);
                 await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
             });
-            if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
+            
         } else {
             // No hay cambio de estado: igual envolvemos update + prioridad en una transacción.
             await sequelize.transaction(async (t) => {
@@ -752,11 +752,11 @@ const updateShipmentStatus = async (req, res) => {
                 );
             }
         });
-
+/*
         const eventCode = await notificationEventModel.getEventCodeByShipmentStatus(Number(newStatusId));
         const freshShipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(eventCode || NotificationEvent.SHIPMENT_ASSIGNED, freshShipment);
-
+*/
         if (Number(newStatusId) === 4) {
             try {
                 const { updateActualResult } = require('../models/shipmentPrediction');
@@ -794,10 +794,10 @@ const assignDelivery = async (req, res) => {
             latitude: supervisorCoords.latitude,
             longitude: supervisorCoords.longitude,
         });
-
+/*
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_ASSIGNED, shipment);
-
+*/
         res.redirect(`/shipment/update/${id}?success=3`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
@@ -821,10 +821,10 @@ const prepareShipment = async (req, res) => {
             latitude: actorCoords.latitude,
             longitude: actorCoords.longitude,
         });
-
+/*
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_IN_PREPARATION, shipment);
-
+*/
         res.redirect(`/shipment/update/${id}?success=4`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
@@ -850,10 +850,10 @@ const cancelShipment = async (req, res) => {
             latitude: actorCoords.latitude,
             longitude: actorCoords.longitude,
         });
-
+/*
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipment);
-
+*/
         res.redirect(`/shipment/update/${id}?success=5`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
@@ -879,10 +879,10 @@ const markPackageFailed = async (req, res) => {
             latitude: actorCoords.latitude,
             longitude: actorCoords.longitude,
         });
-
+/*
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PACKAGE_FAILED, shipment);
-
+*/
         // US-E02: generar incidencia automática por paquete fallido (dedup interno).
         try {
             const { autoCreateIncident } = require('../services/incidentAutoGen');
