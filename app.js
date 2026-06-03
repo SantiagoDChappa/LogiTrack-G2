@@ -120,8 +120,11 @@ app.use('/api/persons',personRoutes);
     }
     res.redirect('/login');
 });*/
-const scheduler = require('./src/cron/scheduler');
-scheduler.startSchedulers();
+
+if (process.env.ENABLE_EMAIL_JOBS === 'true') {
+    const scheduler = require('./src/cron/scheduler');
+    scheduler.startSchedulers();
+};
 
 
 if (process.env.NODE_ENV !== 'test') {
