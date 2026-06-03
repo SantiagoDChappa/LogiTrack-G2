@@ -1125,6 +1125,12 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
             const latest = attempts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
             vars.failedReason = latest?.reason || '';
         }
+        if (eventCode === NotificationEvent.SHIPMENT_DELAYED) {
+            const expected = new Date(shipment.expectedDeliveryDate);
+            const diffMs = Date.now() - expected.getTime();
+            const diffDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+            vars.daysDelayed = String(diffDays);
+        }
         const fill = (s) => placeholders.render(s, vars);
 
         await queueEmail({
