@@ -353,10 +353,10 @@ const getSurveyForm = async (req, res) => {
         });
     }
 
-    if (check.reason === 'not_delivered') {
+    if (check.reason === 'not_terminal') {
         return res.status(400).render('portal/misEnviosConfirmError', {
             support: await getSupportInfo(),
-            error: 'El envío aún no fue entregado.',
+            error: 'El envío aún no finalizó su gestión.',
         });
     }
 

@@ -22,7 +22,7 @@ const {
     submitSurvey,
     getCompletedSurvey,
     validateRatings,
-    isDelivered,
+    isTerminal,
 } = require('../src/services/portalSurveyService');
 
 const client = { document: 12345678, email: 'cliente@test.com' };
@@ -53,12 +53,22 @@ beforeEach(() => {
     jest.clearAllMocks();
 });
 
-describe('isDelivered()', () => {
-    test('retorna true para statusId 4', () => {
-        expect(isDelivered(deliveredShipment)).toBe(true);
+const cancelledShipment = {
+    id: 12, trackingId: 'ENV-012', statusId: 5,
+    recipient: { fullName: 'María García' },
+    createdAt: new Date('2026-06-03'),
+    toJSON() { return this; },
+};
+
+describe('isTerminal()', () => {
+    test('retorna true para statusId 4 (Entregado)', () => {
+        expect(isTerminal(deliveredShipment)).toBe(true);
     });
-    test('retorna false para statusId distinto', () => {
-        expect(isDelivered(pendingShipment)).toBe(false);
+    test('retorna true para statusId 5 (Cancelado)', () => {
+        expect(isTerminal(cancelledShipment)).toBe(true);
+    });
+    test('retorna false para statusId no terminal', () => {
+        expect(isTerminal(pendingShipment)).toBe(false);
     });
 });
 
@@ -98,13 +108,13 @@ describe('getEligibleShipments()', () => {
         expect(result.completed[0].shipmentId).toBe(20);
     });
 
-    test('excluye envíos no entregados', async () => {
-        shipmentModel.findByClientIdentity.mockResolvedValueOnce([deliveredShipment, pendingShipment]);
+    test('incluye envíos cancelados y excluye no terminales', async () => {
+        shipmentModel.findByClientIdentity.mockResolvedValueOnce([deliveredShipment, cancelledShipment, pendingShipment]);
         surveyModel.findByShipmentIds.mockResolvedValueOnce([]);
 
         const result = await getEligibleShipments(client);
-        expect(result.pending).toHaveLength(1);
-        expect(result.pending[0].shipmentId).toBe(10);
+        expect(result.pending).toHaveLength(2);
+        expect(result.pending.map((r) => r.shipmentId)).toEqual([10, 12]);
     });
 });
 
@@ -134,12 +144,20 @@ describe('isEligible()', () => {
         expect(result.reason).toBe('not_owner');
     });
 
-    test('rechaza envío no entregado', async () => {
+    test('acepta envío cancelado como elegible', async () => {
+        shipmentModel.getById.mockResolvedValueOnce(cancelledShipment);
+        assertClientOwnsShipment.mockReturnValueOnce(true);
+        surveyModel.findByShipmentId.mockResolvedValueOnce(null);
+        const result = await isEligible(12, client);
+        expect(result.eligible).toBe(true);
+    });
+
+    test('rechaza envío no terminal', async () => {
         shipmentModel.getById.mockResolvedValueOnce(pendingShipment);
         assertClientOwnsShipment.mockReturnValueOnce(true);
         const result = await isEligible(11, client);
         expect(result.eligible).toBe(false);
-        expect(result.reason).toBe('not_delivered');
+        expect(result.reason).toBe('not_terminal');
     });
 
     test('rechaza envío con encuesta ya respondida', async () => {

@@ -3,25 +3,25 @@ const surveyModel = require('../models/deliverySurvey');
 const { assertClientOwnsShipment } = require('./portalClientAccess');
 const { Status } = require('../constants/enums');
 
-const DELIVERED_STATUS_ID = Status.DELIVERED.id;
+const ELIGIBLE_STATUS_IDS = new Set([Status.DELIVERED.id, Status.CANCELLED.id]);
 const RATING_MIN = 1;
 const RATING_MAX = 5;
 const COMMENT_MAX_LENGTH = 2000;
 const RATING_FIELDS = ['overallRating', 'punctualityRating', 'packageConditionRating', 'serviceRating'];
 
-const isDelivered = (shipment) => {
+const isTerminal = (shipment) => {
     const json = typeof shipment.toJSON === 'function' ? shipment.toJSON() : shipment;
-    return Number(json.statusId || json.status?.id) === DELIVERED_STATUS_ID;
+    return ELIGIBLE_STATUS_IDS.has(Number(json.statusId || json.status?.id));
 };
 
 const getEligibleShipments = async (client) => {
     const shipments = await shipmentModel.findByClientIdentity(
         { document: client.document, email: client.email },
     );
-    const delivered = shipments.filter(isDelivered);
-    if (!delivered.length) return { pending: [], completed: [] };
+    const terminal = shipments.filter(isTerminal);
+    if (!terminal.length) return { pending: [], completed: [] };
 
-    const ids = delivered.map((s) => (typeof s.toJSON === 'function' ? s.toJSON() : s).id);
+    const ids = terminal.map((s) => (typeof s.toJSON === 'function' ? s.toJSON() : s).id);
     const surveys = await surveyModel.findByShipmentIds(ids);
     const answeredIds = new Set(surveys.map((sv) => sv.shipmentId));
 
@@ -35,8 +35,8 @@ const getEligibleShipments = async (client) => {
         };
     };
 
-    const pending = delivered.filter((s) => !answeredIds.has((typeof s.toJSON === 'function' ? s.toJSON() : s).id)).map(formatRow);
-    const completed = delivered.filter((s) => answeredIds.has((typeof s.toJSON === 'function' ? s.toJSON() : s).id)).map(formatRow);
+    const pending = terminal.filter((s) => !answeredIds.has((typeof s.toJSON === 'function' ? s.toJSON() : s).id)).map(formatRow);
+    const completed = terminal.filter((s) => answeredIds.has((typeof s.toJSON === 'function' ? s.toJSON() : s).id)).map(formatRow);
 
     return { pending, completed };
 };
@@ -45,7 +45,7 @@ const isEligible = async (shipmentId, client) => {
     const shipment = await shipmentModel.getById(shipmentId);
     if (!shipment) return { eligible: false, reason: 'not_found' };
     if (!assertClientOwnsShipment(shipment, client)) return { eligible: false, reason: 'not_owner' };
-    if (!isDelivered(shipment)) return { eligible: false, reason: 'not_delivered' };
+    if (!isTerminal(shipment)) return { eligible: false, reason: 'not_terminal' };
     const existing = await surveyModel.findByShipmentId(shipmentId);
     if (existing) return { eligible: false, reason: 'already_answered', survey: existing };
     return { eligible: true, shipment };
@@ -70,7 +70,7 @@ const submitSurvey = async (shipmentId, client, answers) => {
         const messages = {
             not_found: 'Envío no encontrado.',
             not_owner: 'No tenés acceso a este envío.',
-            not_delivered: 'El envío aún no fue entregado.',
+            not_terminal: 'El envío aún no fue entregado o cancelado.',
             already_answered: 'Ya respondiste la encuesta para este envío.',
         };
         return { ok: false, message: messages[check.reason] || 'No es posible responder la encuesta.' };
@@ -101,6 +101,7 @@ module.exports = {
     submitSurvey,
     getCompletedSurvey,
     validateRatings,
-    isDelivered,
+    isTerminal,
     RATING_FIELDS,
+    ELIGIBLE_STATUS_IDS,
 };

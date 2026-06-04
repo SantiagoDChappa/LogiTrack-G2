@@ -204,15 +204,15 @@ describe('GET /portal/mis-envios/encuesta/:shipmentId', () => {
         expect(res.status).toBe(404);
     });
 
-    test('devuelve 400 para envío no entregado', async () => {
-        surveyService.isEligible.mockResolvedValueOnce({ eligible: false, reason: 'not_delivered' });
+    test('devuelve 400 para envío no terminal', async () => {
+        surveyService.isEligible.mockResolvedValueOnce({ eligible: false, reason: 'not_terminal' });
 
         const res = await request(app)
             .get('/portal/mis-envios/encuesta/11')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(400);
-        expect(res.text).toContain('aún no fue entregado');
+        expect(res.text).toContain('no finalizó');
     });
 });
 
