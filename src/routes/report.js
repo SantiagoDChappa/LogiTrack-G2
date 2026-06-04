@@ -5,10 +5,12 @@ const {
     getOnTimeDeliveries,
     getDeliveryPerformance,
     getIncidentsByPeriod,
+    getSatisfactionReport,
     exportShipmentsByPeriod,
     exportOnTimeDeliveries,
     exportDeliveryPerformance,
     exportIncidentsByPeriod,
+    exportSatisfactionReport,
 } = require('../controllers/report');
 
 router.get('/shipments-by-period', getShipmentsByPeriod);
@@ -19,5 +21,7 @@ router.get('/delivery-performance', getDeliveryPerformance);
 router.get('/delivery-performance/export', exportDeliveryPerformance);
 router.get('/incidents-by-period', getIncidentsByPeriod);
 router.get('/incidents-by-period/export', exportIncidentsByPeriod);
+router.get('/satisfaction', getSatisfactionReport);
+router.get('/satisfaction/export', exportSatisfactionReport);
 
 module.exports = router;

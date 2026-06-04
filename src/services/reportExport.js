@@ -26,6 +26,7 @@ const REPORT_TYPES = {
     ON_TIME_DELIVERIES: 'entregas_a_tiempo',
     DELIVERY_PERFORMANCE: 'rendimiento_repartidores',
     INCIDENTS_BY_PERIOD: 'fallas_por_periodo',
+    SATISFACTION: 'satisfaccion_cliente',
 };
 
 const escapeCsv = (value) => {
@@ -694,6 +695,59 @@ const renderReportExport = (definition, format) => {
     throw error;
 };
 
+const buildSatisfactionExport = ({ dateFrom, dateTo, surveyType, kpis, comparison, distribution }) => {
+    const columns = ['fecha_desde', 'fecha_hasta', 'tipo', 'total', 'promedio_general', 'dim1', 'dim2', 'dim3'];
+    const rows = comparison.map((row) => ({
+        fecha_desde: dateFrom,
+        fecha_hasta: dateTo,
+        tipo: row.survey_type === 'delivery' ? 'Entregas' : 'Incidencias',
+        total: row.total,
+        promedio_general: toPercent(row.avg_overall),
+        dim1: toPercent(row.avg_dim1),
+        dim2: toPercent(row.avg_dim2),
+        dim3: toPercent(row.avg_dim3),
+    }));
+
+    const distSummary = distribution.map((d) => `${d.rating} estrellas: ${d.count}`).join(', ');
+
+    return {
+        type: REPORT_TYPES.SATISFACTION,
+        title: 'Reporte - Satisfaccion del Cliente',
+        columns,
+        rows,
+        pdfDefinition: {
+            subtitle: `Indicadores de encuestas (${surveyType === 'all' ? 'Todas' : surveyType === 'delivery' ? 'Entregas' : 'Incidencias'})`,
+            summaryItems: [
+                { label: 'Periodo', value: `${dateFrom} a ${dateTo}` },
+                { label: 'Total encuestas', value: String(kpis.totalSurveys) },
+                { label: 'Promedio general', value: toPercent(kpis.overallAvg) },
+                ...kpis.dimensions.map((d) => ({ label: d.label, value: toPercent(d.avg) })),
+                { label: 'Distribucion', value: distSummary || 'Sin datos' },
+            ],
+            table: {
+                title: 'Detalle por tipo de encuesta',
+                emptyMessage: 'No hay encuestas para el periodo seleccionado.',
+                columns: [
+                    { key: 'tipo', label: 'Tipo', width: 0.25, font: 'F2' },
+                    { key: 'total', label: 'Total', width: 0.15 },
+                    { key: 'promedio_general', label: 'General', width: 0.15 },
+                    { key: 'dim1', label: 'Dim. 1', width: 0.15 },
+                    { key: 'dim2', label: 'Dim. 2', width: 0.15 },
+                    { key: 'dim3', label: 'Dim. 3', width: 0.15 },
+                ],
+                rows: rows.map((row) => ({
+                    tipo: row.tipo,
+                    total: String(row.total),
+                    promedio_general: row.promedio_general,
+                    dim1: row.dim1,
+                    dim2: row.dim2,
+                    dim3: row.dim3,
+                })),
+            },
+        },
+    };
+};
+
 module.exports = {
     REPORT_TYPES,
     buildDeliveryPerformanceExport,
@@ -701,6 +755,7 @@ module.exports = {
     buildOnTimeDeliveriesExport,
     buildPdf,
     buildReportFilename,
+    buildSatisfactionExport,
     buildShipmentsByPeriodExport,
     buildCsv,
     renderReportExport,

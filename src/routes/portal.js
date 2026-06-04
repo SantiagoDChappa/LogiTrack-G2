@@ -9,7 +9,8 @@ const {
     getIdentifyForm, postRequestAccess, getConfirmAccess,
     getShipmentList, getShipmentDetail, getManageForm, postManageForm,
     getIncidentList, getIncidentDetail, postIncidentResponse, getIncidentAttachment,
-    getSurveyList, getSurveyForm, postSurvey, postLogout,
+    getSurveyList, getSurveyForm, postSurvey,
+    getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
@@ -63,6 +64,9 @@ router.get('/portal/mis-envios/incidencia/:id/adjunto/:attId', requirePortalClie
 router.get('/portal/mis-envios/encuestas',                    requirePortalClient, getSurveyList);
 router.get('/portal/mis-envios/encuesta/:shipmentId',         requirePortalClient, getSurveyForm);
 router.post('/portal/mis-envios/encuesta/:shipmentId',        requirePortalClient, postSurvey);
+router.get('/portal/mis-envios/encuestas-incidencias',                    requirePortalClient, getIncidentSurveyList);
+router.get('/portal/mis-envios/encuesta-incidencia/:incidentId',          requirePortalClient, getIncidentSurveyForm);
+router.post('/portal/mis-envios/encuesta-incidencia/:incidentId',         requirePortalClient, postIncidentSurvey);
 router.post('/portal/mis-envios/salir',       postLogout);
 
 module.exports = router;

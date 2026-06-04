@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Satisfacción del Cliente</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        .sat-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .sat-kpi-card { background: var(--card-bg, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: .75rem; padding: 1.25rem; text-align: center; }
+        .sat-kpi-value { font-size: 2rem; font-weight: 700; color: var(--primary, #2563eb); line-height: 1.2; }
+        .sat-kpi-label { font-size: .85rem; color: var(--text-muted, #64748b); margin-top: .25rem; }
+        .sat-kpi-stars { color: #f59e0b; font-size: 1.1rem; margin-top: .25rem; }
+        .sat-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        @media (max-width: 900px) { .sat-charts-grid { grid-template-columns: 1fr; } }
+        .sat-chart-card { background: var(--card-bg, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: .75rem; padding: 1.25rem; }
+        .sat-chart-card h3 { font-size: 1rem; margin: 0 0 1rem 0; color: var(--text, #0f172a); }
+        .sat-chart-full { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Satisfacción del Cliente</h1>
+            </div>
+
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/satisfaction" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="type">Tipo de encuesta</label>
+                            <select id="type" name="type">
+                                <option value="all" <%= surveyType === 'all' ? 'selected' : '' %>>Todas</option>
+                                <option value="delivery" <%= surveyType === 'delivery' ? 'selected' : '' %>>Entregas</option>
+                                <option value="incident" <%= surveyType === 'incident' ? 'selected' : '' %>>Incidencias</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/satisfaction" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/satisfaction/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                                <a href="/report/satisfaction/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="action-btn action-btn--lg neutro" data-tooltip="Exportar PDF" aria-label="Exportar PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+                <% if (kpis.totalSurveys === 0) { %>
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">sentiment_neutral</span>
+                            <p>No existen encuestas respondidas en el período <strong><%= dateFrom %></strong> → <strong><%= dateTo %></strong>.</p>
+                        </div>
+                    </div>
+                <% } else { %>
+
+                <div class="sat-kpis">
+                    <div class="sat-kpi-card">
+                        <div class="sat-kpi-value"><%= kpis.totalSurveys %></div>
+                        <div class="sat-kpi-label">Encuestas respondidas</div>
+                    </div>
+                    <div class="sat-kpi-card">
+                        <div class="sat-kpi-value"><%= Number(kpis.overallAvg).toFixed(1) %></div>
+                        <div class="sat-kpi-stars">
+                            <% for (var i = 1; i <= 5; i++) { %>
+                                <span class="material-symbols-outlined" style="font-size:1.1rem;<%= i <= Math.round(kpis.overallAvg) ? 'color:#f59e0b' : 'color:#cbd5e1' %>">star</span>
+                            <% } %>
+                        </div>
+                        <div class="sat-kpi-label">Promedio general</div>
+                    </div>
+                    <% kpis.dimensions.forEach(function(d) { %>
+                    <div class="sat-kpi-card">
+                        <div class="sat-kpi-value"><%= Number(d.avg).toFixed(1) %></div>
+                        <div class="sat-kpi-label"><%= d.label %></div>
+                    </div>
+                    <% }); %>
+                </div>
+
+                <div class="sat-charts-grid">
+                    <div class="sat-chart-card sat-chart-full">
+                        <h3>Tendencia de satisfacción mensual</h3>
+                        <canvas id="trendChart" height="80"></canvas>
+                    </div>
+
+                    <div class="sat-chart-card">
+                        <h3>Comparativa por tipo de encuesta</h3>
+                        <canvas id="compChart" height="200"></canvas>
+                    </div>
+
+                    <div class="sat-chart-card">
+                        <h3>Distribución de calificaciones</h3>
+                        <canvas id="distChart" height="200"></canvas>
+                    </div>
+                </div>
+
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            var from = document.getElementById('from').value;
+            var to = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                var existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    var alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+
+        <% if (!error && kpis.totalSurveys > 0) { %>
+        (function() {
+            var trend = <%- JSON.stringify(trend) %>;
+            var comparison = <%- JSON.stringify(comparison) %>;
+            var distribution = <%- JSON.stringify(distribution) %>;
+
+            // Trend line chart
+            if (trend.length > 0) {
+                new Chart(document.getElementById('trendChart'), {
+                    type: 'line',
+                    data: {
+                        labels: trend.map(function(r) { return r.month; }),
+                        datasets: [{
+                            label: 'Promedio general',
+                            data: trend.map(function(r) { return r.avg_overall; }),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37,99,235,0.1)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { min: 0, max: 5, ticks: { stepSize: 1 } } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+
+            // Comparison bar chart
+            if (comparison.length > 0) {
+                var labels = comparison.map(function(r) { return r.survey_type === 'delivery' ? 'Entregas' : 'Incidencias'; });
+                new Chart(document.getElementById('compChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'General', data: comparison.map(function(r) { return r.avg_overall; }), backgroundColor: '#2563eb' },
+                            { label: 'Dim. 1', data: comparison.map(function(r) { return r.avg_dim1; }), backgroundColor: '#f59e0b' },
+                            { label: 'Dim. 2', data: comparison.map(function(r) { return r.avg_dim2; }), backgroundColor: '#10b981' },
+                            { label: 'Dim. 3', data: comparison.map(function(r) { return r.avg_dim3; }), backgroundColor: '#8b5cf6' },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { min: 0, max: 5, ticks: { stepSize: 1 } } },
+                    }
+                });
+            }
+
+            // Distribution doughnut chart
+            if (distribution.length > 0) {
+                var allRatings = [1, 2, 3, 4, 5];
+                var distMap = {};
+                distribution.forEach(function(r) { distMap[r.rating] = r.count; });
+                new Chart(document.getElementById('distChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: allRatings.map(function(r) { return r + ' estrella' + (r !== 1 ? 's' : ''); }),
+                        datasets: [{
+                            data: allRatings.map(function(r) { return distMap[r] || 0; }),
+                            backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e'],
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+        })();
+        <% } %>
+    </script>
+</body>
+</html>
