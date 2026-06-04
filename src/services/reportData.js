@@ -229,12 +229,141 @@ const getIncidentsByPeriodData = async (query = {}, deps = { sequelize, QueryTyp
     return viewModel;
 };
 
+const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+    const surveyType = query.type || 'all';
+
+    const viewModel = {
+        dateFrom,
+        dateTo,
+        surveyType,
+        error: null,
+        kpis: { totalSurveys: 0, overallAvg: 0, dimensions: [] },
+        trend: [],
+        comparison: [],
+        distribution: [],
+        hasQuery,
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo, type: surveyType }),
+    };
+
+    if (dateFrom > dateTo) {
+        viewModel.error = 'La fecha de inicio no puede ser mayor a la fecha de fin.';
+        return viewModel;
+    }
+
+    const deliveryCte = `
+        SELECT 'delivery' AS survey_type,
+               "overallRating"           AS overall,
+               "punctualityRating"       AS dim1,
+               "packageConditionRating"  AS dim2,
+               "serviceRating"           AS dim3,
+               NULL::smallint            AS dim4,
+               "createdAt"
+          FROM logitrack.delivery_survey
+         WHERE "createdAt"::date >= :from AND "createdAt"::date <= :to`;
+
+    const incidentCte = `
+        SELECT 'incident' AS survey_type,
+               "overallRating"           AS overall,
+               "resolutionTimeRating"    AS dim1,
+               "communicationRating"     AS dim2,
+               "outcomeRating"           AS dim3,
+               NULL::smallint            AS dim4,
+               "createdAt"
+          FROM logitrack.incident_survey
+         WHERE "createdAt"::date >= :from AND "createdAt"::date <= :to`;
+
+    let unionCte;
+    if (surveyType === 'delivery') {
+        unionCte = deliveryCte;
+    } else if (surveyType === 'incident') {
+        unionCte = incidentCte;
+    } else {
+        unionCte = `${deliveryCte} UNION ALL ${incidentCte}`;
+    }
+
+    const baseCte = `WITH surveys AS (${unionCte})`;
+    const replacements = { from: dateFrom, to: dateTo };
+
+    const kpiRows = await deps.sequelize.query(
+        `${baseCte}
+         SELECT COUNT(*)::int AS total,
+                ROUND(AVG(overall), 2)::float AS overall_avg,
+                ROUND(AVG(dim1), 2)::float AS dim1_avg,
+                ROUND(AVG(dim2), 2)::float AS dim2_avg,
+                ROUND(AVG(dim3), 2)::float AS dim3_avg
+           FROM surveys`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    const kpi = kpiRows[0] || {};
+    viewModel.kpis.totalSurveys = kpi.total || 0;
+    viewModel.kpis.overallAvg = kpi.overall_avg || 0;
+
+    if (surveyType === 'incident') {
+        viewModel.kpis.dimensions = [
+            { label: 'Tiempo de resolución', avg: kpi.dim1_avg || 0 },
+            { label: 'Comunicación', avg: kpi.dim2_avg || 0 },
+            { label: 'Resultado obtenido', avg: kpi.dim3_avg || 0 },
+        ];
+    } else if (surveyType === 'delivery') {
+        viewModel.kpis.dimensions = [
+            { label: 'Puntualidad', avg: kpi.dim1_avg || 0 },
+            { label: 'Estado del paquete', avg: kpi.dim2_avg || 0 },
+            { label: 'Atención del servicio', avg: kpi.dim3_avg || 0 },
+        ];
+    } else {
+        viewModel.kpis.dimensions = [
+            { label: 'Dimensión 1', avg: kpi.dim1_avg || 0 },
+            { label: 'Dimensión 2', avg: kpi.dim2_avg || 0 },
+            { label: 'Dimensión 3', avg: kpi.dim3_avg || 0 },
+        ];
+    }
+
+    viewModel.trend = await deps.sequelize.query(
+        `${baseCte}
+         SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month,
+                ROUND(AVG(overall), 2)::float AS avg_overall,
+                COUNT(*)::int AS total
+           FROM surveys
+          GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
+          ORDER BY month`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    viewModel.comparison = await deps.sequelize.query(
+        `${baseCte}
+         SELECT survey_type,
+                ROUND(AVG(overall), 2)::float AS avg_overall,
+                ROUND(AVG(dim1), 2)::float AS avg_dim1,
+                ROUND(AVG(dim2), 2)::float AS avg_dim2,
+                ROUND(AVG(dim3), 2)::float AS avg_dim3,
+                COUNT(*)::int AS total
+           FROM surveys
+          GROUP BY survey_type
+          ORDER BY survey_type`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    viewModel.distribution = await deps.sequelize.query(
+        `${baseCte}
+         SELECT overall AS rating, COUNT(*)::int AS count
+           FROM surveys
+          GROUP BY overall
+          ORDER BY overall`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    return viewModel;
+};
+
 module.exports = {
     buildExportQuery,
     formatIsoDate,
     getDeliveryPerformanceData,
     getIncidentsByPeriodData,
     getOnTimeDeliveriesData,
+    getSatisfactionData,
     getShipmentsByPeriodData,
     resolveDateRange,
 };

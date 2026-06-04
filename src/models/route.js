@@ -32,6 +32,7 @@ const RouteStatus = Object.freeze({
     FINISHED:    3,
     CANCELLED:   4,
     INTERRUPTED: 5, // Sprint 3 - ruta interrumpida (entregas vuelven a sucursal)
+    BLOCKED_FATIGUE: 6, // Ojo de Patrón (LGT-193) - ruta bloqueada por fatiga del transportista
 });
 
 const getAllByBranch = (branchId) => {

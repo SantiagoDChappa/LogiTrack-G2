@@ -7,7 +7,10 @@ const {
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, getConfirmAccess,
-    getShipmentList, getShipmentDetail, getManageForm, postManageForm, postLogout,
+    getShipmentList, getShipmentDetail, getManageForm, postManageForm,
+    getIncidentList, getIncidentDetail, postIncidentResponse, getIncidentAttachment,
+    getSurveyList, getSurveyForm, postSurvey,
+    getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
@@ -17,6 +20,18 @@ const optionalEvidence = (req, res, next) => {
     evidenceUpload.single('evidence')(req, res, (err) => {
         if (err) { req.file = undefined; }
         next();
+    });
+};
+
+const portalEvidenceUpload = (req, res, next) => {
+    evidenceUpload.single('evidence')(req, res, (err) => {
+        if (!err) { return next(); }
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            req.uploadError = 'El archivo supera el tamaño máximo permitido de 5 MB.';
+        } else {
+            req.uploadError = err.message || 'Archivo no válido.';
+        }
+        return next();
     });
 };
 
@@ -42,6 +57,16 @@ router.get('/portal/mis-envios/lista',        requirePortalClient, getShipmentLi
 router.get('/portal/mis-envios/envio/:id',    requirePortalClient, getShipmentDetail);
 router.get('/portal/mis-envios/envio/:id/gestion', requirePortalClient, getManageForm);
 router.post('/portal/mis-envios/envio/:id/gestion', requirePortalClient, postManageForm);
+router.get('/portal/mis-envios/incidencias',        requirePortalClient, getIncidentList);
+router.get('/portal/mis-envios/incidencia/:id',     requirePortalClient, getIncidentDetail);
+router.post('/portal/mis-envios/incidencia/:id/responder', requirePortalClient, portalEvidenceUpload, postIncidentResponse);
+router.get('/portal/mis-envios/incidencia/:id/adjunto/:attId', requirePortalClient, getIncidentAttachment);
+router.get('/portal/mis-envios/encuestas',                    requirePortalClient, getSurveyList);
+router.get('/portal/mis-envios/encuesta/:shipmentId',         requirePortalClient, getSurveyForm);
+router.post('/portal/mis-envios/encuesta/:shipmentId',        requirePortalClient, postSurvey);
+router.get('/portal/mis-envios/encuestas-incidencias',                    requirePortalClient, getIncidentSurveyList);
+router.get('/portal/mis-envios/encuesta-incidencia/:incidentId',          requirePortalClient, getIncidentSurveyForm);
+router.post('/portal/mis-envios/encuesta-incidencia/:incidentId',         requirePortalClient, postIncidentSurvey);
 router.post('/portal/mis-envios/salir',       postLogout);
 
 module.exports = router;

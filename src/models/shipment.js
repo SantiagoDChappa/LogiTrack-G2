@@ -39,6 +39,8 @@ const Shipment = sequelize.define('shipment', {
     deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
     // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
     portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
+    // Sprint 4 - Notificación de demora (LGT-160)
+    delayNotifiedAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'delayNotifiedAt' },
 },
 { timestamps: true, tableName: 'shipment' });
 

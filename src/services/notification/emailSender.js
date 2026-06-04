@@ -88,10 +88,11 @@ async function sendEmail(to, subject, content, format = 'text') {
 
     try {
         await transporter.sendMail(data);
-    }catch (error) {
-        throw error;
+        return true;
+    } catch (error) {
+        console.error('sendEmail:', error.message);
+        return false;
     }
-
 }
 
 module.exports = { sendEmail };

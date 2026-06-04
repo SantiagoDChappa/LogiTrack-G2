@@ -1523,6 +1523,167 @@ ul { list-style: none; }
 .portal-result-block ul { margin: 0; padding-left: 1.2rem; }
 .portal-result-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; margin-top: 1.5rem; }
 
+.portal-incident-detail-card {
+    background: var(--c-surface, #fff);
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.portal-incident-detail-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem 1.5rem;
+}
+.portal-incident-detail-row--block { flex-direction: column; gap: 0.35rem; }
+.portal-incident-description {
+    margin: 0;
+    color: var(--c-text);
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.portal-incident-resolution-card {
+    margin-top: 1.25rem;
+    background: var(--c-surface, #fff);
+    border: 1px solid var(--c-success, #22c55e);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.portal-incident-resolution-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--c-success, #16a34a);
+}
+.portal-incident-resolution-header h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: inherit;
+}
+.portal-incident-resolution-header .material-symbols-outlined {
+    font-size: 1.3rem;
+}
+
+.portal-incident-section { margin-top: 1.25rem; }
+.portal-incident-section-title {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    color: var(--c-text);
+}
+.portal-incident-attachments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+.portal-incident-attachment-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--c-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+.portal-incident-attachment-meta {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--c-text-2);
+    margin-top: 0.15rem;
+}
+.portal-incident-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+.portal-incident-timeline-item {
+    border-left: 3px solid var(--c-border);
+    padding-left: 0.85rem;
+}
+.portal-incident-timeline-item--client {
+    border-left-color: var(--c-primary);
+}
+.portal-incident-timeline-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+}
+.portal-incident-timeline-meta {
+    font-size: 0.8rem;
+    color: var(--c-text-2);
+    margin-top: 0.15rem;
+}
+.portal-incident-timeline-detail {
+    margin: 0.35rem 0 0;
+    color: var(--c-text);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+/* Survey stars */
+.portal-survey-question {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.portal-survey-stars,
+.portal-survey-stars-readonly {
+    display: flex;
+    gap: 0.15rem;
+}
+.portal-star {
+    font-size: 1.65rem;
+    color: var(--c-border, #d1d5db);
+    transition: color 0.15s;
+    user-select: none;
+}
+.portal-star--filled {
+    color: #f59e0b;
+}
+.portal-star--input {
+    cursor: pointer;
+}
+.portal-star--input:hover {
+    color: #fbbf24;
+}
+.portal-survey-completed-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--c-success, #16a34a);
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--c-border);
+}
+.portal-survey-completed-banner .material-symbols-outlined {
+    font-size: 1.3rem;
+}
+.portal-survey-badge-completed {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: #ecfdf5;
+    color: #065f46;
+}
+
 @media (max-width: 640px) {
     .portal-manage-grid2 { grid-template-columns: 1fr; }
     .portal-mis-envios-wrapper { padding: 1.25rem; }

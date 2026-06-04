@@ -27,6 +27,7 @@ const notificationVariableModel = require('../models/notificationVariable');
 const placeholders = require('../services/notificationPlaceholders');
 const notificationEventModel = require('../models/notificationEvents')
 const { queueEmail } = require('../services/notification/notificationEmailService');
+const failedAttemptModel = require('../models/failedAttempt');
 const sequelize = require('../database/connection');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
@@ -1119,6 +1120,17 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
 
         // Catálogo de datos del envío + variables custom del cliente.
         const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap() };
+        if (eventCode === NotificationEvent.SHIPMENT_FAILED_ATTEMPT) {
+            const attempts = await failedAttemptModel.getByShipmentId(shipment.id);
+            const latest = attempts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+            vars.failedReason = latest?.reason || '';
+        }
+        if (eventCode === NotificationEvent.SHIPMENT_DELAYED) {
+            const expected = new Date(shipment.expectedDeliveryDate);
+            const diffMs = Date.now() - expected.getTime();
+            const diffDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+            vars.daysDelayed = String(diffDays);
+        }
         const fill = (s) => placeholders.render(s, vars);
 
         await queueEmail({
