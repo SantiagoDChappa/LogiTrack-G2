@@ -37,6 +37,8 @@ const CATALOG = [
     { token: 'codAmount',      label: 'Monto contrareembolso', group: 'Envío',      description: 'Monto a cobrar (COD), si aplica.',             resolve: s => (notNil(s.codAmount) ? String(s.codAmount) : '') },
     { token: 'secretCode',     label: 'Código clave',        group: 'Envío',        description: 'Código clave de entrega.',                     resolve: s => s.deliverySecretCode || '' },
     { token: 'secretCodeLine', label: 'Línea código clave',  group: 'Envío',        description: 'Frase completa con el código clave (si existe).', resolve: s => (s.deliverySecretCode ? `\n\nCódigo clave de entrega: ${s.deliverySecretCode}. Mostráselo al repartidor para confirmar la entrega.` : '') },
+    { token: 'failedReason',   label: 'Motivo intento fallido', group: 'Envío',     description: 'Motivo del último intento de entrega fallido.',       resolve: s => s._failedReason || '' },
+    { token: 'daysDelayed',    label: 'Días de demora',         group: 'Envío',     description: 'Cantidad de días de demora respecto a la fecha estimada.', resolve: s => s._daysDelayed || '' },
     // Dirección
     { token: 'addressLine',    label: 'Dirección',           group: 'Dirección',    description: 'Calle y número de entrega.',                   resolve: s => s.address ? `${s.address.street || ''} ${s.address.number || ''}`.trim() : '' },
     { token: 'province',       label: 'Provincia',           group: 'Dirección',    description: 'Provincia de destino.',                        resolve: s => s.address?.province?.description || '' },
@@ -74,6 +76,8 @@ const sampleShipment = () => ({
     codAmount: 15000,
     deliverySecretCode: '4827',
     portalToken: 'demo-token-1234',
+    _failedReason: 'Destinatario ausente',
+    _daysDelayed: '3',
     recipient: { fullName: 'Juan Pérez', email: 'juan@ejemplo.com', phone: '11-5555-0000', document: 30111222 },
     sender:    { fullName: 'Tienda Online SA' },
     status:    { description: 'En Sucursal' },

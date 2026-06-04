@@ -93,6 +93,7 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_INCIDENT:            'SHIPMENT_INCIDENT',           // Incidencia / demora
     ROUTE_CANCELLED:              'ROUTE_CANCELLED',
     ROUTE_INTERRUPTED:            'ROUTE_INTERRUPTED',
+    SHIPMENT_DELAYED:             'SHIPMENT_DELAYED',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
