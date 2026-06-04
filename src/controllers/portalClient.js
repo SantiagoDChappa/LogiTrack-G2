@@ -26,6 +26,12 @@ const {
 } = require('../services/portalIncidentView');
 const { submitClientResponse } = require('../services/portalIncidentResponseService');
 const incidentAttachmentModel = require('../models/incidentAttachment');
+const {
+    getEligibleShipments,
+    isEligible,
+    submitSurvey,
+    getCompletedSurvey,
+} = require('../services/portalSurveyService');
 
 const formatModificationsList = (rows) => rows.map((row) => {
     const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
@@ -323,6 +329,65 @@ const getIncidentAttachment = async (req, res) => {
     return res.type(att.mimeType).send(buffer);
 };
 
+const getSurveyList = async (req, res) => {
+    const { pending, completed } = await getEligibleShipments(res.locals.portalClient);
+    const tab = req.query.tab === 'completed' ? 'completed' : 'pending';
+
+    res.render('portal/misEnviosSurveyList', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        pending,
+        completed,
+        tab,
+    });
+};
+
+const getSurveyForm = async (req, res) => {
+    const shipmentId = Number(req.params.shipmentId);
+    const check = await isEligible(shipmentId, res.locals.portalClient);
+
+    if (check.reason === 'not_found' || check.reason === 'not_owner') {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    if (check.reason === 'not_delivered') {
+        return res.status(400).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El envío aún no fue entregado.',
+        });
+    }
+
+    const survey = check.reason === 'already_answered' ? check.survey : null;
+    const shipment = check.shipment || await require('../models/shipment').getById(shipmentId);
+    const json = typeof shipment.toJSON === 'function' ? shipment.toJSON() : shipment;
+
+    res.render('portal/misEnviosSurveyForm', {
+        support: await getSupportInfo(),
+        shipment: {
+            id: json.id,
+            trackingId: json.trackingId,
+            recipientName: json.recipient?.fullName || '-',
+        },
+        survey,
+        flash: req.query.ok === '1' ? 'Tu encuesta fue registrada correctamente.' : null,
+        error: req.query.error ? String(req.query.error) : null,
+    });
+};
+
+const postSurvey = async (req, res) => {
+    const shipmentId = Number(req.params.shipmentId);
+    const result = await submitSurvey(shipmentId, res.locals.portalClient, req.body);
+
+    if (!result.ok) {
+        return res.redirect(`/portal/mis-envios/encuesta/${shipmentId}?error=${encodeURIComponent(result.message)}`);
+    }
+
+    return res.redirect(`/portal/mis-envios/encuesta/${shipmentId}?ok=1`);
+};
+
 module.exports = {
     getIdentifyForm,
     postRequestAccess,
@@ -335,6 +400,9 @@ module.exports = {
     getIncidentDetail,
     postIncidentResponse,
     getIncidentAttachment,
+    getSurveyList,
+    getSurveyForm,
+    postSurvey,
     postLogout,
     formatModificationsList,
 };
