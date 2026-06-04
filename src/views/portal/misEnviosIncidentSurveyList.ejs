@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Encuestas de satisfacción - <%= support.nombre %></title>
+    <title>Encuestas de incidencias - <%= support.nombre %></title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -18,8 +18,8 @@
             <div class="portal-mis-envios-list-header">
                 <div>
                     <span class="portal-incident-eyebrow">Satisfacción</span>
-                    <h1>Encuestas de satisfacción</h1>
-                    <p class="portal-mis-envios-lead">Contanos tu experiencia con los envíos finalizados.</p>
+                    <h1>Encuestas post-incidencia</h1>
+                    <p class="portal-mis-envios-lead">Contanos tu experiencia con la resolución de tus incidencias.</p>
                 </div>
                 <form method="POST" action="/portal/mis-envios/salir">
                     <button type="submit" class="portal-mis-envios-logout">
@@ -34,17 +34,17 @@
 
             <% if (totalCount === 0) { %>
             <div class="portal-empty">
-                <span class="material-symbols-outlined portal-empty-icon">rate_review</span>
+                <span class="material-symbols-outlined portal-empty-icon">feedback</span>
                 <h2>No existen encuestas disponibles</h2>
-                <p>No hay envíos finalizados con encuestas pendientes para responder en este momento.</p>
-                <a href="/portal/mis-envios/lista" class="btn-primary">Ver mis envíos</a>
+                <p>No hay incidencias cerradas con encuestas pendientes para responder en este momento.</p>
+                <a href="/portal/mis-envios/incidencias" class="btn-primary">Ver mis incidencias</a>
             </div>
             <% } else { %>
             <div class="portal-mis-envios-tabs">
-                <a href="/portal/mis-envios/encuestas?tab=pending" class="portal-mis-envios-tab <%= tab !== 'completed' ? 'active' : '' %>">
+                <a href="/portal/mis-envios/encuestas-incidencias?tab=pending" class="portal-mis-envios-tab <%= tab !== 'completed' ? 'active' : '' %>">
                     Pendientes (<%= pending.length %>)
                 </a>
-                <a href="/portal/mis-envios/encuestas?tab=completed" class="portal-mis-envios-tab <%= tab === 'completed' ? 'active' : '' %>">
+                <a href="/portal/mis-envios/encuestas-incidencias?tab=completed" class="portal-mis-envios-tab <%= tab === 'completed' ? 'active' : '' %>">
                     Completadas (<%= completed.length %>)
                 </a>
             </div>
@@ -60,25 +60,27 @@
                 <table class="portal-mis-envios-table">
                     <thead>
                         <tr>
+                            <th>Incidencia</th>
                             <th>Envío</th>
-                            <th>Destinatario</th>
-                            <th>Fecha de ingreso</th>
+                            <th>Tipo</th>
+                            <th>Fecha cierre</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         <% currentList.forEach(function(s) { %>
                         <tr>
-                            <td><strong><%= s.trackingId %></strong></td>
-                            <td><%= s.recipientName %></td>
-                            <td><%= new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+                            <td><strong>#<%= s.incidentId %></strong></td>
+                            <td><%= s.trackingId || '-' %></td>
+                            <td><%= s.typeLabel %></td>
+                            <td><%= s.closedAt ? new Date(s.closedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) : '-' %></td>
                             <td>
                                 <% if (tab === 'completed') { %>
-                                <a href="/portal/mis-envios/encuesta/<%= s.shipmentId %>" class="portal-mis-envios-link">
+                                <a href="/portal/mis-envios/encuesta-incidencia/<%= s.incidentId %>" class="portal-mis-envios-link">
                                     <span class="portal-survey-badge-completed">Completada</span>
                                 </a>
                                 <% } else { %>
-                                <a href="/portal/mis-envios/encuesta/<%= s.shipmentId %>" class="portal-mis-envios-link">
+                                <a href="/portal/mis-envios/encuesta-incidencia/<%= s.incidentId %>" class="portal-mis-envios-link">
                                     Responder encuesta
                                     <span class="material-symbols-outlined">chevron_right</span>
                                 </a>

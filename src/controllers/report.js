@@ -3,12 +3,14 @@ const {
     getOnTimeDeliveriesData,
     getDeliveryPerformanceData,
     getIncidentsByPeriodData,
+    getSatisfactionData,
 } = require('../services/reportData');
 const {
     buildDeliveryPerformanceExport,
     buildIncidentsByPeriodExport,
     buildOnTimeDeliveriesExport,
     buildReportFilename,
+    buildSatisfactionExport,
     buildShipmentsByPeriodExport,
     renderReportExport,
 } = require('../services/reportExport');
@@ -92,13 +94,33 @@ const exportIncidentsByPeriod = async (req, res) => {
     }
 };
 
+const getSatisfactionReport = async (req, res) => {
+    const viewModel = await getSatisfactionData(req.query);
+    res.render('report/satisfaction', viewModel);
+};
+
+const exportSatisfactionReport = async (req, res) => {
+    try {
+        const report = await getSatisfactionData(req.query);
+        if (report.error) {
+            return res.status(400).send(report.error);
+        }
+        sendExport(res, buildSatisfactionExport(report), req.query.format);
+    } catch (err) {
+        const statusCode = err.statusCode || 500;
+        res.status(statusCode).send(statusCode === 400 ? err.message : 'Error al exportar el reporte');
+    }
+};
+
 module.exports = {
     exportDeliveryPerformance,
     exportIncidentsByPeriod,
     exportOnTimeDeliveries,
+    exportSatisfactionReport,
     exportShipmentsByPeriod,
     getDeliveryPerformance,
     getIncidentsByPeriod,
     getOnTimeDeliveries,
+    getSatisfactionReport,
     getShipmentsByPeriod,
 };

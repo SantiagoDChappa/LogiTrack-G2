@@ -41,6 +41,8 @@ jest.mock('../src/services/portalIncidentView', () => ({
     listClientIncidents: jest.fn(),
     loadIncidentDetailViewModel: jest.fn(),
     loadOwnedIncident: jest.fn(),
+    getClientShipmentIds: jest.fn(),
+    assertClientOwnsIncident: jest.fn(),
 }));
 
 jest.mock('../src/services/portalIncidentResponseService', () => ({
@@ -52,10 +54,16 @@ jest.mock('../src/models/incidentAttachment', () => ({
 }));
 
 jest.mock('../src/services/portalSurveyService', () => ({
-    getEligibleShipments: jest.fn(),
+    getEligibleShipments: jest.fn().mockResolvedValue({ pending: [], completed: [] }),
     isEligible: jest.fn(),
     submitSurvey: jest.fn(),
     getCompletedSurvey: jest.fn(),
+}));
+
+jest.mock('../src/services/portalIncidentSurveyService', () => ({
+    getEligibleIncidents: jest.fn(),
+    isEligible: jest.fn(),
+    submitSurvey: jest.fn(),
 }));
 
 jest.mock('../src/models/shipment', () => ({
@@ -63,9 +71,14 @@ jest.mock('../src/models/shipment', () => ({
     findByClientIdentity: jest.fn(),
 }));
 
+jest.mock('../src/models/incident', () => ({
+    findByIdFull: jest.fn(),
+    findByShipmentIds: jest.fn(),
+}));
+
 const portalClientAccess = require('../src/services/portalClientAccess');
-const surveyService = require('../src/services/portalSurveyService');
-const shipmentModel = require('../src/models/shipment');
+const incidentSurveyService = require('../src/services/portalIncidentSurveyService');
+const incidentModel = require('../src/models/incident');
 const portalRoutes = require('../src/routes/portal');
 
 process.env.JWT_SECRET = 'test-secret';
@@ -99,18 +112,18 @@ beforeEach(() => {
     });
 });
 
-describe('GET /portal/mis-envios/encuestas', () => {
+describe('GET /portal/mis-envios/encuestas-incidencias', () => {
     test('redirige sin sesión', async () => {
-        const res = await request(app).get('/portal/mis-envios/encuestas');
+        const res = await request(app).get('/portal/mis-envios/encuestas-incidencias');
         expect(res.status).toBe(302);
         expect(res.headers.location).toBe('/portal/mis-envios');
     });
 
     test('muestra empty state sin encuestas', async () => {
-        surveyService.getEligibleShipments.mockResolvedValueOnce({ pending: [], completed: [] });
+        incidentSurveyService.getEligibleIncidents.mockResolvedValueOnce({ pending: [], completed: [] });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuestas')
+            .get('/portal/mis-envios/encuestas-incidencias')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(200);
@@ -118,75 +131,81 @@ describe('GET /portal/mis-envios/encuestas', () => {
     });
 
     test('muestra listado con pendientes', async () => {
-        surveyService.getEligibleShipments.mockResolvedValueOnce({
+        incidentSurveyService.getEligibleIncidents.mockResolvedValueOnce({
             pending: [{
-                shipmentId: 10,
+                incidentId: 1,
                 trackingId: 'ENV-010',
-                recipientName: 'Juan Perez',
-                createdAt: new Date('2026-06-01'),
+                typeLabel: 'Daño',
+                closedAt: new Date('2026-06-02'),
             }],
             completed: [],
         });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuestas')
+            .get('/portal/mis-envios/encuestas-incidencias')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(200);
         expect(res.text).toContain('ENV-010');
-        expect(res.text).toContain('Juan Perez');
         expect(res.text).toContain('Responder encuesta');
     });
 
     test('muestra completadas en tab correspondiente', async () => {
-        surveyService.getEligibleShipments.mockResolvedValueOnce({
+        incidentSurveyService.getEligibleIncidents.mockResolvedValueOnce({
             pending: [],
             completed: [{
-                shipmentId: 20,
-                trackingId: 'ENV-020',
-                recipientName: 'Ana López',
-                createdAt: new Date('2026-06-01'),
+                incidentId: 3,
+                trackingId: 'ENV-010',
+                typeLabel: 'Daño',
+                closedAt: new Date('2026-06-02'),
             }],
         });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuestas?tab=completed')
+            .get('/portal/mis-envios/encuestas-incidencias?tab=completed')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(200);
-        expect(res.text).toContain('ENV-020');
         expect(res.text).toContain('Completada');
     });
 });
 
-describe('GET /portal/mis-envios/encuesta/:shipmentId', () => {
-    test('muestra formulario para envío elegible', async () => {
-        surveyService.isEligible.mockResolvedValueOnce({
+describe('GET /portal/mis-envios/encuesta-incidencia/:incidentId', () => {
+    test('muestra formulario para incidencia elegible', async () => {
+        incidentSurveyService.isEligible.mockResolvedValueOnce({
             eligible: true,
-            shipment: { id: 10, trackingId: 'ENV-010', recipient: { fullName: 'Juan' }, toJSON() { return this; } },
+            incident: {
+                id: 1, shipmentId: 10, status: 'CLOSED',
+                shipment: { trackingId: 'ENV-010' },
+                type: { description: 'Daño', code: 'DAMAGE' },
+                toJSON() { return this; },
+            },
         });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuesta/10')
+            .get('/portal/mis-envios/encuesta-incidencia/1')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(200);
         expect(res.text).toContain('Enviar encuesta');
-        expect(res.text).toContain('ENV-010');
+        expect(res.text).toContain('Incidencia #1');
     });
 
     test('muestra encuesta ya completada', async () => {
-        surveyService.isEligible.mockResolvedValueOnce({
+        incidentSurveyService.isEligible.mockResolvedValueOnce({
             eligible: false,
             reason: 'already_answered',
-            survey: { id: 1, overallRating: 5, punctualityRating: 4, packageConditionRating: 3, serviceRating: 5, comment: 'Excelente' },
+            survey: { id: 1, overallRating: 5, resolutionTimeRating: 4, communicationRating: 3, outcomeRating: 5, comment: 'Excelente' },
         });
-        shipmentModel.getById.mockResolvedValueOnce({
-            id: 10, trackingId: 'ENV-010', recipient: { fullName: 'Juan' }, toJSON() { return this; },
+        incidentModel.findByIdFull.mockResolvedValueOnce({
+            id: 1, shipmentId: 10, status: 'CLOSED',
+            shipment: { trackingId: 'ENV-010' },
+            type: { description: 'Daño' },
+            toJSON() { return this; },
         });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuesta/10')
+            .get('/portal/mis-envios/encuesta-incidencia/1')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(200);
@@ -194,47 +213,47 @@ describe('GET /portal/mis-envios/encuesta/:shipmentId', () => {
         expect(res.text).toContain('Excelente');
     });
 
-    test('devuelve 404 para envío ajeno', async () => {
-        surveyService.isEligible.mockResolvedValueOnce({ eligible: false, reason: 'not_owner' });
+    test('devuelve 404 para incidencia no encontrada', async () => {
+        incidentSurveyService.isEligible.mockResolvedValueOnce({ eligible: false, reason: 'not_found' });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuesta/99')
+            .get('/portal/mis-envios/encuesta-incidencia/999')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(404);
     });
 
-    test('devuelve 400 para envío no terminal', async () => {
-        surveyService.isEligible.mockResolvedValueOnce({ eligible: false, reason: 'not_terminal' });
+    test('devuelve 400 para incidencia no cerrada', async () => {
+        incidentSurveyService.isEligible.mockResolvedValueOnce({ eligible: false, reason: 'not_closed' });
 
         const res = await request(app)
-            .get('/portal/mis-envios/encuesta/11')
+            .get('/portal/mis-envios/encuesta-incidencia/2')
             .set('Cookie', makeSessionCookie());
 
         expect(res.status).toBe(400);
-        expect(res.text).toContain('no finalizó');
+        expect(res.text).toContain('no fue resuelta');
     });
 });
 
-describe('POST /portal/mis-envios/encuesta/:shipmentId', () => {
+describe('POST /portal/mis-envios/encuesta-incidencia/:incidentId', () => {
     test('registra y redirige con confirmación', async () => {
-        surveyService.submitSurvey.mockResolvedValueOnce({ ok: true, surveyId: 1, shipmentId: 10 });
+        incidentSurveyService.submitSurvey.mockResolvedValueOnce({ ok: true, surveyId: 1, incidentId: 1 });
 
         const res = await request(app)
-            .post('/portal/mis-envios/encuesta/10')
+            .post('/portal/mis-envios/encuesta-incidencia/1')
             .set('Cookie', makeSessionCookie())
             .type('form')
-            .send({ overallRating: '5', punctualityRating: '4', packageConditionRating: '3', serviceRating: '4', comment: 'Ok' });
+            .send({ overallRating: '5', resolutionTimeRating: '4', communicationRating: '3', outcomeRating: '4', comment: 'Ok' });
 
         expect(res.status).toBe(302);
-        expect(res.headers.location).toBe('/portal/mis-envios/encuesta/10?ok=1');
+        expect(res.headers.location).toBe('/portal/mis-envios/encuesta-incidencia/1?ok=1');
     });
 
     test('redirige con error para rating inválido', async () => {
-        surveyService.submitSurvey.mockResolvedValueOnce({ ok: false, message: 'Rating inválido' });
+        incidentSurveyService.submitSurvey.mockResolvedValueOnce({ ok: false, message: 'Rating inválido' });
 
         const res = await request(app)
-            .post('/portal/mis-envios/encuesta/10')
+            .post('/portal/mis-envios/encuesta-incidencia/1')
             .set('Cookie', makeSessionCookie())
             .type('form')
             .send({ overallRating: '0' });
@@ -243,22 +262,9 @@ describe('POST /portal/mis-envios/encuesta/:shipmentId', () => {
         expect(res.headers.location).toContain('error=');
     });
 
-    test('redirige con error para envío no elegible', async () => {
-        surveyService.submitSurvey.mockResolvedValueOnce({ ok: false, message: 'Ya respondiste la encuesta' });
-
-        const res = await request(app)
-            .post('/portal/mis-envios/encuesta/10')
-            .set('Cookie', makeSessionCookie())
-            .type('form')
-            .send({ overallRating: '5', punctualityRating: '4', packageConditionRating: '3', serviceRating: '4' });
-
-        expect(res.status).toBe(302);
-        expect(res.headers.location).toContain('error=');
-    });
-
     test('requiere sesión', async () => {
         const res = await request(app)
-            .post('/portal/mis-envios/encuesta/10')
+            .post('/portal/mis-envios/encuesta-incidencia/1')
             .type('form')
             .send({ overallRating: '5' });
 

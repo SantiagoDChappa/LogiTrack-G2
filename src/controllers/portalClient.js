@@ -30,8 +30,13 @@ const {
     getEligibleShipments,
     isEligible,
     submitSurvey,
-    getCompletedSurvey,
+    getCompletedSurvey: getCompletedDeliverySurvey,
 } = require('../services/portalSurveyService');
+const {
+    getEligibleIncidents,
+    isEligible: isIncidentSurveyEligible,
+    submitSurvey: submitIncidentSurvey,
+} = require('../services/portalIncidentSurveyService');
 
 const formatModificationsList = (rows) => rows.map((row) => {
     const json = typeof row.toJSON === 'function' ? row.toJSON() : row;
@@ -353,10 +358,10 @@ const getSurveyForm = async (req, res) => {
         });
     }
 
-    if (check.reason === 'not_delivered') {
+    if (check.reason === 'not_terminal') {
         return res.status(400).render('portal/misEnviosConfirmError', {
             support: await getSupportInfo(),
-            error: 'El envío aún no fue entregado.',
+            error: 'El envío aún no finalizó su gestión.',
         });
     }
 
@@ -388,6 +393,66 @@ const postSurvey = async (req, res) => {
     return res.redirect(`/portal/mis-envios/encuesta/${shipmentId}?ok=1`);
 };
 
+const getIncidentSurveyList = async (req, res) => {
+    const { pending, completed } = await getEligibleIncidents(res.locals.portalClient);
+    const tab = req.query.tab === 'completed' ? 'completed' : 'pending';
+
+    res.render('portal/misEnviosIncidentSurveyList', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        pending,
+        completed,
+        tab,
+    });
+};
+
+const getIncidentSurveyForm = async (req, res) => {
+    const incidentId = Number(req.params.incidentId);
+    const check = await isIncidentSurveyEligible(incidentId, res.locals.portalClient);
+
+    if (check.reason === 'not_found' || check.reason === 'not_owner') {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Incidencia no encontrada.',
+        });
+    }
+
+    if (check.reason === 'not_closed') {
+        return res.status(400).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'La incidencia aún no fue resuelta.',
+        });
+    }
+
+    const survey = check.reason === 'already_answered' ? check.survey : null;
+    const incident = check.incident || await require('../models/incident').findByIdFull(incidentId);
+    const json = typeof incident.toJSON === 'function' ? incident.toJSON() : incident;
+
+    res.render('portal/misEnviosIncidentSurveyForm', {
+        support: await getSupportInfo(),
+        incident: {
+            id: json.id,
+            typeLabel: json.type?.description || json.type?.code || 'Incidencia',
+            trackingId: json.shipment?.trackingId || '-',
+            shipmentId: json.shipmentId,
+        },
+        survey,
+        flash: req.query.ok === '1' ? 'Tu encuesta fue registrada correctamente.' : null,
+        error: req.query.error ? String(req.query.error) : null,
+    });
+};
+
+const postIncidentSurvey = async (req, res) => {
+    const incidentId = Number(req.params.incidentId);
+    const result = await submitIncidentSurvey(incidentId, res.locals.portalClient, req.body);
+
+    if (!result.ok) {
+        return res.redirect(`/portal/mis-envios/encuesta-incidencia/${incidentId}?error=${encodeURIComponent(result.message)}`);
+    }
+
+    return res.redirect(`/portal/mis-envios/encuesta-incidencia/${incidentId}?ok=1`);
+};
+
 module.exports = {
     getIdentifyForm,
     postRequestAccess,
@@ -403,6 +468,9 @@ module.exports = {
     getSurveyList,
     getSurveyForm,
     postSurvey,
+    getIncidentSurveyList,
+    getIncidentSurveyForm,
+    postIncidentSurvey,
     postLogout,
     formatModificationsList,
 };

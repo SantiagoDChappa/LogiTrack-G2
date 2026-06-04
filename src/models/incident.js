@@ -125,7 +125,7 @@ const findByShipmentIds = (shipmentIds, { statusIn, limit = 200 } = {}) => {
             { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'], required: true },
             { model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'], required: true },
         ],
-        attributes: ['id', 'shipmentId', 'status', 'resolution', 'description', 'createdAt'],
+        attributes: ['id', 'shipmentId', 'status', 'resolution', 'description', 'createdAt', 'closedAt'],
         order: [['createdAt', 'DESC']],
         limit,
     });
