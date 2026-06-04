@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Configuración de fatiga - LogiTrack</title>
+    <style>
+        .cfg-wrap { max-width: 720px; margin: 0 auto; padding: 24px; font-family: system-ui, sans-serif; }
+        .row { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #eef2f7; }
+        .row label { font-weight:600; font-size:14px; }
+        .row small { color:#64748b; display:block; font-weight:400; }
+        input[type=number], input[type=text], select { padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; min-width:140px; }
+        .save { margin-top:16px; padding:11px 20px; border:0; background:#2563eb; color:#fff; border-radius:10px; font-weight:700; cursor:pointer; }
+        .err { background:#fde2e1; color:#b91c1c; padding:10px 14px; border-radius:8px; margin:10px 0; }
+        .ok  { background:#e8f5ec; color:#2f9e44; padding:10px 14px; border-radius:8px; margin:10px 0; }
+    </style>
+</head>
+<body>
+<div class="cfg-wrap">
+    <h1>⚙ Configuración — Control de fatiga</h1>
+    <p style="color:#64748b">Valores globales por defecto. Ley 25.326: la <b>retención</b> controla el borrado automático de datos.</p>
+    <% if (saved) { %><div class="ok">Configuración guardada.</div><% } %>
+    <% if (errors && errors.length) { %><div class="err"><%= errors.join(' · ') %></div><% } %>
+
+    <form method="POST" action="/fatigue/config">
+        <div class="row"><label>Control de fatiga activo <small>enabled</small></label>
+            <input type="checkbox" name="enabled" <%= cfg.enabled ? 'checked' : '' %>></div>
+        <div class="row"><label>Bloqueo automático <small>autoBlock</small></label>
+            <input type="checkbox" name="autoBlock" <%= cfg.autoBlock ? 'checked' : '' %>></div>
+        <div class="row"><label>Umbral de fatiga (%) <small>thresholdPct (0–100)</small></label>
+            <input type="number" name="thresholdPct" min="0" max="100" value="<%= cfg.thresholdPct %>"></div>
+        <div class="row"><label>Métodos habilitados <small>method</small></label>
+            <select name="method">
+                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.method===o?'selected':'' %>><%= o %></option><% }) %>
+            </select></div>
+        <div class="row"><label>Método al iniciar <small>methodStart</small></label>
+            <select name="methodStart">
+                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o %></option><% }) %>
+            </select></div>
+        <div class="row"><label>Método en re-chequeo <small>methodRecheck</small></label>
+            <select name="methodRecheck">
+                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o %></option><% }) %>
+            </select></div>
+        <div class="row"><label>Duración de la prueba (seg) <small>testDurationSec</small></label>
+            <input type="number" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>"></div>
+        <div class="row"><label>Conducción para re-chequeo (min) <small>recheckDriveMin</small></label>
+            <input type="number" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>"></div>
+        <div class="row"><label>Detención que dispara re-chequeo (min) <small>recheckStoppedMin</small></label>
+            <input type="number" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>"></div>
+        <div class="row"><label>Ventana de patrón (días) <small>patternWindowDays</small></label>
+            <input type="number" name="patternWindowDays" min="1" max="365" value="<%= cfg.patternWindowDays %>"></div>
+        <div class="row"><label>Eventos para marcar patrón <small>patternEventCount</small></label>
+            <input type="number" name="patternEventCount" min="1" max="50" value="<%= cfg.patternEventCount %>"></div>
+        <div class="row"><label>Retención de datos (días) <small>retentionDays · Ley 25.326</small></label>
+            <input type="number" name="retentionDays" min="1" max="3650" value="<%= cfg.retentionDays %>"></div>
+        <div class="row"><label>Versión de consentimiento <small>consentVersion</small></label>
+            <input type="text" name="consentVersion" value="<%= cfg.consentVersion %>"></div>
+        <button class="save" type="submit">Guardar</button>
+        <a href="/fatigue" style="margin-left:12px">← Volver</a>
+    </form>
+</div>
+</body>
+</html>

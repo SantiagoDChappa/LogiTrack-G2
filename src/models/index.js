@@ -19,6 +19,10 @@ const { RouteStop }       = require('./routeStop');
 const { RoutePause }      = require('./routePause');
 const { RouteIncident }   = require('./routeIncident');
 const { PanicEvent }      = require('./panicEvent');
+const { FatigueCheck }    = require('./fatigueCheck');
+const { FatigueConfig }   = require('./fatigueConfig');
+const { FatigueAudit }    = require('./fatigueAudit');
+const { FatiguePatternCounter } = require('./fatiguePatternCounter');
 const { ReturnToBranchScan } = require('./returnToBranchScan');
 const { IncidentType }    = require('./incidentType');
 const { Incident }        = require('./incident');
@@ -135,6 +139,12 @@ const safeAssociate = () => {
         PanicEvent.belongsTo(User,  { as: 'user',  foreignKey: 'userId' });
         PanicEvent.belongsTo(Route, { as: 'route', foreignKey: 'routeId' });
     }
+    if (FatigueCheck.belongsTo) {
+        FatigueCheck.belongsTo(User,   { as: 'driver',   foreignKey: 'userId' });
+        FatigueCheck.belongsTo(User,   { as: 'releaser', foreignKey: 'releasedBy' });
+        FatigueCheck.belongsTo(Route,  { as: 'route',    foreignKey: 'routeId' });
+        FatigueCheck.belongsTo(Branch, { as: 'branch',   foreignKey: 'branchId' });
+    }
     if (ReturnToBranchScan.belongsTo) {
         ReturnToBranchScan.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' });
         ReturnToBranchScan.belongsTo(Branch,   { as: 'branch',   foreignKey: 'branchId' });
@@ -211,6 +221,10 @@ module.exports = {
     RoutePause,
     RouteIncident,
     PanicEvent,
+    FatigueCheck,
+    FatigueConfig,
+    FatigueAudit,
+    FatiguePatternCounter,
     ReturnToBranchScan,
     IncidentType,
     Incident,

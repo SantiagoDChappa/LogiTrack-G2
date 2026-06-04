@@ -372,7 +372,7 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 const fr = await require('../models/failedAttemptReason').getByCode(reasonCode);
                 if (fr && fr.maxAttemptsOverride) { maxIntentos = fr.maxAttemptsOverride; }
             }
-        } catch (_) { /* fallback default */ }
+        } catch { /* fallback default */ }
         const intentosPrevios = await failedAttemptModel.getByShipmentId(stop.shipmentId);
         if (intentosPrevios.length >= maxIntentos) {
             const shipmentHistoryModel = require('../models/shipmentHistory');
@@ -399,7 +399,7 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 const fr = await require('../models/failedAttemptReason').getByCode(reasonCode);
                 if (fr && fr.createsIncident) { shouldCreateIncident = true; }
             }
-        } catch (_) { /* fallback */ }
+        } catch { /* fallback */ }
         if (shouldCreateIncident) {
             try {
                 await createDamageIncident({
@@ -502,6 +502,19 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
     if (route.statusId !== RouteStatus.PLANNED) {
         return res.status(409).json({ error: `No se puede iniciar una ruta en estado ${route.statusId}. Sólo rutas planificadas.` });
     }
+    // Ojo de Patrón (LGT-190/193): gate de fatiga antes de salir a reparto.
+    // Requiere consentimiento aceptado y prueba apta (o liberación del supervisor).
+    try {
+        const fatigueCfg = require('../services/fatigue/config');
+        const fatigueSvc = require('../services/fatigue');
+        const cfg = await fatigueCfg.getConfig(route.originBranchId);
+        if (cfg.enabled) {
+            const gate = await fatigueSvc.canStart(route.id);
+            if (!gate.ok) {
+                return res.status(409).json({ error: 'Control de fatiga requerido', fatigue: gate });
+            }
+        }
+    } catch { /* si el control de fatiga falla, no bloquear el inicio operativo */ }
     // 1 ruta activa por repartidor: si ya hay otra IN_ROUTE de este driver, bloquear.
     const { Transport } = require('../models/transport');
     const driverTransports = await Transport.findAll({
@@ -672,6 +685,86 @@ router.post('/route/:id/incident', requireDelivery, async (req, res) => {
         longitude:   longitude   || null,
     });
     res.json({ ok: true, incidentId: inc.id });
+});
+
+// ===================== Ojo de Patrón — control de fatiga =====================
+const fatigueSvc = require('../services/fatigue');
+const fatigueCfg = require('../services/fatigue/config');
+
+async function ownRouteOr403(req, res) {
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        res.status(403).json({ error: 'No autorizado' });
+        return null;
+    }
+    return route;
+}
+
+// Config pública para el portal (qué método/duración) — sin datos sensibles.
+router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    res.json({
+        enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
+        testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
+    });
+});
+
+// US-1: registrar consentimiento (acepta o rechaza).
+router.post('/route/:id/consent', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const accepted = req.body.accepted === true || req.body.accepted === 'true';
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const check = await fatigueSvc.recordConsent({
+        userId: res.locals.currentUser.id, routeId: route.id,
+        branchId: route.originBranchId, accepted, version: cfg.consentVersion,
+    });
+    res.json({ ok: true, accepted, checkId: check.id });
+});
+
+// US-2/3/4/9: ejecutar la prueba y evaluar la fatiga.
+router.post('/route/:id/fatigue-check', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const { checkId, method, metrics, triggerType } = req.body;
+    if (!['VOZ', 'REACCION'].includes(method)) { return res.status(400).json({ error: 'Método inválido' }); }
+    try {
+        const result = await fatigueSvc.evaluate({
+            checkId, userId: res.locals.currentUser.id, routeId: route.id,
+            branchId: route.originBranchId, method, metrics: metrics || {},
+            triggerType: triggerType || 'INICIO',
+        });
+        res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// US-10: re-chequeo en ruta (lo dispara el cliente/cron por tiempo + detención).
+router.post('/route/:id/fatigue-recheck', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const { method, metrics } = req.body;
+    if (!['VOZ', 'REACCION'].includes(method)) { return res.status(400).json({ error: 'Método inválido' }); }
+    const result = await fatigueSvc.evaluate({
+        userId: res.locals.currentUser.id, routeId: route.id, branchId: route.originBranchId,
+        method, metrics: metrics || {}, triggerType: 'EN_RUTA',
+    });
+    res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
+});
+
+// US-11: revocar consentimiento.
+router.post('/fatigue/consent/revoke', requireDelivery, async (req, res) => {
+    await fatigueSvc.revokeConsent({ userId: res.locals.currentUser.id });
+    res.json({ ok: true });
+});
+
+// US-13: mis datos de fatiga (acceso).
+router.get('/fatigue/mis-datos', requireDelivery, async (req, res) => {
+    const rows = await fatigueSvc.getDriverHistory(res.locals.currentUser.id);
+    res.render('delivery/misDatosFatiga', { checks: rows.map(r => r.toJSON()) });
+});
+
+// US-13: solicitar supresión de mis datos.
+router.post('/fatigue/mis-datos/suprimir', requireDelivery, async (req, res) => {
+    const n = await fatigueSvc.suppressDriverData({ userId: res.locals.currentUser.id, actorId: res.locals.currentUser.id });
+    res.json({ ok: true, deleted: n });
 });
 
 // === Botón de pánico (puede no pertenecer a una ruta) ===

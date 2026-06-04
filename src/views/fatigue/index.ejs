@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Control de fatiga - LogiTrack</title>
+    <style>
+        .fb-wrap { max-width: 1040px; margin: 0 auto; padding: 24px; font-family: system-ui, sans-serif; }
+        .fb-top { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+        .fb-card { border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; margin:10px 0; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+        .fb-card.blocked { border-left:5px solid #e03131; }
+        .fb-btn { padding:8px 14px; border-radius:9px; border:0; cursor:pointer; font-weight:600; }
+        .fb-btn.rel { background:#2f9e44; color:#fff; }
+        .fb-btn.keep { background:#fff; border:1px solid #cbd5e1; }
+        table { border-collapse: collapse; width:100%; margin-top:8px; }
+        th, td { border:1px solid #e2e8f0; padding:8px 10px; text-align:left; font-size:14px; }
+        .pill { padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+        .pill.yes { background:#fde2e1; color:#b91c1c; } .pill.no { background:#e8f5ec; color:#2f9e44; }
+    </style>
+</head>
+<body>
+<div class="fb-wrap">
+    <div class="fb-top">
+        <h1 style="margin:0">👁 Ojo de Patrón — Control de fatiga</h1>
+        <div>
+            <a href="/home">← Inicio</a>
+            <% if (isAdmin) { %> · <a href="/fatigue/config">⚙ Configuración</a><% } %>
+        </div>
+    </div>
+    <p style="color:#64748b">Umbral actual: <b><%= cfg.thresholdPct %>%</b> · Bloqueo automático: <b><%= cfg.autoBlock ? 'sí' : 'no' %></b></p>
+
+    <h2>Rutas bloqueadas por fatiga</h2>
+    <% if (!blocked.length) { %>
+        <p style="color:#64748b">No hay rutas bloqueadas por fatiga.</p>
+    <% } %>
+    <% blocked.forEach(b => { %>
+        <div class="fb-card blocked" id="check-<%= b.id %>">
+            <b>Ruta #<%= b.routeId %></b> — transportista #<%= b.userId %> ·
+            score <b><%= b.score %></b>/<%= b.threshold %> · <%= b.method || '—' %> ·
+            <%= new Date(b.createdAt).toLocaleString('es-AR') %>
+            <div style="margin-top:10px;display:flex;gap:8px">
+                <button class="fb-btn rel"  onclick="release(<%= b.id %>)">Liberar con motivo</button>
+                <button class="fb-btn keep" onclick="keep(<%= b.id %>)">Mantener bloqueada</button>
+            </div>
+        </div>
+    <% }) %>
+
+    <h2 style="margin-top:28px">Patrón de fatiga recurrente</h2>
+    <table>
+        <tr><th>Transportista</th><th>Bloqueos (ventana <%= cfg.patternWindowDays %>d)</th><th>Total histórico</th><th>Patrón</th></tr>
+        <% if (!patterns.length) { %><tr><td colspan="4" style="color:#64748b">Sin eventos registrados.</td></tr><% } %>
+        <% patterns.forEach(p => { %>
+            <tr>
+                <td>#<%= p.userId %></td>
+                <td><%= p.windowCount %> / <%= p.threshold %></td>
+                <td><%= p.totalBlocked %></td>
+                <td><span class="pill <%= p.recurrent ? 'yes' : 'no' %>"><%= p.recurrent ? '⚠ Recurrente' : 'Normal' %></span></td>
+            </tr>
+        <% }) %>
+    </table>
+</div>
+<script>
+async function release(id) {
+    const reason = prompt('Motivo de liberación:\n- Falso positivo del sistema\n- Autorizado con descanso\n- Otro\n\nEscribí el motivo:');
+    if (!reason) { return; }
+    const r = await fetch('/fatigue/' + id + '/release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
+    if (r.ok) { document.getElementById('check-' + id)?.remove(); } else { alert('No se pudo liberar.'); }
+}
+async function keep(id) {
+    await fetch('/fatigue/' + id + '/keep', { method: 'POST' });
+    alert('La ruta sigue bloqueada.');
+}
+</script>
+</body>
+</html>
