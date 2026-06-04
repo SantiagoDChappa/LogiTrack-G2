@@ -39,6 +39,7 @@ const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
+const fatigueRoutes    = require('./src/routes/fatigue');
 
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
@@ -104,6 +105,7 @@ app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
+app.use('/fatigue',   requireAuth, fatigueRoutes);
 
 ;
 app.use('/api/persons',personRoutes);
