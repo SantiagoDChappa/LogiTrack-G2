@@ -14,7 +14,6 @@ async function processPendingEmails() {
             await emailSender.sendEmail(email.recipient, email.subject, email.body, email.format);
             await NotificationEmail.markAsSent(email.id);
         } catch (error) {
-            console.error('emailProcessorJob send error:', error.message);
             await NotificationEmail.scheduleRetry(email.id, email.attempts, error.message);
         }
     }
