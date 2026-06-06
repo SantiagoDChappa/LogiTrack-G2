@@ -52,7 +52,7 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
     await notify.audit('EVALUATED', { actorId: userId, checkId: check.id, detail: `score ${scoreValue} → ${decision}` });
 
     if (decision === 'BLOCKED') {
-        await bumpPatternCounter(check.userId);
+        await bumpPatternCounter(check.userId, config, branchId);
         const transportName = await driverName(check.userId);
         await notify.notifyBlock({ check, branchId, transportName, routeId, score: scoreValue });
     }
@@ -123,12 +123,42 @@ async function release({ checkId, actorId, reason, detail }) {
     return check;
 }
 
-// ── Detección de patrón recurrente (US-8) ───────────────────────────────────
-async function bumpPatternCounter(userId) {
+// ── Detección de patrón recurrente (US-8 / LGT-197) ─────────────────────────
+async function bumpPatternCounter(userId, cfg, branchId) {
     const [row] = await FatiguePatternCounter.findOrCreate({
         where: { userId }, defaults: { userId, blockedCount: 0 },
     });
     await row.update({ blockedCount: row.blockedCount + 1, lastEventAt: new Date() });
+
+    // LGT-197: si los bloqueos en la ventana superan el umbral, se marca patrón
+    // recurrente y se notifica al Supervisor (una sola vez hasta que lo revisen).
+    const config = cfg || await configSvc.getConfig(branchId || null);
+    const cutoff = new Date(Date.now() - config.patternWindowDays * 86400000);
+    const windowCount = await FatigueCheck.count({
+        where: { userId, decision: 'BLOCKED', createdAt: { [Op.gte]: cutoff } },
+    });
+    if (windowCount >= config.patternEventCount && !row.recurrentNotifiedAt) {
+        await row.update({
+            recurrentMarkedAt: new Date(), recurrentEvents: windowCount,
+            recurrentWindowDays: config.patternWindowDays, recurrentNotifiedAt: new Date(),
+            reviewStatus: 'PENDING',
+        });
+        await notify.notifyPattern({ userId, branchId, windowCount, windowDays: config.patternWindowDays });
+    }
+    return row;
+}
+
+// LGT-197 Esc.6: el Supervisor marca el patrón como revisado o descartado.
+async function reviewPattern({ userId, actorId, status, note }) {
+    if (!['REVIEWED', 'DISCARDED'].includes(status)) { throw new Error('Estado de revisión inválido'); }
+    const row = await FatiguePatternCounter.findByPk(userId);
+    if (!row) { throw new Error('No hay patrón registrado para el transportista'); }
+    await row.update({
+        reviewStatus: status, reviewedBy: actorId, reviewedAt: new Date(), reviewNote: note || null,
+        // Si se descarta, se permite volver a notificar si reaparece el patrón.
+        recurrentNotifiedAt: status === 'DISCARDED' ? null : row.recurrentNotifiedAt,
+    });
+    await notify.audit('PATTERN_REVIEWED', { actorId, detail: `Transportista #${userId}: ${status}. ${note || ''}` });
     return row;
 }
 
@@ -146,6 +176,8 @@ async function patternStatus(userId, cfg) {
         recurrent: windowCount >= config.patternEventCount,
         threshold: config.patternEventCount,
         windowDays: config.patternWindowDays,
+        reviewStatus: counter ? counter.reviewStatus : 'NONE',
+        reviewedAt: counter ? counter.reviewedAt : null,
     };
 }
 
@@ -226,6 +258,6 @@ async function driverName(userId) {
 
 module.exports = {
     recordConsent, revokeConsent, evaluate, latestForRoute, canStart,
-    listBlocked, release, reassignRoute, bumpPatternCounter, patternStatus,
+    listBlocked, release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
     getDriverHistory, suppressDriverData, purgeExpired,
 };

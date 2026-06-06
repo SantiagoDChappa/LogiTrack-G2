@@ -32,4 +32,13 @@ async function notifyBlock({ check, branchId, transportName, routeId, score }) {
     return recipients.length;
 }
 
-module.exports = { audit, resolveRecipients, notifyBlock };
+// LGT-197 — notifica al Supervisor (y admin) cuando se marca patrón recurrente.
+async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
+    const recipients = await resolveRecipients(branchId);
+    const detail = `Patrón de fatiga recurrente: transportista #${userId} con ${windowCount} bloqueos ` +
+        `en ${windowDays} días. Notificados: ${recipients.length} (supervisores + admin).`;
+    await audit('PATTERN_RECURRENT', { actorId: userId, detail });
+    return recipients.length;
+}
+
+module.exports = { audit, resolveRecipients, notifyBlock, notifyPattern };

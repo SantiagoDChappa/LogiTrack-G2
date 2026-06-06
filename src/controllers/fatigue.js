@@ -104,6 +104,21 @@ exports.saveConfig = async (req, res) => {
     res.redirect('/fatigue/config?saved=1');
 };
 
+// POST /fatigue/pattern/review — marcar patrón recurrente revisado/descartado (LGT-197).
+// Gestión operativa exclusiva del Supervisor; el Admin solo configura parámetros.
+exports.reviewPattern = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'La gestión del patrón es exclusiva del Supervisor' });
+    }
+    const { userId, status, note } = req.body;
+    if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
+    try {
+        await fatigueSvc.reviewPattern({ userId: Number(userId), actorId: u.id, status, note });
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
 // POST /fatigue/purge — purga manual por retención (US-12, solo admin).
 exports.purge = async (req, res) => {
     const u = res.locals.currentUser;

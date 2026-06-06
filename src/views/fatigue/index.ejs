@@ -55,14 +55,24 @@
 
     <h2 style="margin-top:28px">Patrón de fatiga recurrente</h2>
     <table>
-        <tr><th>Transportista</th><th>Bloqueos (ventana <%= cfg.patternWindowDays %>d)</th><th>Total histórico</th><th>Patrón</th></tr>
-        <% if (!patterns.length) { %><tr><td colspan="4" style="color:#64748b">Sin eventos registrados.</td></tr><% } %>
+        <tr><th>Transportista</th><th>Bloqueos (ventana <%= cfg.patternWindowDays %>d)</th><th>Total histórico</th><th>Patrón</th><th>Revisión</th></tr>
+        <% if (!patterns.length) { %><tr><td colspan="5" style="color:#64748b">Sin eventos registrados.</td></tr><% } %>
         <% patterns.forEach(p => { %>
-            <tr>
+            <tr id="pat-<%= p.userId %>">
                 <td>#<%= p.userId %></td>
                 <td><%= p.windowCount %> / <%= p.threshold %></td>
                 <td><%= p.totalBlocked %></td>
                 <td><span class="pill <%= p.recurrent ? 'yes' : 'no' %>"><%= p.recurrent ? '⚠ Recurrente' : 'Normal' %></span></td>
+                <td>
+                    <% if (p.recurrent && !isAdmin && (p.reviewStatus === 'PENDING' || p.reviewStatus === 'NONE')) { %>
+                        <button class="fb-btn keep" onclick="reviewPattern(<%= p.userId %>, 'REVIEWED')">Revisado</button>
+                        <button class="fb-btn keep" onclick="reviewPattern(<%= p.userId %>, 'DISCARDED')">Descartar</button>
+                    <% } else if (p.reviewStatus && p.reviewStatus !== 'NONE') { %>
+                        <%= p.reviewStatus === 'REVIEWED' ? '✔ Revisado' : (p.reviewStatus === 'DISCARDED' ? 'Descartado' : 'Pendiente') %>
+                    <% } else { %>
+                        —
+                    <% } %>
+                </td>
             </tr>
         <% }) %>
     </table>
@@ -97,6 +107,16 @@ async function reassign(routeId) {
     const data = await r.json().catch(() => ({}));
     if (r.ok) { alert('Ruta reasignada. El nuevo conductor deberá rehacer consentimiento y prueba.'); location.reload(); }
     else { alert(data.error || 'No se pudo reasignar.'); }
+}
+async function reviewPattern(userId, status) {
+    let note = '';
+    if (status === 'DISCARDED') { note = prompt('Motivo de descarte (opcional):') || ''; }
+    const r = await fetch('/fatigue/pattern/review', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, status, note }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) { location.reload(); } else { alert(data.error || 'No se pudo registrar la revisión.'); }
 }
 </script>
 </body>
