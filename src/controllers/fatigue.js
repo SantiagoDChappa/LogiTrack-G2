@@ -4,6 +4,7 @@
 const fatigueSvc = require('../services/fatigue');
 const fatigueCfg = require('../services/fatigue/config');
 const notify = require('../services/fatigue/notify');
+const transportModel = require('../models/transport');
 const { RoleType } = require('../constants/enums');
 
 const isAdmin = (u) => u?.roleId === RoleType.ADMIN.id;
@@ -21,12 +22,33 @@ exports.index = async (req, res) => {
     const patterns = [];
     for (const c of counters) { patterns.push(await fatigueSvc.patternStatus(c.userId, cfg)); }
 
+    const transports = await transportModel.getEnabledForBranch(branchId);
+
     res.render('fatigue/index', {
         blocked: blocked.map(b => b.toJSON()),
         patterns,
         isAdmin: isAdmin(u),
         cfg,
+        transports: transports.map(t => ({ id: t.id, name: t.name, driverName: t.driver?.fullName || null })),
     });
+};
+
+// POST /fatigue/reassign — reasignar ruta bloqueada a otro transporte (LGT-193/190).
+// Exclusivo del Supervisor de la sucursal de origen (Esc.10): el Admin no gestiona.
+exports.reassign = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'La reasignación es exclusiva del Supervisor de la sucursal de origen' });
+    }
+    const { routeId, transportId } = req.body;
+    if (!routeId || !transportId) { return res.status(400).json({ error: 'Faltan datos (ruta y transporte)' }); }
+    try {
+        const r = await fatigueSvc.reassignRoute({
+            routeId: Number(routeId), newTransportId: Number(transportId),
+            actorId: u.id, actorBranchId: u.branchId,
+        });
+        res.json({ ok: true, ...r });
+    } catch (e) { res.status(400).json({ error: e.message }); }
 };
 
 // POST /fatigue/:checkId/release — liberar con motivo (US-6).

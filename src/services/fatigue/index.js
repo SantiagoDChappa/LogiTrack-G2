@@ -118,6 +118,51 @@ async function patternStatus(userId, cfg) {
     };
 }
 
+// ── Reasignación de ruta (LGT-193 Esc.9/10, LGT-190 Esc.7) ──────────────────
+// Transfiere la ruta a otro transporte (conductor) de la MISMA sucursal sin
+// desvincular los envíos (siguen colgados de la ruta vía route_stop). La ruta
+// vuelve a PLANNED para que el nuevo conductor rehaga consentimiento + prueba.
+async function reassignRoute({ routeId, newTransportId, actorId, actorBranchId }) {
+    const { Op } = require('sequelize');
+    const { Route, RouteStatus } = require('../../models/route');
+    const { Transport } = require('../../models/transport');
+    const { RouteFatigueSession } = require('../../models/routeFatigueSession');
+
+    const route = await Route.findByPk(routeId);
+    if (!route) { throw new Error('Ruta no encontrada'); }
+    // RBAC: exclusivo del Supervisor de la sucursal de origen (Esc.10). actorBranchId
+    // null = admin → se rechaza en el controller; acá reforzamos por sucursal.
+    if (actorBranchId && route.originBranchId !== actorBranchId) {
+        throw new Error('No autorizado: la ruta es de otra sucursal');
+    }
+    const tx = await Transport.findByPk(newTransportId);
+    if (!tx || !tx.driverUserId) { throw new Error('El transporte no existe o no tiene conductor asignado'); }
+    if (tx.branchId !== route.originBranchId) { throw new Error('El transporte es de otra sucursal'); }
+    if (tx.outOfService || !tx.enabled) { throw new Error('El transporte no está disponible'); }
+
+    // Regla de negocio: una sola ruta activa por conductor.
+    const driverTxIds = (await Transport.findAll({
+        where: { driverUserId: tx.driverUserId }, attributes: ['id'],
+    })).map(t => t.id);
+    const active = await Route.findOne({
+        where: {
+            id: { [Op.ne]: routeId },
+            transportId: { [Op.in]: driverTxIds.length ? driverTxIds : [0] },
+            statusId: { [Op.in]: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE, RouteStatus.PAUSED_FATIGUE] },
+        },
+    });
+    if (active) { throw new Error(`El conductor ya tiene una ruta activa (#${active.id})`); }
+
+    const prevTransportId = route.transportId;
+    await route.update({ transportId: newTransportId, statusId: RouteStatus.PLANNED, startedAt: null });
+    await RouteFatigueSession.destroy({ where: { routeId } });
+    await notify.audit('ROUTE_REASSIGNED', {
+        actorId,
+        detail: `Ruta #${routeId}: transporte ${prevTransportId} → ${newTransportId} (conductor #${tx.driverUserId}). Envíos conservados.`,
+    });
+    return { ok: true, newDriverUserId: tx.driverUserId };
+}
+
 // ── Derechos del titular (US-13) ────────────────────────────────────────────
 function getDriverHistory(userId) {
     return FatigueCheck.findAll({ where: { userId }, order: [['createdAt', 'DESC']] });
@@ -150,6 +195,6 @@ async function driverName(userId) {
 
 module.exports = {
     recordConsent, revokeConsent, evaluate, latestForRoute, canStart,
-    listBlocked, release, bumpPatternCounter, patternStatus,
+    listBlocked, release, reassignRoute, bumpPatternCounter, patternStatus,
     getDriverHistory, suppressDriverData, purgeExpired,
 };

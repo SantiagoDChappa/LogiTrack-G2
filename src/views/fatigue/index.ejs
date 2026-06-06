@@ -37,9 +37,18 @@
             <b>Ruta #<%= b.routeId %></b> — transportista #<%= b.userId %> ·
             score <b><%= b.score %></b>/<%= b.threshold %> · <%= b.method || '—' %> ·
             <%= new Date(b.createdAt).toLocaleString('es-AR') %>
-            <div style="margin-top:10px;display:flex;gap:8px">
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <button class="fb-btn rel"  onclick="release(<%= b.id %>)">Liberar con motivo</button>
                 <button class="fb-btn keep" onclick="keep(<%= b.id %>)">Mantener bloqueada</button>
+                <% if (!isAdmin) { %>
+                    <select id="tx-<%= b.routeId %>" class="fb-btn keep" style="font-weight:400">
+                        <option value="">Reasignar a…</option>
+                        <% transports.forEach(t => { %>
+                            <option value="<%= t.id %>"><%= t.name %><%= t.driverName ? ' — ' + t.driverName : '' %></option>
+                        <% }) %>
+                    </select>
+                    <button class="fb-btn keep" onclick="reassign(<%= b.routeId %>)">Reasignar ruta</button>
+                <% } %>
             </div>
         </div>
     <% }) %>
@@ -68,6 +77,18 @@ async function release(id) {
 async function keep(id) {
     await fetch('/fatigue/' + id + '/keep', { method: 'POST' });
     alert('La ruta sigue bloqueada.');
+}
+async function reassign(routeId) {
+    const sel = document.getElementById('tx-' + routeId);
+    const transportId = sel && sel.value;
+    if (!transportId) { alert('Elegí un transporte para reasignar.'); return; }
+    const r = await fetch('/fatigue/reassign', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routeId, transportId }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) { alert('Ruta reasignada. El nuevo conductor deberá rehacer consentimiento y prueba.'); location.reload(); }
+    else { alert(data.error || 'No se pudo reasignar.'); }
 }
 </script>
 </body>

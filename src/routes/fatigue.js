@@ -7,6 +7,7 @@ const ctrl = require('../controllers/fatigue');
 router.get('/',                 requireSupervisorOrAdmin, ctrl.index);
 router.get('/config',           requireSupervisorOrAdmin, ctrl.configPage);
 router.post('/config',          requireSupervisorOrAdmin, ctrl.saveConfig);
+router.post('/reassign',        requireSupervisorOrAdmin, ctrl.reassign);
 router.post('/purge',           requireSupervisorOrAdmin, ctrl.purge);
 router.post('/:checkId/release', requireSupervisorOrAdmin, ctrl.release);
 router.post('/:checkId/keep',    requireSupervisorOrAdmin, ctrl.keep);
