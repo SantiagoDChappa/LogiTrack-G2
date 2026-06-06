@@ -21,14 +21,29 @@ async function resolveRecipients(branchId) {
     } catch { return []; }
 }
 
-// Notifica el bloqueo por fatiga. Devuelve la cantidad de destinatarios resueltos.
+// LGT-194 — entrega por email (best-effort). Nunca rompe el flujo de bloqueo.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+async function deliverEmail(recipients, subject, body) {
+    try {
+        const emails = recipients.map(r => r.email).filter(e => EMAIL_RE.test(String(e || '').trim()));
+        if (!emails.length) { return 0; }
+        const { sendEmail } = require('../notification/emailSender');
+        await sendEmail(emails, subject, body, 'text');
+        return emails.length;
+    } catch { return 0; }
+}
+
+// Notifica el bloqueo por fatiga (in-app vía auditoría/panel + email). LGT-194.
 async function notifyBlock({ check, branchId, transportName, routeId, score }) {
     const recipients = await resolveRecipients(branchId);
     const detail = `Ruta #${routeId} bloqueada por fatiga (score ${score}). ` +
         `Transportista: ${transportName || 'N/D'}. Notificados: ${recipients.length} (supervisores + admin).`;
     await audit('NOTIFY_BLOCK', { checkId: check?.id, detail });
-    // Best-effort: integración con el pipeline de notificaciones internas/email.
-    // Se deja como gancho; el panel de supervisor (US-6) es la superficie principal.
+    const body = `Se bloqueó la ruta #${routeId} por fatiga.\n` +
+        `Transportista: ${transportName || 'N/D'}\nScore: ${score}\n\n` +
+        `Gestioná el caso en el panel: /fatigue`;
+    const sent = await deliverEmail(recipients, `[LogiTrack] Bloqueo por fatiga — Ruta #${routeId}`, body);
+    await audit('NOTIFY_BLOCK_EMAIL', { checkId: check?.id, detail: `Emails enviados: ${sent}` });
     return recipients.length;
 }
 
@@ -38,6 +53,9 @@ async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     const detail = `Patrón de fatiga recurrente: transportista #${userId} con ${windowCount} bloqueos ` +
         `en ${windowDays} días. Notificados: ${recipients.length} (supervisores + admin).`;
     await audit('PATTERN_RECURRENT', { actorId: userId, detail });
+    const body = `Se detectó patrón de fatiga recurrente.\nTransportista: #${userId}\n` +
+        `${windowCount} bloqueos en ${windowDays} días.\n\nRevisalo en el panel: /fatigue`;
+    await deliverEmail(recipients, `[LogiTrack] Patrón de fatiga recurrente — Transportista #${userId}`, body);
     return recipients.length;
 }
 
