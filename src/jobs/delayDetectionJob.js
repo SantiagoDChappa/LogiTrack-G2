@@ -14,6 +14,9 @@ const TERMINAL_STATUS_IDS = [
 // umbral escale con la duración: 6 días sobre 60 son 10%, sobre 120 son 5%.
 const DEFAULT_DELAY_THRESHOLD_PCT = 15;
 
+// Intervalo (en días) entre recordatorios mientras persiste la demora (LGT-160 Esc.4).
+const DEFAULT_DELAY_REMINDER_DAYS = 1;
+
 const readThresholdPct = async () => {
     try {
         const raw = await Setting.get('delay_threshold_pct');
@@ -21,6 +24,15 @@ const readThresholdPct = async () => {
         if (Number.isFinite(n) && n > 0 && n <= 100) { return n; }
     } catch { /* usa default */ }
     return DEFAULT_DELAY_THRESHOLD_PCT;
+};
+
+const readReminderDays = async () => {
+    try {
+        const raw = await Setting.get('delay_reminder_days');
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 1) { return n; }
+    } catch { /* usa default */ }
+    return DEFAULT_DELAY_REMINDER_DAYS;
 };
 
 // Días enteros entre dos fechas (truncadas a día).
@@ -41,41 +53,56 @@ const isSignificantlyDelayed = (shipment, today, pct) => {
     return overdueDays > allowedDelayDays;
 };
 
+// ¿Toca (re)notificar? Primera vez (delayNotifiedAt null) o pasó el intervalo de
+// recordatorio desde el último aviso (LGT-160 Esc.4). delayNotifiedAt = último envío.
+const shouldNotify = (shipment, now, reminderDays) => {
+    if (!shipment.delayNotifiedAt) { return true; }
+    const last = new Date(shipment.delayNotifiedAt);
+    return (now - last) >= reminderDays * 86400000;
+};
+
 const processDelayedShipments = async () => {
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const today = new Date(now); today.setHours(0, 0, 0, 0);
         const pct = await readThresholdPct();
+        const reminderDays = await readReminderDays();
 
-        // Candidatos: ya vencidos (expected < hoy), no terminales y sin notificar.
-        // El filtro fino por % se aplica en JS porque depende de la duración de cada envío.
+        // Candidatos: ya vencidos (expected < hoy) y no terminales. Incluye los ya
+        // notificados para poder reenviar recordatorios mientras persista la demora.
         const candidates = await Shipment.findAll({
             where: {
                 expectedDeliveryDate: { [Op.lt]: today },
                 statusId: { [Op.notIn]: TERMINAL_STATUS_IDS },
-                delayNotifiedAt: null,
             },
             attributes: ['id', 'trackingId', 'createdAt', 'expectedDeliveryDate', 'delayNotifiedAt'],
         });
 
-        const overdue = candidates.filter(s => isSignificantlyDelayed(s, today, pct));
+        const toNotify = candidates.filter(s =>
+            isSignificantlyDelayed(s, today, pct) && shouldNotify(s, now, reminderDays));
 
-        if (!overdue.length) {
-            console.log(`[delayDetectionJob] Sin demoras significativas (umbral ${pct}% de la duración).`);
+        if (!toNotify.length) {
+            console.log(`[delayDetectionJob] Sin avisos pendientes (umbral ${pct}%, recordatorio ${reminderDays}d).`);
             return;
         }
 
         const { notifyShipmentEvent } = require('../controllers/shipment');
+        let firstTime = 0, reminders = 0;
 
-        for (const shipment of overdue) {
+        for (const shipment of toNotify) {
+            if (shipment.delayNotifiedAt) { reminders++; } else { firstTime++; }
             await notifyShipmentEvent(NotificationEvent.SHIPMENT_DELAYED, shipment.id);
             await shipment.update({ delayNotifiedAt: new Date() });
         }
 
-        console.log(`[delayDetectionJob] Notificaciones de demora enviadas: ${overdue.length} (umbral ${pct}%).`);
+        console.log(`[delayDetectionJob] Avisos de demora: ${firstTime} nuevos + ${reminders} recordatorios (umbral ${pct}%).`);
     } catch (err) {
         console.error('[delayDetectionJob] Error:', err.message);
     }
 };
 
-module.exports = { processDelayedShipments, isSignificantlyDelayed, readThresholdPct, DEFAULT_DELAY_THRESHOLD_PCT };
+module.exports = {
+    processDelayedShipments, isSignificantlyDelayed, shouldNotify,
+    readThresholdPct, readReminderDays,
+    DEFAULT_DELAY_THRESHOLD_PCT, DEFAULT_DELAY_REMINDER_DAYS,
+};
