@@ -94,6 +94,7 @@ const NotificationEvent = Object.freeze({
     ROUTE_CANCELLED:              'ROUTE_CANCELLED',
     ROUTE_INTERRUPTED:            'ROUTE_INTERRUPTED',
     SHIPMENT_DELAYED:             'SHIPMENT_DELAYED',
+    SHIPMENT_DELAY_RECOVERED:     'SHIPMENT_DELAY_RECOVERED', // LGT-160 Esc.6
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)

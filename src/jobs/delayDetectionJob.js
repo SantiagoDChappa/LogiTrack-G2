@@ -95,14 +95,37 @@ const processDelayedShipments = async () => {
             await shipment.update({ delayNotifiedAt: new Date() });
         }
 
+        await processRecoveries(today, pct);
+
         console.log(`[delayDetectionJob] Avisos de demora: ${firstTime} nuevos + ${reminders} recordatorios (umbral ${pct}%).`);
     } catch (err) {
         console.error('[delayDetectionJob] Error:', err.message);
     }
 };
 
+// LGT-160 Esc.6 — recuperación: envíos ya notificados que dejaron de estar en
+// demora significativa (p. ej. se reprogramó el ETA) → avisar y limpiar la marca.
+const processRecoveries = async (today, pct) => {
+    const candidates = await Shipment.findAll({
+        where: {
+            delayNotifiedAt: { [Op.ne]: null },
+            statusId: { [Op.notIn]: TERMINAL_STATUS_IDS },
+        },
+        attributes: ['id', 'trackingId', 'createdAt', 'expectedDeliveryDate', 'delayNotifiedAt'],
+    });
+    const recovered = candidates.filter(s => !isSignificantlyDelayed(s, today, pct));
+    if (!recovered.length) { return; }
+
+    const { notifyShipmentEvent } = require('../controllers/shipment');
+    for (const shipment of recovered) {
+        await notifyShipmentEvent(NotificationEvent.SHIPMENT_DELAY_RECOVERED, shipment.id);
+        await shipment.update({ delayNotifiedAt: null });
+    }
+    console.log(`[delayDetectionJob] Recuperaciones notificadas: ${recovered.length}.`);
+};
+
 module.exports = {
-    processDelayedShipments, isSignificantlyDelayed, shouldNotify,
+    processDelayedShipments, processRecoveries, isSignificantlyDelayed, shouldNotify,
     readThresholdPct, readReminderDays,
     DEFAULT_DELAY_THRESHOLD_PCT, DEFAULT_DELAY_REMINDER_DAYS,
 };
