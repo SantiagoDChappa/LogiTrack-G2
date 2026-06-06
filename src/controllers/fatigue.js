@@ -23,6 +23,7 @@ exports.index = async (req, res) => {
     for (const c of counters) { patterns.push(await fatigueSvc.patternStatus(c.userId, cfg)); }
 
     const transports = await transportModel.getEnabledForBranch(branchId);
+    const disabledDrivers = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
 
     res.render('fatigue/index', {
         blocked: blocked.map(b => b.toJSON()),
@@ -30,7 +31,22 @@ exports.index = async (req, res) => {
         isAdmin: isAdmin(u),
         cfg,
         transports: transports.map(t => ({ id: t.id, name: t.name, driverName: t.driver?.fullName || null })),
+        disabledDrivers,
     });
+};
+
+// POST /fatigue/driver/restore — restablecer transportista inhabilitado (LGT-195 Esc.7/8).
+exports.restoreDriver = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'El restablecimiento es exclusivo del Supervisor' });
+    }
+    const { userId, kind } = req.body;
+    if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
+    try {
+        await fatigueSvc.restoreDriver({ userId: Number(userId), actorId: u.id, kind });
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
 };
 
 // POST /fatigue/reassign — reasignar ruta bloqueada a otro transporte (LGT-193/190).

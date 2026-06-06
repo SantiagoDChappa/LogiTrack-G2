@@ -18,7 +18,53 @@ async function recordConsent({ userId, routeId, branchId, accepted, version, tri
     });
     await notify.audit(accepted ? 'CONSENT_ACCEPTED' : 'CONSENT_REJECTED',
         { actorId: userId, checkId: check.id, detail: `Ruta #${routeId}, versión ${version}` });
+    // LGT-195: el rechazo inhabilita al transportista para iniciar nuevas rutas
+    // (cross-ruta) hasta que un Supervisor lo restablezca.
+    if (!accepted) {
+        await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId });
+    }
     return check;
+}
+
+// ── Habilitación del transportista (LGT-195 Esc.7/8) ────────────────────────
+async function disableDriver({ userId, reason, branchId }) {
+    const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
+    await DriverFatigueStatus.upsert({
+        userId, status: 'DISABLED', reason: reason || 'OTHER',
+        disabledAt: new Date(), restoredBy: null, restoredAt: null, updatedAt: new Date(),
+    });
+    await notify.audit('DRIVER_DISABLED', { actorId: userId, detail: `Transportista #${userId} inhabilitado (${reason}).` });
+    // Notifica al Supervisor de la sucursal (canal interno + auditoría).
+    if (branchId) {
+        const recipients = await notify.resolveRecipients(branchId);
+        await notify.audit('DRIVER_DISABLED_NOTIFY', { detail: `Notificados ${recipients.length} (supervisores + admin).` });
+    }
+    return { ok: true };
+}
+
+async function restoreDriver({ userId, actorId, kind }) {
+    const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
+    const row = await DriverFatigueStatus.findByPk(userId);
+    if (!row || row.status !== 'DISABLED') { throw new Error('El transportista no está inhabilitado'); }
+    await row.update({ status: 'ACTIVE', restoredBy: actorId, restoredAt: new Date(), updatedAt: new Date() });
+    // kind: 'consent' (Esc.7) vuelve a pedir consentimiento; 'test' (Esc.8) reintenta la prueba.
+    await notify.audit('DRIVER_RESTORED', { actorId, detail: `Transportista #${userId} restablecido (${kind || 'general'}).` });
+    return row;
+}
+
+function getDriverStatus(userId) {
+    const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
+    return DriverFatigueStatus.findByPk(userId);
+}
+
+async function isDriverDisabled(userId) {
+    const row = await getDriverStatus(userId);
+    return !!(row && row.status === 'DISABLED');
+}
+
+function listDisabledDrivers() {
+    const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
+    return DriverFatigueStatus.findAll({ where: { status: 'DISABLED' }, order: [['disabledAt', 'DESC']] });
 }
 
 async function revokeConsent({ userId, actorId }) {
@@ -259,5 +305,6 @@ async function driverName(userId) {
 module.exports = {
     recordConsent, revokeConsent, evaluate, latestForRoute, canStart,
     listBlocked, release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
+    disableDriver, restoreDriver, getDriverStatus, isDriverDisabled, listDisabledDrivers,
     getDriverHistory, suppressDriverData, purgeExpired,
 };

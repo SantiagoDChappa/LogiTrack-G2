@@ -509,6 +509,10 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
         const fatigueSvc = require('../services/fatigue');
         const cfg = await fatigueCfg.getConfig(route.originBranchId);
         if (cfg.enabled) {
+            // LGT-195: transportista inhabilitado (cross-ruta) no puede iniciar.
+            if (await fatigueSvc.isDriverDisabled(res.locals.currentUser.id)) {
+                return res.status(409).json({ error: 'Transportista inhabilitado por fatiga', fatigue: { reason: 'DRIVER_DISABLED' } });
+            }
             const gate = await fatigueSvc.canStart(route.id);
             if (!gate.ok) {
                 return res.status(409).json({ error: 'Control de fatiga requerido', fatigue: gate });
