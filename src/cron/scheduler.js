@@ -3,6 +3,8 @@ const emailProcessorJob = require('../jobs/emailProcessorJob');
 const delayDetectionJob = require('../jobs/delayDetectionJob');
 
 function startSchedulers() {
+    // No agendar bajo tests: los cron dejan handles abiertos y cuelgan Jest.
+    if (process.env.NODE_ENV === 'test') { return; }
 
     cron.schedule('* * * * *', async () => {
         await emailProcessorJob.processPendingEmails();
