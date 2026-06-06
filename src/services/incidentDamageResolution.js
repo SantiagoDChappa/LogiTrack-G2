@@ -30,4 +30,35 @@ async function setChoice({ incidentId, choice, by, userId, personId }) {
 
 function getChoice(incident) { return incident ? incident.damageChoice || null : null; }
 
-module.exports = { CHOICES, setChoice, getChoice };
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DAMAGE_RE = /(da[nñ]ad|roto|damage|rotura)/i;
+
+function isDamageType(type) {
+    return DAMAGE_RE.test(`${type?.code || ''} ${type?.description || ''}`);
+}
+
+// LGT-204 Esc.1/2 — al crear una incidencia de paquete dañado, avisar al
+// remitente (quien pagó) con un acceso al portal para elegir reembolso/reemplazo.
+async function notifySenderIfDamage({ incidentId, shipment, type }) {
+    try {
+        if (!isDamageType(type)) { return false; }
+        let senderEmail = shipment?.sender?.email || null;
+        const trackingId = shipment?.trackingId || shipment?.id;
+        if (!senderEmail && shipment?.id) {
+            const { Shipment } = require('../models/shipment');
+            const full = await Shipment.findByPk(shipment.id, { include: [{ association: 'sender' }] });
+            senderEmail = full?.sender?.email || null;
+        }
+        if (!EMAIL_RE.test(String(senderEmail || '').trim())) { return false; }
+
+        const link = '/portal/mis-envios';
+        const body = `Tu paquete llegó con daño (envío ${trackingId}).\n\n` +
+            `¿Querés un reembolso o un reemplazo? Ingresá al portal y elegí una opción:\n${link}\n\n` +
+            `Incidencia #${incidentId}.`;
+        const { sendEmail } = require('./notification/emailSender');
+        await sendEmail(senderEmail, '[LogiTrack] Tu paquete llegó con daño — elegí reembolso o reemplazo', body, 'text');
+        return true;
+    } catch { return false; }
+}
+
+module.exports = { CHOICES, setChoice, getChoice, isDamageType, notifySenderIfDamage };

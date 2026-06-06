@@ -292,6 +292,10 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
             .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
     }
+    // LGT-204: si es paquete dañado, avisar al remitente para que elija reembolso/reemplazo.
+    require('../services/incidentDamageResolution').notifySenderIfDamage({ incidentId, shipment, type })
+        .catch(e => console.error('[incident] notif daño remitente:', e.message));
+
     if (emails.length === 0) { return; }
 
     const reportedByLabel = openedBy
