@@ -49,6 +49,9 @@
                     <dt>Tipo</dt><dd><%= incident.type ? incident.type.description : '—' %></dd>
                     <dt>Estado</dt><dd><span class="incident-badge incident-badge--<%= incident.status.toLowerCase() %>"><%= incident.status %></span></dd>
                     <dt>Resolución</dt><dd><%= incident.resolution || '—' %></dd>
+                    <% if (incident.damageChoice) { %>
+                    <dt>Elección del remitente</dt><dd><strong><%= incident.damageChoice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong><% if (incident.damageChoiceAt) { %> · <%= new Date(incident.damageChoiceAt).toLocaleString('es-AR') %><% } %></dd>
+                    <% } %>
                     <dt>Prioridad</dt><dd>P<%= incident.priority %></dd>
                     <dt>Escalado</dt><dd><%= incident.escalated ? 'Sí' : 'No' %></dd>
                     <dt>Canal</dt><dd><%= incident.openedChannel %></dd>

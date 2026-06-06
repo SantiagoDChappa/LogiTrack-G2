@@ -97,6 +97,24 @@
             </div>
             <% } %>
 
+            <% if (typeof damage !== 'undefined' && damage.isDamage) { %>
+            <div class="portal-incident-detail-card portal-incident-section">
+                <h2 class="portal-incident-section-title">Tu paquete llegó con daño</h2>
+                <% if (damage.choice) { %>
+                    <p class="portal-manage-hint">Elegiste: <strong><%= damage.choice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong>. El operador lo verá y actuará en consecuencia.</p>
+                    <% if (!damage.closed) { %><p class="portal-manage-hint">Podés cambiar tu elección mientras la incidencia siga abierta.</p><% } %>
+                <% } else { %>
+                    <p class="portal-manage-hint">¿Querés un reembolso o un reemplazo? Elegí una opción y el operador la gestionará.</p>
+                <% } %>
+                <% if (!damage.closed) { %>
+                <form method="POST" action="/portal/mis-envios/incidencia/<%= incident.id %>/eleccion" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+                    <button type="submit" name="choice" value="REEMBOLSO" class="portal-search-panel-btn">Solicitar reembolso</button>
+                    <button type="submit" name="choice" value="REEMPLAZO" class="portal-search-panel-btn">Solicitar reemplazo</button>
+                </form>
+                <% } %>
+            </div>
+            <% } %>
+
             <% if (incident.attachments && incident.attachments.length) { %>
             <div class="portal-incident-detail-card portal-incident-section">
                 <h2 class="portal-incident-section-title">Evidencias adjuntas</h2>

@@ -279,13 +279,43 @@ const getIncidentDetail = async (req, res) => {
         });
     }
 
+    // LGT-204: elección reembolso/reemplazo solo para incidencias de paquete dañado.
+    const damageSvc = require('../services/incidentDamageResolution');
+    const typeText = `${incident.type?.code || ''} ${incident.type?.description || ''}`;
+    const isDamage = /(da[nñ]ad|roto|damage|rotura)/i.test(typeText);
+
     res.render('portal/misEnviosIncidentDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
         incident: await loadIncidentDetailViewModel(incident),
-        flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.' : null,
+        damage: { isDamage, choice: incident.damageChoice || null, options: damageSvc.CHOICES, closed: !!incident.closedAt },
+        flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.'
+            : (req.query.choice ? 'Registramos tu elección. El operador la verá y actuará en consecuencia.' : null),
         error: req.query.error ? String(req.query.error) : null,
     });
+};
+
+// LGT-204 — el remitente registra su elección (reembolso/reemplazo).
+const postDamageChoice = async (req, res) => {
+    const incidentId = Number(req.params.id);
+    const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
+    if (!incident) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Incidencia no encontrada.',
+        });
+    }
+    try {
+        const damageSvc = require('../services/incidentDamageResolution');
+        await damageSvc.setChoice({
+            incidentId,
+            choice: req.body.choice,
+            by: res.locals.portalClient?.email || res.locals.portalClient?.document || null,
+        });
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?choice=1`);
+    } catch (e) {
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?error=${encodeURIComponent(e.message)}`);
+    }
 };
 
 const postIncidentResponse = async (req, res) => {
@@ -464,6 +494,7 @@ module.exports = {
     getIncidentList,
     getIncidentDetail,
     postIncidentResponse,
+    postDamageChoice,
     getIncidentAttachment,
     getSurveyList,
     getSurveyForm,
