@@ -186,6 +186,11 @@ const saveEvidence = async (req, res) => {
             if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
                 return res.status(403).send('Esta ruta no te pertenece.');
             }
+            // LGT-193/199: ruta bloqueada o pausada por fatiga → no se puede registrar entrega.
+            if (route.statusId === routeModel.RouteStatus.BLOCKED_FATIGUE
+                || route.statusId === routeModel.RouteStatus.PAUSED_FATIGUE) {
+                return res.status(409).send('Ruta bloqueada por fatiga. Consultá con tu supervisor.');
+            }
             const activePause = await RoutePause.findOne({ where: { routeId, endedAt: null } });
             if (activePause) {
                 return res.status(409).send('La ruta está pausada. Reanudala antes de confirmar la entrega.');

@@ -214,6 +214,21 @@
                 <h1>Mi Ruteo</h1>
             </div>
 
+            <% if (typeof fatigueBlocked !== 'undefined' && fatigueBlocked) { %>
+            <div style="background:#fde2e1;border:1px solid #f5b5b2;color:#b91c1c;border-radius:14px;
+                        padding:16px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+                <span class="material-symbols-outlined" style="font-size:24px">block</span>
+                <div>
+                    <div style="font-weight:800;font-size:1rem">Ruta bloqueada por fatiga</div>
+                    <div style="font-size:.9rem;margin-top:2px">
+                        Tu ruta #<%= fatigueBlocked.id %> está <%= fatigueBlocked.paused ? 'pausada' : 'bloqueada' %>
+                        por el control de fatiga. No podés continuar el reparto ni registrar entregas.
+                        <b>Consultá con tu supervisor.</b>
+                    </div>
+                </div>
+            </div>
+            <% } %>
+
             <% if (activeSummary) { %>
                 <a class="active-hero" href="/delivery/route/<%= activeSummary.id %>">
                     <div>

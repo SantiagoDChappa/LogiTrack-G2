@@ -102,6 +102,13 @@ router.get('/', requireDelivery, async (req, res) => {
         const activeRoute = inRoute || planned[0] || null;
         const upcomingRoutes = planned.filter(r => !activeRoute || r.id !== activeRoute.id);
 
+        // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
+        const fatigueRoute = routes.find(r =>
+            r.statusId === RouteStatus.BLOCKED_FATIGUE || r.statusId === RouteStatus.PAUSED_FATIGUE) || null;
+        const fatigueBlocked = fatigueRoute
+            ? { id: fatigueRoute.id, paused: fatigueRoute.statusId === RouteStatus.PAUSED_FATIGUE }
+            : null;
+
         // Resumen para el card destacado
         let activeSummary = null;
         if (activeRoute) {
@@ -144,6 +151,7 @@ router.get('/', requireDelivery, async (req, res) => {
             activeSummary,
             upcomingRoutes: upcomingRoutes.map(summarizeRoute),
             finishedRoutes: finished.map(summarizeRoute),
+            fatigueBlocked,
         });
     } catch (err) {
         console.error(err);
@@ -206,6 +214,11 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
         if (!route) { return res.status(404).send('Ruta no encontrada'); }
         if (route.transport?.driverUserId !== res.locals.currentUser.id) {
             return res.status(403).send('Esta ruta no te pertenece');
+        }
+        // LGT-193/199: ruta bloqueada/pausada por fatiga → no se puede operar.
+        // Redirige al inicio, donde se muestra el aviso para consultar al supervisor.
+        if (route.statusId === RouteStatus.BLOCKED_FATIGUE || route.statusId === RouteStatus.PAUSED_FATIGUE) {
+            return res.redirect('/delivery?fatigue=1');
         }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
         res.render('delivery/route', { route, readOnly });
