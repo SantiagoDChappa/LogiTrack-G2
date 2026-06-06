@@ -84,11 +84,42 @@ function listBlocked(branchId) {
     return FatigueCheck.findAll({ where, order: [['createdAt', 'DESC']] });
 }
 
+// LGT-195: liberar un bloqueo. "falso_positivo" deja la ruta apta sin nueva
+// prueba (Esc.2); "autorizado_descanso"/"otro" exigen rehacer la prueba (Esc.3/4).
 async function release({ checkId, actorId, reason, detail }) {
+    const { Route, RouteStatus } = require('../../models/route');
+    const { RouteFatigueSession } = require('../../models/routeFatigueSession');
     const check = await FatigueCheck.findByPk(checkId);
     if (!check) { throw new Error('Chequeo no encontrado'); }
+    const requiresRetest = reason !== 'falso_positivo';
     await check.update({ releasedAt: new Date(), releasedBy: actorId, releaseReason: reason, releaseDetail: detail || null });
-    await notify.audit('RELEASED', { actorId, checkId, detail: `Motivo: ${reason}. ${detail || ''}` });
+
+    if (check.routeId) {
+        const route = await Route.findByPk(check.routeId);
+        if (route && route.statusId === RouteStatus.PAUSED_FATIGUE) {
+            // Bloqueo en viaje (LGT-199).
+            if (requiresRetest) {
+                // El conductor debe rehacer la prueba: el widget la pedirá (RECHECK_PENDING).
+                await RouteFatigueSession.update(
+                    { state: 'RECHECK_PENDING', pausedAt: null, restUntil: null },
+                    { where: { routeId: route.id } });
+            } else {
+                // Falso positivo: reanuda y reinicia el conteo de conducción.
+                await route.update({ statusId: RouteStatus.IN_ROUTE });
+                await RouteFatigueSession.update(
+                    { state: 'DRIVING', driveStartedAt: new Date(), stoppedAt: null, recheckRequestedAt: null, pausedAt: null, restUntil: null },
+                    { where: { routeId: route.id } });
+            }
+        } else if (route && route.statusId === RouteStatus.BLOCKED_FATIGUE) {
+            // Bloqueo al inicio: la ruta vuelve a planificada; el gate la deja salir (releasedAt).
+            await route.update({ statusId: RouteStatus.PLANNED });
+        }
+    }
+
+    await notify.audit('RELEASED', {
+        actorId, checkId,
+        detail: `Motivo: ${reason}. ${requiresRetest ? 'Requiere nueva prueba. ' : 'Sin nueva prueba. '}${detail || ''}`,
+    });
     return check;
 }
 

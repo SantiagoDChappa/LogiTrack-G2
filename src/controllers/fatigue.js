@@ -61,7 +61,12 @@ exports.release = async (req, res) => {
         return res.status(403).json({ error: 'No autorizado: la ruta es de otra sucursal' });
     }
     const { reason, detail } = req.body;
-    if (!reason) { return res.status(400).json({ error: 'El motivo es obligatorio' }); }
+    const VALID = ['falso_positivo', 'autorizado_descanso', 'otro'];
+    if (!VALID.includes(reason)) { return res.status(400).json({ error: 'Motivo inválido' }); }
+    // Esc.5: motivo "Otro" exige descripción de al menos 10 caracteres.
+    if (reason === 'otro' && (!detail || detail.trim().length < 10)) {
+        return res.status(400).json({ error: 'La descripción es obligatoria (mínimo 10 caracteres)' });
+    }
     await fatigueSvc.release({ checkId: check.id, actorId: u.id, reason, detail });
     res.json({ ok: true });
 };

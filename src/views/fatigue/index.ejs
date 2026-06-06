@@ -69,10 +69,18 @@
 </div>
 <script>
 async function release(id) {
-    const reason = prompt('Motivo de liberación:\n- Falso positivo del sistema\n- Autorizado con descanso\n- Otro\n\nEscribí el motivo:');
+    const opt = prompt('Motivo de liberación:\n1) Falso positivo (la ruta queda apta, sin nueva prueba)\n2) Autorizado con descanso (debe rehacer la prueba)\n3) Otro (descripción obligatoria)\n\nEscribí 1, 2 o 3:');
+    const map = { '1': 'falso_positivo', '2': 'autorizado_descanso', '3': 'otro' };
+    const reason = map[(opt || '').trim()];
     if (!reason) { return; }
-    const r = await fetch('/fatigue/' + id + '/release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
-    if (r.ok) { document.getElementById('check-' + id)?.remove(); } else { alert('No se pudo liberar.'); }
+    let detail = '';
+    if (reason === 'otro') {
+        detail = prompt('Descripción (mínimo 10 caracteres):') || '';
+        if (detail.trim().length < 10) { alert('La descripción debe tener al menos 10 caracteres.'); return; }
+    }
+    const r = await fetch('/fatigue/' + id + '/release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason, detail }) });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) { document.getElementById('check-' + id)?.remove(); } else { alert(data.error || 'No se pudo liberar.'); }
 }
 async function keep(id) {
     await fetch('/fatigue/' + id + '/keep', { method: 'POST' });
