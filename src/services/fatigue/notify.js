@@ -9,6 +9,8 @@ async function audit(action, { actorId = null, checkId = null, detail = null } =
 }
 
 // Destinatarios internos: supervisores de la sucursal de origen + administradores.
+// LGT-194 Esc.6: si la sucursal no tiene supervisores, la notificación queda
+// cubierta por los administradores (fallback) y se registra el caso.
 async function resolveRecipients(branchId) {
     try {
         const { Op } = require('sequelize');
@@ -16,7 +18,13 @@ async function resolveRecipients(branchId) {
         const { RoleType } = require('../../constants/enums');
         const or = [{ roleId: RoleType.ADMIN.id }];
         if (branchId) { or.push({ roleId: RoleType.SUPERVISOR.id, branchId }); }
-        const users = await User.findAll({ where: { [Op.or]: or }, attributes: ['id', 'email', 'fullName'] });
+        const users = await User.findAll({ where: { [Op.or]: or }, attributes: ['id', 'email', 'fullName', 'roleId'] });
+        if (branchId) {
+            const supervisors = users.filter(u => u.roleId === RoleType.SUPERVISOR.id).length;
+            if (supervisors === 0) {
+                await audit('NOTIFY_FALLBACK_ADMIN', { detail: `Sucursal #${branchId} sin supervisores: notificación redirigida a administradores.` });
+            }
+        }
         return users.map(u => u.toJSON());
     } catch { return []; }
 }
