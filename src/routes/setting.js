@@ -21,6 +21,7 @@ router.post('/identity',     requireAdmin, optionalLogo, settingController.saveI
 router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 router.post('/params',          requireAdmin, settingController.saveParams);
+router.post('/incident-params', requireAdmin, settingController.saveIncidentParams);
 router.post('/status-colors',   requireAdmin, settingController.saveStatusColors);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
 // Variantes de plantilla (rutas específicas antes de las genéricas por :eventCode)

@@ -21,7 +21,7 @@ const statusModel = require('../models/status');
 const statusColors = require('../services/statusColors');
 
 // LGT-174: secciones de Ajustes (cada una es su propia página, navegada desde el menú).
-const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'auditoria'];
+const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'incidencias', 'auditoria'];
 
 // Tras guardar, vuelve a la sección desde la que se envió el formulario (vía Referer).
 function settingBack(req, suffix = '') {
@@ -392,6 +392,30 @@ const saveStatusColors = async (req, res) => {
     }
 };
 
+// LGT-160 — parámetros de demora (sección Incidencias). Se guardan en `setting`.
+const saveIncidentParams = async (req, res) => {
+    try {
+        const pct  = Number(req.body.delay_threshold_pct);
+        const days = Number(req.body.delay_reminder_days);
+        if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+            return res.redirect(settingBack(req, '?error=delay_pct'));
+        }
+        if (!Number.isFinite(days) || days < 1 || days > 365) {
+            return res.redirect(settingBack(req, '?error=delay_days'));
+        }
+        const pairs = { delay_threshold_pct: String(pct), delay_reminder_days: String(days) };
+        for (const [key, value] of Object.entries(pairs)) {
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(settingBack(req, '?success=incident_params'));
+    } catch (err) {
+        console.error('saveIncidentParams:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=incident_params_save'));
+    }
+};
+
 // LGT-172: Identidad visual (nombre + logo institucional).
 const saveIdentity = async (req, res) => {
     try {
@@ -737,5 +761,5 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors,
+    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors, saveIncidentParams,
 };

@@ -1423,6 +1423,66 @@
 
             <!-- Card 5: Historial de cambios -->
             <% } %>
+
+            <% if (activeSection === 'incidencias') { %>
+            <span class="settings-anchor" id="sec-incidencias"></span>
+            <section class="settings-category" id="cat-incidencias">
+                <span class="material-symbols-outlined">report</span>
+                <div><h3>Incidencias</h3><p>Demoras, plantillas de gestión y tipos de incidencia.</p></div>
+            </section>
+
+            <!-- Card: Parámetros de demora (LGT-160) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Demora significativa
+                </h2>
+                <p class="settings-subtitle">Cuándo se considera que un envío está demorado y cada cuánto se recuerda.</p>
+                <form method="POST" action="/setting/incident-params">
+                    <div style="display:flex;gap:1rem;flex-wrap:wrap">
+                        <label style="font-weight:600">Umbral (% de la duración del viaje)
+                            <input type="number" name="delay_threshold_pct" min="1" max="100"
+                                   value="<%= settings.delay_threshold_pct || '15' %>"
+                                   style="display:block;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px;width:160px">
+                        </label>
+                        <label style="font-weight:600">Intervalo de recordatorio (días)
+                            <input type="number" name="delay_reminder_days" min="1" max="365"
+                                   value="<%= settings.delay_reminder_days || '1' %>"
+                                   style="display:block;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px;width:160px">
+                        </label>
+                    </div>
+                    <button class="action-btn action-btn--lg guardar" type="submit" style="margin-top:.75rem" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                </form>
+            </div>
+
+            <!-- Card: Plantillas de checklist -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">checklist</span>
+                    Plantillas de gestión (checklist)
+                </h2>
+                <p class="settings-subtitle">Pasos de resolución por tipo de incidencia.</p>
+                <a class="action-btn action-btn--lg" href="/incident/config/templates">
+                    <span class="material-symbols-outlined">open_in_new</span> Administrar plantillas
+                </a>
+            </div>
+
+            <!-- Card: Tipos de incidencia (catálogo) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">category</span>
+                    Tipos de incidencia
+                </h2>
+                <p class="settings-subtitle">Catálogo de tipos disponibles.</p>
+                <ul style="margin:0;padding-left:1.1rem">
+                    <% (incidentTypes || []).forEach(t => { %>
+                    <li><b><%= t.code %></b> — <%= t.description %><%= t.active === false ? ' (inactivo)' : '' %></li>
+                    <% }) %>
+                    <% if (!incidentTypes || !incidentTypes.length) { %><li style="color:#64748b">Sin tipos cargados.</li><% } %>
+                </ul>
+            </div>
+            <% } %>
+
             <% if (activeSection === 'auditoria') { %>
             <span class="settings-anchor" id="sec-auditoria"></span>
             <section class="settings-category" id="cat-auditoria">
