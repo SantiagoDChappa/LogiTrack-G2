@@ -31,7 +31,8 @@ async function setChoice({ incidentId, choice, by, userId, personId }) {
 function getChoice(incident) { return incident ? incident.damageChoice || null : null; }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DAMAGE_RE = /(da[nñ]ad|roto|damage|rotura)/i;
+// Matchea el código real del catálogo (PACKAGE_BROKEN) y descripciones en español.
+const DAMAGE_RE = /(package_broken|broken|da[nñ]ad|roto|damage|rotura)/i;
 
 function isDamageType(type) {
     return DAMAGE_RE.test(`${type?.code || ''} ${type?.description || ''}`);

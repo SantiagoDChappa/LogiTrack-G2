@@ -281,8 +281,7 @@ const getIncidentDetail = async (req, res) => {
 
     // LGT-204: elección reembolso/reemplazo solo para incidencias de paquete dañado.
     const damageSvc = require('../services/incidentDamageResolution');
-    const typeText = `${incident.type?.code || ''} ${incident.type?.description || ''}`;
-    const isDamage = /(da[nñ]ad|roto|damage|rotura)/i.test(typeText);
+    const isDamage = damageSvc.isDamageType(incident.type);
 
     res.render('portal/misEnviosIncidentDetail', {
         support: await getSupportInfo(),
