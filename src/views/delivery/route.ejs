@@ -1118,9 +1118,201 @@
         setInterval(() => navigator.geolocation.getCurrentPosition(sendHb, () => {}, { enableHighAccuracy: true, timeout: 5000 }), 30000);
     }
 
-    // Inicia ruta automáticamente si aún no se inició (sólo modo activo)
+    // ===================== Ojo de Patrón — UI del conductor =====================
+    // LGT-190 (consentimiento) · LGT-191/198 (prueba) · LGT-199 (re-chequeo en ruta).
+    let fatigueCfgCache = null;
+    async function getFatigueCfg() {
+        if (fatigueCfgCache) { return fatigueCfgCache; }
+        try {
+            const r = await fetch(`/delivery/route/${routeId}/fatigue/config`);
+            fatigueCfgCache = await r.json();
+        } catch (_) { fatigueCfgCache = { enabled: false }; }
+        return fatigueCfgCache;
+    }
+
+    // LGT-190: modal de consentimiento. Devuelve { accepted, checkId } o null si error.
+    async function runConsent(cfg) {
+        const res = await Swal.fire({
+            title: 'Consentimiento — Control de fatiga',
+            html: `<div style="text-align:left;font-size:.9rem;line-height:1.5">
+                <p>Antes de salir realizaremos una <b>prueba de fatiga</b>.</p>
+                <ul style="padding-left:18px">
+                  <li><b>Dato:</b> una muestra de voz o tiempos de reacción.</li>
+                  <li><b>Finalidad:</b> evaluar tu estado de fatiga para tu seguridad.</li>
+                  <li><b>Responsable:</b> LogiTrack. <b>No</b> se guarda el dato biométrico crudo, solo un puntaje.</li>
+                  <li><b>Tus derechos (Ley 25.326):</b> acceso, revocación y supresión desde "Mis datos de fatiga".</li>
+                </ul>
+                <p style="font-size:.8rem;color:#64748b">Versión ${cfg.consentVersion || 'v1'}</p></div>`,
+            showCancelButton: true, confirmButtonText: 'Acepto', cancelButtonText: 'No acepto',
+            confirmButtonColor: '#16a34a', cancelButtonColor: '#dc2626', allowOutsideClick: false,
+        });
+        const accepted = res.isConfirmed;
+        try {
+            const r = await fetch(`/delivery/route/${routeId}/consent`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accepted }),
+            });
+            const data = await r.json();
+            return { accepted, checkId: data.checkId };
+        } catch (_) {
+            Swal.fire({ icon: 'error', title: 'No se pudo registrar', text: 'Reintentá en unos segundos.' });
+            return null;
+        }
+    }
+
+    // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics:{reactionsMs} } o null.
+    async function pruebaReaccion(attempts = 3) {
+        const reactionsMs = [];
+        for (let i = 0; i < attempts; i++) {
+            const ok = await new Promise((resolve) => {
+                Swal.fire({
+                    title: `Prueba de reacción (${i + 1}/${attempts})`,
+                    html: `<div id="rt-box" style="height:160px;border-radius:12px;background:#334155;display:flex;
+                            align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer">
+                            Esperá el verde…</div>`,
+                    showConfirmButton: false, allowOutsideClick: false, didOpen: () => {
+                        const box = document.getElementById('rt-box');
+                        let shownAt = 0, armed = false;
+                        const delay = 800 + Math.random() * 2500;
+                        const t = setTimeout(() => {
+                            box.style.background = '#16a34a'; box.textContent = '¡TOCÁ!';
+                            shownAt = performance.now(); armed = true;
+                        }, delay);
+                        box.addEventListener('click', () => {
+                            if (!armed) { // tocó antes del estímulo → se anula (Esc.2)
+                                clearTimeout(t); resolve(false); Swal.close(); return;
+                            }
+                            reactionsMs.push(Math.round(performance.now() - shownAt));
+                            resolve(true); Swal.close();
+                        });
+                    },
+                });
+            });
+            if (!ok) { i--; } // intento anulado, se repite sin penalización
+        }
+        return { method: 'REACCION', metrics: { reactionsMs } };
+    }
+
+    // LGT-191: prueba de voz (mantener presionado para "grabar"). Mock: usa la duración.
+    async function pruebaVoz(cfg) {
+        const expected = (cfg.testDurationSec || 5);
+        const dur = await new Promise((resolve) => {
+            Swal.fire({
+                title: 'Prueba de voz',
+                html: `<div style="font-size:.85rem;margin-bottom:8px">Mantené presionado y leé en voz alta la frase durante ~${expected}s.</div>
+                       <button id="vz-btn" style="padding:14px 18px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">
+                       Mantener presionado para grabar</button><div id="vz-tip" style="margin-top:8px;font-size:.8rem;color:#64748b"></div>`,
+                showConfirmButton: false, allowOutsideClick: false, didOpen: () => {
+                    const b = document.getElementById('vz-btn'); const tip = document.getElementById('vz-tip');
+                    let t0 = 0;
+                    const down = (e) => { e.preventDefault(); t0 = performance.now(); b.style.background = '#16a34a'; tip.textContent = 'Grabando…'; };
+                    const up = () => { if (!t0) { return; } const ms = performance.now() - t0; resolve(Math.round(ms)); Swal.close(); };
+                    b.addEventListener('mousedown', down); b.addEventListener('touchstart', down);
+                    b.addEventListener('mouseup', up); b.addEventListener('touchend', up);
+                },
+            });
+        });
+        return { method: 'VOZ', metrics: { durationMs: dur, expectedMs: expected * 1000 } };
+    }
+
+    // Ejecuta la prueba según el método configurado.
+    async function runPrueba(method, cfg) {
+        if (method === 'VOZ') { return pruebaVoz(cfg); }
+        return pruebaReaccion();
+    }
+
+    // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
+    async function startWithFatigue() {
+        const cfg = await getFatigueCfg();
+        if (!cfg.enabled) {
+            fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            return;
+        }
+        const consent = await runConsent(cfg);
+        if (!consent) { return; }
+        if (!consent.accepted) {
+            Swal.fire({ icon: 'warning', title: 'Ruta no iniciada',
+                text: 'Rechazaste el consentimiento. Quedás inhabilitado hasta que tu Supervisor te restablezca.' });
+            return;
+        }
+        const prueba = await runPrueba(cfg.methodStart, cfg);
+        const r = await fetch(`/delivery/route/${routeId}/fatigue-check`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ checkId: consent.checkId, ...prueba, triggerType: 'INICIO' }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (data.blocked) {
+            await Swal.fire({ icon: 'error', title: 'Ruta bloqueada por fatiga',
+                text: `Puntaje ${data.score}. Pedí revisión a tu Supervisor desde el portal.` });
+            return;
+        }
+        await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+        window.location.reload();
+    }
+
+    // LGT-199 — widget de re-chequeo en ruta ("Estoy detenido").
+    function mountRecheckWidget() {
+        const btn = document.createElement('button');
+        btn.id = 'fatigue-stop-btn';
+        btn.style.cssText = 'position:fixed;bottom:84px;right:16px;z-index:9999;padding:12px 16px;border:0;' +
+            'border-radius:999px;background:#b45309;color:#fff;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.3)';
+        btn.textContent = '🛑 Estoy detenido';
+        document.body.appendChild(btn);
+        let stopped = false, poll = null;
+
+        async function refresh() {
+            try {
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
+                const s = await r.json();
+                if (s.paused) {
+                    btn.textContent = `⏸ Pausada por fatiga (${s.restRemainingMin}m)`;
+                    btn.style.background = '#dc2626';
+                    if (s.restRemainingMin <= 0) { await launchRecheck(s.methodRecheck); }
+                } else if (s.needsRecheck) {
+                    await launchRecheck(s.methodRecheck);
+                }
+            } catch (_) { /* red */ }
+        }
+        async function launchRecheck(method) {
+            const cfg = await getFatigueCfg();
+            const prueba = await runPrueba(method || cfg.methodRecheck, cfg);
+            const r = await fetch(`/delivery/route/${routeId}/fatigue-recheck`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(prueba),
+            });
+            const data = await r.json().catch(() => ({}));
+            if (r.status === 409) {
+                Swal.fire({ icon: 'info', title: 'Descanso en curso', text: `Esperá ${data.restRemainingMin} min.` });
+                return;
+            }
+            if (data.blocked) {
+                Swal.fire({ icon: 'error', title: 'Pausada por fatiga',
+                    text: 'La ruta queda pausada. Tu Supervisor fue notificado.' });
+            } else {
+                Swal.fire({ icon: 'success', title: 'Apto', text: 'Podés continuar la ruta.' });
+                stopped = false; btn.textContent = '🛑 Estoy detenido'; btn.style.background = '#b45309';
+                if (poll) { clearInterval(poll); poll = null; }
+            }
+        }
+        btn.addEventListener('click', async () => {
+            if (stopped) {
+                await fetch(`/delivery/route/${routeId}/fatigue/resume`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                stopped = false; btn.textContent = '🛑 Estoy detenido'; btn.style.background = '#b45309';
+                if (poll) { clearInterval(poll); poll = null; }
+                return;
+            }
+            await fetch(`/delivery/route/${routeId}/fatigue/stopped`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            stopped = true; btn.textContent = '▶ Reanudar marcha'; btn.style.background = '#2563eb';
+            await refresh();
+            poll = setInterval(refresh, 30000);
+        });
+    }
+
+    // Inicia ruta con gate de fatiga si aún no se inició (sólo modo activo).
     if (!routeStarted && !readOnly) {
-        fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+        startWithFatigue();
+    } else if (routeStarted && !readOnly) {
+        getFatigueCfg().then(cfg => { if (cfg.enabled) { mountRecheckWidget(); } });
     }
 
     // === Step gating + métricas live ===

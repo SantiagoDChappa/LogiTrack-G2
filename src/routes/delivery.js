@@ -737,15 +737,58 @@ router.post('/route/:id/fatigue-check', requireDelivery, async (req, res) => {
     } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// US-10: re-chequeo en ruta (lo dispara el cliente/cron por tiempo + detención).
+// LGT-199 — re-chequeo en ruta (disparo manual: "Estoy detenido" + tiempos).
+// Route y RouteStatus ya están importados al tope del archivo.
+const fatigueRecheck = require('../services/fatigue/recheck');
+
+// Estado del re-chequeo para el portal (¿debe hacer la prueba?, ¿descanso restante?).
+router.get('/route/:id/fatigue/recheck-status', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const status = await fatigueRecheck.getStatus(route.id, route, cfg);
+    res.json({ ok: true, ...status });
+});
+
+// Esc.1/2: "Estoy detenido" — empieza a contar la detención.
+// Ruta namespaced bajo /fatigue para no colisionar con la pausa operativa (/route/:id/pause|resume).
+router.post('/route/:id/fatigue/stopped', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const status = await fatigueRecheck.markStopped(route.id, route, cfg);
+    res.json({ ok: true, ...status });
+});
+
+// Esc.7: "Reanudar marcha" antes del umbral descarta el conteo de detención.
+router.post('/route/:id/fatigue/resume', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const status = await fatigueRecheck.resume(route.id, route, cfg);
+    res.json({ ok: true, ...status });
+});
+
+// Esc.3/4/9/10: ejecutar la prueba de re-chequeo y aplicar el resultado.
 router.post('/route/:id/fatigue-recheck', requireDelivery, async (req, res) => {
     const route = await ownRouteOr403(req, res); if (!route) { return; }
     const { method, metrics } = req.body;
     if (!['VOZ', 'REACCION'].includes(method)) { return res.status(400).json({ error: 'Método inválido' }); }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+
+    // Esc.10: no permitir reintento antes de cumplir el descanso mínimo.
+    const guard = await fatigueRecheck.guardRetry(route.id, cfg);
+    if (!guard.ok) {
+        return res.status(409).json({ error: 'Descanso en curso', restRemainingMin: guard.restRemainingMin });
+    }
+
     const result = await fatigueSvc.evaluate({
         userId: res.locals.currentUser.id, routeId: route.id, branchId: route.originBranchId,
-        method, metrics: metrics || {}, triggerType: 'EN_RUTA',
+        method, metrics: metrics || {}, triggerType: 'EN_RUTA', cfg,
     });
+
+    // Aplica el resultado al estado de la sesión y al estado de la ruta.
+    await fatigueRecheck.onRecheckResult(route.id, result.decision, cfg);
+    const newStatus = result.decision === 'BLOCKED' ? RouteStatus.PAUSED_FATIGUE : RouteStatus.IN_ROUTE;
+    await Route.update({ statusId: newStatus }, { where: { id: route.id } });
+
     res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
 });
 
