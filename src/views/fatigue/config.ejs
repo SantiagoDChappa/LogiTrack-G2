@@ -46,6 +46,8 @@
             <input type="number" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>"></div>
         <div class="row"><label>Detención que dispara re-chequeo (min) <small>recheckStoppedMin</small></label>
             <input type="number" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>"></div>
+        <div class="row"><label>Descanso para reintentar prueba en ruta (min) <small>recheckRestMin (LGT-199)</small></label>
+            <input type="number" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>"></div>
         <div class="row"><label>Ventana de patrón (días) <small>patternWindowDays</small></label>
             <input type="number" name="patternWindowDays" min="1" max="365" value="<%= cfg.patternWindowDays %>"></div>
         <div class="row"><label>Eventos para marcar patrón <small>patternEventCount</small></label>
