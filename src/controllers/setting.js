@@ -477,21 +477,18 @@ const saveIdentity = async (req, res) => {
         await settingLogModel.logChange(res.locals.currentUser?.id, 'nombre_empresa', oldNombre, nombre);
         await settingModel.set('nombre_empresa', nombre);
 
-        // Logo opcional: si se subió un archivo válido, guardar su ruta pública y borrar el anterior.
+        // Logo opcional: se persiste en la base (base64) y se sirve por /brand/logo.
+        // Antes se guardaba en disco, pero el filesystem de Render es efímero y el
+        // archivo se perdía en cada deploy (logo roto). La base sobrevive al deploy.
         if (req.file) {
-            const fs        = require('fs');
-            const path      = require('path');
-            const publicUrl = `/images/brand/${req.file.filename}`;
-            const oldLogo   = await settingModel.get('logo_empresa');
+            const oldLogo = await settingModel.get('logo_empresa');
+            // URL estable con versión para invalidar la caché del navegador al cambiar el logo.
+            const publicUrl = `/brand/logo?v=${Date.now()}`;
 
+            await settingModel.set('logo_empresa_data', req.file.buffer.toString('base64'));
+            await settingModel.set('logo_empresa_mime', req.file.mimetype || 'image/png');
             await settingLogModel.logChange(res.locals.currentUser?.id, 'logo_empresa', oldLogo, publicUrl);
             await settingModel.set('logo_empresa', publicUrl);
-
-            // Limpieza del logo previo (solo si vivía en el directorio de marca).
-            if (oldLogo && oldLogo.startsWith('/images/brand/')) {
-                const oldPath = path.join(__dirname, '..', '..', 'public', oldLogo);
-                fs.promises.unlink(oldPath).catch(() => { /* ya no existe */ });
-            }
         }
 
         res.redirect(settingBack(req, '?success=identity'));

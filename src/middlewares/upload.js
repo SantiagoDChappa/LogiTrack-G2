@@ -1,6 +1,4 @@
 const multer = require('multer');
-const fs     = require('fs');
-const path   = require('path');
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -41,10 +39,9 @@ const evidenceUpload = multer({
     fileFilter: evidenceFileFilter,
 });
 
-// LGT-172: Logo institucional. Imágenes hasta 2 MB, guardado en disco (public/images/brand).
+// LGT-172: Logo institucional. Imágenes hasta 2 MB, persistido en base (base64).
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
-const LOGO_DIR = path.join(__dirname, '..', '..', 'public', 'images', 'brand');
 
 const logoFileFilter = (req, file, cb) => {
     if (ALLOWED_LOGO_MIME.includes(file.mimetype)) {
@@ -54,19 +51,10 @@ const logoFileFilter = (req, file, cb) => {
     }
 };
 
-const logoStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        fs.mkdirSync(LOGO_DIR, { recursive: true });
-        cb(null, LOGO_DIR);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
-        cb(null, `logo-${Date.now()}${ext}`);
-    },
-});
-
+// En memoria: el logo se persiste en la base (base64), no en disco. El disco de Render
+// es efímero y el archivo se perdía en cada deploy (logo roto).
 const logoUpload = multer({
-    storage: logoStorage,
+    storage: multer.memoryStorage(),
     limits:  { fileSize: LOGO_MAX_BYTES },
     fileFilter: logoFileFilter,
 });
