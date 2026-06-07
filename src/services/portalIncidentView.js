@@ -4,7 +4,7 @@ const incidentHistoryModel = require('../models/incidentHistory');
 const incidentAttachmentModel = require('../models/incidentAttachment');
 const { assertClientOwnsShipment } = require('./portalClientAccess');
 const { canClientInteract } = require('./portalIncidentResponseService');
-const { IncidentStatus, IncidentResolution, IncidentEventType } = require('../constants/enums');
+const { IncidentStatus, IncidentResolution, IncidentEventType, IncidentChannel } = require('../constants/enums');
 
 const CLIENT_VISIBLE_EVENTS = new Set([
     IncidentEventType.CREATED,
@@ -17,6 +17,8 @@ const CLIENT_VISIBLE_EVENTS = new Set([
 
 const OPEN_STATUSES = [IncidentStatus.OPEN, IncidentStatus.IN_REVIEW];
 const CLOSED_STATUSES = [IncidentStatus.CLOSED];
+// CP-CINC01: incidencias autogeneradas por el sistema no se exponen en el portal del cliente.
+const PORTAL_EXCLUDED_CHANNELS = [IncidentChannel.SYSTEM];
 
 const incidentJson = (incident) => (typeof incident.toJSON === 'function' ? incident.toJSON() : incident);
 
@@ -51,8 +53,8 @@ const listClientIncidents = async (client) => {
     }
 
     const [openRows, closedRows] = await Promise.all([
-        incidentModel.findByShipmentIds(shipmentIds, { statusIn: OPEN_STATUSES }),
-        incidentModel.findByShipmentIds(shipmentIds, { statusIn: CLOSED_STATUSES }),
+        incidentModel.findByShipmentIds(shipmentIds, { statusIn: OPEN_STATUSES, excludeChannels: PORTAL_EXCLUDED_CHANNELS }),
+        incidentModel.findByShipmentIds(shipmentIds, { statusIn: CLOSED_STATUSES, excludeChannels: PORTAL_EXCLUDED_CHANNELS }),
     ]);
 
     return {
@@ -192,6 +194,9 @@ const loadOwnedIncident = async (incidentId, client) => {
     if (!incidentId) { return null; }
     const incident = await incidentModel.findByIdFull(incidentId);
     if (!incident) { return null; }
+    // CP-CINC01: las incidencias SYSTEM no son visibles en el portal ni siquiera por URL directa.
+    const json = incidentJson(incident);
+    if (PORTAL_EXCLUDED_CHANNELS.includes(json.openedChannel)) { return null; }
     const owns = await assertClientOwnsIncident(incident, client);
     if (!owns) { return null; }
     return incident;

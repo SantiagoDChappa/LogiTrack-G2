@@ -112,13 +112,15 @@ const findOpenByShipment = (shipmentId) => Incident.findAll({
     attributes: ['id', 'incidentTypeId', 'status']
 });
 
-const findByShipmentIds = (shipmentIds, { statusIn, limit = 200 } = {}) => {
+const findByShipmentIds = (shipmentIds, { statusIn, excludeChannels, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const ids = Array.isArray(shipmentIds) ? shipmentIds.filter(Boolean) : [];
     if (!ids.length) { return Promise.resolve([]); }
 
     const where = { shipmentId: { [Op.in]: ids } };
     if (statusIn?.length) { where.status = { [Op.in]: statusIn }; }
+    // CP-CINC01: el portal del cliente no debe mostrar incidencias autogeneradas (canal SYSTEM).
+    if (excludeChannels?.length) { where.openedChannel = { [Op.notIn]: excludeChannels }; }
 
     const { Shipment } = require('./shipment');
     const { IncidentType } = require('./incidentType');

@@ -34,24 +34,24 @@ const assertClientOwnsShipment = (shipment, { document, email }) => {
     return senderMatch || recipientMatch;
 };
 
+// CP-CONS03: mensaje genérico para todos los casos de fallo (DNI/email/formato/sin envíos).
+// No se revela qué dato falló: evita enumeración de usuarios y filtración de información.
+const INVALID_CREDENTIALS_MSG = 'Credenciales inválidas. Verifique los datos e intente nuevamente.';
+
 const validateClientCredentials = async (document, email) => {
     const docNum = parseDocument(document);
     const emailNorm = normalize(email);
 
     if (!docNum) {
-        return { ok: false, code: 'invalid_document', message: 'Ingresá un DNI válido (solo números).' };
+        return { ok: false, code: 'invalid_document', message: INVALID_CREDENTIALS_MSG };
     }
     if (!emailNorm) {
-        return { ok: false, code: 'invalid_email', message: 'El email es obligatorio.' };
+        return { ok: false, code: 'invalid_email', message: INVALID_CREDENTIALS_MSG };
     }
 
     const count = await shipmentModel.countByClientIdentity({ document: docNum, email: emailNorm });
     if (count === 0) {
-        return {
-            ok: false,
-            code: 'no_shipments',
-            message: 'No se encontraron envíos vinculados a esos datos.',
-        };
+        return { ok: false, code: 'no_shipments', message: INVALID_CREDENTIALS_MSG };
     }
 
     return { ok: true, document: docNum, email: emailNorm };
