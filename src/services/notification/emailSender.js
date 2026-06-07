@@ -1,14 +1,40 @@
 const nodemailer = require('nodemailer');
-const settingModel = require('../../models/setting');
 require('dotenv').config();
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+// Transporter configurable por entorno: sirve cualquier proveedor SMTP
+// (SendGrid, Brevo, Mailgun, Amazon SES, etc.). Si se define SMTP_HOST se usa
+// SMTP genérico; si no, se cae al servicio Gmail (modo desarrollo).
+// En Render configurar las variables SMTP_* del proveedor transaccional, ya que
+// el plan free bloquea Gmail/puertos SMTP salientes hacia hosts arbitrarios.
+function buildTransporter() {
+    if (process.env.SMTP_HOST) {
+        const port = Number(process.env.SMTP_PORT) || 587;
+        return nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port,
+            // 465 = SSL implícito; 587/2525 = STARTTLS. Override con SMTP_SECURE=true/false.
+            secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465,
+            auth: {
+                user: process.env.SMTP_USER || process.env.EMAIL_USER,
+                pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
+            },
+        });
+    }
+    return nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+        },
+    });
+}
+
+const transporter = buildTransporter();
+
+// Remitente: EMAIL_FROM permite un From con nombre (ej: "LogiTrack <no-reply@dominio.com>").
+// Fallback al usuario SMTP/Gmail.
+const fromAddress = () =>
+    process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER;
 
 const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -80,11 +106,16 @@ async function sendEmail(to, subject, content, format = 'text') {
     }
 
     const data = {
-        from: process.env.EMAIL_USER,
+        from: fromAddress(),
         to: recipients.join(', '),
         subject,
-        text: format === 'html' ? htmlToText(content) : content,
     };
+    if (format === 'html') {
+        data.html = content;
+        data.text = htmlToText(content); // fallback texto plano
+    } else {
+        data.text = content;
+    }
 
     try {
         await transporter.sendMail(data);

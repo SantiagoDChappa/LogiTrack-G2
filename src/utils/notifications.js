@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const { sendEmail: sendEmailViaProvider } = require('../services/notification/emailSender');
 
 // ── Etiquetas de estado en español ──────────────────────────────────────────
 const STATUS_LABELS = {
@@ -19,32 +19,11 @@ function statusLabel(description) {
     return STATUS_LABELS[key] || STATUS_LABELS[description.toLowerCase()] || description;
 }
 
-// ── Nodemailer transporter (opcional) ────────────────────────────────────────
-function buildTransporter() {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {return null;}
-
-    if (process.env.SMTP_SERVICE) {
-        return nodemailer.createTransport({
-            service: process.env.SMTP_SERVICE,
-            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        });
-    }
-
-    return nodemailer.createTransport({
-        host:   process.env.SMTP_HOST || 'smtp.gmail.com',
-        port:   parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-}
-
 // ── Email ────────────────────────────────────────────────────────────────────
+// Delega el envío en el proveedor SMTP único (emailSender → SendGrid/EMAIL_FROM).
+// Así no hay transporter duplicado ni configuración divergente.
 async function sendEmail(recipient, trackingId, label) {
     if (!recipient?.email) {return;}
-    const transporter = buildTransporter();
-    if (!transporter) {return;}
-
-    const from = process.env.SMTP_FROM || process.env.SMTP_USER;
 
     const html = `
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
@@ -65,13 +44,12 @@ async function sendEmail(recipient, trackingId, label) {
         </div>`;
 
     try {
-        await transporter.sendMail({
-            from,
-            to:      recipient.email,
-            subject: `Tu envío ${trackingId} cambió a "${label}" — LogiTrack`,
+        await sendEmailViaProvider(
+            recipient.email,
+            `Tu envío ${trackingId} cambió a "${label}" — LogiTrack`,
             html,
-            text: `Hola ${recipient.fullName || 'cliente'}, tu envío ${trackingId} cambió al estado "${label}".`,
-        });
+            'html',
+        );
     } catch (err) {
         console.error('[notifications] Error email:', err.message);
     }
