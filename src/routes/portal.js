@@ -9,7 +9,7 @@ const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
     getShipmentList, getShipmentDetail, getManageForm, postManageForm,
     getIncidentList, getIncidentDetail, postIncidentResponse, postDamageChoice, getIncidentAttachment,
-    getSurveyList, getSurveyForm, postSurvey,
+    getSurveyList, getSurveyForm, postSurvey, getPublicSurveyForm, postPublicSurvey,
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
@@ -48,6 +48,10 @@ router.post('/portal/incident/api',    createPublicApi);
 // Sprint 3 - 3.2 Autogestión destinatario (token único por envío)
 router.get('/portal/self/:token',      getSelfServiceForm);
 router.post('/portal/self/:token',     saveSelfService);
+
+// CP-ENCS03 — Encuesta de satisfacción accesible desde el email sin login (token firmado)
+router.get('/portal/encuesta/:token',  getPublicSurveyForm);
+router.post('/portal/encuesta/:token', postPublicSurvey);
 
 // Portal — Mis envíos del cliente (HU 1)
 router.get('/portal/mis-envios',              optionalPortalClient, getIdentifyForm);

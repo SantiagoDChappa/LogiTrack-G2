@@ -30,7 +30,8 @@ const {
     getEligibleShipments,
     isEligible,
     submitSurvey,
-    getCompletedSurvey: getCompletedDeliverySurvey,
+    verifySurveyToken,
+    clientFromShipment,
 } = require('../services/portalSurveyService');
 const {
     getEligibleIncidents,
@@ -449,6 +450,77 @@ const postSurvey = async (req, res) => {
     return res.redirect(`/portal/mis-envios/encuesta/${shipmentId}?ok=1`);
 };
 
+// CP-ENCS03: encuesta accesible desde el email sin login (token firmado por envío).
+const getPublicSurveyForm = async (req, res) => {
+    const token = req.params.token;
+    const shipmentId = verifySurveyToken(token);
+    if (!shipmentId) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El enlace de la encuesta no es válido o expiró.',
+        });
+    }
+
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const check = await isEligible(shipmentId, clientFromShipment(shipment));
+    if (check.reason === 'not_terminal') {
+        return res.status(400).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El envío aún no finalizó su gestión.',
+        });
+    }
+
+    const survey = check.reason === 'already_answered' ? check.survey : null;
+    const json = typeof shipment.toJSON === 'function' ? shipment.toJSON() : shipment;
+
+    res.render('portal/misEnviosSurveyForm', {
+        support: await getSupportInfo(),
+        shipment: {
+            id: json.id,
+            trackingId: json.trackingId,
+            recipientName: json.recipient?.fullName || '-',
+        },
+        survey,
+        flash: req.query.ok === '1' ? 'Tu encuesta fue registrada correctamente.' : null,
+        error: req.query.error ? String(req.query.error) : null,
+        actionUrl: `/portal/encuesta/${encodeURIComponent(token)}`,
+        publicMode: true,
+    });
+};
+
+const postPublicSurvey = async (req, res) => {
+    const token = req.params.token;
+    const shipmentId = verifySurveyToken(token);
+    if (!shipmentId) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El enlace de la encuesta no es válido o expiró.',
+        });
+    }
+
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const result = await submitSurvey(shipmentId, clientFromShipment(shipment), req.body);
+    const base = `/portal/encuesta/${encodeURIComponent(token)}`;
+    if (!result.ok) {
+        return res.redirect(`${base}?error=${encodeURIComponent(result.message)}`);
+    }
+    return res.redirect(`${base}?ok=1`);
+};
+
 const getIncidentSurveyList = async (req, res) => {
     const { pending, completed } = await getEligibleIncidents(res.locals.portalClient);
     const tab = req.query.tab === 'completed' ? 'completed' : 'pending';
@@ -526,6 +598,8 @@ module.exports = {
     getSurveyList,
     getSurveyForm,
     postSurvey,
+    getPublicSurveyForm,
+    postPublicSurvey,
     getIncidentSurveyList,
     getIncidentSurveyForm,
     postIncidentSurvey,

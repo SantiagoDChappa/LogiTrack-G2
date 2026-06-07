@@ -266,6 +266,9 @@ const saveEvidence = async (req, res) => {
             await autoCloseForShipment(shipment.id, { reason: 'Cierre automático: envío entregado' }, t);
         });
 
+        // CP-ENCS01: al entregar, enviar email con el link a la encuesta (fire-and-forget).
+        require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
+
         if (routeId) {
             return res.redirect(`/delivery/route/${routeId}?delivered=true`);
         }

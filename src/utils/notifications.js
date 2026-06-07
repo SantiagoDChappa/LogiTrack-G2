@@ -95,6 +95,13 @@ function notifyStatusChange(shipment, newStatusDescription) {
         sendEmail(recipient, trackingId, label),
         sendSms(recipient,   trackingId, label),
     ]).catch(err => console.error('[notifications] Error general:', err));
+
+    // CP-ENCS01: al pasar a "Entregado" se envía también el email con el link a la encuesta.
+    if (label === 'Entregado' && shipment?.id) {
+        require('../services/portalSurveyService')
+            .sendSurveyEmail(shipment.id)
+            .catch(err => console.error('[notifications] Error email encuesta:', err.message));
+    }
 }
 
 module.exports = { notifyStatusChange };

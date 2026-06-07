@@ -1,7 +1,34 @@
+const JWT = require('jsonwebtoken');
 const shipmentModel = require('../models/shipment');
 const surveyModel = require('../models/deliverySurvey');
 const { assertClientOwnsShipment } = require('./portalClientAccess');
+const { sendEmail } = require('./notification/emailSender');
 const { Status } = require('../constants/enums');
+
+// CP-ENCS03: token firmado para abrir la encuesta desde el email sin login.
+const SURVEY_TOKEN_TTL = '30d';
+const baseUrl = () => (process.env.APP_URL || process.env.BASE_URL || 'https://logitrack-prototype.onrender.com').replace(/\/+$/, '');
+
+const signSurveyToken = (shipmentId) =>
+    JWT.sign({ type: 'delivery_survey', shipmentId: Number(shipmentId) }, process.env.JWT_SECRET, { expiresIn: SURVEY_TOKEN_TTL });
+
+const verifySurveyToken = (token) => {
+    try {
+        const decoded = JWT.verify(String(token || ''), process.env.JWT_SECRET);
+        if (decoded.type !== 'delivery_survey' || !decoded.shipmentId) { return null; }
+        return Number(decoded.shipmentId);
+    } catch {
+        return null;
+    }
+};
+
+// Identidad de cliente derivada del envío (para reusar isEligible/submitSurvey en el flujo por token).
+const clientFromShipment = (shipment) => {
+    const json = typeof shipment.toJSON === 'function' ? shipment.toJSON() : shipment;
+    return { document: json.recipient?.document, email: json.recipient?.email };
+};
+
+const surveyUrl = (shipmentId) => `${baseUrl()}/portal/encuesta/${signSurveyToken(shipmentId)}`;
 
 const ELIGIBLE_STATUS_IDS = new Set([Status.DELIVERED.id, Status.CANCELLED.id]);
 const RATING_MIN = 1;
@@ -95,6 +122,41 @@ const submitSurvey = async (shipmentId, client, answers) => {
 
 const getCompletedSurvey = (shipmentId) => surveyModel.findByShipmentId(shipmentId);
 
+// CP-ENCS01: al entregar el envío se envía un email al destinatario con el link a la encuesta.
+// Fire-and-forget e idempotente: no reenvía si ya respondió.
+const sendSurveyEmail = async (shipmentId) => {
+    try {
+        const shipment = await shipmentModel.getById(shipmentId);
+        if (!shipment) { return false; }
+        const json = typeof shipment.toJSON === 'function' ? shipment.toJSON() : shipment;
+        if (!isTerminal(json)) { return false; }
+        const existing = await surveyModel.findByShipmentId(shipmentId);
+        if (existing) { return false; }
+        const email = json.recipient?.email;
+        if (!email) { return false; }
+
+        const link = surveyUrl(shipmentId);
+        const tracking = json.trackingId || `#${shipmentId}`;
+        const subject = `¿Cómo fue tu entrega? — ${tracking}`;
+        const body = `Hola ${json.recipient?.fullName || ''},
+
+Tu envío ${tracking} ya fue entregado. Nos ayudaría mucho conocer tu opinión.
+
+Respondé la encuesta (no necesitás iniciar sesión) desde este enlace:
+
+${link}
+
+¡Gracias por elegirnos!
+
+Saludos,
+Equipo LogiTrack`;
+        return await sendEmail(email, subject, body, 'text');
+    } catch (err) {
+        console.error('[survey] error enviando email de encuesta:', err.message);
+        return false;
+    }
+};
+
 module.exports = {
     getEligibleShipments,
     isEligible,
@@ -102,6 +164,11 @@ module.exports = {
     getCompletedSurvey,
     validateRatings,
     isTerminal,
+    signSurveyToken,
+    verifySurveyToken,
+    clientFromShipment,
+    surveyUrl,
+    sendSurveyEmail,
     RATING_FIELDS,
     ELIGIBLE_STATUS_IDS,
 };
