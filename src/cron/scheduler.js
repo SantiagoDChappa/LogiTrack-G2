@@ -7,8 +7,13 @@ function startSchedulers() {
     if (process.env.NODE_ENV === 'test') { return; }
 
     cron.schedule('* * * * *', async () => {
-        await emailProcessorJob.processPendingEmails();
-        console.log("Se ejecuto el schedule");
+        const t0 = Date.now();
+        try {
+            await emailProcessorJob.processPendingEmails();
+            console.log(`[scheduler] procesador de mails OK (${Date.now() - t0}ms)`);
+        } catch (err) {
+            console.error('[scheduler] procesador de mails FALLÓ:', err && err.message ? err.message : err);
+        }
     });
 
     // Detección de demoras: se ejecuta una vez por día a las 8:00 AM

@@ -103,8 +103,19 @@ Si no solicitaste este acceso, ignorá este mensaje.
 Saludos,
 Equipo LogiTrack`;
 
-    const mailDelivered = await sendEmail(validation.email, subject, body);
-    const devLink = (!mailDelivered && isDevMode()) ? confirmUrl : null;
+    // Envío en segundo plano (fire-and-forget): no bloqueamos la respuesta para que
+    // el portal redirija de inmediato a "revisá tu correo" en vez de quedar cargando
+    // esperando al SMTP. El resultado se loguea para diagnóstico.
+    const dev = isDevMode();
+    sendEmail(validation.email, subject, body)
+        .then((ok) => {
+            if (ok) {
+                console.log(`[portal-access] mail de confirmación enviado a ${validation.email}`);
+            } else {
+                console.warn(`[portal-access] sendEmail devolvió false para ${validation.email} (revisar config SMTP / logs [email] ERROR)`);
+            }
+        })
+        .catch((err) => console.error(`[portal-access] excepción enviando mail a ${validation.email}:`, err.message));
 
     return {
         ok: true,
@@ -112,8 +123,10 @@ Equipo LogiTrack`;
             email: validation.email,
             document: validation.document,
             expiresAt,
-            mailDelivered,
-            devLink,
+            // Optimista en producción (ya disparamos el envío). En desarrollo mostramos
+            // el link directo porque normalmente no hay SMTP configurado localmente.
+            mailDelivered: !dev,
+            devLink: dev ? confirmUrl : null,
         },
     };
 };

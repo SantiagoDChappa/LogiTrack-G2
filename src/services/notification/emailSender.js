@@ -6,10 +6,18 @@ require('dotenv').config();
 // SMTP genérico; si no, se cae al servicio Gmail (modo desarrollo).
 // En Render configurar las variables SMTP_* del proveedor transaccional, ya que
 // el plan free bloquea Gmail/puertos SMTP salientes hacia hosts arbitrarios.
+// Timeouts: si el SMTP no responde (ej: Render free bloquea el puerto saliente)
+// preferimos fallar rápido en vez de dejar la request/job colgada "cargando".
+const SMTP_TIMEOUTS = {
+    connectionTimeout: 10000, // 10s para abrir la conexión TCP
+    greetingTimeout:   10000, // 10s para el saludo del servidor
+    socketTimeout:     20000, // 20s de inactividad del socket
+};
+
 function buildTransporter() {
     if (process.env.SMTP_HOST) {
         const port = Number(process.env.SMTP_PORT) || 587;
-        return nodemailer.createTransport({
+        const cfg = {
             host: process.env.SMTP_HOST,
             port,
             // 465 = SSL implícito; 587/2525 = STARTTLS. Override con SMTP_SECURE=true/false.
@@ -18,25 +26,36 @@ function buildTransporter() {
                 user: process.env.SMTP_USER || process.env.EMAIL_USER,
                 pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
             },
-        });
+            ...SMTP_TIMEOUTS,
+        };
+        console.log(`[email] transporter SMTP -> host=${cfg.host} port=${cfg.port} secure=${cfg.secure} user=${cfg.auth.user}`);
+        return nodemailer.createTransport(cfg);
     }
+    console.log('[email] transporter -> servicio Gmail (modo desarrollo, sin SMTP_HOST)');
     return nodemailer.createTransport({
         service: 'gmail',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
         },
+        ...SMTP_TIMEOUTS,
     });
 }
 
 const transporter = buildTransporter();
 
+// Verificación de conexión al arrancar (no en tests). Loguea si el SMTP responde
+// o el motivo exacto del fallo, para diagnosticar problemas de envío.
+if (process.env.NODE_ENV !== 'test') {
+    transporter.verify()
+        .then(() => console.log('[email] conexión SMTP verificada: el servidor acepta mensajes ✔'))
+        .catch((err) => console.error('[email] FALLO al verificar SMTP:', err && err.message ? err.message : err));
+}
+
 // Remitente: EMAIL_FROM permite un From con nombre (ej: "LogiTrack <no-reply@dominio.com>").
 // Fallback al usuario SMTP/Gmail.
 const fromAddress = () =>
     process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER;
-
-const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 // Quita etiquetas HTML para generar un fallback de texto plano.
 const htmlToText = (html) => String(html || '')
@@ -47,62 +66,15 @@ const htmlToText = (html) => String(html || '')
     .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-/*
-// `format` opcional: 'html' envía cuerpo HTML (con fallback de texto); cualquier otro valor = texto plano.
-// `opts.allowOverride` (default false): solo los envíos de PRUEBA aplican el redirect
-// `test_email_override`. Las notificaciones reales (destinatario/remitente/parametrizado)
-// NUNCA se redirigen: van siempre al destinatario configurado.
-async function sendEmail(to, subject, content, format = 'text', opts = {}) {
-    try {
-        const allowOverride = opts.allowOverride === true;
-        const override = allowOverride ? ((await settingModel.get('test_email_override')) || '') : '';
-        const useOverride = allowOverride && isValidEmail(override);
-
-        const recipients = []
-            .concat(to || [])
-            .flatMap(v => String(v).split(','))
-            .map(v => v.trim())
-            .filter(isValidEmail);
-
-        const finalTo = useOverride ? override.trim() : recipients.join(', ');
-        if (!finalTo) {
-            console.warn('sendEmail: sin destinatarios válidos, no se envía');
-            return false;
-        }
-
-        const finalSubject = useOverride
-            ? `[TEST → ${recipients.join(', ') || 'sin destinatarios'}] ${subject}`
-            : subject;
-
-        const message = {
-            from: process.env.EMAIL_USER,
-            to: finalTo,
-            subject: finalSubject,
-        };
-        if (format === 'html') {
-            message.html = content;
-            message.text = htmlToText(content);
-        } else {
-            message.text = content;
-        }
-
-        await transporter.sendMail(message);
-        return true;
-    }
-    catch (error) {
-        console.error('Error sending email:', error);
-        return false;
-    }
-}*/
-
 async function sendEmail(to, subject, content, format = 'text') {
     const recipients = []
         .concat(to || [])
         .flatMap(v => String(v).split(','))
-        .map(v => v.trim());
+        .map(v => v.trim())
+        .filter(Boolean);
     if (recipients.length === 0) {
-        throw new Error('No valid recipients provided');
-        return;
+        console.warn('[email] sendEmail: sin destinatarios válidos, no se envía');
+        return false;
     }
 
     const data = {
@@ -117,11 +89,19 @@ async function sendEmail(to, subject, content, format = 'text') {
         data.text = content;
     }
 
+    console.log(`[email] enviando -> to=${data.to} subject="${subject}" from=${data.from} format=${format}`);
     try {
-        await transporter.sendMail(data);
+        const info = await transporter.sendMail(data);
+        console.log(`[email] ENVIADO ✔ to=${data.to} messageId=${info.messageId || '-'} response=${info.response || '-'}`);
         return true;
     } catch (error) {
-        console.error('sendEmail:', error.message);
+        // Log completo: código + comando + respuesta del servidor ayudan a ubicar el error.
+        console.error(`[email] ERROR enviando a ${data.to}:`, {
+            message: error.message,
+            code:    error.code,
+            command: error.command,
+            response: error.response,
+        });
         return false;
     }
 }
