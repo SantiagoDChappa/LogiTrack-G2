@@ -13,7 +13,6 @@ const SESSION_HOURS = 8;
 const COOKIE_NAME = 'portal_client';
 
 const isDevMode = () => (process.env.NODE_ENV || 'development') !== 'production';
-const appBaseUrl = () => process.env.APP_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
 
 const parseDocument = (raw) => {
     const digits = String(raw || '').replace(/\D/g, '');
@@ -75,36 +74,47 @@ const verifyPortalClientSession = (token) => {
     }
 };
 
+// CP-CONS01: genera un código numérico de 6 dígitos único entre los pendientes vigentes.
+const generateAccessCode = async () => {
+    for (let i = 0; i < 8; i += 1) {
+        const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+        const exists = await portalClientAccessPendingModel.findByToken(code);
+        if (!exists) { return code; }
+    }
+    // Fallback extremadamente improbable: agrega entropía para no fallar.
+    return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+};
+
 const requestAccess = async ({ document, email }) => {
     const validation = await validateClientCredentials(document, email);
     if (!validation.ok) { return validation; }
 
-    portalClientAccessPendingModel.deleteExpired().catch(() => {});
+    await portalClientAccessPendingModel.deleteExpired().catch(() => {});
+    // Invalida códigos previos del mismo cliente para que solo el último sea válido.
+    await portalClientAccessPendingModel.deleteByEmail(validation.email).catch(() => {});
 
-    const token = crypto.randomBytes(24).toString('hex');
+    const code = await generateAccessCode();
     const expiresAt = new Date(Date.now() + CONFIRMATION_TTL_HOURS * 60 * 60 * 1000);
 
     await portalClientAccessPendingModel.create({
-        token,
+        token: code,
         document: validation.document,
         email: validation.email,
         expiresAt,
     });
 
-    const confirmUrl = `${appBaseUrl()}/portal/mis-envios/confirm?token=${encodeURIComponent(token)}`;
-
     // Plantilla editable desde Ajustes → Comunicaciones (evento PORTAL_CLIENT_ACCESS).
     // Si no existe la fila (migración no corrida), se usa el texto por defecto.
     // Es un mail transaccional: se envía siempre (no respeta toggle de "habilitado").
-    const tplVars = { confirmUrl, ttlHoras: CONFIRMATION_TTL_HOURS };
-    let subject = '[LogiTrack] Confirmá el acceso a tus envíos';
+    const tplVars = { codigo: code, ttlHoras: CONFIRMATION_TTL_HOURS };
+    let subject = '[LogiTrack] Tu código de acceso a tus envíos';
     let body = `Hola,
 
 Recibimos una solicitud para consultar tus envíos en el portal de LogiTrack.
 
-Para continuar, confirmá tu acceso haciendo click en el siguiente enlace (válido por ${CONFIRMATION_TTL_HOURS} horas):
+Tu código de acceso es: ${code}
 
-${confirmUrl}
+Ingresalo en el portal para continuar (válido por ${CONFIRMATION_TTL_HOURS} horas).
 
 Si no solicitaste este acceso, ignorá este mensaje.
 
@@ -129,7 +139,7 @@ Equipo LogiTrack`;
     sendEmail(validation.email, subject, body, format)
         .then((ok) => {
             if (ok) {
-                console.log(`[portal-access] mail de confirmación enviado a ${validation.email}`);
+                console.log(`[portal-access] código de acceso enviado a ${validation.email}`);
             } else {
                 console.warn(`[portal-access] sendEmail devolvió false para ${validation.email} (revisar config SMTP / logs [email] ERROR)`);
             }
@@ -143,36 +153,39 @@ Equipo LogiTrack`;
             document: validation.document,
             expiresAt,
             // Optimista en producción (ya disparamos el envío). En desarrollo mostramos
-            // el link directo porque normalmente no hay SMTP configurado localmente.
+            // el código directo porque normalmente no hay SMTP configurado localmente.
             mailDelivered: !dev,
-            devLink: dev ? confirmUrl : null,
+            devCode: dev ? code : null,
         },
     };
 };
 
-const confirmAccess = async (rawToken) => {
-    const token = String(rawToken || '').trim();
-    if (!token) {
-        return { ok: false, status: 400, message: 'El enlace de confirmación no es válido.' };
+// CP-CONS01/CP-CONS12: confirma con código de 6 dígitos, ligado al email que lo solicitó.
+const confirmAccess = async (rawCode, rawEmail) => {
+    const code = String(rawCode || '').trim();
+    if (!/^\d{6}$/.test(code)) {
+        return { ok: false, status: 400, message: 'El código ingresado no es válido. Verificá los 6 dígitos.' };
     }
 
-    const pending = await portalClientAccessPendingModel.findByToken(token);
-    if (!pending) {
-        return { ok: false, status: 404, message: 'El enlace de confirmación no es válido o ya fue utilizado.' };
+    const pending = await portalClientAccessPendingModel.findByToken(code);
+    // Si se conoce el email (flujo del portal), el código debe corresponder a ese cliente.
+    const emailNorm = normalize(rawEmail);
+    if (!pending || (emailNorm && normalize(pending.email) !== emailNorm)) {
+        return { ok: false, status: 404, message: 'El código ingresado no es válido. Verificá los datos e intentá nuevamente.' };
     }
 
     if (new Date(pending.expiresAt) < new Date()) {
-        await portalClientAccessPendingModel.deleteByToken(token);
-        return { ok: false, status: 410, message: 'El enlace de confirmación expiró. Volvé a solicitar acceso desde el portal.' };
+        await portalClientAccessPendingModel.deleteByToken(code);
+        return { ok: false, status: 410, message: 'El código ingresado expiró. Solicite uno nuevo.' };
     }
 
     const validation = await validateClientCredentials(pending.document, pending.email);
     if (!validation.ok) {
-        await portalClientAccessPendingModel.deleteByToken(token);
+        await portalClientAccessPendingModel.deleteByToken(code);
         return { ok: false, status: 404, message: 'No se encontraron envíos vinculados a tu identidad.' };
     }
 
-    await portalClientAccessPendingModel.deleteByToken(token);
+    await portalClientAccessPendingModel.deleteByToken(code);
 
     const sessionToken = signPortalClientSession({
         document: pending.document,

@@ -6,7 +6,7 @@ const {
     getSelfServiceForm, saveSelfService,
 } = require('../controllers/portal');
 const {
-    getIdentifyForm, postRequestAccess, getConfirmAccess,
+    getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
     getShipmentList, getShipmentDetail, getManageForm, postManageForm,
     getIncidentList, getIncidentDetail, postIncidentResponse, postDamageChoice, getIncidentAttachment,
     getSurveyList, getSurveyForm, postSurvey,
@@ -52,6 +52,7 @@ router.post('/portal/self/:token',     saveSelfService);
 // Portal — Mis envíos del cliente (HU 1)
 router.get('/portal/mis-envios',              optionalPortalClient, getIdentifyForm);
 router.post('/portal/mis-envios/acceso',      postRequestAccess);
+router.post('/portal/mis-envios/confirm',     postConfirmAccess);
 router.get('/portal/mis-envios/confirm',      getConfirmAccess);
 router.get('/portal/mis-envios/lista',        requirePortalClient, getShipmentList);
 router.get('/portal/mis-envios/envio/:id',    requirePortalClient, getShipmentDetail);

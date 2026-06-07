@@ -135,7 +135,7 @@ describe('POST /portal/mis-envios/acceso', () => {
             .send({ document: '12345678', email: 'cliente@test.com' });
 
         expect(res.status).toBe(200);
-        expect(res.text).toContain('Revisá tu casilla de email');
+        expect(res.text).toContain('Ingresá tu código de acceso');
     });
 });
 

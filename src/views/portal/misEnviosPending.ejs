@@ -19,25 +19,49 @@
             <div class="portal-incident-success-body">
                 <span class="portal-incident-eyebrow">Confirmación pendiente</span>
                 <span class="material-symbols-outlined portal-incident-success-icon" style="color:#f59e0b">mark_email_unread</span>
-                <h1>Revisá tu casilla de email</h1>
+                <h1>Ingresá tu código de acceso</h1>
 
                 <p class="portal-incident-success-lead">
-                    Te enviamos un mail a <strong><%= email %></strong> con un link para acceder a tus envíos de forma segura.
+                    Te enviamos un <strong>código de 6 dígitos</strong> a <strong><%= email %></strong> para acceder a tus envíos de forma segura.
                 </p>
 
                 <p class="portal-incident-success-copy">
-                    El link expira <strong><%= new Date(expiresAt).toLocaleString('es-AR') %></strong>.
+                    El código expira <strong><%= new Date(expiresAt).toLocaleString('es-AR') %></strong>.
                     Si no encontrás el mail, revisá tu carpeta de spam.
                 </p>
 
-                <% if (!mailDelivered && devLink) { %>
+                <% if (typeof error !== 'undefined' && error) { %>
                 <div class="alert alert-error" style="text-align:left; margin-top:1rem;">
-                    <strong>Modo desarrollo:</strong> SMTP no configurado. Link de prueba:<br>
-                    <a href="<%= devLink %>" style="word-break: break-all;"><%= devLink %></a>
+                    <%= error %>
                 </div>
                 <% } %>
 
-                <a href="/portal/mis-envios" class="btn-primary" style="margin-top:1rem;">Volver</a>
+                <% if (!mailDelivered && devCode) { %>
+                <div class="alert alert-error" style="text-align:left; margin-top:1rem;">
+                    <strong>Modo desarrollo:</strong> SMTP no configurado. Código de prueba:
+                    <strong style="letter-spacing:.2em;font-size:1.2em;"><%= devCode %></strong>
+                </div>
+                <% } %>
+
+                <form method="POST" action="/portal/mis-envios/confirm" style="margin-top:1.25rem;display:flex;flex-direction:column;gap:.75rem;align-items:center">
+                    <input type="hidden" name="email" value="<%= email %>">
+                    <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
+                    <input type="hidden" name="expiresAt" value="<%= expiresAt %>">
+                    <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+                        autocomplete="one-time-code" placeholder="000000"
+                        style="font-size:1.6em;letter-spacing:.4em;text-align:center;width:7em;padding:.5rem;border:1px solid var(--color-border,#ccc);border-radius:8px">
+                    <button type="submit" class="btn-primary">Confirmar acceso</button>
+                </form>
+
+                <form method="POST" action="/portal/mis-envios/acceso" style="margin-top:1rem">
+                    <input type="hidden" name="email" value="<%= email %>">
+                    <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
+                    <button type="submit" class="portal-link-btn" style="background:none;border:none;color:var(--color-primary,#2563eb);cursor:pointer;text-decoration:underline">
+                        Reenviar código
+                    </button>
+                </form>
+
+                <a href="/portal/mis-envios" style="margin-top:.5rem;color:var(--color-text-secondary)">Volver</a>
             </div>
         </div>
     </section>

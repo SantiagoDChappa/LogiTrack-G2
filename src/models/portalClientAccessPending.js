@@ -16,8 +16,10 @@ const findByToken = (token) => PortalClientAccessPending.findOne({ where: { toke
 
 const deleteByToken = (token) => PortalClientAccessPending.destroy({ where: { token } });
 
+const deleteByEmail = (email) => PortalClientAccessPending.destroy({ where: { email } });
+
 const deleteExpired = () => PortalClientAccessPending.destroy({
     where: { expiresAt: { [Op.lt]: new Date() } }
 });
 
-module.exports = { PortalClientAccessPending, create, findByToken, deleteByToken, deleteExpired };
+module.exports = { PortalClientAccessPending, create, findByToken, deleteByToken, deleteByEmail, deleteExpired };

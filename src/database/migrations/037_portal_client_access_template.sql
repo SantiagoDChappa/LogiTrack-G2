@@ -2,7 +2,7 @@
 -- Se ejecuta en transacción separada de 036 por la restricción de PostgreSQL con enums.
 -- NO se inserta en notification_config: es un mail transaccional, siempre activo,
 -- y no se muestra en la grilla de "Notificaciones por evento" (que es para envíos).
--- Placeholders disponibles: {{confirmUrl}} (enlace de confirmación) y {{ttlHoras}} (validez en horas).
+-- Placeholders disponibles: {{codigo}} (código de 6 dígitos) y {{ttlHoras}} (validez en horas).
 
 INSERT INTO logitrack.notification_events ("id", "code", "description")
 SELECT
@@ -17,14 +17,14 @@ INSERT INTO logitrack.email_template ("id", "eventCode", "subject", "body")
 SELECT
     (SELECT COALESCE(MAX("id"), 0) FROM logitrack.email_template) + 1,
     'PORTAL_CLIENT_ACCESS'::"logitrack"."type_notification_event",
-    '[LogiTrack] Confirmá el acceso a tus envíos',
+    '[LogiTrack] Tu código de acceso a tus envíos',
     'Hola,
 
 Recibimos una solicitud para consultar tus envíos en el portal de LogiTrack.
 
-Para continuar, confirmá tu acceso haciendo click en el siguiente enlace (válido por {{ttlHoras}} horas):
+Tu código de acceso es: {{codigo}}
 
-{{confirmUrl}}
+Ingresalo en el portal para continuar (válido por {{ttlHoras}} horas).
 
 Si no solicitaste este acceso, ignorá este mensaje.
 

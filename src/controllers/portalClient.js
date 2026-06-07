@@ -113,14 +113,46 @@ const postRequestAccess = async (req, res) => {
     return res.render('portal/misEnviosPending', {
         support: await getSupportInfo(),
         email: result.pending.email,
+        document: result.pending.document,
         expiresAt: result.pending.expiresAt,
         mailDelivered: result.pending.mailDelivered,
-        devLink: result.pending.devLink,
+        devCode: result.pending.devCode,
+        error: null,
     });
 };
 
+const setPortalSession = (res, sessionToken) => {
+    res.cookie(COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 8 * 60 * 60 * 1000,
+    });
+};
+
+// CP-CONS01: confirmación del acceso ingresando el código de 6 dígitos enviado por email.
+const postConfirmAccess = async (req, res) => {
+    const code = req.body.code;
+    const email = req.body.email;
+    const result = await confirmAccess(code, email);
+    if (!result.ok) {
+        return res.status(result.status).render('portal/misEnviosPending', {
+            support: await getSupportInfo(),
+            email,
+            document: req.body.document,
+            expiresAt: req.body.expiresAt || new Date(),
+            mailDelivered: true,
+            devCode: null,
+            error: result.message,
+        });
+    }
+
+    setPortalSession(res, result.sessionToken);
+    return res.redirect('/portal/mis-envios/lista');
+};
+
+// Compat: confirmación por link (?token=) — opcional, usado en desarrollo.
 const getConfirmAccess = async (req, res) => {
-    const result = await confirmAccess(req.query.token);
+    const result = await confirmAccess(req.query.token, req.query.email);
     if (!result.ok) {
         return res.status(result.status).render('portal/misEnviosConfirmError', {
             support: await getSupportInfo(),
@@ -128,12 +160,7 @@ const getConfirmAccess = async (req, res) => {
         });
     }
 
-    res.cookie(COOKIE_NAME, result.sessionToken, {
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 8 * 60 * 60 * 1000,
-    });
-
+    setPortalSession(res, result.sessionToken);
     return res.redirect('/portal/mis-envios/lista');
 };
 
@@ -485,6 +512,7 @@ const postIncidentSurvey = async (req, res) => {
 module.exports = {
     getIdentifyForm,
     postRequestAccess,
+    postConfirmAccess,
     getConfirmAccess,
     getShipmentList,
     getShipmentDetail,

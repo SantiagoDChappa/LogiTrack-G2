@@ -686,7 +686,7 @@
                 <p class="settings-subtitle">
                     Mail de confirmación que recibe el cliente al pedir acceso a sus envíos desde el portal público.
                     Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar) porque sin él el cliente no puede ingresar.
-                    Placeholders disponibles: <code>{{confirmUrl}}</code> (enlace de confirmación) y <code>{{ttlHoras}}</code> (validez en horas).
+                    Placeholders disponibles: <code>{{codigo}}</code> (código de 6 dígitos) y <code>{{ttlHoras}}</code> (validez en horas).
                 </p>
                 <% if (templatesByEvent['PORTAL_CLIENT_ACCESS']) { %>
                 <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
