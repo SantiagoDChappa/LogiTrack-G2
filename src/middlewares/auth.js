@@ -47,13 +47,18 @@ const requireAuth = async (req, res, next) => {
     }
 };
 
+// Responde 403: JSON para rutas /api/, popup (error.ejs en modo modal) para navegación.
+const denyAccess = (req, res, reason) => {
+    if (req.path.startsWith('/api/')) {
+        return res.status(403).json({ error: reason });
+    }
+    return res.status(403).render('error', { status: 403, reason, popup: true });
+};
+
 const requireAdmin = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
     if (res.locals.currentUser?.roleId !== RoleType.ADMIN.id) {
-        if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de administrador' });
-        }
-        return res.status(403).send('Acceso denegado: se requieren permisos de administrador');
+        return denyAccess(req, res, 'Acceso denegado: se requieren permisos de administrador');
     }
     next();
 };
@@ -62,10 +67,7 @@ const requireSupervisor = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
     const roleId = res.locals.currentUser?.roleId;
     if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.ADMIN.id) {
-        if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de supervisor' });
-        }
-        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor');
+        return denyAccess(req, res, 'Acceso denegado: se requieren permisos de supervisor');
     }
     next();
 };
@@ -74,10 +76,7 @@ const requireSupervisorOrOperator = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
     const roleId = res.locals.currentUser?.roleId;
     if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.OPERATOR.id && roleId !== RoleType.ADMIN.id) {
-        if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de supervisor u operador' });
-        }
-        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor u operador');
+        return denyAccess(req, res, 'Acceso denegado: se requieren permisos de supervisor u operador');
     }
     next();
 };
@@ -85,10 +84,7 @@ const requireSupervisorOrOperator = (req, res, next) => {
 const requireDelivery = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
     if (res.locals.currentUser?.roleId !== RoleType.DELIVERY.id) {
-        if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de repartidor' });
-        }
-        return res.status(403).send('Acceso denegado: se requieren permisos de repartidor');
+        return denyAccess(req, res, 'Acceso denegado: se requieren permisos de repartidor');
     }
     next();
 };
@@ -97,10 +93,7 @@ const requireSupervisorOrAdmin = (req, res, next) => {
     const { RoleType } = require('../constants/enums');
     const roleId = res.locals.currentUser?.roleId;
     if (roleId !== RoleType.SUPERVISOR.id && roleId !== RoleType.ADMIN.id) {
-        if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de supervisor o administrador' });
-        }
-        return res.status(403).send('Acceso denegado: se requieren permisos de supervisor o administrador');
+        return denyAccess(req, res, 'Acceso denegado: se requieren permisos de supervisor o administrador');
     }
     next();
 };

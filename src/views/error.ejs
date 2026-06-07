@@ -25,6 +25,25 @@
             width: 100%;
         }
 
+        /* Modo popup/modal: card flotante sobre fondo atenuado */
+        body.is-popup {
+            background-color: rgba(0, 0, 0, 0.45);
+        }
+
+        body.is-popup .error-container {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+            padding: var(--space-8) var(--space-6);
+            animation: popup-in 0.18s ease-out;
+        }
+
+        @keyframes popup-in {
+            from { opacity: 0; transform: translateY(8px) scale(0.98); }
+            to   { opacity: 1; transform: none; }
+        }
+
         .error-icon-wrap {
             width: 80px;
             height: 80px;
@@ -152,7 +171,7 @@
     </style>
     <link rel="stylesheet" href="/css/error.css">
 </head>
-<body>
+<body class="<%= (typeof popup !== 'undefined' && popup) ? 'is-popup' : '' %>">
     <div class="error-container">
 
         <div class="error-icon-wrap <%= status === 404 ? 'warn' : '' %>">
@@ -181,7 +200,9 @@
         </h1>
 
         <p class="error-message">
-            <% if (status === 404) { %>
+            <% if (typeof reason !== 'undefined' && reason) { %>
+                <%= reason %>
+            <% } else if (status === 404) { %>
                 La página que buscás no existe o fue movida. Verificá la URL o volvé al inicio.
             <% } else if (status === 403) { %>
                 No tenés permiso para acceder a este recurso. Contactá al administrador si creés que es un error.
