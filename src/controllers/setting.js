@@ -848,6 +848,17 @@ const saveIncidentNotifConfig = async (req, res) => {
     }
 };
 
+const triggerDelayDetection = async (req, res) => {
+    try {
+        const { processDelayedShipments } = require('../jobs/delayDetectionJob');
+        await processDelayedShipments();
+        res.redirect(settingBack(req, '?success=delay_triggered'));
+    } catch (err) {
+        console.error('triggerDelayDetection:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=delay_triggered'));
+    }
+};
+
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
     saveParams, saveIdentity, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
@@ -855,4 +866,5 @@ module.exports = {
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
     saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    triggerDelayDetection,
 };
