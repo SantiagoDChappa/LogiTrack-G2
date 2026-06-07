@@ -98,7 +98,8 @@ describe('requestAccess()', () => {
         expect(sendEmail).toHaveBeenCalledWith(
             'cliente@test.com',
             expect.stringContaining('LogiTrack'),
-            expect.stringContaining('/portal/mis-envios/confirm')
+            expect.stringContaining('/portal/mis-envios/confirm'),
+            expect.any(String)
         );
     });
 });

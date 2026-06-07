@@ -4,6 +4,9 @@ const { normalize } = require('./incidentEmailValidation');
 const shipmentModel = require('../models/shipment');
 const portalClientAccessPendingModel = require('../models/portalClientAccessPending');
 const { sendEmail } = require('./notification/emailSender');
+const emailTemplateModel = require('../models/emailTemplate');
+const placeholders = require('./notificationPlaceholders');
+const { NotificationEvent } = require('../constants/enums');
 
 const CONFIRMATION_TTL_HOURS = 24;
 const SESSION_HOURS = 8;
@@ -89,8 +92,13 @@ const requestAccess = async ({ document, email }) => {
     });
 
     const confirmUrl = `${appBaseUrl()}/portal/mis-envios/confirm?token=${encodeURIComponent(token)}`;
-    const subject = '[LogiTrack] Confirmá el acceso a tus envíos';
-    const body = `Hola,
+
+    // Plantilla editable desde Ajustes → Comunicaciones (evento PORTAL_CLIENT_ACCESS).
+    // Si no existe la fila (migración no corrida), se usa el texto por defecto.
+    // Es un mail transaccional: se envía siempre (no respeta toggle de "habilitado").
+    const tplVars = { confirmUrl, ttlHoras: CONFIRMATION_TTL_HOURS };
+    let subject = '[LogiTrack] Confirmá el acceso a tus envíos';
+    let body = `Hola,
 
 Recibimos una solicitud para consultar tus envíos en el portal de LogiTrack.
 
@@ -102,12 +110,23 @@ Si no solicitaste este acceso, ignorá este mensaje.
 
 Saludos,
 Equipo LogiTrack`;
+    let format = 'text';
+    try {
+        const tpl = await emailTemplateModel.getDefaultByEventCode(NotificationEvent.PORTAL_CLIENT_ACCESS);
+        if (tpl) {
+            subject = placeholders.render(tpl.subject, tplVars) || subject;
+            body    = placeholders.render(tpl.body, tplVars)    || body;
+            format  = tpl.format === 'html' ? 'html' : 'text';
+        }
+    } catch (err) {
+        console.warn('[portal-access] no se pudo cargar plantilla, uso texto por defecto:', err.message);
+    }
 
     // Envío en segundo plano (fire-and-forget): no bloqueamos la respuesta para que
     // el portal redirija de inmediato a "revisá tu correo" en vez de quedar cargando
     // esperando al SMTP. El resultado se loguea para diagnóstico.
     const dev = isDevMode();
-    sendEmail(validation.email, subject, body)
+    sendEmail(validation.email, subject, body, format)
         .then((ok) => {
             if (ok) {
                 console.log(`[portal-access] mail de confirmación enviado a ${validation.email}`);

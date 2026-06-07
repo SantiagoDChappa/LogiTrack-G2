@@ -677,6 +677,35 @@
                 </form>
             </div>
 
+            <!-- Card: Mail de acceso al portal cliente (Mis Envíos) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">mail_lock</span>
+                    Mail de acceso al portal (Mis Envíos)
+                </h2>
+                <p class="settings-subtitle">
+                    Mail de confirmación que recibe el cliente al pedir acceso a sus envíos desde el portal público.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar) porque sin él el cliente no puede ingresar.
+                    Placeholders disponibles: <code>{{confirmUrl}}</code> (enlace de confirmación) y <code>{{ttlHoras}}</code> (validez en horas).
+                </p>
+                <% if (templatesByEvent['PORTAL_CLIENT_ACCESS']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla de confirmación de acceso</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="PORTAL_CLIENT_ACCESS"
+                        data-description="Mail de acceso al portal (Mis Envíos)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
+                    mientras tanto se usa el texto por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
             <!-- Card: Notificaciones de incidencias (destinatarios internos) -->
             <div class="settings-card">
                 <h2 class="settings-card-title">

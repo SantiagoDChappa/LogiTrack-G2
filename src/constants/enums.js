@@ -95,6 +95,9 @@ const NotificationEvent = Object.freeze({
     ROUTE_INTERRUPTED:            'ROUTE_INTERRUPTED',
     SHIPMENT_DELAYED:             'SHIPMENT_DELAYED',
     SHIPMENT_DELAY_RECOVERED:     'SHIPMENT_DELAY_RECOVERED', // LGT-160 Esc.6
+    // Mail transaccional del portal cliente "Mis Envíos" (confirmación de acceso).
+    // Editable desde Ajustes → Comunicaciones; siempre activo (no es un evento de envío).
+    PORTAL_CLIENT_ACCESS:         'PORTAL_CLIENT_ACCESS',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
@@ -158,7 +161,7 @@ const EmailQueueStatus = {
     PROCESSING: 'PROCESSING',
     SENT: 'SENT',
     FAILED: 'FAILED'
-}
+};
 
 
 module.exports = {
