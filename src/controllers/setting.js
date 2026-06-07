@@ -59,6 +59,14 @@ const getSettings = async (req, res) => {
         color: settings[statusColors.keyFor(s.id)] || '',
     }));
 
+    // Colores personalizables de los estados de incidencia (enum fijo).
+    const incidentStatusColorList = statusColors.INCIDENT_STATUSES.map(s => ({
+        code: s.code,
+        label: s.label,
+        color: settings[statusColors.incidentKeyFor(s.code)] || '',
+        defaultColor: s.defaultColor,
+    }));
+
     // Variantes de plantilla agrupadas por evento (lista). La 1ra es la predeterminada.
     const templatesByEvent = {};
     for (const t of emailTemplates) {
@@ -86,7 +94,7 @@ const getSettings = async (req, res) => {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         placeholderGroups, customVariables, emailSnippets, sampleVars,
-        statusColorList, activeSection,
+        statusColorList, incidentStatusColorList, activeSection,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -388,6 +396,28 @@ const saveStatusColors = async (req, res) => {
         res.redirect(settingBack(req, '?success=status_colors'));
     } catch (err) {
         console.error('saveStatusColors:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=status_colors_save'));
+    }
+};
+
+// Guarda el color personalizado de cada estado de incidencia (enum fijo).
+const saveIncidentStatusColors = async (req, res) => {
+    try {
+        for (const s of statusColors.INCIDENT_STATUSES) {
+            const key        = statusColors.incidentKeyFor(s.code);
+            const useDefault = req.body[`default_${s.code}`] === 'on';
+            // Checkbox "usar color del tema" tildado => se borra la personalización.
+            const value = useDefault ? '' : (req.body[key] || '').trim();
+            if (value && !statusColors.isValidHex(value)) {
+                return res.redirect(settingBack(req, '?error=color_invalido'));
+            }
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(settingBack(req, '?success=status_colors'));
+    } catch (err) {
+        console.error('saveIncidentStatusColors:', err.message);
         res.status(500).redirect(settingBack(req, '?error=status_colors_save'));
     }
 };
@@ -761,5 +791,5 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors, saveIncidentParams,
+    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
 };

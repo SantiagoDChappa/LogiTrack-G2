@@ -23,6 +23,7 @@ router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimiz
 router.post('/params',          requireAdmin, settingController.saveParams);
 router.post('/incident-params', requireAdmin, settingController.saveIncidentParams);
 router.post('/status-colors',   requireAdmin, settingController.saveStatusColors);
+router.post('/incident-status-colors', requireAdmin, settingController.saveIncidentStatusColors);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
 // Variantes de plantilla (rutas específicas antes de las genéricas por :eventCode)
 router.post('/email-template/variant/:eventCode', requireAdmin, settingController.createEmailTemplateVariant);

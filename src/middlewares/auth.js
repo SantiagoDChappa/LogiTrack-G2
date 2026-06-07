@@ -35,7 +35,11 @@ const requireAuth = async (req, res, next) => {
         // LGT-172: logo institucional configurable.
         res.locals.logoEmpresa     = allSettings.logo_empresa || '/images/logo.png';
         // LGT-173: CSS de colores de estados configurados (se inyecta en el <head>).
-        res.locals.statusColorsCss = statusColors.buildCss(allSettings, statuses);
+        // Incluye estados de envío y estados de incidencia.
+        res.locals.statusColorsCss = [
+            statusColors.buildCss(allSettings, statuses),
+            statusColors.buildIncidentCss(allSettings),
+        ].filter(Boolean).join('\n');
         next();
     } catch {
         const returnTo = req.originalUrl;

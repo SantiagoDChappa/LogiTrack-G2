@@ -1,64 +1,207 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <%- include('../partials/head') %>
-    <title>Configuración de fatiga - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/settings.css">
+    <title>Ojo de Patrón - LogiTrack</title>
     <style>
-        .cfg-wrap { max-width: 720px; margin: 0 auto; padding: 24px; font-family: system-ui, sans-serif; }
-        .row { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #eef2f7; }
-        .row label { font-weight:600; font-size:14px; }
-        .row small { color:#64748b; display:block; font-weight:400; }
-        input[type=number], input[type=text], select { padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; min-width:140px; }
-        .save { margin-top:16px; padding:11px 20px; border:0; background:#2563eb; color:#fff; border-radius:10px; font-weight:700; cursor:pointer; }
-        .err { background:#fde2e1; color:#b91c1c; padding:10px 14px; border-radius:8px; margin:10px 0; }
-        .ok  { background:#e8f5ec; color:#2f9e44; padding:10px 14px; border-radius:8px; margin:10px 0; }
+        .settings-content {
+            padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
+        }
+        .settings-category {
+            display: flex; align-items: center; gap: .75rem;
+            margin: .25rem 0 .5rem; padding-bottom: .6rem;
+            border-bottom: 2px solid var(--color-border);
+        }
+        .settings-category > .material-symbols-outlined {
+            font-size: 1.6rem; color: var(--color-primary);
+            background: var(--color-primary-light); border-radius: var(--radius-md);
+            padding: .35rem; flex-shrink: 0;
+        }
+        .settings-category h3 { margin: 0; font-size: var(--font-size-lg); }
+        .settings-category p  { margin: .1rem 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+        .cfg-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: var(--space-4) var(--space-5);
+            align-items: start;
+        }
+        .cfg-grid .span-full { grid-column: 1 / -1; }
+        .cfg-switch {
+            display: flex; align-items: center; gap: .6rem;
+            padding: .65rem .85rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-surface-alt);
+            cursor: pointer;
+        }
+        .cfg-switch input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+        .cfg-switch .cfg-switch-label { font-weight: var(--font-weight-semibold); }
+        .cfg-switch small { display: block; color: var(--color-text-secondary); font-weight: 400; }
     </style>
 </head>
-<body>
-<div class="cfg-wrap">
-    <h1>⚙ Configuración — Control de fatiga</h1>
-    <p style="color:#64748b">Valores globales por defecto. Ley 25.326: la <b>retención</b> controla el borrado automático de datos.</p>
-    <% if (saved) { %><div class="ok">Configuración guardada.</div><% } %>
-    <% if (errors && errors.length) { %><div class="err"><%= errors.join(' · ') %></div><% } %>
 
-    <form method="POST" action="/fatigue/config">
-        <div class="row"><label>Control de fatiga activo <small>enabled</small></label>
-            <input type="checkbox" name="enabled" <%= cfg.enabled ? 'checked' : '' %>></div>
-        <div class="row"><label>Bloqueo automático <small>autoBlock</small></label>
-            <input type="checkbox" name="autoBlock" <%= cfg.autoBlock ? 'checked' : '' %>></div>
-        <div class="row"><label>Umbral de fatiga (%) <small>thresholdPct (0–100)</small></label>
-            <input type="number" name="thresholdPct" min="0" max="100" value="<%= cfg.thresholdPct %>"></div>
-        <div class="row"><label>Métodos habilitados <small>method</small></label>
-            <select name="method">
-                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.method===o?'selected':'' %>><%= o %></option><% }) %>
-            </select></div>
-        <div class="row"><label>Método al iniciar <small>methodStart</small></label>
-            <select name="methodStart">
-                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o %></option><% }) %>
-            </select></div>
-        <div class="row"><label>Método en re-chequeo <small>methodRecheck</small></label>
-            <select name="methodRecheck">
-                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o %></option><% }) %>
-            </select></div>
-        <div class="row"><label>Duración de la prueba (seg) <small>testDurationSec</small></label>
-            <input type="number" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>"></div>
-        <div class="row"><label>Conducción para re-chequeo (min) <small>recheckDriveMin</small></label>
-            <input type="number" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>"></div>
-        <div class="row"><label>Detención que dispara re-chequeo (min) <small>recheckStoppedMin</small></label>
-            <input type="number" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>"></div>
-        <div class="row"><label>Descanso para reintentar prueba en ruta (min) <small>recheckRestMin (LGT-199)</small></label>
-            <input type="number" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>"></div>
-        <div class="row"><label>Ventana de patrón (días) <small>patternWindowDays</small></label>
-            <input type="number" name="patternWindowDays" min="1" max="365" value="<%= cfg.patternWindowDays %>"></div>
-        <div class="row"><label>Eventos para marcar patrón <small>patternEventCount</small></label>
-            <input type="number" name="patternEventCount" min="1" max="50" value="<%= cfg.patternEventCount %>"></div>
-        <div class="row"><label>Retención de datos (días) <small>retentionDays · Ley 25.326</small></label>
-            <input type="number" name="retentionDays" min="1" max="3650" value="<%= cfg.retentionDays %>"></div>
-        <div class="row"><label>Versión de consentimiento <small>consentVersion</small></label>
-            <input type="text" name="consentVersion" value="<%= cfg.consentVersion %>"></div>
-        <button class="save" type="submit">Guardar</button>
-        <a href="/fatigue" style="margin-left:12px">← Volver</a>
-    </form>
-</div>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Ojo de Patrón</h1>
+        </div>
+
+        <div class="settings-content">
+            <section class="settings-category">
+                <span class="material-symbols-outlined">monitor_heart</span>
+                <div>
+                    <h3>Control de fatiga</h3>
+                    <p>Valores globales por defecto. Ley 25.326: la retención controla el borrado automático de datos.</p>
+                </div>
+            </section>
+
+            <% if (saved) { %>
+                <div class="settings-card" style="border-left:4px solid #16a34a;color:#16a34a">Configuración guardada.</div>
+            <% } %>
+            <% if (errors && errors.length) { %>
+                <div class="settings-card" style="border-left:4px solid #dc2626;color:#dc2626"><%= errors.join(' · ') %></div>
+            <% } %>
+
+            <form method="POST" action="/fatigue/config">
+                <!-- Card: Control general -->
+                <div class="settings-card">
+                    <h2 class="settings-card-title">
+                        <span class="material-symbols-outlined">tune</span>
+                        Control general
+                    </h2>
+                    <p class="settings-subtitle">Activación del control de fatiga y umbral de bloqueo.</p>
+                    <div class="cfg-grid">
+                        <label class="cfg-switch">
+                            <input type="checkbox" name="enabled" <%= cfg.enabled ? 'checked' : '' %>>
+                            <span class="cfg-switch-label">Control de fatiga activo <small>enabled</small></span>
+                        </label>
+                        <label class="cfg-switch">
+                            <input type="checkbox" name="autoBlock" <%= cfg.autoBlock ? 'checked' : '' %>>
+                            <span class="cfg-switch-label">Bloqueo automático <small>autoBlock</small></span>
+                        </label>
+                        <div class="field">
+                            <label for="thresholdPct">Umbral de fatiga (%)</label>
+                            <input type="number" id="thresholdPct" name="thresholdPct" min="0" max="100" value="<%= cfg.thresholdPct %>">
+                            <small>thresholdPct (0–100)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Métodos de prueba -->
+                <div class="settings-card">
+                    <h2 class="settings-card-title">
+                        <span class="material-symbols-outlined">psychology</span>
+                        Métodos de prueba
+                    </h2>
+                    <p class="settings-subtitle">Qué prueba se usa al iniciar la ruta y en los re-chequeos.</p>
+                    <div class="cfg-grid">
+                        <div class="field">
+                            <label for="method">Métodos habilitados</label>
+                            <select id="method" name="method">
+                                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.method===o?'selected':'' %>><%= o %></option><% }) %>
+                            </select>
+                            <small>method</small>
+                        </div>
+                        <div class="field">
+                            <label for="methodStart">Método al iniciar</label>
+                            <select id="methodStart" name="methodStart">
+                                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o %></option><% }) %>
+                            </select>
+                            <small>methodStart</small>
+                        </div>
+                        <div class="field">
+                            <label for="methodRecheck">Método en re-chequeo</label>
+                            <select id="methodRecheck" name="methodRecheck">
+                                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o %></option><% }) %>
+                            </select>
+                            <small>methodRecheck</small>
+                        </div>
+                        <div class="field">
+                            <label for="testDurationSec">Duración de la prueba (seg)</label>
+                            <input type="number" id="testDurationSec" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>">
+                            <small>testDurationSec</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Re-chequeo en ruta -->
+                <div class="settings-card">
+                    <h2 class="settings-card-title">
+                        <span class="material-symbols-outlined">schedule</span>
+                        Re-chequeo en ruta
+                    </h2>
+                    <p class="settings-subtitle">Disparadores de re-chequeo durante el viaje.</p>
+                    <div class="cfg-grid">
+                        <div class="field">
+                            <label for="recheckDriveMin">Conducción para re-chequeo (min)</label>
+                            <input type="number" id="recheckDriveMin" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>">
+                            <small>recheckDriveMin</small>
+                        </div>
+                        <div class="field">
+                            <label for="recheckStoppedMin">Detención que dispara re-chequeo (min)</label>
+                            <input type="number" id="recheckStoppedMin" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>">
+                            <small>recheckStoppedMin</small>
+                        </div>
+                        <div class="field">
+                            <label for="recheckRestMin">Descanso para reintentar prueba en ruta (min)</label>
+                            <input type="number" id="recheckRestMin" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>">
+                            <small>recheckRestMin (LGT-199)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Patrón y retención -->
+                <div class="settings-card">
+                    <h2 class="settings-card-title">
+                        <span class="material-symbols-outlined">policy</span>
+                        Patrón y retención (Ley 25.326)
+                    </h2>
+                    <p class="settings-subtitle">Detección de patrones recurrentes y borrado automático de datos sensibles.</p>
+                    <div class="cfg-grid">
+                        <div class="field">
+                            <label for="patternWindowDays">Ventana de patrón (días)</label>
+                            <input type="number" id="patternWindowDays" name="patternWindowDays" min="1" max="365" value="<%= cfg.patternWindowDays %>">
+                            <small>patternWindowDays</small>
+                        </div>
+                        <div class="field">
+                            <label for="patternEventCount">Eventos para marcar patrón</label>
+                            <input type="number" id="patternEventCount" name="patternEventCount" min="1" max="50" value="<%= cfg.patternEventCount %>">
+                            <small>patternEventCount</small>
+                        </div>
+                        <div class="field">
+                            <label for="retentionDays">Retención de datos (días)</label>
+                            <input type="number" id="retentionDays" name="retentionDays" min="1" max="3650" value="<%= cfg.retentionDays %>">
+                            <small>retentionDays · Ley 25.326</small>
+                        </div>
+                        <div class="field">
+                            <label for="consentVersion">Versión de consentimiento</label>
+                            <input type="text" id="consentVersion" name="consentVersion" value="<%= cfg.consentVersion %>">
+                            <small>consentVersion</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <a href="/fatigue" class="action-btn action-btn--lg" data-tooltip="Volver al panel" aria-label="Volver al panel">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar configuración" aria-label="Guardar configuración">
+                        <span class="material-symbols-outlined">save</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
 </body>
+
 </html>
