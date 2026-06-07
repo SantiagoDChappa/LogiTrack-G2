@@ -828,7 +828,11 @@
                     <textarea name="text" rows="2" class="abm-in tplm-textarea" placeholder="Versión texto (ej: Seguí tu envío: {{trackingUrl}})"></textarea>
                 </form>
             </div>
+            <% } %>
 
+            <%/* El modal de edición de templates y su JS viven con la sección Comunicaciones,
+                 que es donde están los botones "editar mail" y los selects de destinatario. */%>
+            <% if (activeSection === 'comunicaciones') { %>
             <!-- Modal: Editar template de email (interactivo) -->
             <div id="tpl-modal-backdrop" class="tplm-backdrop">
                 <div class="tplm-dialog">
