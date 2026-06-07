@@ -51,5 +51,6 @@ router.post('/incident-type',          requireAdmin, settingController.saveIncid
 router.post('/incident-type/:id',      requireAdmin, settingController.saveIncidentType);
 router.post('/incident-notification',  requireAdmin, settingController.saveIncidentNotifConfig);
 router.post('/test-shipment-notification', requireAdmin, settingController.testShipmentNotification);
+router.post('/trigger-delay-detection',   requireAdmin, settingController.triggerDelayDetection);
 
 module.exports = router;
