@@ -283,6 +283,20 @@ const testShipmentNotification = async (req, res) => {
     }
 };
 
+// Envía manualmente toda la cola de emails pendientes (sin esperar al cron).
+const flushEmailQueue = async (req, res) => {
+    try {
+        const { processPendingEmails } = require('../jobs/emailProcessorJob');
+        const summary = await processPendingEmails();
+        const sent = summary?.sent || 0;
+        const retried = summary?.retried || 0;
+        return res.redirect(settingBack(req, `?success=flush&sent=${sent}&retried=${retried}`));
+    } catch (err) {
+        console.error('flushEmailQueue:', err.message);
+        return res.status(500).redirect(settingBack(req, '?error=flush'));
+    }
+};
+
 // ===== Variables custom de notificación (ABM) =====
 const VAR_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 const saveNotificationVariable = async (req, res) => {
@@ -791,5 +805,5 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
 };

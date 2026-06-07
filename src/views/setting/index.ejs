@@ -794,6 +794,25 @@
                 </form>
             </div>
 
+            <!-- Card: Envío manual de la cola de emails -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">outbox</span>
+                    Enviar cola de emails ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Procesa y envía <strong>inmediatamente</strong> todos los emails pendientes en la cola, sin esperar al proceso automático programado.
+                    Los que fallen quedan reprogramados para reintento.
+                </p>
+                <form method="POST" action="/setting/flush-email-queue">
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Enviar pendientes ahora" aria-label="Enviar pendientes ahora">
+                            <span class="material-symbols-outlined">outbox</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card: Email de prueba (override) -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -1737,8 +1756,9 @@
             });
         }
 
-        const _param = new URLSearchParams(window.location.search).get('success');
-        if (_param === '1' || _param === '2' || _param === '3' || _param === '4') {
+        const _qs = new URLSearchParams(window.location.search);
+        const _param = _qs.get('success');
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             const _titles = {
                 '1': 'Ajustes guardados',
@@ -1746,9 +1766,18 @@
                 '3': 'Configuración de ruteo guardada',
                 '4': 'Parámetros guardados correctamente'
             };
+            let _title = _titles[_param];
+            let _text;
+            if (_param === 'flush') {
+                const _sent = parseInt(_qs.get('sent') || '0', 10);
+                const _retried = parseInt(_qs.get('retried') || '0', 10);
+                _title = _sent > 0 ? `${_sent} email(s) enviado(s)` : 'No había emails pendientes';
+                _text = _retried > 0 ? `${_retried} quedaron reprogramados para reintento.` : undefined;
+            }
             Swal.fire({
                 icon: 'success',
-                title: _titles[_param],
+                title: _title,
+                text: _text,
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',

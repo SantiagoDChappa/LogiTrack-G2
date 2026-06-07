@@ -51,5 +51,7 @@ router.post('/incident-type',          requireAdmin, settingController.saveIncid
 router.post('/incident-type/:id',      requireAdmin, settingController.saveIncidentType);
 router.post('/incident-notification',  requireAdmin, settingController.saveIncidentNotifConfig);
 router.post('/test-shipment-notification', requireAdmin, settingController.testShipmentNotification);
+// Envío manual de toda la cola de emails pendientes (sin esperar al cron).
+router.post('/flush-email-queue',          requireAdmin, settingController.flushEmailQueue);
 
 module.exports = router;
