@@ -192,8 +192,8 @@
                                     <tr>
                                         <td class="tracking-id"><%= s.trackingId %></td>
                                         <td>
-                                            <span class="dest-nombre"><%= s.recipient.fullName %></span>
-                                            <span class="dest-dni">DNI: <%= s.recipient.document %></span>
+                                            <span class="dest-nombre"><%= s.recipient ? s.recipient.fullName : 'Sin destinatario' %></span>
+                                            <span class="dest-dni">DNI: <%= s.recipient ? s.recipient.document : '-' %></span>
                                         </td>
                                         <td>
                                             <% const _sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
