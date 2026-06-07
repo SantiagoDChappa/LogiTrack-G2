@@ -283,6 +283,32 @@ const testShipmentNotification = async (req, res) => {
     }
 };
 
+// Ejecuta manualmente un proceso automático "ahora" (sin esperar al horario programado).
+const runProcess = async (req, res) => {
+    const proc = String(req.params.proc || '');
+    try {
+        let detail = '';
+        if (proc === 'expirados') {
+            const n = await expireShipments();
+            detail = `${n || 0} envío(s) expirado(s)`;
+        } else if (proc === 'notificaciones') {
+            const { processPendingEmails } = require('../jobs/emailProcessorJob');
+            const s = await processPendingEmails();
+            detail = `${s?.sent || 0} email(s) enviado(s)`;
+        } else if (proc === 'demoras') {
+            const { processDelayedShipments } = require('../jobs/delayDetectionJob');
+            await processDelayedShipments();
+            detail = 'Detección de demoras ejecutada';
+        } else {
+            return res.redirect(settingBack(req, '?error=proc_desconocido'));
+        }
+        return res.redirect(settingBack(req, `?success=proc&proc=${encodeURIComponent(proc)}&detail=${encodeURIComponent(detail)}`));
+    } catch (err) {
+        console.error(`runProcess(${proc}):`, err.message);
+        return res.status(500).redirect(settingBack(req, '?error=proc_run'));
+    }
+};
+
 // Envía manualmente toda la cola de emails pendientes (sin esperar al cron).
 const flushEmailQueue = async (req, res) => {
     try {
@@ -802,5 +828,5 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
 };

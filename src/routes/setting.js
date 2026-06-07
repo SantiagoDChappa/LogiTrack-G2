@@ -53,5 +53,7 @@ router.post('/incident-notification',  requireAdmin, settingController.saveIncid
 router.post('/test-shipment-notification', requireAdmin, settingController.testShipmentNotification);
 // Envío manual de toda la cola de emails pendientes (sin esperar al cron).
 router.post('/flush-email-queue',          requireAdmin, settingController.flushEmailQueue);
+// Ejecutar manualmente un proceso automático ahora (expirados | notificaciones | demoras).
+router.post('/run-process/:proc',          requireAdmin, settingController.runProcess);
 
 module.exports = router;

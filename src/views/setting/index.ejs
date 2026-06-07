@@ -616,6 +616,37 @@
                 </form>
             </div>
 
+            <!-- Card: Ejecutar procesos manualmente (sin esperar al horario programado) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">play_circle</span>
+                    Ejecutar procesos ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Ejecutá manualmente un proceso en este momento, sin esperar al horario programado arriba. Útil para pruebas o para forzar el procesamiento.
+                </p>
+                <div style="display:flex;flex-direction:column;gap:.6rem">
+                    <% var _procs = [
+                        { id: 'expirados',      label: 'Revisar pedidos expirados', hint: 'Cancela envíos pendientes que superaron el límite de días.' },
+                        { id: 'demoras',        label: 'Detección de demoras',      hint: 'Avisa al cliente de envíos con demora significativa (y recuperaciones).' },
+                        { id: 'notificaciones', label: 'Envío de notificaciones pendientes', hint: 'Procesa y envía la cola de emails acumulados.' }
+                    ]; %>
+                    <% _procs.forEach(function(p) { %>
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                        <div>
+                            <strong><%= p.label %></strong>
+                            <small style="display:block;color:var(--color-text-secondary)"><%= p.hint %></small>
+                        </div>
+                        <form method="POST" action="/setting/run-process/<%= p.id %>" style="margin:0">
+                            <button type="submit" class="action-btn modificar" data-tooltip="Ejecutar ahora" aria-label="Ejecutar ahora">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>
+                        </form>
+                    </div>
+                    <% }); %>
+                </div>
+            </div>
+
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
             <% } %>
             <% if (activeSection === 'comunicaciones') { %>
@@ -1758,7 +1789,7 @@
 
         const _qs = new URLSearchParams(window.location.search);
         const _param = _qs.get('success');
-        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush') {
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             const _titles = {
                 '1': 'Ajustes guardados',
@@ -1773,6 +1804,10 @@
                 const _retried = parseInt(_qs.get('retried') || '0', 10);
                 _title = _sent > 0 ? `${_sent} email(s) enviado(s)` : 'No había emails pendientes';
                 _text = _retried > 0 ? `${_retried} quedaron reprogramados para reintento.` : undefined;
+            }
+            if (_param === 'proc') {
+                _title = 'Proceso ejecutado';
+                _text = _qs.get('detail') || undefined;
             }
             Swal.fire({
                 icon: 'success',
