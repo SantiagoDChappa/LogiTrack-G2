@@ -1572,6 +1572,15 @@ ul { list-style: none; }
 }
 
 .portal-incident-section { margin-top: 1.25rem; }
+/* En el detalle de "Mis Envíos" la clase .portal-incident-section se usa solo como
+   separador entre cards. incidents.css (página de creación) define esa misma clase
+   como "sección a pantalla completa" (min-height 100vh + padding enorme + gradiente),
+   y al cargarse después pisaba el alto de cada card. Lo anulamos acotado al detalle. */
+.portal-mis-envios-detail-wrapper .portal-incident-section {
+    min-height: 0;
+    padding: 1.25rem 1.5rem;
+    background: var(--c-surface, #fff);
+}
 .portal-incident-section-title {
     margin: 0 0 1rem;
     font-size: 1.05rem;

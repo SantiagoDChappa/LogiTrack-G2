@@ -98,6 +98,8 @@ const NotificationEvent = Object.freeze({
     // Mail transaccional del portal cliente "Mis Envíos" (confirmación de acceso).
     // Editable desde Ajustes → Comunicaciones; siempre activo (no es un evento de envío).
     PORTAL_CLIENT_ACCESS:         'PORTAL_CLIENT_ACCESS',
+    // Cambio de estado de una incidencia → aviso al cliente. Editable desde Ajustes.
+    INCIDENT_STATUS_CHANGE:       'INCIDENT_STATUS_CHANGE',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)

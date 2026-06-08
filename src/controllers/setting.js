@@ -283,6 +283,46 @@ const testShipmentNotification = async (req, res) => {
     }
 };
 
+// Ejecuta manualmente un proceso automático "ahora" (sin esperar al horario programado).
+const runProcess = async (req, res) => {
+    const proc = String(req.params.proc || '');
+    try {
+        let detail = '';
+        if (proc === 'expirados') {
+            const n = await expireShipments();
+            detail = `${n || 0} envío(s) expirado(s)`;
+        } else if (proc === 'notificaciones') {
+            const { processPendingEmails } = require('../jobs/emailProcessorJob');
+            const s = await processPendingEmails();
+            detail = `${s?.sent || 0} email(s) enviado(s)`;
+        } else if (proc === 'demoras') {
+            const { processDelayedShipments } = require('../jobs/delayDetectionJob');
+            await processDelayedShipments();
+            detail = 'Detección de demoras ejecutada';
+        } else {
+            return res.redirect(settingBack(req, '?error=proc_desconocido'));
+        }
+        return res.redirect(settingBack(req, `?success=proc&proc=${encodeURIComponent(proc)}&detail=${encodeURIComponent(detail)}`));
+    } catch (err) {
+        console.error(`runProcess(${proc}):`, err.message);
+        return res.status(500).redirect(settingBack(req, '?error=proc_run'));
+    }
+};
+
+// Envía manualmente toda la cola de emails pendientes (sin esperar al cron).
+const flushEmailQueue = async (req, res) => {
+    try {
+        const { processPendingEmails } = require('../jobs/emailProcessorJob');
+        const summary = await processPendingEmails();
+        const sent = summary?.sent || 0;
+        const retried = summary?.retried || 0;
+        return res.redirect(settingBack(req, `?success=flush&sent=${sent}&retried=${retried}`));
+    } catch (err) {
+        console.error('flushEmailQueue:', err.message);
+        return res.status(500).redirect(settingBack(req, '?error=flush'));
+    }
+};
+
 // ===== Variables custom de notificación (ABM) =====
 const VAR_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 const saveNotificationVariable = async (req, res) => {
@@ -463,21 +503,18 @@ const saveIdentity = async (req, res) => {
         await settingLogModel.logChange(res.locals.currentUser?.id, 'nombre_empresa', oldNombre, nombre);
         await settingModel.set('nombre_empresa', nombre);
 
-        // Logo opcional: si se subió un archivo válido, guardar su ruta pública y borrar el anterior.
+        // Logo opcional: se persiste en la base (base64) y se sirve por /brand/logo.
+        // Antes se guardaba en disco, pero el filesystem de Render es efímero y el
+        // archivo se perdía en cada deploy (logo roto). La base sobrevive al deploy.
         if (req.file) {
-            const fs        = require('fs');
-            const path      = require('path');
-            const publicUrl = `/images/brand/${req.file.filename}`;
-            const oldLogo   = await settingModel.get('logo_empresa');
+            const oldLogo = await settingModel.get('logo_empresa');
+            // URL estable con versión para invalidar la caché del navegador al cambiar el logo.
+            const publicUrl = `/brand/logo?v=${Date.now()}`;
 
+            await settingModel.set('logo_empresa_data', req.file.buffer.toString('base64'));
+            await settingModel.set('logo_empresa_mime', req.file.mimetype || 'image/png');
             await settingLogModel.logChange(res.locals.currentUser?.id, 'logo_empresa', oldLogo, publicUrl);
             await settingModel.set('logo_empresa', publicUrl);
-
-            // Limpieza del logo previo (solo si vivía en el directorio de marca).
-            if (oldLogo && oldLogo.startsWith('/images/brand/')) {
-                const oldPath = path.join(__dirname, '..', '..', 'public', oldLogo);
-                fs.promises.unlink(oldPath).catch(() => { /* ya no existe */ });
-            }
         }
 
         res.redirect(settingBack(req, '?success=identity'));
@@ -802,6 +839,6 @@ module.exports = {
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
     triggerDelayDetection,
 };

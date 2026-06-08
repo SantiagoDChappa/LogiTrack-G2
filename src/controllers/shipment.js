@@ -1096,7 +1096,7 @@ async function resolveShipmentForNotification(shipmentOrId) {
     return shipmentModel.getById(id);
 }
 
-async function notifyShipmentEvent(eventCode, shipmentOrId) {
+async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
     try {
         const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
         if (!cfg || !cfg.enabled) { return; }
@@ -1118,8 +1118,8 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
             return;
         }
 
-        // Catálogo de datos del envío + variables custom del cliente.
-        const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap() };
+        // Catálogo de datos del envío + variables custom del cliente + variables extra (ej. contexto de incidencia).
+        const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap(), ...extraVars };
         if (eventCode === NotificationEvent.SHIPMENT_FAILED_ATTEMPT) {
             const attempts = await failedAttemptModel.getByShipmentId(shipment.id);
             const latest = attempts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];

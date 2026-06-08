@@ -476,8 +476,25 @@ const changeStatus = async (req, res) => {
             transaction: t
         });
     });
+    // Aviso al cliente del cambio de estado (plantilla editable en Ajustes).
+    notifyIncidentStatusChange(incident.shipmentId, id, toStatus);
     res.redirect(`/incident/${id}`);
 };
+
+// Notifica al cliente el cambio de estado de una incidencia vía el sistema de
+// plantillas editables (evento INCIDENT_STATUS_CHANGE). Fire-and-forget.
+const INCIDENT_STATUS_LABELS = {
+    [IncidentStatus.OPEN]:      'Abierta',
+    [IncidentStatus.IN_REVIEW]: 'En revisión',
+    [IncidentStatus.CLOSED]:    'Cerrada',
+};
+function notifyIncidentStatusChange(shipmentId, incidentId, toStatus) {
+    if (!shipmentId) { return; }
+    require('./shipment').notifyShipmentEvent(NotificationEvent.INCIDENT_STATUS_CHANGE, shipmentId, {
+        incidentId,
+        incidentEstado: INCIDENT_STATUS_LABELS[toStatus] || toStatus,
+    }).catch((e) => console.error('notifyIncidentStatusChange:', e.message));
+}
 
 const escalate = async (req, res) => {
     const user = res.locals.currentUser;
@@ -605,6 +622,8 @@ const close = async (req, res) => {
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, incident.shipmentId)
             .catch(e => console.error('[incident] notif CANCELLED:', e.message));
     }
+    // Aviso al cliente: la incidencia se cerró.
+    notifyIncidentStatusChange(incident.shipmentId, id, IncidentStatus.CLOSED);
 
     res.redirect(`/incident/${id}`);
 };
@@ -633,6 +652,8 @@ const reopen = async (req, res) => {
             transaction: t
         });
     });
+    // Aviso al cliente: la incidencia se reabrió (vuelve a En revisión).
+    notifyIncidentStatusChange(incident.shipmentId, id, IncidentStatus.IN_REVIEW);
     res.redirect(`/incident/${id}`);
 };
 

@@ -79,6 +79,9 @@ app.use('/', authRoutes);
 
 app.use(apiHealthRoutes);
 
+// Logo institucional servido desde la base (público: login, portal, encabezado).
+app.use('/brand', require('./src/routes/brand'));
+
 // Rutas Protegidas
 app.use('/home', requireAuth, homeRoutes);
 app.use('/user',          requireAuth, requireSupervisor, userRoutes);

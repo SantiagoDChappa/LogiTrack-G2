@@ -116,7 +116,7 @@
         .tplm-event { font-size:.8rem; color:var(--color-text-secondary); }
         .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
             display:inline-flex; padding:.2rem; border-radius:6px; }
-        .tplm-close:hover { background:var(--color-bg-secondary,#f1f3f5); color:var(--color-text); }
+        .tplm-close:hover { background:var(--color-surface-alt); color:var(--color-text); }
         .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
             padding:1.1rem 1.25rem; overflow:hidden; }
         .tplm-editor { display:contents; }
@@ -133,7 +133,7 @@
         .tplm-segmented button.is-active { background:var(--color-primary,#2563eb); color:#fff; }
         .tplm-chips { display:flex; flex-wrap:wrap; gap:.4rem; }
         .tplm-chip { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.78rem;
-            background:var(--color-bg-secondary,#eef2ff); color:var(--color-primary,#2563eb);
+            background:var(--color-surface-alt); color:var(--color-primary,#2563eb);
             border:1px solid var(--color-border,#dbe1ea); border-radius:999px;
             padding:.25rem .6rem; cursor:grab; transition:all .12s ease; }
         .tplm-chip:hover { background:var(--color-primary,#2563eb); color:#fff; }
@@ -163,11 +163,11 @@
         .abm-snip-form { flex:1; display:flex; flex-direction:column; gap:.4rem; min-width:0; }
         .abm-snip-head { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
         .abm-snip-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-secondary); }
-        .abm-badge { font-size:.68rem; background:var(--color-bg-secondary,#eef2ff); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:999px; padding:.1rem .5rem; }
+        .abm-badge { font-size:.68rem; background:var(--color-surface-alt); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:999px; padding:.1rem .5rem; }
         .tplm-hint { display:block; margin-top:.4rem; font-size:.78rem; color:var(--color-text-secondary); line-height:1.4; }
         .tplm-ph-desc { display:flex; align-items:flex-start; gap:.45rem; margin-top:.5rem;
             padding:.5rem .65rem; border:1px solid var(--color-border); border-radius:8px;
-            background:var(--color-bg-secondary,#f8fafc); color:var(--color-text-secondary);
+            background:var(--color-surface-alt); color:var(--color-text-secondary);
             font-size:.8rem; line-height:1.35; box-sizing:border-box;
             height:3.6rem; overflow:auto; transition:border-color .15s ease; }
         .tplm-ph-desc-text { display:block; }
@@ -177,7 +177,7 @@
         .tplm-ph-desc em { color:var(--color-text-secondary); font-style:italic; }
         .tplm-snippets { display:flex; flex-wrap:wrap; gap:.4rem; }
         .tplm-snip { display:inline-flex; align-items:center; gap:.35rem; font-size:.8rem;
-            background:var(--color-bg-secondary,#f1f5f9); color:var(--color-text);
+            background:var(--color-surface-alt); color:var(--color-text);
             border:1px solid var(--color-border,#dbe1ea); border-radius:8px;
             padding:.35rem .7rem; cursor:pointer; transition:all .12s ease; }
         .tplm-snip:hover { border-color:var(--color-primary,#2563eb); color:var(--color-primary,#2563eb); }
@@ -632,6 +632,37 @@
                 </form>
             </div>
 
+            <!-- Card: Ejecutar procesos manualmente (sin esperar al horario programado) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">play_circle</span>
+                    Ejecutar procesos ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Ejecutá manualmente un proceso en este momento, sin esperar al horario programado arriba. Útil para pruebas o para forzar el procesamiento.
+                </p>
+                <div style="display:flex;flex-direction:column;gap:.6rem">
+                    <% var _procs = [
+                        { id: 'expirados',      label: 'Revisar pedidos expirados', hint: 'Cancela envíos pendientes que superaron el límite de días.' },
+                        { id: 'demoras',        label: 'Detección de demoras',      hint: 'Avisa al cliente de envíos con demora significativa (y recuperaciones).' },
+                        { id: 'notificaciones', label: 'Envío de notificaciones pendientes', hint: 'Procesa y envía la cola de emails acumulados.' }
+                    ]; %>
+                    <% _procs.forEach(function(p) { %>
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                        <div>
+                            <strong><%= p.label %></strong>
+                            <small style="display:block;color:var(--color-text-secondary)"><%= p.hint %></small>
+                        </div>
+                        <form method="POST" action="/setting/run-process/<%= p.id %>" style="margin:0">
+                            <button type="submit" class="action-btn modificar" data-tooltip="Ejecutar ahora" aria-label="Ejecutar ahora">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>
+                        </form>
+                    </div>
+                    <% }); %>
+                </div>
+            </div>
+
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
             <% } %>
             <% if (activeSection === 'comunicaciones') { %>
@@ -652,7 +683,7 @@
                 <form method="POST" action="/setting/notification-config">
                     <div style="display:flex;flex-direction:column;gap:.6rem">
                         <% notifConfig.forEach(config => { %>
-                            <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                            <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
                                 <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
                                     <input type="checkbox" name="enabled_<%= config.eventCode %>"
                                         <%= config.enabled ? 'checked' : '' %>>
@@ -705,7 +736,7 @@
                     Placeholders disponibles: <code>{{codigo}}</code> (código de 6 dígitos) y <code>{{ttlHoras}}</code> (validez en horas).
                 </p>
                 <% if (templatesByEvent['PORTAL_CLIENT_ACCESS']) { %>
-                <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
                     <span style="font-weight:600">Plantilla de confirmación de acceso</span>
                     <button type="button" class="action-btn modificar notif-edit-tpl-btn"
                         data-event="PORTAL_CLIENT_ACCESS"
@@ -805,6 +836,25 @@
                     <div class="settings-actions">
                         <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
                             <span class="material-symbols-outlined">send</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Envío manual de la cola de emails -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">outbox</span>
+                    Enviar cola de emails ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Procesa y envía <strong>inmediatamente</strong> todos los emails pendientes en la cola, sin esperar al proceso automático programado.
+                    Los que fallen quedan reprogramados para reintento.
+                </p>
+                <form method="POST" action="/setting/flush-email-queue">
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Enviar pendientes ahora" aria-label="Enviar pendientes ahora">
+                            <span class="material-symbols-outlined">outbox</span>
                         </button>
                     </div>
                 </form>
@@ -1494,7 +1544,7 @@
                         gap:.5rem;
                         align-items:center;
                         padding:.5rem .75rem;
-                        background: var(--color-bg-secondary, #f8fafc);
+                        background: var(--color-surface-alt);
                         border:1px solid var(--color-border, #e2e8f0);
                         border-radius:8px;
                     }
@@ -1753,8 +1803,9 @@
             });
         }
 
-        const _param = new URLSearchParams(window.location.search).get('success');
-        if (_param === '1' || _param === '2' || _param === '3' || _param === '4') {
+        const _qs = new URLSearchParams(window.location.search);
+        const _param = _qs.get('success');
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             const _titles = {
                 '1': 'Ajustes guardados',
@@ -1762,9 +1813,22 @@
                 '3': 'Configuración de ruteo guardada',
                 '4': 'Parámetros guardados correctamente'
             };
+            let _title = _titles[_param];
+            let _text;
+            if (_param === 'flush') {
+                const _sent = parseInt(_qs.get('sent') || '0', 10);
+                const _retried = parseInt(_qs.get('retried') || '0', 10);
+                _title = _sent > 0 ? `${_sent} email(s) enviado(s)` : 'No había emails pendientes';
+                _text = _retried > 0 ? `${_retried} quedaron reprogramados para reintento.` : undefined;
+            }
+            if (_param === 'proc') {
+                _title = 'Proceso ejecutado';
+                _text = _qs.get('detail') || undefined;
+            }
             Swal.fire({
                 icon: 'success',
-                title: _titles[_param],
+                title: _title,
+                text: _text,
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
