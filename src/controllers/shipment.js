@@ -1096,6 +1096,14 @@ async function resolveShipmentForNotification(shipmentOrId) {
     return shipmentModel.getById(id);
 }
 
+// NFAL07 (LGT-158): eventos cuyo email lleva el link de autogestión accionable.
+// Al enviarlos se "arma" el token (vence en N días, rearmado para un uso).
+const ACTIONABLE_SELF_SERVICE_EVENTS = new Set([
+    NotificationEvent.SHIPMENT_FAILED_ATTEMPT,
+    NotificationEvent.SHIPMENT_DELAYED,
+    NotificationEvent.SHIPMENT_RETURNED_BRANCH,
+]);
+
 async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
     try {
         const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
@@ -1116,6 +1124,12 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
         if (recipients.length === 0) {
             console.warn(`notifyShipmentEvent: ${eventCode} sin destinatarios (mode=${mode})`);
             return;
+        }
+
+        // NFAL07: arma el link accionable cuando efectivamente se envía el aviso.
+        if (ACTIONABLE_SELF_SERVICE_EVENTS.has(eventCode)) {
+            shipmentModel.armSelfServiceToken(shipment.id)
+                .catch(e => console.error('notifyShipmentEvent armSelfServiceToken:', e.message));
         }
 
         // Catálogo de datos del envío + variables custom del cliente + variables extra (ej. contexto de incidencia).

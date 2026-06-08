@@ -1,4 +1,7 @@
 const { Shipment } = require('../models/shipment');
+const shipmentModel = require('../models/shipment');
+// NFAL07 (LGT-158): mensaje único cuando el link accionable ya no sirve.
+const SELF_SERVICE_LINK_INVALID_MSG = 'Este enlace ya no es válido. Para gestionar tu envío ingresá al portal o contactá a soporte.';
 const { Person } = require('../models/person');
 const { Status } = require('../models/status');
 const { Address } = require('../models/address');
@@ -638,6 +641,11 @@ const getSelfServiceForm = async (req, res) => {
             ],
         });
         if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
+        // NFAL07: link de un solo uso + vencimiento. Si ya se usó o venció, se rechaza.
+        // Excepción: justo después de reprogramar (?saved=1) se muestra la confirmación.
+        if (shipmentModel.selfServiceTokenState(shipment) !== 'ok' && req.query.saved !== '1') {
+            return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
         const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
@@ -669,6 +677,10 @@ const saveSelfService = async (req, res) => {
             ],
         });
         if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        // NFAL07: no permitir reprogramar con un link ya usado o vencido.
+        if (shipmentModel.selfServiceTokenState(shipment) !== 'ok') {
+            return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
 
         const result = await submitPortalModification({
             shipment,
@@ -691,6 +703,10 @@ const saveSelfService = async (req, res) => {
                 error: result.message,
             });
         }
+
+        // NFAL07: consumir el link tras una reprogramación exitosa (un solo uso).
+        await shipmentModel.markSelfServiceTokenUsed(shipment.id)
+            .catch(e => console.error('markSelfServiceTokenUsed:', e.message));
 
         const qs = new URLSearchParams({ saved: '1' });
         if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
