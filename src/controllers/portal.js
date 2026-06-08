@@ -631,13 +631,16 @@ const getSelfServiceForm = async (req, res) => {
         const shipment = await Shipment.findOne({
             where: { portalToken: token },
             include: [
-                { model: Person, as: 'recipient', attributes: ['fullName'] },
-                { model: Status, as: 'status',    attributes: ['description'] },
+                { model: Person, as: 'recipient', attributes: ['fullName'], required: false },
+                { model: Status, as: 'status',    attributes: ['description'], required: false },
                 { model: Address, as: 'address',  required: false, include: [{ model: Province, as: 'province' }] },
                 { model: Branch,  as: 'pickupBranch', required: false },
             ],
         });
-        if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
+        if (!shipment) { return res.status(404).render('error', { status: 404, reason: 'Este enlace ya no es válido. Para gestionar tu envío ingresá al portal o contactá a soporte.' }); }
+        if (shipment.portalTokenExpiresAt && new Date() > new Date(shipment.portalTokenExpiresAt)) {
+            return res.status(404).render('error', { status: 404, reason: 'Este enlace expiró. Para gestionar tu envío ingresá al portal o contactá a soporte.' });
+        }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
         const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
@@ -692,14 +695,25 @@ const saveSelfService = async (req, res) => {
             });
         }
 
+        // Invalidar el token usado para que el link del email no pueda reutilizarse.
+        const { generatePortalToken, generatePortalTokenExpiry } = require('../utils/shipmentTokens');
+        await shipment.update({ portalToken: generatePortalToken(), portalTokenExpiresAt: generatePortalTokenExpiry() });
+
         const qs = new URLSearchParams({ saved: '1' });
         if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
         if (result.pending?.length) { qs.set('pending', String(result.pending.length)); }
-        res.redirect(`/portal/self/${token}?${qs.toString()}`);
+        res.redirect(`/portal/self-saved/${shipment.trackingId}?${qs.toString()}`);
     } catch (err) {
         console.error('saveSelfService:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService };
+const getSelfServiceSaved = (req, res) => {
+    const { trackingId } = req.params;
+    const appliedCount = Number(req.query.applied) || 0;
+    const pendingCount = Number(req.query.pending) || 0;
+    res.render('portal/selfServiceSaved', { trackingId, appliedCount, pendingCount });
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };

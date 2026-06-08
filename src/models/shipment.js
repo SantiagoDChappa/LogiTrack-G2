@@ -39,6 +39,7 @@ const Shipment = sequelize.define('shipment', {
     deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
     // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
     portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
+    portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
     // Sprint 4 - Notificación de demora (LGT-160)
     delayNotifiedAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'delayNotifiedAt' },
 },
@@ -105,11 +106,12 @@ const generateTrackingId = async (prefix = 'ENV') => {
 
 const create = async (data, options = {}) => {
     const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
-    const { generateSecretCode, generatePortalToken } = require('../utils/shipmentTokens');
+    const { generateSecretCode, generatePortalToken, generatePortalTokenExpiry } = require('../utils/shipmentTokens');
     return Shipment.create({
         trackingId,
-        deliverySecretCode: data.deliverySecretCode || generateSecretCode(),
-        portalToken:        data.portalToken        || generatePortalToken(),
+        deliverySecretCode:   data.deliverySecretCode   || generateSecretCode(),
+        portalToken:          data.portalToken          || generatePortalToken(),
+        portalTokenExpiresAt: data.portalTokenExpiresAt || generatePortalTokenExpiry(),
         statusId:         data.statusId || 1,
         senderId:         data.senderId,
         recipientId:      data.recipientId,

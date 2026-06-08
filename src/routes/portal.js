@@ -3,7 +3,7 @@ const router = express.Router();
 const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
-    getSelfServiceForm, saveSelfService,
+    getSelfServiceForm, saveSelfService, getSelfServiceSaved,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -46,8 +46,9 @@ router.get('/portal/incident/types',   getIncidentTypesApi);
 router.post('/portal/incident/api',    createPublicApi);
 
 // Sprint 3 - 3.2 Autogestión destinatario (token único por envío)
-router.get('/portal/self/:token',      getSelfServiceForm);
-router.post('/portal/self/:token',     saveSelfService);
+router.get('/portal/self/:token',             getSelfServiceForm);
+router.post('/portal/self/:token',            saveSelfService);
+router.get('/portal/self-saved/:trackingId',  getSelfServiceSaved);
 
 // CP-ENCS03 — Encuesta de satisfacción accesible desde el email sin login (token firmado)
 router.get('/portal/encuesta/:token',  getPublicSurveyForm);
