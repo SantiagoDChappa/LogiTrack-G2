@@ -49,6 +49,9 @@ const CATALOG = [
     { token: 'trackingUrl',    label: 'Enlace seguimiento',  group: 'Enlaces',      description: '🔗 Ver el seguimiento del envío en el portal.', resolve: s => (s.trackingId ? `${baseUrl()}/portal?q=${encodeURIComponent(s.trackingId)}` : baseUrl()) },
     { token: 'selfServiceUrl', label: 'Enlace autogestión',  group: 'Enlaces',      description: '🔗 Reprogramar o elegir retiro en sucursal (sin login).', resolve: s => (s.portalToken ? `${baseUrl()}/portal/self/${s.portalToken}` : (s.trackingId ? `${baseUrl()}/portal?q=${encodeURIComponent(s.trackingId)}` : baseUrl())) },
     { token: 'incidentUrl',    label: 'Enlace incidencia',   group: 'Enlaces',      description: '🔗 Reportar o responder una incidencia del envío.', resolve: s => (s.trackingId ? `${baseUrl()}/portal/incident/new?trackingId=${encodeURIComponent(s.trackingId)}` : `${baseUrl()}/portal/incident/new`) },
+    // Acceso al portal — solo aplican al evento PORTAL_CLIENT_ACCESS (se resuelven al pedir el código).
+    { token: 'codigo',         label: 'Código de verificación', group: 'Acceso al portal', description: 'Código de 6 dígitos para acceder a "Mis envíos".', resolve: s => s._codigo || '' },
+    { token: 'ttlHoras',       label: 'Validez (horas)',        group: 'Acceso al portal', description: 'Cantidad de horas que el código sigue siendo válido.', resolve: s => (notNil(s._ttlHoras) ? String(s._ttlHoras) : '') },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
@@ -71,6 +74,8 @@ const catalogMeta = () => CATALOG.map(({ token, label, description, group }) => 
 // Shipment de ejemplo para previsualización / email de prueba.
 const sampleShipment = () => ({
     trackingId: 'ENV-001234',
+    _codigo: '482913',
+    _ttlHoras: 24,
     expectedDeliveryDate: new Date(),
     expectedDeliveryFrom: '09:00', expectedDeliveryTo: '13:00',
     codAmount: 15000,

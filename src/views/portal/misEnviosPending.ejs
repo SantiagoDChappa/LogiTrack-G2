@@ -36,32 +36,33 @@
                 </div>
                 <% } %>
 
-                <% if (!mailDelivered && devCode) { %>
+                <% if ((typeof mailDelivered === 'undefined' || !mailDelivered) && typeof devCode !== 'undefined' && devCode) { %>
                 <div class="alert alert-error" style="text-align:left; margin-top:1rem;">
                     <strong>Modo desarrollo:</strong> SMTP no configurado. Código de prueba:
                     <strong style="letter-spacing:.2em;font-size:1.2em;"><%= devCode %></strong>
                 </div>
                 <% } %>
 
-                <form method="POST" action="/portal/mis-envios/confirm" style="margin-top:1.25rem;display:flex;flex-direction:column;gap:.75rem;align-items:center">
+                <form method="POST" action="/portal/mis-envios/confirm" class="portal-access-form">
                     <input type="hidden" name="email" value="<%= email %>">
                     <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
                     <input type="hidden" name="expiresAt" value="<%= expiresAt %>">
                     <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
-                        autocomplete="one-time-code" placeholder="000000"
-                        style="font-size:1.6em;letter-spacing:.4em;text-align:center;width:7em;padding:.5rem;border:1px solid var(--color-border,#ccc);border-radius:8px">
-                    <button type="submit" class="btn-primary">Confirmar acceso</button>
+                        autocomplete="one-time-code" placeholder="000000" class="portal-access-code-input">
+                    <button type="submit" class="btn-primary portal-access-confirm">Confirmar acceso</button>
                 </form>
 
-                <form method="POST" action="/portal/mis-envios/acceso" style="margin-top:1rem">
-                    <input type="hidden" name="email" value="<%= email %>">
-                    <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
-                    <button type="submit" class="portal-link-btn" style="background:none;border:none;color:var(--color-primary,#2563eb);cursor:pointer;text-decoration:underline">
-                        Reenviar código
-                    </button>
-                </form>
-
-                <a href="/portal/mis-envios" style="margin-top:.5rem;color:var(--color-text-secondary)">Volver</a>
+                <div class="portal-access-secondary">
+                    <form method="POST" action="/portal/mis-envios/acceso">
+                        <input type="hidden" name="email" value="<%= email %>">
+                        <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
+                        <button type="submit" class="portal-access-resend">
+                            <span class="material-symbols-outlined">refresh</span>
+                            Reenviar código
+                        </button>
+                    </form>
+                    <a href="/portal/mis-envios" class="portal-access-back">Volver</a>
+                </div>
             </div>
         </div>
     </section>
