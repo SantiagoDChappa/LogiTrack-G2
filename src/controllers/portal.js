@@ -634,8 +634,8 @@ const getSelfServiceForm = async (req, res) => {
         const shipment = await Shipment.findOne({
             where: { portalToken: token },
             include: [
-                { model: Person, as: 'recipient', attributes: ['fullName'] },
-                { model: Status, as: 'status',    attributes: ['description'] },
+                { model: Person, as: 'recipient', attributes: ['fullName'], required: false },
+                { model: Status, as: 'status',    attributes: ['description'], required: false },
                 { model: Address, as: 'address',  required: false, include: [{ model: Province, as: 'province' }] },
                 { model: Branch,  as: 'pickupBranch', required: false },
             ],
@@ -711,11 +711,18 @@ const saveSelfService = async (req, res) => {
         const qs = new URLSearchParams({ saved: '1' });
         if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
         if (result.pending?.length) { qs.set('pending', String(result.pending.length)); }
-        res.redirect(`/portal/self/${token}?${qs.toString()}`);
+        res.redirect(`/portal/self-saved/${shipment.trackingId}?${qs.toString()}`);
     } catch (err) {
         console.error('saveSelfService:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService };
+const getSelfServiceSaved = (req, res) => {
+    const { trackingId } = req.params;
+    const appliedCount = Number(req.query.applied) || 0;
+    const pendingCount = Number(req.query.pending) || 0;
+    res.render('portal/selfServiceSaved', { trackingId, appliedCount, pendingCount });
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };

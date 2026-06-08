@@ -110,11 +110,12 @@ const generateTrackingId = async (prefix = 'ENV') => {
 
 const create = async (data, options = {}) => {
     const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
-    const { generateSecretCode, generatePortalToken } = require('../utils/shipmentTokens');
+    const { generateSecretCode, generatePortalToken, generatePortalTokenExpiry } = require('../utils/shipmentTokens');
     return Shipment.create({
         trackingId,
-        deliverySecretCode: data.deliverySecretCode || generateSecretCode(),
-        portalToken:        data.portalToken        || generatePortalToken(),
+        deliverySecretCode:   data.deliverySecretCode   || generateSecretCode(),
+        portalToken:          data.portalToken          || generatePortalToken(),
+        portalTokenExpiresAt: data.portalTokenExpiresAt || generatePortalTokenExpiry(),
         statusId:         data.statusId || 1,
         senderId:         data.senderId,
         recipientId:      data.recipientId,
