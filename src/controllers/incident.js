@@ -79,6 +79,8 @@ const list = async (req, res) => {
         priority:          req.query.priority ? Number(req.query.priority) : null,
         assignedToUserId:  req.query.assignedToUserId ? Number(req.query.assignedToUserId) : null,
         shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null,
+        // Búsqueda por código de envío (ej. "ENV-011").
+        trackingId:        req.query.trackingId ? String(req.query.trackingId).trim() : null,
         openedChannel:     req.query.origin === 'EXTERNO' ? IncidentChannel.PORTAL
                           : req.query.origin === 'INTERNO' ? IncidentChannel.INTERNAL
                           : null,
