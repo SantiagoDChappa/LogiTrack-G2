@@ -551,7 +551,12 @@ header {
     top: 0;
     left: 0;
     width: 240px;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     z-index: 100;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
@@ -569,13 +574,14 @@ header {
   .left-header .nav {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 1 0 auto;
   }
 
   .left-header .theme-toggle {
     margin-left: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding: 0.75rem 0.5rem;
+    flex-shrink: 0;
   }
 
   /* Top header: full width, fixed */
