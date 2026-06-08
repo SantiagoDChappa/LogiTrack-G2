@@ -55,5 +55,6 @@ router.post('/test-shipment-notification', requireAdmin, settingController.testS
 router.post('/flush-email-queue',          requireAdmin, settingController.flushEmailQueue);
 // Ejecutar manualmente un proceso automático ahora (expirados | notificaciones | demoras).
 router.post('/run-process/:proc',          requireAdmin, settingController.runProcess);
+router.post('/trigger-delay-detection',   requireAdmin, settingController.triggerDelayDetection);
 
 module.exports = router;

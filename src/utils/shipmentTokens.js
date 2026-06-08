@@ -15,6 +15,14 @@ const generateSecretCode = (length = 6) => {
     return out;
 };
 
+const PORTAL_TOKEN_TTL_HOURS = 72;
+
 const generatePortalToken = () => crypto.randomBytes(24).toString('base64url');
 
-module.exports = { generateSecretCode, generatePortalToken };
+const generatePortalTokenExpiry = () => {
+    const d = new Date();
+    d.setHours(d.getHours() + PORTAL_TOKEN_TTL_HOURS);
+    return d;
+};
+
+module.exports = { generateSecretCode, generatePortalToken, generatePortalTokenExpiry, PORTAL_TOKEN_TTL_HOURS };
