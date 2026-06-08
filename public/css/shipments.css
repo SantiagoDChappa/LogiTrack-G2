@@ -1842,9 +1842,66 @@
 }
 
 .pred-days .material-symbols-outlined,
-.pred-dist .material-symbols-outlined {
+.pred-dist .material-symbols-outlined,
+.pred-prob--sub .material-symbols-outlined {
   font-size: 1rem;
 }
+
+/* ── Semáforo de fiabilidad (LGT-111) ── */
+.pred-semaforo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.pred-semaforo--alta  { background: #dcfce7; color: #166534; }
+.pred-semaforo--media { background: #fef9c3; color: #854d0e; }
+.pred-semaforo--baja  { background: #fee2e2; color: #991b1b; }
+
+.pred-prob--sub { margin-top: var(--space-1); }
+
+/* Etiquetas/factores como chips (antes salían pegadas y sin estilo) */
+.pred-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-3);
+}
+.pred-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Aviso de fiabilidad baja + repartidor sugerido */
+.pred-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-3);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+.pred-alert .material-symbols-outlined { font-size: 1.1rem; flex-shrink: 0; }
+
+[data-theme="dark"] .pred-tag { background: var(--color-surface); }
+[data-theme="dark"] .pred-alert { background: #2a1416; border-color: #7f1d1d; color: #fca5a5; }
 
 @keyframes pred-spin {
   to { transform: rotate(360deg); }
