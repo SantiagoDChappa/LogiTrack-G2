@@ -12,8 +12,9 @@ WHERE NOT EXISTS (
     SELECT 1 FROM logitrack.notification_events WHERE "code"::text = 'INCIDENT_STATUS_CHANGE'
 );
 
+-- recipient_mode 'both': el aviso le llega al cliente que reportó (remitente o destinatario). Ver CP-SEGC08.
 INSERT INTO logitrack.notification_config ("eventCode", "enabled", "recipient_mode")
-SELECT 'INCIDENT_STATUS_CHANGE'::"logitrack"."type_notification_event", true, 'recipient'
+SELECT 'INCIDENT_STATUS_CHANGE'::"logitrack"."type_notification_event", true, 'both'
 WHERE NOT EXISTS (
     SELECT 1 FROM logitrack.notification_config WHERE "eventCode"::text = 'INCIDENT_STATUS_CHANGE'
 );

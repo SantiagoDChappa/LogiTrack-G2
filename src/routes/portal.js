@@ -27,7 +27,7 @@ const portalEvidenceUpload = (req, res, next) => {
     evidenceUpload.single('evidence')(req, res, (err) => {
         if (!err) { return next(); }
         if (err.code === 'LIMIT_FILE_SIZE') {
-            req.uploadError = 'El archivo supera el tamaño máximo permitido de 5 MB.';
+            req.uploadError = 'Archivo excede los 10MB';
         } else {
             req.uploadError = err.message || 'Archivo no válido.';
         }
