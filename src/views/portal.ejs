@@ -200,7 +200,7 @@
                     <div class="portal-card-grid">
                         <div class="portal-card-field">
                             <span class="portal-card-label">Destinatario</span>
-                            <span class="portal-card-value"><%= s.recipient.fullName %></span>
+                            <span class="portal-card-value"><%= s.recipient ? s.recipient.fullName : '—' %></span>
                         </div>
                         <div class="portal-card-field">
                             <span class="portal-card-label">Tipo de envio</span>
@@ -240,7 +240,7 @@
                         </div>
                         <div class="portal-card-field">
                             <span class="portal-card-label">Remitente</span>
-                            <span class="portal-card-value"><%= s.sender.fullName %></span>
+                            <span class="portal-card-value"><%= s.sender ? s.sender.fullName : '—' %></span>
                         </div>
                     </div>
 

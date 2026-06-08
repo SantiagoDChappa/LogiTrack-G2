@@ -149,15 +149,16 @@
 <% shipments.forEach(shipment => { %>
                             <tr>
                                 <td class="tracking-id"><%= shipment.trackingId %></td>
-                                <td><%= shipment.sender.fullName %></td>
-                                <td><%= shipment.sender.document %></td>
-                                <td><%= shipment.recipient.fullName %></td>
-                                <td><%= shipment.recipient.document %></td>
+                                <td><%= shipment.sender ? shipment.sender.fullName : '—' %></td>
+                                <td><%= shipment.sender ? shipment.sender.document : '—' %></td>
+                                <td><%= shipment.recipient ? shipment.recipient.fullName : '—' %></td>
+                                <td><%= shipment.recipient ? shipment.recipient.document : '—' %></td>
                                 <td>
-                                    <% const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
+                                    <% const _desc = shipment.status && shipment.status.description ? shipment.status.description : ''; %>
+                                    <% const _sk = _desc.toLowerCase().replace(/[\s-]+/g, '_'); %>
                                     <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'}; %>
                                     <span class="status-badge <%= _sk %>">
-                                        <%= _sl[_sk] || shipment.status.description %>
+                                        <%= _sl[_sk] || _desc || 'Sin estado' %>
                                     </span>
                                     <!-- <% const _p = shipment.latestPrediction; %>
                                     <% if (_p) { %>
