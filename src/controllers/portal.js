@@ -660,8 +660,8 @@ const getSelfServiceForm = async (req, res) => {
             pendingCount: Number(req.query.pending) || 0,
         });
     } catch (err) {
-        console.error('getSelfServiceForm:', err.message);
-        res.status(500).render('error', { message: 'Error al cargar autogestión' });
+        console.error('getSelfServiceForm:', err.message, err.stack);
+        res.status(500).render('error', { status: 500, reason: err.message });
     }
 };
 
