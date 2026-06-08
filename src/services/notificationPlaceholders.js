@@ -52,6 +52,9 @@ const CATALOG = [
     // Acceso al portal — solo aplican al evento PORTAL_CLIENT_ACCESS (se resuelven al pedir el código).
     { token: 'codigo',         label: 'Código de verificación', group: 'Acceso al portal', description: 'Código de 6 dígitos para acceder a "Mis envíos".', resolve: s => s._codigo || '' },
     { token: 'ttlHoras',       label: 'Validez (horas)',        group: 'Acceso al portal', description: 'Cantidad de horas que el código sigue siendo válido.', resolve: s => (notNil(s._ttlHoras) ? String(s._ttlHoras) : '') },
+    // Incidencia — aplican al evento INCIDENT_STATUS_CHANGE (se resuelven al cambiar el estado).
+    { token: 'incidentId',     label: 'N° de incidencia',       group: 'Incidencia', description: 'Identificador de la incidencia.',         resolve: s => (notNil(s._incidentId) ? String(s._incidentId) : '') },
+    { token: 'incidentEstado', label: 'Estado de incidencia',   group: 'Incidencia', description: 'Nuevo estado de la incidencia.',           resolve: s => s._incidentEstado || '' },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
@@ -62,6 +65,21 @@ const buildVars = (shipment) => {
         try { vars[p.token] = p.resolve(s); } catch { vars[p.token] = ''; }
     }
     return vars;
+};
+
+// CP-CNNF04: detección de variables {{token}} no válidas en una plantilla.
+const TOKEN_RE = /\{\{\s*([\w]+)\s*\}\}/g;
+const knownTokens = () => new Set(CATALOG.map((p) => p.token));
+const extractTokens = (str) => {
+    const out = new Set();
+    String(str || '').replace(TOKEN_RE, (_, k) => { out.add(k); return _; });
+    return [...out];
+};
+// Tokens usados en `str` que NO están permitidos. `allowedExtra`: tokens válidos extra (ej. variables custom).
+const findUnknownTokens = (str, allowedExtra = []) => {
+    const allowed = knownTokens();
+    for (const t of allowedExtra) { allowed.add(t); }
+    return extractTokens(str).filter((t) => !allowed.has(t));
 };
 
 // Reemplazo genérico {{key}} (mismo criterio que standardMessage.render).
@@ -83,6 +101,8 @@ const sampleShipment = () => ({
     portalToken: 'demo-token-1234',
     _failedReason: 'Destinatario ausente',
     _daysDelayed: '3',
+    _incidentId: '1024',
+    _incidentEstado: 'En revisión',
     recipient: { fullName: 'Juan Pérez', email: 'juan@ejemplo.com', phone: '11-5555-0000', document: 30111222 },
     sender:    { fullName: 'Tienda Online SA' },
     status:    { description: 'En Sucursal' },
@@ -91,4 +111,4 @@ const sampleShipment = () => ({
     currentBranch: { name: 'Sucursal Centro' },
 });
 
-module.exports = { CATALOG, buildVars, render, catalogMeta, sampleShipment };
+module.exports = { CATALOG, buildVars, render, catalogMeta, sampleShipment, findUnknownTokens, extractTokens };

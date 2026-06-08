@@ -1819,6 +1819,21 @@
                 color:      isDark ? '#f1f5f9' : '#1e293b',
             }).then(() => { history.replaceState(null, '', window.location.pathname); });
         }
+
+        // CP-CNNF04: error de variables inválidas en plantilla (mensaje dinámico en ?msg).
+        const _err = _qs.get('error');
+        if (_err === 'tpl_vars') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'error',
+                title: 'Variables no válidas',
+                text: _qs.get('msg') || 'La plantilla usa variables que no existen.',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color:      isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
+        }
     </script>
 </body>
 
