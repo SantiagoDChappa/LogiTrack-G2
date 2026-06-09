@@ -1005,9 +1005,10 @@
         return best;
     }
 
-    // Inicializa posición mid en mobile, full (sin transform) en desktop
+    // Inicializa el sheet plegado en mobile (solo el handle; mapa al máximo).
+    // El conductor lo arrastra hacia arriba para ver el envío. Desktop: full.
     function initSheet() {
-        if (isMobile()) snapTo('mid');
+        if (isMobile()) snapTo('tucked');
         else setSheetY(0);
     }
     initSheet();
