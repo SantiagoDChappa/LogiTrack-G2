@@ -106,6 +106,9 @@ const submitSurvey = async (shipmentId, client, answers) => {
     const validation = validateRatings(answers);
     if (!validation.ok) return validation;
 
+    // El destinatario puede no tener documento/email cargado: guardamos NULL en
+    // vez de NaN/'null' (evita "invalid input syntax for type integer").
+    const docNum = Number(client.document);
     const survey = await surveyModel.create({
         shipmentId,
         overallRating: Number(answers.overallRating),
@@ -113,8 +116,8 @@ const submitSurvey = async (shipmentId, client, answers) => {
         packageConditionRating: Number(answers.packageConditionRating),
         serviceRating: Number(answers.serviceRating),
         comment: answers.comment ? String(answers.comment).trim().slice(0, COMMENT_MAX_LENGTH) : null,
-        respondedByDocument: Number(client.document),
-        respondedByEmail: String(client.email).toLowerCase().trim(),
+        respondedByDocument: Number.isFinite(docNum) ? docNum : null,
+        respondedByEmail: client.email ? String(client.email).toLowerCase().trim() : null,
     });
 
     return { ok: true, surveyId: survey.id, shipmentId };
