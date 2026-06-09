@@ -360,6 +360,11 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
     const reason = (reasonText || reasonCode || comment || '').trim();
     if (!reason) { return res.status(400).json({ error: 'Motivo obligatorio' }); }
 
+    // Paquete dañado tiene un flujo propio: el remitente decide reembolso o reemplazo,
+    // no se le ofrece reentrega (esperar nueva fecha o retirar por sucursal).
+    const isDamaged = ['paquete_dañado', 'paquete_danado'].includes(reasonCode)
+        || /\bdanad/.test(String(reason).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+
     const failedAttemptModel = require('../models/failedAttempt');
     const { getSuggestedDate } = require('../utils/failedAttempt');
 
@@ -378,6 +383,44 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             suggestedDate:    getSuggestedDate(reason),
             status:           retrySameDay ? 'reintento_mismo_dia' : 'pendiente',
         });
+
+        // === Paquete dañado: incidencia + email de gestión (reembolso / reemplazo) al
+        // remitente, y estado terminal PACKAGE_FAILED. NO se manda el aviso de reentrega.
+        if (isDamaged) {
+            const { NotificationEvent: NED } = require('../constants/enums');
+            try {
+                const inc = await createDamageIncident({
+                    shipmentId: stop.shipmentId,
+                    description: `Paquete dañado reportado en ruta. Motivo: ${reason}.${comment ? ' Detalle: ' + comment : ''}`,
+                    userId: res.locals.currentUser?.id || null,
+                });
+                // Aviso informativo de incidencia + email accionable al remitente (reembolso/reemplazo).
+                require('../controllers/shipment').notifyShipmentEvent(NED.SHIPMENT_INCIDENT, stop.shipmentId)
+                    .catch(e => console.error('notif INCIDENT', stop.shipmentId, e.message));
+                require('../services/incidentDamageResolution').notifySenderIfDamage({
+                    incidentId: inc?.id || null,
+                    shipment: { id: stop.shipmentId, trackingId: stop.shipment?.trackingId },
+                    type: { code: 'PACKAGE_BROKEN' },
+                }).catch(e => console.error('notif damage choice', stop.shipmentId, e.message));
+            } catch (incErr) {
+                console.error('auto-incident dañado err:', incErr.message);
+            }
+            // Estado PACKAGE_FAILED (emite SHIPMENT_PACKAGE_FAILED, no reentrega).
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.PACKAGE_FAILED.id,
+                actor: res.locals.currentUser,
+                comment: reason,
+                latitude: latitude  || null,
+                longitude: longitude || null,
+            });
+            await RouteStop.update(
+                { completed: true, completedAt: new Date() },
+                { where: { id: stop.id, routeId: route.id } }
+            );
+            return res.json({ ok: true, packageFailed: true });
+        }
+
         // Verificar si superó el máximo de intentos fallidos.
         // Sprint 3 - 2.5: si el motivo configurado tiene maxAttemptsOverride, usar ese.
         // El intento recién creado YA cuenta; se cancela al alcanzar el tope, no después.
@@ -981,6 +1024,31 @@ router.get('/route/:id/summary', requireDelivery, async (req, res) => {
         const failed    = stops.filter(s => s.stopType === 'delivery' && s.completed && s.shipment?.statusId === Status.FAILED_ATTEMPT.id);
         const skipped   = stops.filter(s => s.skipped && !s.completed);
 
+        // Paquete dañado NO va a la devolución por escaneo: ese caso lo define el
+        // cliente (se abrió incidencia). Solo se devuelven a sucursal los fallidos
+        // por otros motivos (ausente, dirección errónea, etc.).
+        const isDamageReason = (code, text) => {
+            if (['paquete_dañado', 'paquete_danado'].includes(code)) { return true; }
+            const t = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            return /\bdanad/.test(t); // "dañado" / "danado"
+        };
+        const failedShipmentIds = failed.map(s => s.shipmentId).filter(Boolean);
+        const damagedShipmentIds = new Set();
+        if (failedShipmentIds.length) {
+            const { FailedAttempt } = require('../models/failedAttempt');
+            const attempts = await FailedAttempt.findAll({
+                where: { shipmentId: { [Op.in]: failedShipmentIds } },
+                order: [['attemptDate', 'DESC']],
+            });
+            // Toma el intento más reciente por envío (la lista ya viene ordenada DESC).
+            const latestByShipment = new Map();
+            for (const a of attempts) { if (!latestByShipment.has(a.shipmentId)) { latestByShipment.set(a.shipmentId, a); } }
+            for (const [sid, a] of latestByShipment) {
+                if (isDamageReason(a.reasonCode, a.reason)) { damagedShipmentIds.add(sid); }
+            }
+        }
+        const failedForReturn = failed.filter(s => !damagedShipmentIds.has(s.shipmentId));
+
         const km = Number(route.totalDistanceKm || 0);
         const startedAt  = route.startedAt  ? new Date(route.startedAt)  : null;
         const finishedAt = route.finishedAt ? new Date(route.finishedAt) : null;
@@ -999,7 +1067,7 @@ router.get('/route/:id/summary', requireDelivery, async (req, res) => {
             deliveredCount: delivered.length,
             failedCount:    failed.length,
             skippedCount:   skipped.length,
-            failedStops:    failed,
+            failedStops:    failedForReturn,
             km,
             grossSec, pauseSec, effectiveSec,
             fuelL, fuelCost, commission,
