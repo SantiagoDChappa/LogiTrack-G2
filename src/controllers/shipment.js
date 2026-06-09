@@ -1145,6 +1145,19 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
             const diffDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
             vars.daysDelayed = String(diffDays);
         }
+        // Avisos sobre una incidencia ya creada (paquete dañado / incidencia / cambio de
+        // estado): el enlace debe llevar a ESA incidencia, no al alta de una nueva.
+        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED];
+        if (!vars._incidentId && INCIDENT_EVENTS.includes(eventCode)) {
+            try {
+                const { Incident } = require('../models/incident');
+                const inc = await Incident.findOne({ where: { shipmentId: shipment.id }, order: [['id', 'DESC']] });
+                if (inc) { vars._incidentId = String(inc.id); }
+            } catch { /* sin incidencia → queda el enlace de alta */ }
+        }
+        if (vars._incidentId) {
+            vars.incidentUrl = `${placeholders.baseUrl()}/portal/mis-envios/incidencia/${vars._incidentId}`;
+        }
         const fill = (s) => placeholders.render(s, vars);
 
         await queueEmail({
