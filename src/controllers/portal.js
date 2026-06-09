@@ -650,6 +650,10 @@ const getSelfServiceForm = async (req, res) => {
         const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
         const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
+        // Recalcula la fecha estimada para cada modalidad: el destinatario ve, en vivo,
+        // cuándo recibiría a domicilio vs cuándo podría retirar por sucursal y decide.
+        const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+        const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
         res.render('portal/selfService', {
             shipment,
             timeWindows,
@@ -658,6 +662,8 @@ const getSelfServiceForm = async (req, res) => {
             saved: req.query.saved === '1',
             appliedCount: Number(req.query.applied) || 0,
             pendingCount: Number(req.query.pending) || 0,
+            etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
+            etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
         });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
@@ -692,6 +698,8 @@ const saveSelfService = async (req, res) => {
         });
 
         if (!result.ok) {
+            const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+            const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
             return res.status(result.status || 400).render('portal/selfService', {
                 shipment,
                 timeWindows: await require('../models/deliveryTimeWindow').getActive(),
@@ -701,6 +709,8 @@ const saveSelfService = async (req, res) => {
                 appliedCount: 0,
                 pendingCount: 0,
                 error: result.message,
+                etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
+                etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
             });
         }
 
