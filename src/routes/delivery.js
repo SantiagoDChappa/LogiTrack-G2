@@ -726,6 +726,7 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
         reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
         voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
+        voiceAcousticEnabled: cfg.voiceAcousticEnabled,
     });
 });
 

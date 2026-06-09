@@ -23,6 +23,11 @@ describe('Ojo de Patrón — scorer (US-3/US-9)', () => {
     test('voz matchRatio bajo → fatiga alta', () => {
         expect(scorer.scoreFromVoice({ matchRatio: 0 })).toBeGreaterThanOrEqual(95);
     });
+    test('voz acousticScore tiene prioridad sobre matchRatio', () => {
+        // Aunque la frase coincida perfecto, manda el puntaje acústico real.
+        expect(scorer.scoreFromVoice({ matchRatio: 1, acousticScore: 90 })).toBe(90);
+        expect(scorer.scoreFromVoice({ matchRatio: 0, acousticScore: 10 })).toBe(10);
+    });
     test('score() despacha por método y valida', () => {
         expect(scorer.score({ method: 'REACCION', metrics: { reactionsMs: [300] } })).toBeGreaterThanOrEqual(0);
         expect(() => scorer.score({ method: 'NADA' })).toThrow();

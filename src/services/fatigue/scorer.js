@@ -19,12 +19,14 @@ function scoreFromReaction(reactionsMs = [], fastMs = 250, slowMs = 800) {
 
 // Voz: deriva la fatiga de la prueba de lectura de frase (reconocimiento de voz).
 //  - mockScore: fuerza un valor (tests / demo).
-//  - matchRatio (0..1): qué tan bien coincidió lo leído con la frase. Mejor
-//    coincidencia → menos fatiga (1 → ~10, 0.6 → ~46, 0 → 100).
-//  - durationMs/expectedMs: fallback legacy (mock por duración) cuando no hay
-//    matchRatio (una muestra más corta de lo pedido → más "fatiga").
-function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio } = {}) {
+//  - acousticScore (0..100): fatiga calculada por análisis ACÚSTICO real del audio
+//    (velocidad de habla, pausas, F0 y su variabilidad, dinámica de energía). Es la
+//    señal preferida: la lectura correcta de la frase es solo el "gate" de cooperación.
+//  - matchRatio (0..1): qué tan bien coincidió lo leído con la frase (fallback).
+//  - durationMs/expectedMs: fallback legacy (mock por duración).
+function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio, acousticScore } = {}) {
     if (Number.isFinite(mockScore)) { return clamp(Math.round(mockScore), 0, 100); }
+    if (Number.isFinite(acousticScore)) { return clamp(Math.round(acousticScore), 0, 100); }
     if (Number.isFinite(matchRatio)) {
         const m = clamp(matchRatio, 0, 1);
         return clamp(Math.round(100 - m * 90), 0, 100);

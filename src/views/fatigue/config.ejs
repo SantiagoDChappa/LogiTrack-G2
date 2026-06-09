@@ -126,6 +126,14 @@
                             <input type="number" id="testDurationSec" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>">
                             <small class="cfg-help">Solo para la prueba de voz: segundos que escucha el micrófono.</small>
                         </div>
+                        <div class="field span-full">
+                            <label class="cfg-switch">
+                                <input type="checkbox" name="voiceAcousticEnabled" <%= cfg.voiceAcousticEnabled ? 'checked' : '' %>>
+                                <span class="cfg-switch-label">Análisis acústico de fatiga vocal
+                                    <small>Mide la fatiga por la voz (velocidad, pausas, tono), no solo si leíste la frase. Requiere STT activo (graba el audio). Se evalúa en el navegador; el audio no se guarda.</small>
+                                </span>
+                            </label>
+                        </div>
                         <div class="field">
                             <label for="reactionFastMs">Reacción óptima (ms)</label>
                             <input type="number" id="reactionFastMs" name="reactionFastMs" min="50" max="2000" value="<%= cfg.reactionFastMs %>"

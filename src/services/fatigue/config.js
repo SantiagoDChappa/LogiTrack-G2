@@ -11,6 +11,7 @@ const DEFAULTS = Object.freeze({
     methodStart:       'VOZ',    // método usado al iniciar la ruta
     methodRecheck:     'REACCION', // método usado en el re-chequeo en ruta
     testDurationSec:   '5',      // duración de la prueba
+    voiceAcousticEnabled: 'true', // medir fatiga vocal por análisis acústico (requiere STT)
     reactionFastMs:    '250',    // reacción "muy alerta" → fatiga 0
     reactionSlowMs:    '800',    // límite de reacción: más lento → fatiga 100
     recheckDriveMin:   '90',     // min de conducción que habilita re-chequeo
@@ -39,7 +40,7 @@ const ENUM_VALUES = Object.freeze({
     methodStart:   ['VOZ', 'REACCION', 'AMBOS'], // AMBOS: el conductor elige voz o reacción
     methodRecheck: ['VOZ', 'REACCION', 'AMBOS'],
 });
-const BOOL_PARAMS = Object.freeze(['enabled', 'autoBlock']);
+const BOOL_PARAMS = Object.freeze(['enabled', 'autoBlock', 'voiceAcousticEnabled']);
 
 // ── Helpers puros (testeables sin DB) ───────────────────────────────────────
 function coerce(merged) {

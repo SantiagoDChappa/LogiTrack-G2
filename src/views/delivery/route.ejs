@@ -1306,6 +1306,83 @@
         });
     }
 
+    // === Análisis ACÚSTICO de fatiga vocal (Web Audio, 100% en el navegador, $0) ===
+    // Extrae marcadores reales del waveform: velocidad de habla, pausas, tono (F0) y
+    // su variabilidad, dinámica de energía. El audio es efímero: se analiza y se
+    // descarta (Ley 25.326); al server solo va el puntaje, nunca el audio.
+    async function extraerFeaturesVoz(blob) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC || !blob || !blob.size) { return null; }
+        const ctx = new AC();
+        let audio;
+        try { audio = await ctx.decodeAudioData(await blob.arrayBuffer()); }
+        catch (_) { try { await ctx.close(); } catch (e) {} return null; }
+        const data = audio.getChannelData(0);
+        const sr = audio.sampleRate;
+        try { await ctx.close(); } catch (e) {}
+        if (!data || data.length < sr * 0.3) { return null; }
+
+        const frameLen = Math.max(1, Math.round(0.03 * sr)); // 30 ms
+        const hop = Math.max(1, Math.round(0.01 * sr));       // 10 ms
+        const rms = [];
+        for (let i = 0; i + frameLen <= data.length; i += hop) {
+            let s = 0;
+            for (let j = 0; j < frameLen; j++) { const v = data[i + j]; s += v * v; }
+            rms.push(Math.sqrt(s / frameLen));
+        }
+        if (rms.length < 3) { return null; }
+        const maxRms = Math.max.apply(null, rms);
+        if (maxRms <= 1e-4) { return null; } // sin audio útil
+        const thr = maxRms * 0.18; // umbral voz/silencio
+        const voiced = rms.map(r => r > thr);
+        const voicedFrames = voiced.filter(Boolean).length;
+        const pauseRatio = 1 - voicedFrames / voiced.length;
+        let onsets = 0;
+        for (let i = 1; i < voiced.length; i++) { if (voiced[i] && !voiced[i - 1]) { onsets++; } }
+        const durSec = data.length / sr;
+        const speechRate = onsets / Math.max(0.5, durSec); // arranques de voz por seg
+
+        // F0 por autocorrelación en frames con voz (70–350 Hz)
+        const minLag = Math.floor(sr / 350), maxLag = Math.floor(sr / 70);
+        const f0s = [];
+        for (let i = 0; i + frameLen <= data.length; i += hop * 2) {
+            if (!voiced[Math.floor(i / hop)]) { continue; }
+            let best = 0, bestLag = 0;
+            for (let lag = minLag; lag <= maxLag; lag++) {
+                let s = 0;
+                for (let j = 0; j < frameLen - lag; j++) { s += data[i + j] * data[i + j + lag]; }
+                if (s > best) { best = s; bestLag = lag; }
+            }
+            if (bestLag) { f0s.push(sr / bestLag); }
+        }
+        const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+        const f0mean = f0s.length ? mean(f0s) : 0;
+        const f0std = f0s.length ? Math.sqrt(mean(f0s.map(x => (x - f0mean) * (x - f0mean)))) : 0;
+        const f0cv = f0mean ? f0std / f0mean : 0;
+        const rmsMean = mean(rms);
+        const rmsStd = Math.sqrt(mean(rms.map(x => (x - rmsMean) * (x - rmsMean))));
+        const energyCv = rmsMean ? rmsStd / rmsMean : 0;
+
+        return {
+            durSec: +durSec.toFixed(2), speechRate: +speechRate.toFixed(2),
+            pauseRatio: +pauseRatio.toFixed(2), f0mean: Math.round(f0mean),
+            f0cv: +f0cv.toFixed(3), energyCv: +energyCv.toFixed(3), voicedFrames,
+        };
+    }
+
+    // Mapa de features → fatiga 0..100 (heurística sobre marcadores reales, calibrable).
+    // Más fatiga: habla lenta, muchas pausas, tono monótono, poca dinámica de energía.
+    function scoreAcusticoVoz(f) {
+        if (!f) { return null; }
+        const c01 = (x) => Math.max(0, Math.min(1, x));
+        const lento   = c01((2.6 - f.speechRate) / 2.2);
+        const pausas  = c01((f.pauseRatio - 0.40) / 0.40);
+        const monoton = c01((0.12 - f.f0cv) / 0.12);
+        const planoEn = c01((0.55 - f.energyCv) / 0.55);
+        const fatiga = 0.35 * lento + 0.30 * pausas + 0.20 * monoton + 0.15 * planoEn;
+        return Math.round(fatiga * 100);
+    }
+
     // Prueba de voz SERVER-SIDE (iOS/compatibilidad): graba con MediaRecorder, sube
     // el audio en base64 y el server lo transcribe (STT) y compara con la frase.
     // El audio es efímero (Ley 25.326): no se guarda. Devuelve métricas, 'BACK' o null.
@@ -1404,7 +1481,13 @@
             Swal.close();
             vozLog('stt-result', { dicho: data.dicho, match: data.matchRatio });
             if (data.matchRatio >= MIN_MATCH) {
-                return { method: 'VOZ', metrics: { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 } };
+                // Gate de frase superado → ahora evaluamos la FATIGA por análisis acústico.
+                const feats = cfg.voiceAcousticEnabled !== false ? await extraerFeaturesVoz(g.blob) : null;
+                const acousticScore = scoreAcusticoVoz(feats);
+                vozLog('acustico', { feats, acousticScore });
+                const metrics = { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 };
+                if (Number.isFinite(acousticScore)) { metrics.acousticScore = acousticScore; }
+                return { method: 'VOZ', metrics };
             }
             const pct = Math.round((data.matchRatio || 0) * 100);
             const rr = await Swal.fire({ icon: 'info', title: 'No coincide la frase',
@@ -1431,6 +1514,14 @@
                 }).catch(() => {});
             } catch (_) {}
         };
+
+        // Modo ACÚSTICO: si está activo y el server tiene STT, usamos SIEMPRE el camino
+        // de grabación (sirve en cualquier dispositivo, incl. iOS): el servidor valida la
+        // frase y el navegador analiza la onda para medir la fatiga vocal real.
+        if (cfg.voiceAcousticEnabled !== false && cfg.voiceSttEnabled) {
+            vozLog('modo-acustico', {});
+            return pruebaVozSTT(cfg, canGoBack, vozLog);
+        }
 
         // iOS (iPhone/iPad): la Web Speech API dice estar soportada pero NO capta
         // audio (todos los navegadores son WebKit). Si el server tiene STT, grabamos
