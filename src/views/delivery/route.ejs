@@ -1287,6 +1287,25 @@
             return canGoBack ? 'BACK' : null;
         }
         vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
+
+        // iOS (iPhone/iPad): la Web Speech API dice estar soportada pero NO capta
+        // audio (todos los navegadores son WebKit). Avisamos para usar reacción.
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+            vozLog('ios-detectado', {});
+            const r = await Swal.fire({
+                icon: 'warning', title: 'Voz no disponible en iPhone/iPad',
+                text: 'El reconocimiento de voz no funciona en iPhone ni iPad. Usá el test de reacción.',
+                showCancelButton: true,
+                confirmButtonText: canGoBack ? 'Usar test de reacción' : 'Intentar igual',
+                cancelButtonText: canGoBack ? 'Intentar voz igual' : 'Cancelar',
+                confirmButtonColor: '#16a34a',
+            });
+            if (canGoBack) { if (r.isConfirmed) { return 'BACK'; } } // si no, intenta voz igual
+            else if (!r.isConfirmed) { return null; }
+        }
+
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
         const MIN_MATCH = 0.7; // exige leer la frase casi completa y en orden
 
