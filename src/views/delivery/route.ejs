@@ -1168,7 +1168,7 @@
                   <li><b>Responsable:</b> LogiTrack. <b>No</b> se guarda el dato biométrico crudo, solo un puntaje.</li>
                   <li><b>Tus derechos (Ley 25.326):</b> acceso, revocación y supresión desde "Mis datos de fatiga".</li>
                 </ul>
-                <p style="font-size:.8rem;color:#64748b">Versión ${cfg.consentVersion || 'v1'}</p></div>`,
+                <p style="font-size:.8rem;opacity:.7">Versión ${cfg.consentVersion || 'v1'}</p></div>`,
             showCancelButton: true, confirmButtonText: 'Acepto', cancelButtonText: 'No acepto',
             confirmButtonColor: '#16a34a', cancelButtonColor: '#dc2626', allowOutsideClick: false,
         });
@@ -1261,9 +1261,9 @@
                 Swal.fire({
                     title: 'Prueba de voz',
                     html: `<div style="font-size:.85rem;margin-bottom:8px">Tocá el botón y leé en voz alta, claro y completo:</div>
-                           <div style="font-weight:700;font-size:1.05rem;margin:8px 0;color:#1e2761">“${frase}”</div>
-                           <button id="vz-go" style="padding:12px 16px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">🎤 Empezar a hablar</button>
-                           <div id="vz-tip" style="margin-top:10px;font-size:.8rem;color:#64748b"></div>`,
+                           <div style="font-weight:700;font-size:1.05rem;margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(37,99,235,.12);color:inherit">“${frase}”</div>
+                           <button id="vz-go" style="padding:12px 16px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">🎤 Empezar prueba</button>
+                           <div id="vz-tip" style="margin-top:10px;font-size:.85rem;opacity:.85"></div>`,
                     showConfirmButton: false, allowOutsideClick: false, allowEscapeKey: false,
                     didOpen: () => {
                         const go = document.getElementById('vz-go');
@@ -1271,9 +1271,18 @@
                         go.addEventListener('click', () => {
                             const rec = new SR();
                             rec.lang = 'es-AR'; rec.interimResults = false; rec.maxAlternatives = 3; rec.continuous = false;
-                            go.disabled = true; tip.textContent = 'Escuchando… hablá ahora.';
+                            go.disabled = true;
+                            // Mic activo en rojo + cuenta regresiva. Corta solo según testDurationSec (ajustes).
+                            const secs = cfg.testDurationSec || 5;
+                            let left = secs;
+                            const paint = () => { tip.innerHTML = `<span style="color:#dc2626;font-weight:700">🔴 Micrófono activado</span> — leé ahora (${Math.max(0, left)}s)`; };
+                            paint();
+                            const countdown = setInterval(() => { left--; paint(); }, 1000);
+                            const autostop = setTimeout(() => { try { rec.stop(); } catch (_) {} }, secs * 1000);
+                            const cleanup = () => { clearInterval(countdown); clearTimeout(autostop); };
                             const t0 = performance.now();
                             rec.onresult = (e) => {
+                                cleanup();
                                 let best = 0, dicho = '';
                                 const alts = e.results[0];
                                 for (let i = 0; i < alts.length; i++) {
@@ -1283,11 +1292,12 @@
                                 done({ ok: best >= MIN_MATCH, matchRatio: best, dicho, durationMs: Math.round(performance.now() - t0) });
                             };
                             rec.onerror = (ev) => {
+                                cleanup();
                                 if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { done({ denied: true }); return; }
                                 done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: ev.error === 'no-speech' });
                             };
-                            rec.onend = () => { done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: true }); };
-                            try { rec.start(); } catch (_) { done({ ok: false, matchRatio: 0 }); }
+                            rec.onend = () => { cleanup(); done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: true }); };
+                            try { rec.start(); } catch (_) { cleanup(); done({ ok: false, matchRatio: 0 }); }
                         });
                     },
                 });
