@@ -1297,6 +1297,7 @@
                             const autostop = setTimeout(() => { try { rec.stop(); } catch (_) {} }, secs * 1000);
                             const cleanup = () => { clearInterval(countdown); clearTimeout(autostop); };
                             const t0 = performance.now();
+                            rec.onstart = () => { console.log('[fatiga-voz] micrófono activo, escuchando…'); };
                             rec.onresult = (e) => {
                                 cleanup();
                                 let best = 0, dicho = '';
@@ -1305,15 +1306,17 @@
                                     const sim = similitudFrase(alts[i].transcript, frase);
                                     if (sim > best) { best = sim; dicho = alts[i].transcript; }
                                 }
+                                console.log('[fatiga-voz] escuché:', JSON.stringify(dicho), '· coincidencia:', best.toFixed(2), '· mínimo:', MIN_MATCH);
                                 done({ ok: best >= MIN_MATCH, matchRatio: best, dicho, durationMs: Math.round(performance.now() - t0) });
                             };
                             rec.onerror = (ev) => {
                                 cleanup();
+                                console.warn('[fatiga-voz] error de reconocimiento:', ev.error);
                                 if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { done({ denied: true }); return; }
-                                done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: ev.error === 'no-speech' });
+                                done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: ev.error || 'desconocido' });
                             };
-                            rec.onend = () => { cleanup(); done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: true }); };
-                            try { rec.start(); } catch (_) { cleanup(); done({ ok: false, matchRatio: 0 }); }
+                            rec.onend = () => { cleanup(); done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: 'sin-resultado' }); };
+                            try { rec.start(); } catch (err) { cleanup(); console.warn('[fatiga-voz] no se pudo iniciar:', err); done({ ok: false, matchRatio: 0, errorType: 'no-inicia' }); }
                         });
                     },
                 });
@@ -1331,9 +1334,20 @@
             if (r.ok) {
                 return { method: 'VOZ', metrics: { matchRatio: r.matchRatio, durationMs: r.durationMs, expectedMs: (cfg.testDurationSec || 5) * 1000 } };
             }
+            const HINTS = {
+                'no-speech': 'No detecté tu voz. Hablá más fuerte y cerca del micrófono.',
+                'sin-resultado': 'No detecté tu voz. Hablá apenas toques el botón, sin esperar.',
+                'audio-capture': 'No se detecta el micrófono. Revisá que esté conectado y permitido en el navegador.',
+                'network': 'Falló la conexión del reconocimiento de voz (requiere internet).',
+                'aborted': 'Se interrumpió la prueba. Probá de nuevo.',
+                'no-inicia': 'El navegador no pudo iniciar el micrófono. Usá Chrome o Edge.',
+            };
+            const msg = r.errorType
+                ? (HINTS[r.errorType] || ('Error técnico: ' + r.errorType))
+                : (r.dicho ? `Escuché: “<i>${r.dicho}</i>”.<br>Leé la frase completa, más claro.` : 'No detecté tu voz. Probá de nuevo.');
             const retry = await Swal.fire({
                 icon: 'info', title: 'No te entendí bien',
-                html: r.dicho ? `Escuché: “<i>${r.dicho}</i>”.<br>Leé la frase completa, más claro.` : 'No detecté tu voz. Probá de nuevo.',
+                html: msg,
                 showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: 'Cancelar',
                 allowOutsideClick: false,
             });
