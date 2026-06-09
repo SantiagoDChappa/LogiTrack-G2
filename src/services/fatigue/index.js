@@ -78,7 +78,7 @@ async function revokeConsent({ userId, actorId }) {
 async function evaluate({ checkId, userId, routeId, branchId, method, metrics, triggerType = 'INICIO', cfg }) {
     const config = cfg || await configSvc.getConfig(branchId);
     const expectedMs = config.testDurationSec * 1000;
-    let scoreValue, decision;
+    let scoreValue, decision, failed;
     if (method === 'REACCION') {
         // Modo de evaluación configurable (promedio vs cantidad de aprobados).
         const r = scorer.evaluateReaction({
@@ -87,10 +87,11 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
             mode: config.reactionEvalMode, required: config.reactionRequired,
             autoBlock: config.autoBlock,
         });
-        scoreValue = r.score; decision = r.decision;
+        scoreValue = r.score; decision = r.decision; failed = !r.apto;
     } else {
         scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
         decision = scorer.decide(scoreValue, config);
+        failed = scoreValue > config.thresholdPct; // "no pasó" independiente de autoBlock
     }
 
     let check;
@@ -114,7 +115,7 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
         const transportName = await driverName(check.userId);
         await notify.notifyBlock({ check, branchId, transportName, routeId, score: scoreValue });
     }
-    return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision };
+    return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision, failed };
 }
 
 // ── Gate de inicio de ruta (US-1 / US-4) ────────────────────────────────────

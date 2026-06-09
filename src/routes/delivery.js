@@ -105,9 +105,13 @@ router.get('/', requireDelivery, async (req, res) => {
         // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
         const fatigueRoute = routes.find(r =>
             r.statusId === RouteStatus.BLOCKED_FATIGUE || r.statusId === RouteStatus.PAUSED_FATIGUE) || null;
-        const fatigueBlocked = fatigueRoute
+        let fatigueBlocked = fatigueRoute
             ? { id: fatigueRoute.id, paused: fatigueRoute.statusId === RouteStatus.PAUSED_FATIGUE }
             : null;
+        // Bloqueo en el control de INICIO (la ruta no cambia de estado): banner por redirect.
+        if (!fatigueBlocked && req.query.fatiga === 'bloqueado') {
+            fatigueBlocked = { id: Number(req.query.ruta) || null, paused: false, gate: true };
+        }
 
         // Resumen para el card destacado
         let activeSummary = null;

@@ -1495,11 +1495,10 @@
             }
             Swal.close();
             intentosFallidos++;
-            // Agotó los intentos permitidos → no apto (bloqueado).
+            // Agotó los intentos permitidos → el verdicto (bloquear o avisar) lo decide
+            // quien llamó a la prueba, según autoBlock.
             if (intentosFallidos >= maxIntentos) {
                 vozLog('gate-fallido', { intentos: intentosFallidos });
-                await Swal.fire({ icon: 'error', title: 'No pudiste leer la frase',
-                    text: `Agotaste los ${maxIntentos} intentos. No quedás habilitado para salir.` });
                 return { method: 'VOZ', metrics: { phraseGateFailed: true } };
             }
             const pct = Math.round((data.matchRatio || 0) * 100);
@@ -1654,8 +1653,6 @@
             intentosFallidos++;
             if (intentosFallidos >= maxIntentos) {
                 vozLog('gate-fallido', { intentos: intentosFallidos });
-                await Swal.fire({ icon: 'error', title: 'No pudiste leer la frase',
-                    text: `Agotaste los ${maxIntentos} intentos. No quedás habilitado para salir.` });
                 return { method: 'VOZ', metrics: { phraseGateFailed: true } };
             }
             const HINTS = {
@@ -1740,11 +1737,33 @@
         });
         const data = await r.json().catch(() => ({}));
         hideRouteLoader();
+        const gateFail = !!(prueba.metrics && prueba.metrics.phraseGateFailed);
+        const failed = data.failed === true;
+
+        // autoBlock ON → bloqueado: no queda habilitado. Redirige a Mis Envíos con banner rojo.
         if (data.blocked) {
-            await Swal.fire({ icon: 'error', title: 'Ruta bloqueada por fatiga',
-                text: `Puntaje ${data.score}. Pedí revisión a tu Supervisor desde el portal.` });
+            await Swal.fire({ icon: 'error',
+                title: gateFail ? 'No pudiste leer la frase' : 'No pasaste el control de fatiga',
+                html: gateFail
+                    ? 'No quedás habilitado para salir.<br>Tu supervisor fue notificado.'
+                    : `Puntaje <b>${data.score}/${data.threshold}</b>. No quedás habilitado para salir.<br>Tu supervisor fue notificado.`,
+                confirmButtonText: 'Entendido', confirmButtonColor: '#dc2626', allowOutsideClick: false });
+            window.location.href = `/delivery?fatiga=bloqueado&ruta=${routeId}`;
             return;
         }
+
+        // autoBlock OFF pero no pasó → puede iniciar, el supervisor lo contactará.
+        if (failed) {
+            await Swal.fire({ icon: 'warning', title: 'No pasaste las pruebas',
+                html: 'Pronto el supervisor se va a contactar con vos.<br>Por ahora <b>podés iniciar la ruta</b>.',
+                confirmButtonText: 'Iniciar ruta', confirmButtonColor: '#d97706', allowOutsideClick: false });
+            showRouteLoader('Iniciando ruta…');
+            await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            window.location.reload();
+            return;
+        }
+
+        // Apto.
         const metodoLbl = prueba.method === 'VOZ' ? 'de voz' : 'de reacción';
         await Swal.fire({ icon: 'success', title: 'Apto para salir',
             html: `Prueba ${metodoLbl} superada.<br><b>Puntaje ${data.score}/${data.threshold}</b>. ¡Buen viaje!`,

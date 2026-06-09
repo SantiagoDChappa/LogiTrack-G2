@@ -60,7 +60,7 @@ function decide(scoreValue, cfg) {
 function evaluateReaction({ reactionsMs = [], fastMs, slowMs, mode = 'PROMEDIO', required = 'MITAD', autoBlock = true } = {}) {
     const valid = reactionsMs.map(Number).filter(n => Number.isFinite(n) && n > 0);
     const score = scoreFromReaction(valid, fastMs, slowMs);
-    if (!valid.length) { return { score: 100, decision: autoBlock ? 'BLOCKED' : 'APTO' }; }
+    if (!valid.length) { return { score: 100, apto: false, decision: autoBlock ? 'BLOCKED' : 'APTO' }; }
     const limit = Number(slowMs) || 800;
     let apto;
     if (mode === 'APROBADOS') {
@@ -72,7 +72,7 @@ function evaluateReaction({ reactionsMs = [], fastMs, slowMs, mode = 'PROMEDIO',
         apto = avg <= limit;
     }
     const decision = (!autoBlock || apto) ? 'APTO' : 'BLOCKED';
-    return { score, decision };
+    return { score, apto, decision };
 }
 
 module.exports = { clamp, scoreFromReaction, scoreFromVoice, score, decide, evaluateReaction };
