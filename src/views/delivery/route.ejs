@@ -215,6 +215,13 @@
         transition: opacity .2s ease, width .2s ease;
     }
     .sheet-grab:hover .sheet-handle { opacity: .7; width: 52px; }
+    .sheet-grab { flex-direction: column; gap: 3px; }
+    .sheet-hint {
+        font-size: 11px; font-weight: 600; color: var(--lt-muted);
+        opacity: 0; max-height: 0; overflow: hidden;
+        transition: opacity .25s ease, max-height .25s ease;
+    }
+    .bottom-sheet.is-tucked .sheet-hint { opacity: .8; max-height: 18px; }
     .bottom-sheet.collapsed { max-height: 80px !important; overflow: hidden; }
     .bottom-sheet.collapsed .stops-list, .bottom-sheet.collapsed .section-title { opacity: 0; pointer-events: none; }
 
@@ -625,6 +632,7 @@
         <section class="bottom-sheet" id="bottom-sheet">
             <div class="sheet-grab" id="sheet-grab" role="button" aria-label="Mostrar u ocultar lista de envíos">
                 <div class="sheet-handle"></div>
+                <div class="sheet-hint" id="sheet-hint">Deslizá para ver la entrega</div>
             </div>
 
             <ol class="stops-list" id="stops-list">
@@ -980,6 +988,7 @@
         const pts = snapPoints();
         currentSnap = name;
         setSheetY(pts[name]);
+        sheet.classList.toggle('is-tucked', name === 'tucked'); // muestra el hint "Deslizá…"
         setTimeout(() => map.invalidateSize(), 380);
     }
 
