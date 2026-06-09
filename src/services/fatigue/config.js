@@ -26,6 +26,7 @@ const DEFAULTS = Object.freeze({
     patternEventCount: '3',      // N.º de bloqueos que marca patrón
     retentionDays:     '90',     // retención de registros (Ley 25.326 art. 4)
     consentVersion:    'v1',     // versión del texto de consentimiento
+    maxConsentRejections: '2',   // rechazos de consentimiento tolerados antes de inhabilitar
 });
 
 const NUMERIC_RANGES = Object.freeze({
@@ -42,6 +43,7 @@ const NUMERIC_RANGES = Object.freeze({
     patternWindowDays: [1, 365],
     patternEventCount: [1, 50],
     retentionDays:     [1, 3650],
+    maxConsentRejections: [1, 20],
 });
 const ENUM_VALUES = Object.freeze({
     method:        ['VOZ', 'REACCION', 'AMBOS'],

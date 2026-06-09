@@ -238,6 +238,12 @@
                             <label for="consentVersion">Versión de consentimiento</label>
                             <input type="text" id="consentVersion" name="consentVersion" value="<%= cfg.consentVersion %>">
                         </div>
+                        <div class="field">
+                            <label for="maxConsentRejections">Rechazos permitidos antes de inhabilitar</label>
+                            <input type="number" id="maxConsentRejections" name="maxConsentRejections" min="1" max="20" value="<%= cfg.maxConsentRejections %>"
+                                   title="Cantidad de veces que el transportista puede rechazar el consentimiento antes de quedar inhabilitado y notificar al supervisor.">
+                            <small class="cfg-help">Al alcanzar este número de rechazos, el transportista queda inhabilitado hasta que el supervisor lo restablezca. Ej.: 2 = puede dudar una vez, al segundo rechazo se notifica al supervisor.</small>
+                        </div>
                     </div>
                 </div>
 

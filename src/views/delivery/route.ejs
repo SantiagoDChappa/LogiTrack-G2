@@ -1183,6 +1183,7 @@
             confirmButtonColor: '#16a34a', cancelButtonColor: '#dc2626', allowOutsideClick: false,
         });
         const accepted = res.isConfirmed;
+        showRouteLoader(accepted ? 'Preparando prueba…' : 'Registrando rechazo…');
         try {
             const r = await fetch(`/delivery/route/${routeId}/consent`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1191,6 +1192,7 @@
             const data = await r.json();
             return { accepted, checkId: data.checkId };
         } catch (_) {
+            hideRouteLoader();
             Swal.fire({ icon: 'error', title: 'No se pudo registrar', text: 'Reintentá en unos segundos.' });
             return null;
         }
@@ -1752,10 +1754,11 @@
         const consent = await runConsent(cfg);
         if (!consent) { return; }
         if (!consent.accepted) {
-            Swal.fire({ icon: 'warning', title: 'Ruta no iniciada',
-                text: 'Rechazaste el consentimiento. Quedás inhabilitado hasta que tu Supervisor te restablezca.' });
+            // Rechazo: el loader queda visible mientras navegamos al home.
+            window.location.href = '/home';
             return;
         }
+        hideRouteLoader();
         const prueba = await runPrueba(cfg.methodStart, cfg);
         if (!prueba) { return; } // prueba cancelada / sin micrófono → no inicia
         showRouteLoader('Evaluando la prueba…');

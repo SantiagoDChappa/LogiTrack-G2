@@ -18,12 +18,33 @@ async function recordConsent({ userId, routeId, branchId, accepted, version, tri
     });
     await notify.audit(accepted ? 'CONSENT_ACCEPTED' : 'CONSENT_REJECTED',
         { actorId: userId, checkId: check.id, detail: `Ruta #${routeId}, versión ${version}` });
-    // LGT-195: el rechazo inhabilita al transportista para iniciar nuevas rutas
-    // (cross-ruta) hasta que un Supervisor lo restablezca.
+    // LGT-195: el rechazo inhabilita al transportista, pero solo al alcanzar el límite
+    // parametrizado de rechazos (maxConsentRejections). Se cuentan los rechazos desde
+    // el último restablecimiento — si nunca lo restablecieron, desde siempre.
     if (!accepted) {
-        await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId });
+        const cfg = await configSvc.getConfig(branchId);
+        const maxRej = Number(cfg.maxConsentRejections) || 2;
+        const rejCount = await countRejectionsSinceRestore(userId);
+        if (rejCount >= maxRej) {
+            await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId });
+        } else {
+            await notify.audit('CONSENT_REJECTED_WARN', {
+                actorId: userId, checkId: check.id,
+                detail: `Rechazo ${rejCount}/${maxRej}. Si alcanza el límite queda inhabilitado.`,
+            });
+        }
     }
     return check;
+}
+
+// Cuenta rechazos de consentimiento desde el último restablecimiento del transportista.
+async function countRejectionsSinceRestore(userId) {
+    const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
+    const row = await DriverFatigueStatus.findByPk(userId).catch(() => null);
+    const since = row && row.restoredAt ? new Date(row.restoredAt) : null;
+    const where = { userId, consentStatus: 'REJECTED' };
+    if (since) { where.consentAt = { [Op.gt]: since }; }
+    return FatigueCheck.count({ where });
 }
 
 // ── Habilitación del transportista (LGT-195 Esc.7/8) ────────────────────────
