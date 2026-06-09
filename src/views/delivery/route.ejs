@@ -1120,6 +1120,32 @@
 
     // ===================== Ojo de Patrón — UI del conductor =====================
     // LGT-190 (consentimiento) · LGT-191/198 (prueba) · LGT-199 (re-chequeo en ruta).
+
+    // Overlay de carga: bloquea toda la ruta mientras se resuelve el gate de fatiga.
+    function showRouteLoader(msg) {
+        let el = document.getElementById('route-fatigue-loader');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'route-fatigue-loader';
+            el.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,.82);' +
+                'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;' +
+                'color:#fff;font-family:system-ui,sans-serif';
+            el.innerHTML = '<div style="width:54px;height:54px;border-radius:50%;border:5px solid rgba(255,255,255,.25);' +
+                'border-top-color:#fff;animation:rflspin 1s linear infinite"></div>' +
+                '<div id="route-fatigue-loader-msg" style="font-size:.95rem;font-weight:600"></div>';
+            const st = document.createElement('style');
+            st.textContent = '@keyframes rflspin{to{transform:rotate(360deg)}}';
+            el.appendChild(st);
+            document.body.appendChild(el);
+        }
+        document.getElementById('route-fatigue-loader-msg').textContent = msg || 'Cargando…';
+        el.style.display = 'flex';
+    }
+    function hideRouteLoader() {
+        const el = document.getElementById('route-fatigue-loader');
+        if (el) { el.style.display = 'none'; }
+    }
+
     let fatigueCfgCache = null;
     async function getFatigueCfg() {
         if (fatigueCfgCache) { return fatigueCfgCache; }
@@ -1223,11 +1249,15 @@
 
     // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
     async function startWithFatigue() {
+        // Bloquea la ruta mientras se carga la config y se resuelve el gate (no se puede operar antes).
+        showRouteLoader('Preparando control de fatiga…');
         const cfg = await getFatigueCfg();
         if (!cfg.enabled) {
-            fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            window.location.reload();
             return;
         }
+        hideRouteLoader();
         const consent = await runConsent(cfg);
         if (!consent) { return; }
         if (!consent.accepted) {
@@ -1236,16 +1266,24 @@
             return;
         }
         const prueba = await runPrueba(cfg.methodStart, cfg);
+        showRouteLoader('Evaluando la prueba…');
         const r = await fetch(`/delivery/route/${routeId}/fatigue-check`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ checkId: consent.checkId, ...prueba, triggerType: 'INICIO' }),
         });
         const data = await r.json().catch(() => ({}));
+        hideRouteLoader();
         if (data.blocked) {
             await Swal.fire({ icon: 'error', title: 'Ruta bloqueada por fatiga',
                 text: `Puntaje ${data.score}. Pedí revisión a tu Supervisor desde el portal.` });
             return;
         }
+        const metodoLbl = prueba.method === 'VOZ' ? 'de voz' : 'de reacción';
+        await Swal.fire({ icon: 'success', title: 'Apto para salir',
+            html: `Prueba ${metodoLbl} superada.<br><b>Puntaje ${data.score}/${data.threshold}</b>. ¡Buen viaje!`,
+            confirmButtonText: 'Iniciar ruta', confirmButtonColor: '#16a34a', allowOutsideClick: false,
+            showCloseButton: true, timer: 10000, timerProgressBar: true });
+        showRouteLoader('Iniciando ruta…');
         await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
         window.location.reload();
     }
