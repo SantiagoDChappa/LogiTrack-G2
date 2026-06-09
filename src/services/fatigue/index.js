@@ -166,6 +166,38 @@ function listReview(branchId) {
     return FatigueCheck.findAll({ where, order: [['createdAt', 'DESC']] });
 }
 
+// LGT-199 Esc.4 — el conductor no completó el re-chequeo pedido a tiempo. Crea un
+// registro REVIEW en Ojo de Patrón (visible en el panel) y avisa al supervisor.
+// Idempotente: si ya hay un aviso de omisión abierto para la ruta, no duplica.
+async function escalateRecheckOmission({ routeId, userId, branchId, minutes, cfg }) {
+    const config = cfg || await configSvc.getConfig(branchId);
+    const existing = await FatigueCheck.findOne({
+        where: { routeId, triggerType: 'EN_RUTA', decision: 'REVIEW', releaseReason: 'recheck_omitido', releasedAt: null },
+    });
+    if (existing) { return existing; }
+    const check = await FatigueCheck.create({
+        userId, routeId, branchId, triggerType: 'EN_RUTA', method: null,
+        consentStatus: 'ACCEPTED', consentVersion: config.consentVersion, consentAt: new Date(),
+        score: null, threshold: config.thresholdPct, decision: 'REVIEW',
+        // Marca el motivo del aviso para distinguirlo de "no apto sin bloqueo".
+        releaseReason: 'recheck_omitido',
+    });
+    const transportName = await driverName(userId);
+    await notify.notifyRecheckOmission({ check, branchId, transportName, routeId, minutes });
+    return check;
+}
+
+// Cierra los avisos de omisión de re-chequeo de una ruta (al completarse la prueba).
+async function clearRecheckOmission({ routeId, actorId }) {
+    const rows = await FatigueCheck.findAll({
+        where: { routeId, triggerType: 'EN_RUTA', decision: 'REVIEW', releaseReason: 'recheck_omitido', releasedAt: null },
+    });
+    for (const r of rows) {
+        await r.update({ releasedAt: new Date(), releasedBy: actorId || null, releaseDetail: 'Re-chequeo completado' });
+    }
+    return rows.length;
+}
+
 // Cierra el aviso (decisión tomada o descartado) sin tocar el estado de la ruta.
 async function resolveReview({ checkId, actorId, note }) {
     const check = await FatigueCheck.findByPk(checkId);
@@ -352,7 +384,8 @@ async function driverName(userId) {
 
 module.exports = {
     recordConsent, revokeConsent, evaluate, latestForRoute, canStart,
-    listBlocked, listReview, resolveReview, release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
+    listBlocked, listReview, resolveReview, escalateRecheckOmission, clearRecheckOmission,
+    release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
     disableDriver, restoreDriver, getDriverStatus, isDriverDisabled, listDisabledDrivers,
     getDriverHistory, suppressDriverData, purgeExpired,
 };

@@ -888,6 +888,9 @@ router.post('/route/:id/fatigue-recheck', requireDelivery, async (req, res) => {
     await fatigueRecheck.onRecheckResult(route.id, result.decision, cfg);
     const newStatus = result.decision === 'BLOCKED' ? RouteStatus.PAUSED_FATIGUE : RouteStatus.IN_ROUTE;
     await Route.update({ statusId: newStatus }, { where: { id: route.id } });
+    // LGT-199 Esc.4: el conductor completó la prueba → cerrar avisos de omisión pendientes.
+    await fatigueSvc.clearRecheckOmission({ routeId: route.id, actorId: res.locals.currentUser.id })
+        .catch(e => console.error('clearRecheckOmission', e.message));
 
     res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
 });

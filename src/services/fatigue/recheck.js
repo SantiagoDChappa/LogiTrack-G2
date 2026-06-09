@@ -96,6 +96,10 @@ async function getStatus(routeId, route, cfg) {
         await s.update({ state: RecheckState.RECHECK_PENDING, recheckRequestedAt: new Date(), updatedAt: new Date() });
     }
     const next = nextCheckAt(s, cfg, d);
+    // Tiempo de manejo acumulado para mostrarlo al repartidor (vs el umbral).
+    // Si está detenido, queda congelado en el momento de detenerse (stoppedAt).
+    const driveRef = s.stoppedAt || new Date();
+    const driveMin = s.driveStartedAt ? Math.max(0, Math.floor(minutesBetween(s.driveStartedAt, driveRef))) : 0;
     return {
         routeId,
         state: d.state,
@@ -104,6 +108,10 @@ async function getStatus(routeId, route, cfg) {
         restRemainingMin: d.restRemaining || 0,
         methodRecheck: cfg.methodRecheck,
         nextCheckAt: next ? next.toISOString() : null,
+        driveMin,
+        driveThresholdMin: cfg.recheckDriveMin,
+        stoppedThresholdMin: cfg.recheckStoppedMin,
+        driveReady: driveMin >= cfg.recheckDriveMin,
     };
 }
 

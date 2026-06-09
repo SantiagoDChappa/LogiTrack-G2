@@ -71,6 +71,22 @@ async function notifyReview({ check, branchId, transportName, routeId, score }) 
     return recipients.length;
 }
 
+// LGT-199 Esc.4 — el conductor no completó el re-chequeo pedido en el tiempo límite:
+// se avisa al supervisor para que decida (contactar, inhabilitar o reasignar).
+async function notifyRecheckOmission({ check, branchId, transportName, routeId, minutes }) {
+    const recipients = await resolveRecipients(branchId);
+    const detail = `Ruta #${routeId}: el transportista ${transportName || 'N/D'} NO completó el re-chequeo de fatiga ` +
+        `pedido en ruta (más de ${minutes} min sin hacerlo). Revisar: contactar, inhabilitar o reasignar. ` +
+        `Notificados: ${recipients.length} (supervisores + admin).`;
+    await audit('NOTIFY_RECHECK_OMITTED', { checkId: check?.id, detail });
+    const body = `Re-chequeo de fatiga NO realizado.\nRuta #${routeId}\n` +
+        `Transportista: ${transportName || 'N/D'}\nSin completar la prueba hace más de ${minutes} min.\n\n` +
+        `Gestioná el caso en el panel: /fatigue`;
+    const sent = await deliverEmail(recipients, `[LogiTrack] Re-chequeo de fatiga sin realizar — Ruta #${routeId}`, body);
+    await audit('NOTIFY_RECHECK_OMITTED_EMAIL', { checkId: check?.id, detail: `Emails enviados: ${sent}` });
+    return recipients.length;
+}
+
 // LGT-197 — notifica al Supervisor (y admin) cuando se marca patrón recurrente.
 async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     const recipients = await resolveRecipients(branchId);
@@ -83,4 +99,4 @@ async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     return recipients.length;
 }
 
-module.exports = { audit, resolveRecipients, notifyBlock, notifyReview, notifyPattern };
+module.exports = { audit, resolveRecipients, notifyBlock, notifyReview, notifyRecheckOmission, notifyPattern };
