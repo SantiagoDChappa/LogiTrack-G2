@@ -25,7 +25,64 @@ async function setChoice({ incidentId, choice, by, userId, personId }) {
         userId:    userId || null,
         personId:  personId || null,
     });
+
+    // Impacto en el envío (best-effort: no rompe el registro de la elección).
+    // Solo actúa si la decisión cambió, para no duplicar (cancelar de nuevo / crear 2 reemplazos).
+    if (c !== prev) {
+        try { await applyChoiceToShipment({ shipmentId: incident.shipmentId, choice: c, by, userId }); }
+        catch (e) { console.warn('[damage] applyChoiceToShipment:', e.message); }
+    }
     return incident;
+}
+
+// REEMBOLSO → el envío se cancela (no se reenvía).
+// REEMPLAZO → se genera un envío NUEVO en PENDING con prioridad alta (clon del original);
+//             el original queda como está (PACKAGE_FAILED) como registro del daño.
+async function applyChoiceToShipment({ shipmentId, choice, by, userId }) {
+    const shipmentModel = require('../models/shipment');
+    const { Shipment } = shipmentModel;
+    const shipmentHistoryModel = require('../models/shipmentHistory');
+    const { Status, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+    const sh = await Shipment.findByPk(shipmentId);
+    if (!sh) { return; }
+
+    if (choice === 'REEMBOLSO') {
+        if (sh.statusId === Status.CANCELLED.id) { return; }
+        const fromStatusId = sh.statusId;
+        await Shipment.update({ statusId: Status.CANCELLED.id }, { where: { id: shipmentId } });
+        await shipmentHistoryModel.create({
+            shipmentId, fromStatusId, toStatusId: Status.CANCELLED.id,
+            comment: `Envío cancelado por reembolso (paquete dañado)${by ? ' — solicitado por ' + by : ''}.`,
+            userId: userId || null, eventType: 'STATUS_CHANGE',
+        });
+        try {
+            require('../controllers/shipment')
+                .notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipmentId).catch(() => {});
+        } catch { /* notif best-effort */ }
+        return;
+    }
+
+    if (choice === 'REEMPLAZO') {
+        const nuevo = await shipmentModel.create({
+            senderId: sh.senderId, recipientId: sh.recipientId, addressId: sh.addressId,
+            shipmentTypeId: sh.shipmentTypeId, deliveryMode: sh.deliveryMode, pickupBranchId: sh.pickupBranchId,
+            weightKg: sh.weightKg, volumeM3: sh.volumeM3, packageQty: sh.packageQty,
+            currentBranchId: sh.currentBranchId, zoneId: sh.zoneId,
+            statusId: Status.PENDING.id,
+            priority: ShipmentPriority.HIGH.id, basePriority: ShipmentPriority.HIGH.id,
+        });
+        await shipmentHistoryModel.create({
+            shipmentId: nuevo.id, fromStatusId: null, toStatusId: Status.PENDING.id,
+            comment: `Envío de reemplazo por paquete dañado (original ${sh.trackingId}). Prioridad alta.`,
+            userId: userId || null, eventType: 'CREATED',
+        });
+        await shipmentHistoryModel.create({
+            shipmentId, fromStatusId: sh.statusId, toStatusId: sh.statusId,
+            comment: `Se generó el envío de reemplazo ${nuevo.trackingId} (paquete dañado).`,
+            userId: userId || null, eventType: 'STATUS_CHANGE',
+        });
+        return nuevo;
+    }
 }
 
 function getChoice(incident) { return incident ? incident.damageChoice || null : null; }
