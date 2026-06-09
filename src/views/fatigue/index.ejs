@@ -2,99 +2,140 @@
 <html lang="es">
 <head>
     <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/settings.css">
     <title>Control de fatiga - LogiTrack</title>
     <style>
-        .fb-wrap { max-width: 1040px; margin: 0 auto; padding: 24px; font-family: system-ui, sans-serif; }
-        .fb-top { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-        .fb-card { border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; margin:10px 0; box-shadow:0 1px 2px rgba(0,0,0,.04); }
-        .fb-card.blocked { border-left:5px solid #e03131; }
-        .fb-btn { padding:8px 14px; border-radius:9px; border:0; cursor:pointer; font-weight:600; }
-        .fb-btn.rel { background:#2f9e44; color:#fff; }
-        .fb-btn.keep { background:#fff; border:1px solid #cbd5e1; }
-        table { border-collapse: collapse; width:100%; margin-top:8px; }
-        th, td { border:1px solid #e2e8f0; padding:8px 10px; text-align:left; font-size:14px; }
-        .pill { padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
-        .pill.yes { background:#fde2e1; color:#b91c1c; } .pill.no { background:#e8f5ec; color:#2f9e44; }
+        .fb-card { border-left: 5px solid var(--color-border); }
+        .fb-card.blocked { border-left-color: #dc2626; }
+        .fb-meta { color: var(--color-text-secondary); font-size: var(--font-size-sm); margin: 0; }
+        .fb-actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+        .fb-section-title { margin: var(--space-6) 0 var(--space-3); font-size: var(--font-size-lg); }
+        .fb-empty { color: var(--color-text-secondary); }
+        .fb-select {
+            padding: .4rem .6rem; border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-sm); background: var(--color-surface);
+            color: var(--color-text); font-size: var(--font-size-sm);
+        }
+        .btn-sm { padding: .35rem .75rem; font-size: var(--font-size-sm); }
     </style>
 </head>
 <body>
-<div class="fb-wrap">
-    <div class="fb-top">
-        <h1 style="margin:0">👁 Ojo de Patrón — Control de fatiga</h1>
-        <div>
-            <a href="/home">← Inicio</a>
-            <% if (isAdmin) { %> · <a href="/fatigue/config">⚙ Configuración</a><% } %>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>👁 Ojo de Patrón — Control de fatiga</h1>
+            <% if (isAdmin) { %>
+                <a href="/fatigue/config" class="btn-secondary">
+                    <span class="material-symbols-outlined">tune</span>Configuración
+                </a>
+            <% } %>
         </div>
-    </div>
-    <p style="color:#64748b">Umbral actual: <b><%= cfg.thresholdPct %>%</b> · Bloqueo automático: <b><%= cfg.autoBlock ? 'sí' : 'no' %></b></p>
 
-    <h2>Rutas bloqueadas por fatiga</h2>
-    <% if (!blocked.length) { %>
-        <p style="color:#64748b">No hay rutas bloqueadas por fatiga.</p>
-    <% } %>
-    <% blocked.forEach(b => { %>
-        <div class="fb-card blocked" id="check-<%= b.id %>">
-            <b>Ruta #<%= b.routeId %></b> — transportista #<%= b.userId %> ·
-            score <b><%= b.score %></b>/<%= b.threshold %> · <%= b.method || '—' %> ·
-            <%= new Date(b.createdAt).toLocaleString('es-AR') %>
-            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                <button class="fb-btn rel"  onclick="release(<%= b.id %>)">Liberar con motivo</button>
-                <button class="fb-btn keep" onclick="keep(<%= b.id %>)">Mantener bloqueada</button>
-                <% if (!isAdmin) { %>
-                    <select id="tx-<%= b.routeId %>" class="fb-btn keep" style="font-weight:400">
-                        <option value="">Reasignar a…</option>
-                        <% transports.forEach(t => { %>
-                            <option value="<%= t.id %>"><%= t.name %><%= t.driverName ? ' — ' + t.driverName : '' %></option>
-                        <% }) %>
-                    </select>
-                    <button class="fb-btn keep" onclick="reassign(<%= b.routeId %>)">Reasignar ruta</button>
+        <div class="settings-content">
+            <p class="fb-meta">
+                Umbral actual: <b><%= cfg.thresholdPct %>%</b> ·
+                Bloqueo automático: <b><%= cfg.autoBlock ? 'sí' : 'no' %></b>
+            </p>
+
+            <!-- Rutas bloqueadas -->
+            <section>
+                <h2 class="fb-section-title">Rutas bloqueadas por fatiga</h2>
+                <% if (!blocked.length) { %>
+                    <p class="fb-empty">No hay rutas bloqueadas por fatiga.</p>
                 <% } %>
-            </div>
-        </div>
-    <% }) %>
+                <% blocked.forEach(b => { %>
+                    <div class="update-card fb-card blocked" id="check-<%= b.id %>" style="margin-bottom:var(--space-3)">
+                        <b>Ruta #<%= b.routeId %></b> — transportista #<%= b.userId %> ·
+                        score <b><%= b.score %></b>/<%= b.threshold %> · <%= b.method || '—' %> ·
+                        <span class="fb-meta"><%= new Date(b.createdAt).toLocaleString('es-AR') %></span>
+                        <div class="fb-actions">
+                            <button class="btn-primary btn-sm" onclick="release(<%= b.id %>)">Liberar con motivo</button>
+                            <button class="btn-secondary btn-sm" onclick="keep(<%= b.id %>)">Mantener bloqueada</button>
+                            <% if (!isAdmin) { %>
+                                <select id="tx-<%= b.routeId %>" class="fb-select">
+                                    <option value="">Reasignar a…</option>
+                                    <% transports.forEach(t => { %>
+                                        <option value="<%= t.id %>"><%= t.name %><%= t.driverName ? ' — ' + t.driverName : '' %></option>
+                                    <% }) %>
+                                </select>
+                                <button class="btn-secondary btn-sm" onclick="reassign(<%= b.routeId %>)">Reasignar ruta</button>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }) %>
+            </section>
 
-    <% if (!isAdmin) { %>
-    <h2 style="margin-top:28px">Transportistas inhabilitados</h2>
-    <% if (!disabledDrivers || !disabledDrivers.length) { %>
-        <p style="color:#64748b">No hay transportistas inhabilitados.</p>
-    <% } %>
-    <% (disabledDrivers || []).forEach(d => { %>
-        <div class="fb-card blocked" id="drv-<%= d.userId %>">
-            <b>Transportista #<%= d.userId %></b> · motivo: <%= d.reason || '—' %> ·
-            desde <%= d.disabledAt ? new Date(d.disabledAt).toLocaleString('es-AR') : '—' %>
-            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-                <button class="fb-btn rel" onclick="restoreDriver(<%= d.userId %>, 'consent')">Restablecer consentimiento</button>
-                <button class="fb-btn keep" onclick="restoreDriver(<%= d.userId %>, 'test')">Restablecer prueba</button>
-            </div>
-        </div>
-    <% }) %>
-    <% } %>
+            <!-- Transportistas inhabilitados (solo supervisor) -->
+            <% if (!isAdmin) { %>
+            <section>
+                <h2 class="fb-section-title">Transportistas inhabilitados</h2>
+                <% if (!disabledDrivers || !disabledDrivers.length) { %>
+                    <p class="fb-empty">No hay transportistas inhabilitados.</p>
+                <% } %>
+                <% (disabledDrivers || []).forEach(d => { %>
+                    <div class="update-card fb-card blocked" id="drv-<%= d.userId %>" style="margin-bottom:var(--space-3)">
+                        <b>Transportista #<%= d.userId %></b> · motivo: <%= d.reason || '—' %> ·
+                        <span class="fb-meta">desde <%= d.disabledAt ? new Date(d.disabledAt).toLocaleString('es-AR') : '—' %></span>
+                        <div class="fb-actions">
+                            <button class="btn-primary btn-sm" onclick="restoreDriver(<%= d.userId %>, 'consent')">Restablecer consentimiento</button>
+                            <button class="btn-secondary btn-sm" onclick="restoreDriver(<%= d.userId %>, 'test')">Restablecer prueba</button>
+                        </div>
+                    </div>
+                <% }) %>
+            </section>
+            <% } %>
 
-    <h2 style="margin-top:28px">Patrón de fatiga recurrente</h2>
-    <table>
-        <tr><th>Transportista</th><th>Bloqueos (ventana <%= cfg.patternWindowDays %>d)</th><th>Total histórico</th><th>Patrón</th><th>Revisión</th></tr>
-        <% if (!patterns.length) { %><tr><td colspan="5" style="color:#64748b">Sin eventos registrados.</td></tr><% } %>
-        <% patterns.forEach(p => { %>
-            <tr id="pat-<%= p.userId %>">
-                <td>#<%= p.userId %></td>
-                <td><%= p.windowCount %> / <%= p.threshold %></td>
-                <td><%= p.totalBlocked %></td>
-                <td><span class="pill <%= p.recurrent ? 'yes' : 'no' %>"><%= p.recurrent ? '⚠ Recurrente' : 'Normal' %></span></td>
-                <td>
-                    <% if (p.recurrent && !isAdmin && (p.reviewStatus === 'PENDING' || p.reviewStatus === 'NONE')) { %>
-                        <button class="fb-btn keep" onclick="reviewPattern(<%= p.userId %>, 'REVIEWED')">Revisado</button>
-                        <button class="fb-btn keep" onclick="reviewPattern(<%= p.userId %>, 'DISCARDED')">Descartar</button>
-                    <% } else if (p.reviewStatus && p.reviewStatus !== 'NONE') { %>
-                        <%= p.reviewStatus === 'REVIEWED' ? '✔ Revisado' : (p.reviewStatus === 'DISCARDED' ? 'Descartado' : 'Pendiente') %>
-                    <% } else { %>
-                        —
-                    <% } %>
-                </td>
-            </tr>
-        <% }) %>
-    </table>
-</div>
-<script>
+            <!-- Patrón recurrente -->
+            <section>
+                <h2 class="fb-section-title">Patrón de fatiga recurrente</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Transportista</th>
+                                <th>Bloqueos (ventana <%= cfg.patternWindowDays %>d)</th>
+                                <th>Total histórico</th>
+                                <th>Patrón</th>
+                                <th>Revisión</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!patterns.length) { %>
+                                <tr><td colspan="5" class="fb-empty">Sin eventos registrados.</td></tr>
+                            <% } %>
+                            <% patterns.forEach(p => { %>
+                                <tr id="pat-<%= p.userId %>">
+                                    <td>#<%= p.userId %></td>
+                                    <td><%= p.windowCount %> / <%= p.threshold %></td>
+                                    <td><%= p.totalBlocked %></td>
+                                    <td>
+                                        <span class="status-badge status-badge--sm <%= p.recurrent ? 'cancelado' : 'entregado' %>">
+                                            <%= p.recurrent ? '⚠ Recurrente' : 'Normal' %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <% if (p.recurrent && !isAdmin && (p.reviewStatus === 'PENDING' || p.reviewStatus === 'NONE')) { %>
+                                            <button class="btn-secondary btn-sm" onclick="reviewPattern(<%= p.userId %>, 'REVIEWED')">Revisado</button>
+                                            <button class="btn-secondary btn-sm" onclick="reviewPattern(<%= p.userId %>, 'DISCARDED')">Descartar</button>
+                                        <% } else if (p.reviewStatus && p.reviewStatus !== 'NONE') { %>
+                                            <%= p.reviewStatus === 'REVIEWED' ? '✔ Revisado' : (p.reviewStatus === 'DISCARDED' ? 'Descartado' : 'Pendiente') %>
+                                        <% } else { %>
+                                            —
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
 async function release(id) {
     const opt = prompt('Motivo de liberación:\n1) Falso positivo (la ruta queda apta, sin nueva prueba)\n2) Autorizado con descanso (debe rehacer la prueba)\n3) Otro (descripción obligatoria)\n\nEscribí 1, 2 o 3:');
     const map = { '1': 'falso_positivo', '2': 'autorizado_descanso', '3': 'otro' };
@@ -143,6 +184,6 @@ async function reviewPattern(userId, status) {
     const data = await r.json().catch(() => ({}));
     if (r.ok) { location.reload(); } else { alert(data.error || 'No se pudo registrar la revisión.'); }
 }
-</script>
+    </script>
 </body>
 </html>
