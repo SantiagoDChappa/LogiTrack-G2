@@ -21,7 +21,31 @@
     const pickupSection = document.getElementById('pickup-branch-section');
     const pickupSelect = document.getElementById('pickupBranchId');
 
-    if (!radios.length || !pickupSection) { return; }
+    // Caja de fecha estimada: se recalcula al cambiar la modalidad para que el
+    // destinatario sepa cuándo recibiría a domicilio vs cuándo podría retirar.
+    const etaBox = document.querySelector('.eta-box');
+    const etaLabel = document.getElementById('etaLabel');
+    const etaDate = document.getElementById('etaDate');
+    const etaNote = document.getElementById('etaNote');
+
+    function applyEta(mode) {
+        if (!etaBox || !etaDate) { return; }
+        const isPickup = mode === 'branch_pickup';
+        const val = isPickup ? etaBox.dataset.etaPickup : etaBox.dataset.etaHome;
+        if (etaLabel) { etaLabel.textContent = isPickup ? 'Retiro disponible desde' : 'Entrega estimada a domicilio'; }
+        etaDate.textContent = val || '—';
+        if (etaNote) {
+            etaNote.textContent = isPickup
+                ? 'Disponible para retirar en la sucursal a partir de esta fecha.'
+                : 'Si elegís retiro por sucursal podés tenerlo antes.';
+        }
+    }
+
+    if (!radios.length || !pickupSection) {
+        // Sin radios (envío no editable): igual mostramos la estimación actual.
+        applyEta(document.querySelector('input[name="deliveryMode"]:checked')?.value || 'home');
+        return;
+    }
 
     function applyDeliveryMode(mode) {
         const isPickup = mode === 'branch_pickup';
@@ -31,6 +55,7 @@
             pickupSelect.required = isPickup;
             if (!isPickup) { pickupSelect.value = ''; }
         }
+        applyEta(mode);
     }
 
     radios.forEach((radio) => {

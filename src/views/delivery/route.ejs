@@ -1198,10 +1198,14 @@
 
     // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics } ,
     // 'BACK' si el conductor elige volver a elegir método (solo modo AMBOS), o null.
-    async function pruebaReaccion(cfg, canGoBack = false, attempts = 3) {
+    async function pruebaReaccion(cfg, canGoBack = false) {
+        const attempts = Math.max(1, Number(cfg && cfg.reactionAttempts) || 3); // intentos configurables
         const limite = (cfg && Number(cfg.reactionSlowMs)) || 800; // ms tope de reacción
         const reactionsMs = [];
         for (let i = 0; i < attempts; i++) {
+            // Entre cada paso mostramos la carga a pantalla completa: la ruta no se puede tocar.
+            showRouteLoader(i === 0 ? 'Iniciando prueba de reacción…' : `Preparando intento ${i + 1} de ${attempts}…`);
+            await new Promise((res) => setTimeout(res, 650));
             const r = await new Promise((resolve) => {
                 Swal.fire({
                     title: `Prueba de reacción (${i + 1}/${attempts})`,
@@ -1211,6 +1215,7 @@
                             <div id="rt-info" style="margin-top:8px;font-size:.8rem;opacity:.85">Tocá apenas se ponga verde. Límite: ${limite} ms.</div>`,
                     showConfirmButton: false, showCancelButton: canGoBack, cancelButtonText: 'Volver a elegir',
                     allowOutsideClick: false, allowEscapeKey: false, didOpen: () => {
+                        hideRouteLoader(); // el modal ya cubre la pantalla; ocultamos el loader
                         const box = document.getElementById('rt-box');
                         const info = document.getElementById('rt-info');
                         let shownAt = 0, armed = false, tapped = false;
@@ -1239,9 +1244,10 @@
                     },
                 }).then((sw) => { if (sw.dismiss === Swal.DismissReason.cancel) { resolve('back'); } });
             });
-            if (r === 'back') { return 'BACK'; }
+            if (r === 'back') { hideRouteLoader(); return 'BACK'; }
             if (r === 'early') { i--; } // intento anulado, se repite sin penalización
         }
+        showRouteLoader('Calculando resultado…'); // bloquea la ruta hasta mostrar el veredicto
         return { method: 'REACCION', metrics: { reactionsMs } };
     }
 
@@ -1306,6 +1312,83 @@
         });
     }
 
+    // === Análisis ACÚSTICO de fatiga vocal (Web Audio, 100% en el navegador, $0) ===
+    // Extrae marcadores reales del waveform: velocidad de habla, pausas, tono (F0) y
+    // su variabilidad, dinámica de energía. El audio es efímero: se analiza y se
+    // descarta (Ley 25.326); al server solo va el puntaje, nunca el audio.
+    async function extraerFeaturesVoz(blob) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC || !blob || !blob.size) { return null; }
+        const ctx = new AC();
+        let audio;
+        try { audio = await ctx.decodeAudioData(await blob.arrayBuffer()); }
+        catch (_) { try { await ctx.close(); } catch (e) {} return null; }
+        const data = audio.getChannelData(0);
+        const sr = audio.sampleRate;
+        try { await ctx.close(); } catch (e) {}
+        if (!data || data.length < sr * 0.3) { return null; }
+
+        const frameLen = Math.max(1, Math.round(0.03 * sr)); // 30 ms
+        const hop = Math.max(1, Math.round(0.01 * sr));       // 10 ms
+        const rms = [];
+        for (let i = 0; i + frameLen <= data.length; i += hop) {
+            let s = 0;
+            for (let j = 0; j < frameLen; j++) { const v = data[i + j]; s += v * v; }
+            rms.push(Math.sqrt(s / frameLen));
+        }
+        if (rms.length < 3) { return null; }
+        const maxRms = Math.max.apply(null, rms);
+        if (maxRms <= 1e-4) { return null; } // sin audio útil
+        const thr = maxRms * 0.18; // umbral voz/silencio
+        const voiced = rms.map(r => r > thr);
+        const voicedFrames = voiced.filter(Boolean).length;
+        const pauseRatio = 1 - voicedFrames / voiced.length;
+        let onsets = 0;
+        for (let i = 1; i < voiced.length; i++) { if (voiced[i] && !voiced[i - 1]) { onsets++; } }
+        const durSec = data.length / sr;
+        const speechRate = onsets / Math.max(0.5, durSec); // arranques de voz por seg
+
+        // F0 por autocorrelación en frames con voz (70–350 Hz)
+        const minLag = Math.floor(sr / 350), maxLag = Math.floor(sr / 70);
+        const f0s = [];
+        for (let i = 0; i + frameLen <= data.length; i += hop * 2) {
+            if (!voiced[Math.floor(i / hop)]) { continue; }
+            let best = 0, bestLag = 0;
+            for (let lag = minLag; lag <= maxLag; lag++) {
+                let s = 0;
+                for (let j = 0; j < frameLen - lag; j++) { s += data[i + j] * data[i + j + lag]; }
+                if (s > best) { best = s; bestLag = lag; }
+            }
+            if (bestLag) { f0s.push(sr / bestLag); }
+        }
+        const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+        const f0mean = f0s.length ? mean(f0s) : 0;
+        const f0std = f0s.length ? Math.sqrt(mean(f0s.map(x => (x - f0mean) * (x - f0mean)))) : 0;
+        const f0cv = f0mean ? f0std / f0mean : 0;
+        const rmsMean = mean(rms);
+        const rmsStd = Math.sqrt(mean(rms.map(x => (x - rmsMean) * (x - rmsMean))));
+        const energyCv = rmsMean ? rmsStd / rmsMean : 0;
+
+        return {
+            durSec: +durSec.toFixed(2), speechRate: +speechRate.toFixed(2),
+            pauseRatio: +pauseRatio.toFixed(2), f0mean: Math.round(f0mean),
+            f0cv: +f0cv.toFixed(3), energyCv: +energyCv.toFixed(3), voicedFrames,
+        };
+    }
+
+    // Mapa de features → fatiga 0..100 (heurística sobre marcadores reales, calibrable).
+    // Más fatiga: habla lenta, muchas pausas, tono monótono, poca dinámica de energía.
+    function scoreAcusticoVoz(f) {
+        if (!f) { return null; }
+        const c01 = (x) => Math.max(0, Math.min(1, x));
+        const lento   = c01((2.6 - f.speechRate) / 2.2);
+        const pausas  = c01((f.pauseRatio - 0.40) / 0.40);
+        const monoton = c01((0.12 - f.f0cv) / 0.12);
+        const planoEn = c01((0.55 - f.energyCv) / 0.55);
+        const fatiga = 0.35 * lento + 0.30 * pausas + 0.20 * monoton + 0.15 * planoEn;
+        return Math.round(fatiga * 100);
+    }
+
     // Prueba de voz SERVER-SIDE (iOS/compatibilidad): graba con MediaRecorder, sube
     // el audio en base64 y el server lo transcribe (STT) y compara con la frase.
     // El audio es efímero (Ley 25.326): no se guarda. Devuelve métricas, 'BACK' o null.
@@ -1365,6 +1448,8 @@
             });
         }
 
+        const maxIntentos = Math.max(1, Number(cfg.voiceMaxAttempts) || 3);
+        let intentosFallidos = 0;
         for (;;) {
             const g = await grabar();
             Swal.close();
@@ -1401,15 +1486,30 @@
                 if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
                 continue;
             }
-            Swal.close();
             vozLog('stt-result', { dicho: data.dicho, match: data.matchRatio });
             if (data.matchRatio >= MIN_MATCH) {
-                return { method: 'VOZ', metrics: { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 } };
+                // Gate de frase superado → ahora evaluamos la FATIGA por análisis acústico.
+                // El loader "Evaluando…" sigue visible durante el análisis del waveform.
+                const feats = cfg.voiceAcousticEnabled !== false ? await extraerFeaturesVoz(g.blob) : null;
+                const acousticScore = scoreAcusticoVoz(feats);
+                vozLog('acustico', { feats, acousticScore });
+                Swal.close();
+                const metrics = { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 };
+                if (Number.isFinite(acousticScore)) { metrics.acousticScore = acousticScore; }
+                return { method: 'VOZ', metrics };
+            }
+            Swal.close();
+            intentosFallidos++;
+            // Agotó los intentos permitidos → el verdicto (bloquear o avisar) lo decide
+            // quien llamó a la prueba, según autoBlock.
+            if (intentosFallidos >= maxIntentos) {
+                vozLog('gate-fallido', { intentos: intentosFallidos });
+                return { method: 'VOZ', metrics: { phraseGateFailed: true } };
             }
             const pct = Math.round((data.matchRatio || 0) * 100);
             const rr = await Swal.fire({ icon: 'info', title: 'No coincide la frase',
                 html: `<div style="text-align:left;font-size:.9rem">
-                        <div>Tenés que leer <b>completa</b>:</div>
+                        <div>Tenés que leer <b>completa</b> (intento ${intentosFallidos + 1} de ${maxIntentos}):</div>
                         <div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(37,99,235,.12)">“${frase}”</div>
                         ${data.dicho ? `<div>Escuché: “<i>${data.dicho}</i>” — coincidencia <b>${pct}%</b> (mínimo ${Math.round(MIN_MATCH*100)}%).</div>` : '<div>No detecté tu voz.</div>'}
                        </div>`,
@@ -1431,6 +1531,14 @@
                 }).catch(() => {});
             } catch (_) {}
         };
+
+        // Modo ACÚSTICO: si está activo y el server tiene STT, usamos SIEMPRE el camino
+        // de grabación (sirve en cualquier dispositivo, incl. iOS): el servidor valida la
+        // frase y el navegador analiza la onda para medir la fatiga vocal real.
+        if (cfg.voiceAcousticEnabled !== false && cfg.voiceSttEnabled) {
+            vozLog('modo-acustico', {});
+            return pruebaVozSTT(cfg, canGoBack, vozLog);
+        }
 
         // iOS (iPhone/iPad): la Web Speech API dice estar soportada pero NO capta
         // audio (todos los navegadores son WebKit). Si el server tiene STT, grabamos
@@ -1532,6 +1640,8 @@
             });
         }
 
+        const maxIntentos = Math.max(1, Number(cfg.voiceMaxAttempts) || 3);
+        let intentosFallidos = 0;
         for (;;) {
             const r = await intentar();
             Swal.close();
@@ -1544,6 +1654,11 @@
             }
             if (r.ok) {
                 return { method: 'VOZ', metrics: { matchRatio: r.matchRatio, durationMs: r.durationMs, expectedMs: (cfg.testDurationSec || 5) * 1000 } };
+            }
+            intentosFallidos++;
+            if (intentosFallidos >= maxIntentos) {
+                vozLog('gate-fallido', { intentos: intentosFallidos });
+                return { method: 'VOZ', metrics: { phraseGateFailed: true } };
             }
             const HINTS = {
                 'no-speech': 'No detecté tu voz. Hablá más fuerte y cerca del micrófono.',
@@ -1600,6 +1715,29 @@
         }
     }
 
+    // Desglose del test de reacción para que el conductor entienda el veredicto:
+    // promedio, intentos dentro del límite y el criterio configurado (US-9/US-10).
+    function reaccionResumenHtml(data) {
+        const rx = data && data.reaction;
+        if (!rx || !rx.total) { return ''; }
+        const avgOk = rx.avg != null && rx.avg <= rx.limit;
+        const critTxt = rx.mode === 'APROBADOS'
+            ? `aprobás si al menos <b>${rx.need} de ${rx.total}</b> intentos quedan dentro de <b>${rx.limit} ms</b>`
+            : `aprobás si el <b>promedio</b> queda dentro de <b>${rx.limit} ms</b>`;
+        const verdictColor = rx.apto ? '#16a34a' : '#dc2626';
+        return `<div style="text-align:left;font-size:.88rem;line-height:1.6;margin-top:12px;padding:10px 12px;
+                    border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#0f172a">
+                <div>⏱ <b>Promedio:</b> ${rx.avg} ms
+                    <span style="color:${avgOk ? '#16a34a' : '#dc2626'};font-weight:700">${avgOk ? '✓ dentro' : '✗ supera'}</span>
+                    del límite (${rx.limit} ms)</div>
+                <div>✅ <b>Intentos dentro del límite:</b> ${rx.passedCount} de ${rx.total}
+                    <span style="opacity:.75">(se requieren ${rx.need})</span></div>
+                <div style="opacity:.8;margin-top:4px">Criterio (${rx.mode === 'APROBADOS' ? 'por intentos' : 'por promedio'}): ${critTxt}.</div>
+                <div style="margin-top:8px;font-weight:800;color:${verdictColor}">
+                    ${rx.apto ? '✔ APTO' : '✗ NO APTO'} según la parametrización</div>
+            </div>`;
+    }
+
     // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
     async function startWithFatigue() {
         // Bloquea la ruta mientras se carga la config y se resuelve el gate (no se puede operar antes).
@@ -1627,14 +1765,42 @@
         });
         const data = await r.json().catch(() => ({}));
         hideRouteLoader();
+        const gateFail = !!(prueba.metrics && prueba.metrics.phraseGateFailed);
+        const failed = data.failed === true;
+        const resumen = reaccionResumenHtml(data); // desglose si fue prueba de reacción
+
+        // autoBlock ON → bloqueado: no queda habilitado. Redirige a Mis Envíos con banner rojo.
         if (data.blocked) {
-            await Swal.fire({ icon: 'error', title: 'Ruta bloqueada por fatiga',
-                text: `Puntaje ${data.score}. Pedí revisión a tu Supervisor desde el portal.` });
+            await Swal.fire({ icon: 'error',
+                title: gateFail ? 'No pudiste leer la frase' : 'No pasaste el control de fatiga',
+                html: (gateFail
+                    ? 'No quedás habilitado para salir.<br>Tu supervisor fue notificado.'
+                    : `Puntaje <b>${data.score}/${data.threshold}</b>. No quedás habilitado para salir.<br>Tu supervisor fue notificado.`)
+                    + resumen,
+                confirmButtonText: 'Entendido', confirmButtonColor: '#dc2626', allowOutsideClick: false });
+            window.location.href = `/delivery?fatiga=bloqueado&ruta=${routeId}`;
             return;
         }
+
+        // autoBlock OFF pero no pasó → puede iniciar, el supervisor lo contactará.
+        // Queda un aviso en "Ojo de Patrón" para que el supervisor decida (inhabilitar/reasignar).
+        if (failed) {
+            await Swal.fire({ icon: 'warning', title: 'No pasaste las pruebas',
+                html: 'Pronto el supervisor se va a contactar con vos.<br>Por ahora <b>podés iniciar la ruta</b>.' + resumen,
+                confirmButtonText: 'Iniciar ruta', confirmButtonColor: '#d97706', allowOutsideClick: false });
+            showRouteLoader('Iniciando ruta…');
+            await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            window.location.reload();
+            return;
+        }
+
+        // Apto.
         const metodoLbl = prueba.method === 'VOZ' ? 'de voz' : 'de reacción';
+        const aptoHtml = resumen
+            ? `Prueba ${metodoLbl} superada.${resumen}<p style="margin-top:8px">¡Buen viaje!</p>`
+            : `Prueba ${metodoLbl} superada.<br><b>Puntaje ${data.score}/${data.threshold}</b>. ¡Buen viaje!`;
         await Swal.fire({ icon: 'success', title: 'Apto para salir',
-            html: `Prueba ${metodoLbl} superada.<br><b>Puntaje ${data.score}/${data.threshold}</b>. ¡Buen viaje!`,
+            html: aptoHtml,
             confirmButtonText: 'Iniciar ruta', confirmButtonColor: '#16a34a', allowOutsideClick: false,
             showCloseButton: true, timer: 10000, timerProgressBar: true });
         showRouteLoader('Iniciando ruta…');
@@ -1714,8 +1880,11 @@
                 if (poll) { clearInterval(poll); poll = null; }
                 return;
             }
-            await fetch(`/delivery/route/${routeId}/fatigue/stopped`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            const sr = await fetch(`/delivery/route/${routeId}/fatigue/stopped`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                .then(r => r.json()).catch(() => null);
             stopped = true; btn.textContent = '▶ Reanudar marcha'; btn.style.background = '#2563eb';
+            // El próximo chequeo se carga en pantalla apenas el conductor se detiene.
+            if (sr && sr.nextCheckAt) { showNext(sr.nextCheckAt, 'PRÓXIMO CHEQUEO'); }
             await refresh();
             poll = setInterval(refresh, 30000);
         });

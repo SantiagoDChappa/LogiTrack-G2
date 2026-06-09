@@ -19,12 +19,15 @@ function scoreFromReaction(reactionsMs = [], fastMs = 250, slowMs = 800) {
 
 // Voz: deriva la fatiga de la prueba de lectura de frase (reconocimiento de voz).
 //  - mockScore: fuerza un valor (tests / demo).
-//  - matchRatio (0..1): qué tan bien coincidió lo leído con la frase. Mejor
-//    coincidencia → menos fatiga (1 → ~10, 0.6 → ~46, 0 → 100).
-//  - durationMs/expectedMs: fallback legacy (mock por duración) cuando no hay
-//    matchRatio (una muestra más corta de lo pedido → más "fatiga").
-function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio } = {}) {
+//  - acousticScore (0..100): fatiga calculada por análisis ACÚSTICO real del audio
+//    (velocidad de habla, pausas, F0 y su variabilidad, dinámica de energía). Es la
+//    señal preferida: la lectura correcta de la frase es solo el "gate" de cooperación.
+//  - matchRatio (0..1): qué tan bien coincidió lo leído con la frase (fallback).
+//  - durationMs/expectedMs: fallback legacy (mock por duración).
+function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio, acousticScore, phraseGateFailed } = {}) {
+    if (phraseGateFailed) { return 100; } // no pudo leer la frase tras los intentos → fatiga máxima
     if (Number.isFinite(mockScore)) { return clamp(Math.round(mockScore), 0, 100); }
+    if (Number.isFinite(acousticScore)) { return clamp(Math.round(acousticScore), 0, 100); }
     if (Number.isFinite(matchRatio)) {
         const m = clamp(matchRatio, 0, 1);
         return clamp(Math.round(100 - m * 90), 0, 100);
@@ -49,4 +52,25 @@ function decide(scoreValue, cfg) {
     return 'APTO';
 }
 
-module.exports = { clamp, scoreFromReaction, scoreFromVoice, score, decide };
+// Evaluación del test de reacción según el modo configurado.
+//  - PROMEDIO: apto si el promedio de los intentos ≤ reactionSlowMs (el límite).
+//  - APROBADOS: apto si la cantidad de intentos bajo el límite alcanza el requerido
+//    (UNO = ≥1, MITAD = ≥mitad redondeada hacia arriba, TODOS = todos).
+// Devuelve { score, apto, decision, ...detalle }. El detalle (avg, passedCount, total,
+// limit, mode, required, need) permite explicar el veredicto en la UI (US-9/US-10).
+function evaluateReaction({ reactionsMs = [], fastMs, slowMs, mode = 'PROMEDIO', required = 'MITAD', autoBlock = true } = {}) {
+    const valid = reactionsMs.map(Number).filter(n => Number.isFinite(n) && n > 0);
+    const score = scoreFromReaction(valid, fastMs, slowMs);
+    const limit = Number(slowMs) || 800;
+    const total = valid.length;
+    const passedCount = valid.filter(ms => ms <= limit).length;
+    const avg = total ? Math.round(valid.reduce((a, b) => a + b, 0) / total) : null;
+    const need = required === 'UNO' ? 1 : (required === 'TODOS' ? total : Math.ceil(total / 2));
+    const detail = { mode, required, limit, total, passedCount, avg, need: total ? need : 0 };
+    if (!total) { return { score: 100, apto: false, decision: autoBlock ? 'BLOCKED' : 'APTO', ...detail }; }
+    const apto = mode === 'APROBADOS' ? (passedCount >= need) : (avg <= limit);
+    const decision = (!autoBlock || apto) ? 'APTO' : 'BLOCKED';
+    return { score, apto, decision, ...detail };
+}
+
+module.exports = { clamp, scoreFromReaction, scoreFromVoice, score, decide, evaluateReaction };

@@ -32,6 +32,7 @@ const buildSnapshot = (shipment) => {
     return {
         expectedDeliveryFrom: normTime(json.expectedDeliveryFrom),
         expectedDeliveryTo:   normTime(json.expectedDeliveryTo),
+        expectedDeliveryDate: json.expectedDeliveryDate ? String(json.expectedDeliveryDate).slice(0, 10) : null,
         deliveryMode:         json.deliveryMode,
         pickupBranchId:       json.pickupBranchId,
         address: {
@@ -128,6 +129,7 @@ const describeChanges = (requested) => {
         parts.push('franja horaria');
     }
     if (requested.deliveryMode !== undefined) { parts.push('modalidad de entrega'); }
+    if (requested.expectedDeliveryDate !== undefined) { parts.push('fecha estimada de entrega'); }
     if (requested.pickupBranchId !== undefined) { parts.push('sucursal de retiro'); }
     if (requested.address) { parts.push('referencias de domicilio'); }
     if (requested.street || requested.number || requested.postalCode || requested.provinceId) {
@@ -156,6 +158,9 @@ const applyDirectChanges = async (shipment, directPayload, transaction) => {
     }
     if (directPayload.expectedDeliveryTo !== undefined) {
         shipmentUpdate.expectedDeliveryTo = directPayload.expectedDeliveryTo;
+    }
+    if (directPayload.expectedDeliveryDate !== undefined) {
+        shipmentUpdate.expectedDeliveryDate = directPayload.expectedDeliveryDate;
     }
     if (directPayload.deliveryMode !== undefined) {
         shipmentUpdate.deliveryMode = directPayload.deliveryMode;
@@ -223,6 +228,13 @@ const submitPortalModification = async ({ shipment, client, body }) => {
 
     if (mode === 'branch_pickup' && !branchId) {
         return { ok: false, status: 400, message: 'Seleccioná una sucursal de retiro válida.' };
+    }
+
+    // Al cambiar la modalidad recalculamos la fecha estimada de entrega/retiro y la
+    // persistimos: el destinatario eligió en función de esa fecha y debe quedar reflejada.
+    if (parsed.direct.deliveryMode !== undefined) {
+        const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+        parsed.direct.expectedDeliveryDate = estimateDeliveryDate({ mode }).toISOString().slice(0, 10);
     }
 
     const applied = [];

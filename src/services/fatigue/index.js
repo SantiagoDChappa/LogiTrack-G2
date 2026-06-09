@@ -78,8 +78,32 @@ async function revokeConsent({ userId, actorId }) {
 async function evaluate({ checkId, userId, routeId, branchId, method, metrics, triggerType = 'INICIO', cfg }) {
     const config = cfg || await configSvc.getConfig(branchId);
     const expectedMs = config.testDurationSec * 1000;
-    const scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
-    const decision = scorer.decide(scoreValue, config);
+    let scoreValue, decision, failed, reaction = null;
+    if (method === 'REACCION') {
+        // Modo de evaluación configurable (promedio vs cantidad de aprobados).
+        const r = scorer.evaluateReaction({
+            reactionsMs: metrics.reactionsMs,
+            fastMs: config.reactionFastMs, slowMs: config.reactionSlowMs,
+            mode: config.reactionEvalMode, required: config.reactionRequired,
+            autoBlock: config.autoBlock,
+        });
+        scoreValue = r.score; decision = r.decision; failed = !r.apto;
+        // Detalle para que el portal explique el veredicto (promedio + aprobados + criterio).
+        reaction = {
+            avg: r.avg, passedCount: r.passedCount, total: r.total, limit: r.limit,
+            mode: r.mode, required: r.required, need: r.need, apto: r.apto,
+        };
+    } else {
+        scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
+        decision = scorer.decide(scoreValue, config);
+        failed = scoreValue > config.thresholdPct; // "no pasó" independiente de autoBlock
+    }
+
+    // LGT-193 — autoBlock OFF + no apto al INICIO: se deja salir, pero queda un registro
+    // REVIEW para que el Supervisor decida (inhabilitar o reasignar). decision='REVIEW'
+    // no bloquea el gate de inicio (canStart lo trata como apto), solo alerta al supervisor.
+    const review = decision !== 'BLOCKED' && failed && !config.autoBlock && triggerType === 'INICIO';
+    if (review) { decision = 'REVIEW'; }
 
     let check;
     if (checkId) {
@@ -101,8 +125,11 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
         await bumpPatternCounter(check.userId, config, branchId);
         const transportName = await driverName(check.userId);
         await notify.notifyBlock({ check, branchId, transportName, routeId, score: scoreValue });
+    } else if (review) {
+        const transportName = await driverName(check.userId);
+        await notify.notifyReview({ check, branchId, transportName, routeId, score: scoreValue });
     }
-    return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision };
+    return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision, failed, reaction, review };
 }
 
 // ── Gate de inicio de ruta (US-1 / US-4) ────────────────────────────────────
@@ -119,7 +146,8 @@ async function canStart(routeId) {
     if (!check) { return { ok: false, reason: 'FATIGUE_REQUIRED' }; }
     if (check.consentStatus !== 'ACCEPTED') { return { ok: false, reason: 'CONSENT_REQUIRED', checkId: check.id }; }
     if (check.decision === 'BLOCKED' && !check.releasedAt) { return { ok: false, reason: 'BLOCKED', checkId: check.id, score: check.score }; }
-    if (check.decision !== 'APTO' && !check.releasedAt) { return { ok: false, reason: 'PENDING', checkId: check.id }; }
+    // REVIEW = no pasó pero autoBlock OFF: el conductor fue advertido y puede salir; queda para revisión.
+    if (check.decision !== 'APTO' && check.decision !== 'REVIEW' && !check.releasedAt) { return { ok: false, reason: 'PENDING', checkId: check.id }; }
     return { ok: true, checkId: check.id };
 }
 
@@ -128,6 +156,26 @@ function listBlocked(branchId) {
     const where = { decision: 'BLOCKED', releasedAt: null };
     if (branchId) { where.branchId = branchId; }
     return FatigueCheck.findAll({ where, order: [['createdAt', 'DESC']] });
+}
+
+// LGT-193 — avisos sin bloqueo (autoBlock OFF + no apto): el conductor salió igual,
+// pero el supervisor debe decidir si inhabilitarlo o reasignar la ruta.
+function listReview(branchId) {
+    const where = { decision: 'REVIEW', releasedAt: null };
+    if (branchId) { where.branchId = branchId; }
+    return FatigueCheck.findAll({ where, order: [['createdAt', 'DESC']] });
+}
+
+// Cierra el aviso (decisión tomada o descartado) sin tocar el estado de la ruta.
+async function resolveReview({ checkId, actorId, note }) {
+    const check = await FatigueCheck.findByPk(checkId);
+    if (!check) { throw new Error('Aviso no encontrado'); }
+    await check.update({
+        releasedAt: new Date(), releasedBy: actorId,
+        releaseReason: 'revisado_sin_bloqueo', releaseDetail: note || null,
+    });
+    await notify.audit('REVIEW_RESOLVED', { actorId, checkId, detail: note || 'Aviso de fatiga revisado.' });
+    return check;
 }
 
 // LGT-195: liberar un bloqueo. "falso_positivo" deja la ruta apta sin nueva
@@ -304,7 +352,7 @@ async function driverName(userId) {
 
 module.exports = {
     recordConsent, revokeConsent, evaluate, latestForRoute, canStart,
-    listBlocked, release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
+    listBlocked, listReview, resolveReview, release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
     disableDriver, restoreDriver, getDriverStatus, isDriverDisabled, listDisabledDrivers,
     getDriverHistory, suppressDriverData, purgeExpired,
 };

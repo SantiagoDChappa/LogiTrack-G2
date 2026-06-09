@@ -39,19 +39,15 @@ function deriveState(session, cfg, now = new Date()) {
 }
 
 // Hora a la que se hará el próximo chequeo (Date) o null si no hay uno agendado.
-//  - DETENIDO: stoppedAt + recheckStoppedMin, sólo si ya se cumplió el tiempo
-//    de conducción mínimo (si no, detenerse no dispara chequeo).
+//  - DETENIDO: stoppedAt + recheckStoppedMin (se agenda apenas el conductor se detiene).
 //  - PAUSADO: restUntil (cuándo se habilita reintentar la prueba).
-function nextCheckAt(session, cfg, derived, now = new Date()) {
+function nextCheckAt(session, cfg, derived) {
     if (!session) { return null; }
     if (derived.state === RecheckState.PAUSED) {
         return session.restUntil ? new Date(session.restUntil) : null;
     }
     if (derived.state === RecheckState.STOPPED && session.stoppedAt) {
-        const driveMin = minutesBetween(session.driveStartedAt, session.stoppedAt);
-        if (driveMin >= cfg.recheckDriveMin) {
-            return new Date(new Date(session.stoppedAt).getTime() + cfg.recheckStoppedMin * MS_MIN);
-        }
+        return new Date(new Date(session.stoppedAt).getTime() + cfg.recheckStoppedMin * MS_MIN);
     }
     return null;
 }

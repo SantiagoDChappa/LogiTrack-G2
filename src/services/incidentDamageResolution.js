@@ -52,7 +52,11 @@ async function notifySenderIfDamage({ incidentId, shipment, type }) {
         }
         if (!EMAIL_RE.test(String(senderEmail || '').trim())) { return false; }
 
-        const link = '/portal/mis-envios';
+        // Enlace directo a la incidencia creada (no al alta de una nueva).
+        const { baseUrl } = require('./notificationPlaceholders');
+        const link = incidentId
+            ? `${baseUrl()}/portal/mis-envios/incidencia/${incidentId}`
+            : `${baseUrl()}/portal/mis-envios`;
         const body = `Tu paquete llegó con daño (envío ${trackingId}).\n\n` +
             `¿Querés un reembolso o un reemplazo? Ingresá al portal y elegí una opción:\n${link}\n\n` +
             `Incidencia #${incidentId}.`;
