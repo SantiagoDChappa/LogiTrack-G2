@@ -95,13 +95,25 @@ const exportIncidentsByPeriod = async (req, res) => {
 };
 
 const getSatisfactionReport = async (req, res) => {
-    const viewModel = await getSatisfactionData(req.query);
+    const { RoleType } = require('../constants/enums');
+    const currentUser = res.locals.currentUser || {};
+    const isAdmin = currentUser.roleId === RoleType.ADMIN.id;
+    const branchId = isAdmin ? (req.query.branchId || null) : (currentUser.branchId || null);
+
+    const viewModel = await getSatisfactionData({ ...req.query, branchId });
+    viewModel.isAdmin = isAdmin;
+    viewModel.currentBranchId = currentUser.branchId || null;
     res.render('report/satisfaction', viewModel);
 };
 
 const exportSatisfactionReport = async (req, res) => {
     try {
-        const report = await getSatisfactionData(req.query);
+        const { RoleType } = require('../constants/enums');
+        const currentUser = res.locals.currentUser || {};
+        const isAdmin = currentUser.roleId === RoleType.ADMIN.id;
+        const branchId = isAdmin ? (req.query.branchId || null) : (currentUser.branchId || null);
+
+        const report = await getSatisfactionData({ ...req.query, branchId });
         if (report.error) {
             return res.status(400).send(report.error);
         }
