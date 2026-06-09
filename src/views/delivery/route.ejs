@@ -1275,6 +1275,130 @@
         return Math.max(0, 1 - dist / Math.max(a.length, b.length));
     }
 
+    // Elige un mimeType de grabación soportado (iOS usa audio/mp4).
+    function pickMimeAudio() {
+        const cands = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+            for (const c of cands) { if (MediaRecorder.isTypeSupported(c)) { return c; } }
+        }
+        return '';
+    }
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => { const s = String(fr.result); resolve(s.slice(s.indexOf(',') + 1)); };
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+        });
+    }
+
+    // Prueba de voz SERVER-SIDE (iOS/compatibilidad): graba con MediaRecorder, sube
+    // el audio en base64 y el server lo transcribe (STT) y compara con la frase.
+    // El audio es efímero (Ley 25.326): no se guarda. Devuelve métricas, 'BACK' o null.
+    async function pruebaVozSTT(cfg, canGoBack, vozLog) {
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+            vozLog('stt-sin-mediarecorder', {});
+            await Swal.fire({ icon: 'warning', title: 'Grabación no disponible',
+                text: 'Tu dispositivo no permite grabar audio. Usá el test de reacción.' });
+            return canGoBack ? 'BACK' : null;
+        }
+        const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
+        const MIN_MATCH = 0.7;
+        const secs = cfg.testDurationSec || 5;
+
+        function grabar() {
+            return new Promise((resolve) => {
+                let resolved = false;
+                const done = (v) => { if (!resolved) { resolved = true; resolve(v); } };
+                Swal.fire({
+                    title: 'Prueba de voz',
+                    html: `<div style="font-size:.85rem;margin-bottom:8px">Tocá el botón y leé en voz alta, claro y completo:</div>
+                           <div style="font-weight:700;font-size:1.05rem;margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(37,99,235,.12);color:inherit">“${frase}”</div>
+                           <button id="vz-go" style="padding:12px 16px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">🎤 Empezar prueba</button>
+                           <div id="vz-tip" style="margin-top:10px;font-size:.85rem;opacity:.85"></div>`,
+                    showConfirmButton: false, showCancelButton: canGoBack, cancelButtonText: 'Volver a elegir',
+                    allowOutsideClick: false, allowEscapeKey: false,
+                    didOpen: () => {
+                        const go = document.getElementById('vz-go');
+                        const tip = document.getElementById('vz-tip');
+                        go.addEventListener('click', async () => {
+                            go.disabled = true;
+                            let stream;
+                            try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+                            catch (e) { vozLog('stt-denied', { e: String(e && e.name) }); done({ denied: true }); return; }
+                            const mime = pickMimeAudio();
+                            let rec;
+                            try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+                            catch (_) { rec = new MediaRecorder(stream); }
+                            const chunks = [];
+                            rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) { chunks.push(ev.data); } };
+                            rec.onstop = () => {
+                                stream.getTracks().forEach(t => t.stop());
+                                const blob = new Blob(chunks, { type: rec.mimeType || mime || 'audio/webm' });
+                                vozLog('stt-grabado', { bytes: blob.size, mime: blob.type });
+                                done({ blob });
+                            };
+                            let left = secs;
+                            const paint = () => { tip.innerHTML = `<span style="color:#dc2626;font-weight:700">🔴 Micrófono activado</span> — leé ahora (${Math.max(0, left)}s)`; };
+                            paint();
+                            const iv = setInterval(() => { left--; paint(); }, 1000);
+                            vozLog('stt-rec-start', { mime: mime || '(default)', secs });
+                            try { rec.start(); } catch (e) { clearInterval(iv); vozLog('stt-no-inicia', { msg: String(e && e.message) }); done({ error: true }); return; }
+                            setTimeout(() => { clearInterval(iv); try { rec.stop(); } catch (_) {} }, secs * 1000);
+                        });
+                    },
+                }).then((sw) => { if (sw.dismiss === Swal.DismissReason.cancel) { done({ back: true }); } });
+            });
+        }
+
+        for (;;) {
+            const g = await grabar();
+            Swal.close();
+            if (g.back) { return canGoBack ? 'BACK' : null; }
+            if (g.denied) {
+                await Swal.fire({ icon: 'error', title: 'Sin permiso de micrófono',
+                    text: canGoBack ? 'Podés elegir el test de reacción.' : 'Habilitá el micrófono y reintentá.' });
+                return canGoBack ? 'BACK' : null;
+            }
+            if (g.error || !g.blob || !g.blob.size) {
+                const rr = await Swal.fire({ icon: 'error', title: 'No se grabó audio',
+                    text: 'No se pudo capturar tu voz. Probá de nuevo.',
+                    showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar' });
+                if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
+                continue;
+            }
+            Swal.fire({ title: 'Evaluando…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let data, httpOk = false;
+            try {
+                const audioBase64 = await blobToBase64(g.blob);
+                const resp = await fetch(`/delivery/route/${routeId}/fatigue/voz-stt`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frase, audioBase64, mimeType: g.blob.type }),
+                });
+                httpOk = resp.ok;
+                data = await resp.json().catch(() => ({}));
+                if (!httpOk) { throw new Error(data.error || ('HTTP ' + resp.status)); }
+            } catch (e) {
+                vozLog('stt-error', { msg: String(e.message) });
+                Swal.close();
+                const rr = await Swal.fire({ icon: 'error', title: 'No se pudo evaluar',
+                    text: 'Hubo un problema al transcribir tu voz. Probá de nuevo.',
+                    showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar' });
+                if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
+                continue;
+            }
+            Swal.close();
+            vozLog('stt-result', { dicho: data.dicho, match: data.matchRatio });
+            if (data.matchRatio >= MIN_MATCH) {
+                return { method: 'VOZ', metrics: { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 } };
+            }
+            const rr = await Swal.fire({ icon: 'info', title: 'No te entendí bien',
+                html: data.dicho ? `Escuché: “<i>${data.dicho}</i>”.<br>Leé la frase completa, más claro.` : 'No detecté tu voz. Probá de nuevo.',
+                showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar', allowOutsideClick: false });
+            if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
+        }
+    }
+
     async function pruebaVoz(cfg, canGoBack = false) {
         // Manda diagnóstico al server (aparece en logs de Render) y a la consola.
         const sessionTag = Math.random().toString(36).slice(2, 8);
@@ -1289,23 +1413,14 @@
             } catch (_) {}
         };
 
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) {
-            vozLog('no-soportado', { ua: navigator.userAgent });
-            await Swal.fire({ icon: 'warning', title: 'Reconocimiento de voz no disponible',
-                text: canGoBack
-                    ? 'Tu navegador no soporta la prueba de voz. Elegí el test de reacción.'
-                    : 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
-            return canGoBack ? 'BACK' : null;
-        }
-        vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
-
         // iOS (iPhone/iPad): la Web Speech API dice estar soportada pero NO capta
-        // audio (todos los navegadores son WebKit). Avisamos para usar reacción.
+        // audio (todos los navegadores son WebKit). Si el server tiene STT, grabamos
+        // y transcribimos del lado del servidor; si no, derivamos al test de reacción.
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
             || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         if (isIOS) {
-            vozLog('ios-detectado', {});
+            vozLog('ios-detectado', { stt: !!cfg.voiceSttEnabled });
+            if (cfg.voiceSttEnabled) { return pruebaVozSTT(cfg, canGoBack, vozLog); }
             const r = await Swal.fire({
                 icon: 'warning', title: 'Voz no disponible en iPhone/iPad',
                 text: 'El reconocimiento de voz no funciona en iPhone ni iPad. Usá el test de reacción.',
@@ -1317,6 +1432,19 @@
             if (canGoBack) { if (r.isConfirmed) { return 'BACK'; } } // si no, intenta voz igual
             else if (!r.isConfirmed) { return null; }
         }
+
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            vozLog('no-soportado', { ua: navigator.userAgent });
+            // Si el server tiene STT, lo usamos también en navegadores sin Web Speech.
+            if (cfg.voiceSttEnabled) { return pruebaVozSTT(cfg, canGoBack, vozLog); }
+            await Swal.fire({ icon: 'warning', title: 'Reconocimiento de voz no disponible',
+                text: canGoBack
+                    ? 'Tu navegador no soporta la prueba de voz. Elegí el test de reacción.'
+                    : 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
+            return canGoBack ? 'BACK' : null;
+        }
+        vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
 
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
         const MIN_MATCH = 0.7; // exige leer la frase casi completa y en orden

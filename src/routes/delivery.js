@@ -725,6 +725,7 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
         reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
     });
 });
 
@@ -734,6 +735,30 @@ router.post('/route/:id/fatigue/voz-log', requireDelivery, (req, res) => {
     const uid = res.locals.currentUser?.id;
     console.log('[fatiga-voz][cliente] user=' + uid + ' route=' + req.params.id, JSON.stringify(req.body));
     res.status(204).end();
+});
+
+// Prueba de voz SERVER-SIDE (compatible iOS): el cliente graba el audio y lo manda
+// en base64; acá se transcribe (STT) y se compara con la frase. El audio es
+// EFÍMERO: se procesa y se descarta, nunca se persiste ni se loguea (Ley 25.326).
+router.post('/route/:id/fatigue/voz-stt', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const fatigueStt = require('../services/fatigue/stt');
+    const phraseMatch = require('../services/fatigue/phraseMatch');
+    if (!fatigueStt.isEnabled()) { return res.status(501).json({ error: 'STT no configurado en el servidor' }); }
+    const { frase, audioBase64, mimeType } = req.body || {};
+    if (!frase || !audioBase64) { return res.status(400).json({ error: 'Faltan datos (frase/audio)' }); }
+    try {
+        const buffer = Buffer.from(audioBase64, 'base64');
+        if (buffer.length > 8 * 1024 * 1024) { return res.status(413).json({ error: 'Audio demasiado grande' }); }
+        const ext = (mimeType && mimeType.includes('mp4')) ? 'mp4' : (mimeType && mimeType.includes('ogg')) ? 'ogg' : 'webm';
+        const dicho = await fatigueStt.transcribe(buffer, { mimeType: mimeType || 'audio/webm', filename: `voz.${ext}` });
+        const matchRatio = phraseMatch.similitudFrase(dicho, frase);
+        // No se persiste el audio ni la transcripción cruda: solo se devuelve el match.
+        res.json({ ok: true, matchRatio, dicho });
+    } catch (e) {
+        console.warn('[fatiga-voz][stt] error:', e.message);
+        res.status(502).json({ error: 'No se pudo transcribir', detail: e.message });
+    }
 });
 
 // US-1: registrar consentimiento (acepta o rechaza).
