@@ -1186,35 +1186,39 @@
         }
     }
 
-    // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics:{reactionsMs} } o null.
-    async function pruebaReaccion(attempts = 3) {
+    // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics } ,
+    // 'BACK' si el conductor elige volver a elegir método (solo modo AMBOS), o null.
+    async function pruebaReaccion(canGoBack = false, attempts = 3) {
         const reactionsMs = [];
         for (let i = 0; i < attempts; i++) {
-            const ok = await new Promise((resolve) => {
+            const r = await new Promise((resolve) => {
                 Swal.fire({
                     title: `Prueba de reacción (${i + 1}/${attempts})`,
                     html: `<div id="rt-box" style="height:160px;border-radius:12px;background:#334155;display:flex;
                             align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer">
                             Esperá el verde…</div>`,
-                    showConfirmButton: false, allowOutsideClick: false, didOpen: () => {
+                    showConfirmButton: false, showCancelButton: canGoBack, cancelButtonText: 'Volver a elegir',
+                    allowOutsideClick: false, allowEscapeKey: false, didOpen: () => {
                         const box = document.getElementById('rt-box');
                         let shownAt = 0, armed = false;
                         const delay = 800 + Math.random() * 2500;
                         const t = setTimeout(() => {
+                            if (!document.body.contains(box)) { return; }
                             box.style.background = '#16a34a'; box.textContent = '¡TOCÁ!';
                             shownAt = performance.now(); armed = true;
                         }, delay);
                         box.addEventListener('click', () => {
                             if (!armed) { // tocó antes del estímulo → se anula (Esc.2)
-                                clearTimeout(t); resolve(false); Swal.close(); return;
+                                clearTimeout(t); resolve('early'); Swal.close(); return;
                             }
                             reactionsMs.push(Math.round(performance.now() - shownAt));
-                            resolve(true); Swal.close();
+                            resolve('ok'); Swal.close();
                         });
                     },
-                });
+                }).then((sw) => { if (sw.dismiss === Swal.DismissReason.cancel) { resolve('back'); } });
             });
-            if (!ok) { i--; } // intento anulado, se repite sin penalización
+            if (r === 'back') { return 'BACK'; }
+            if (r === 'early') { i--; } // intento anulado, se repite sin penalización
         }
         return { method: 'REACCION', metrics: { reactionsMs } };
     }
@@ -1259,7 +1263,7 @@
         return Math.max(0, 1 - dist / Math.max(a.length, b.length));
     }
 
-    async function pruebaVoz(cfg) {
+    async function pruebaVoz(cfg, canGoBack = false) {
         // Manda diagnóstico al server (aparece en logs de Render) y a la consola.
         const sessionTag = Math.random().toString(36).slice(2, 8);
         const vozLog = (stage, data) => {
@@ -1277,8 +1281,10 @@
         if (!SR) {
             vozLog('no-soportado', { ua: navigator.userAgent });
             await Swal.fire({ icon: 'warning', title: 'Reconocimiento de voz no disponible',
-                text: 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
-            return null;
+                text: canGoBack
+                    ? 'Tu navegador no soporta la prueba de voz. Elegí el test de reacción.'
+                    : 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
+            return canGoBack ? 'BACK' : null;
         }
         vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
@@ -1353,8 +1359,10 @@
             Swal.close();
             if (r.denied) {
                 await Swal.fire({ icon: 'error', title: 'Sin permiso de micrófono',
-                    text: 'Necesitamos el micrófono para la prueba de voz. Habilitalo y reintentá.' });
-                return null;
+                    text: canGoBack
+                        ? 'Necesitamos el micrófono para la voz. Podés elegir el test de reacción.'
+                        : 'Necesitamos el micrófono para la prueba de voz. Habilitalo y reintentá.' });
+                return canGoBack ? 'BACK' : null;
             }
             if (r.ok) {
                 return { method: 'VOZ', metrics: { matchRatio: r.matchRatio, durationMs: r.durationMs, expectedMs: (cfg.testDurationSec || 5) * 1000 } };
@@ -1373,10 +1381,11 @@
             const retry = await Swal.fire({
                 icon: 'info', title: 'No te entendí bien',
                 html: msg,
-                showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: 'Cancelar',
+                showCancelButton: true, confirmButtonText: 'Reintentar',
+                cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar',
                 allowOutsideClick: false,
             });
-            if (!retry.isConfirmed) { return null; }
+            if (!retry.isConfirmed) { return canGoBack ? 'BACK' : null; }
         }
     }
 
@@ -1395,11 +1404,17 @@
     }
 
     // Ejecuta la prueba según el método configurado (VOZ, REACCION o AMBOS→elige).
+    // En AMBOS, desde cada prueba se puede "Volver a elegir" (vuelve al selector).
     async function runPrueba(method, cfg) {
-        let m = method;
-        if (m === 'AMBOS') { m = await elegirMetodo(); }
-        if (m === 'VOZ') { return pruebaVoz(cfg); }
-        return pruebaReaccion();
+        if (method !== 'AMBOS') {
+            return method === 'VOZ' ? pruebaVoz(cfg, false) : pruebaReaccion(false);
+        }
+        for (;;) {
+            const m = await elegirMetodo();
+            const res = m === 'VOZ' ? await pruebaVoz(cfg, true) : await pruebaReaccion(true);
+            if (res === 'BACK') { continue; } // volvió a elegir método
+            return res; // métricas, o null si abortó
+        }
     }
 
     // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
