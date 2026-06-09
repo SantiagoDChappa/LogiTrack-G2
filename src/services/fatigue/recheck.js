@@ -38,6 +38,24 @@ function deriveState(session, cfg, now = new Date()) {
     return { state: RecheckState.DRIVING };
 }
 
+// Hora a la que se hará el próximo chequeo (Date) o null si no hay uno agendado.
+//  - DETENIDO: stoppedAt + recheckStoppedMin, sólo si ya se cumplió el tiempo
+//    de conducción mínimo (si no, detenerse no dispara chequeo).
+//  - PAUSADO: restUntil (cuándo se habilita reintentar la prueba).
+function nextCheckAt(session, cfg, derived, now = new Date()) {
+    if (!session) { return null; }
+    if (derived.state === RecheckState.PAUSED) {
+        return session.restUntil ? new Date(session.restUntil) : null;
+    }
+    if (derived.state === RecheckState.STOPPED && session.stoppedAt) {
+        const driveMin = minutesBetween(session.driveStartedAt, session.stoppedAt);
+        if (driveMin >= cfg.recheckDriveMin) {
+            return new Date(new Date(session.stoppedAt).getTime() + cfg.recheckStoppedMin * MS_MIN);
+        }
+    }
+    return null;
+}
+
 // Esc.7: reanudar marcha antes de que se dispare el re-chequeo descarta el conteo.
 function canDiscardStop(session) {
     return !!session && session.state === RecheckState.STOPPED;
@@ -81,6 +99,7 @@ async function getStatus(routeId, route, cfg) {
     if (d.state === RecheckState.RECHECK_PENDING && s.state !== RecheckState.RECHECK_PENDING) {
         await s.update({ state: RecheckState.RECHECK_PENDING, recheckRequestedAt: new Date(), updatedAt: new Date() });
     }
+    const next = nextCheckAt(s, cfg, d);
     return {
         routeId,
         state: d.state,
@@ -88,6 +107,7 @@ async function getStatus(routeId, route, cfg) {
         paused: d.state === RecheckState.PAUSED,
         restRemainingMin: d.restRemaining || 0,
         methodRecheck: cfg.methodRecheck,
+        nextCheckAt: next ? next.toISOString() : null,
     };
 }
 
@@ -123,7 +143,7 @@ async function onRecheckResult(routeId, decision, cfg) {
 }
 
 module.exports = {
-    minutesBetween, deriveState, canDiscardStop,
+    minutesBetween, deriveState, nextCheckAt, canDiscardStop,
     ensureSession, markStopped, resume, getStatus, guardRetry, onRecheckResult,
     RecheckState,
 };

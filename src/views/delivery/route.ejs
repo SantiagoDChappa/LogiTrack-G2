@@ -1397,6 +1397,20 @@
             'border-radius:999px;background:#b45309;color:#fff;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.3)';
         btn.textContent = '🛑 Estoy detenido';
         document.body.appendChild(btn);
+
+        // Cartel flotante con la hora del próximo chequeo / reintento.
+        const nextLbl = document.createElement('div');
+        nextLbl.id = 'fatigue-next-check';
+        nextLbl.style.cssText = 'position:fixed;bottom:132px;right:16px;z-index:9999;padding:8px 12px;border-radius:10px;' +
+            'background:#0f172a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none';
+        document.body.appendChild(nextLbl);
+        const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return '--:--'; } };
+        const showNext = (iso, label) => {
+            if (!iso) { nextLbl.style.display = 'none'; return; }
+            nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span>`;
+            nextLbl.style.display = 'block';
+        };
+
         let stopped = false, poll = null;
 
         async function refresh() {
@@ -1406,9 +1420,13 @@
                 if (s.paused) {
                     btn.textContent = `⏸ Pausada por fatiga (${s.restRemainingMin}m)`;
                     btn.style.background = '#dc2626';
+                    showNext(s.nextCheckAt, 'PRÓXIMO REINTENTO');
                     if (s.restRemainingMin <= 0) { await launchRecheck(s.methodRecheck); }
                 } else if (s.needsRecheck) {
+                    showNext(null);
                     await launchRecheck(s.methodRecheck);
+                } else {
+                    showNext(s.nextCheckAt, 'PRÓXIMO CHEQUEO');
                 }
             } catch (_) { /* red */ }
         }
@@ -1431,6 +1449,7 @@
             } else {
                 Swal.fire({ icon: 'success', title: 'Apto', text: 'Podés continuar la ruta.' });
                 stopped = false; btn.textContent = '🛑 Estoy detenido'; btn.style.background = '#b45309';
+                showNext(null);
                 if (poll) { clearInterval(poll); poll = null; }
             }
         }
@@ -1438,6 +1457,7 @@
             if (stopped) {
                 await fetch(`/delivery/route/${routeId}/fatigue/resume`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
                 stopped = false; btn.textContent = '🛑 Estoy detenido'; btn.style.background = '#b45309';
+                showNext(null);
                 if (poll) { clearInterval(poll); poll = null; }
                 return;
             }
