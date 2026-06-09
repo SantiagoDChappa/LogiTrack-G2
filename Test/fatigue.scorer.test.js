@@ -48,6 +48,14 @@ describe('Ojo de Patrón — scorer (US-3/US-9)', () => {
         expect(scorer.evaluateReaction({ ...base, required: 'TODOS', reactionsMs: [300, 400, 500] }).decision).toBe('APTO');
         expect(scorer.evaluateReaction({ ...base, required: 'TODOS', reactionsMs: [300, 400, 900] }).decision).toBe('BLOCKED');
     });
+    test('evaluateReaction devuelve el desglose para explicar el veredicto (US-9/US-10)', () => {
+        const r = scorer.evaluateReaction({ reactionsMs: [300, 900, 950], fastMs: 250, slowMs: 800, mode: 'APROBADOS', required: 'UNO', autoBlock: false });
+        expect(r).toMatchObject({ total: 3, passedCount: 1, need: 1, limit: 800, avg: 717, apto: true });
+        const p = scorer.evaluateReaction({ reactionsMs: [900, 950, 1000], fastMs: 250, slowMs: 800, mode: 'PROMEDIO', autoBlock: false });
+        expect(p).toMatchObject({ total: 3, passedCount: 0, avg: 950, apto: false });
+        // autoBlock OFF: aunque no apto, la decisión del scorer es APTO (el bloqueo lo decide la capa superior).
+        expect(p.decision).toBe('APTO');
+    });
     test('decide() respeta umbral y autoBlock (US-4/US-7)', () => {
         expect(scorer.decide(90, { autoBlock: true, thresholdPct: 85 })).toBe('BLOCKED');
         expect(scorer.decide(80, { autoBlock: true, thresholdPct: 85 })).toBe('APTO');

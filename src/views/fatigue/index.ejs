@@ -15,6 +15,7 @@
         }
         .fb-card { border-left: 5px solid var(--color-border); margin-bottom: var(--space-3); }
         .fb-card.blocked { border-left-color: #dc2626; }
+        .fb-card.review { border-left-color: #f59e0b; }
         .fb-card.disabled { border-left-color: #d97706; }
         .fb-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
         .fb-card-title { margin: 0; font-size: var(--font-size-md); }
@@ -91,6 +92,36 @@
                             <% if (!isAdmin) { %>
                                 <button class="btn-secondary btn-sm" onclick="reassign(<%= b.routeId %>)">Reasignar a otro transportista</button>
                             <% } %>
+                        </div>
+                    </div>
+                <% }) %>
+            </section>
+
+            <!-- Avisos sin bloqueo (autoBlock OFF + no apto): salió igual, decidir qué hacer -->
+            <section>
+                <h2 class="fb-section-title">Avisos de fatiga sin bloqueo</h2>
+                <% if (!reviews || !reviews.length) { %>
+                    <p class="fb-empty">No hay avisos pendientes. (Aparecen cuando un transportista no supera el control pero el bloqueo automático está desactivado.)</p>
+                <% } %>
+                <% (reviews || []).forEach(rv => { %>
+                    <div class="update-card fb-card review" id="review-<%= rv.id %>">
+                        <div class="fb-card-head">
+                            <div>
+                                <h3 class="fb-card-title">Ruta #<%= rv.routeId %> — salió a ruta</h3>
+                                <p class="fb-meta"><%= rv.driverName || ('Transportista #' + rv.userId) %> (#<%= rv.userId %>) · <%= new Date(rv.createdAt).toLocaleString('es-AR') %></p>
+                            </div>
+                            <span class="fb-score-badge">Fatiga: <%= rv.threshold %>/<%= rv.score %></span>
+                        </div>
+                        <div class="fb-chips">
+                            <span class="status-badge status-badge--sm pendiente">No superó · sin bloqueo</span>
+                            <span class="fb-chip">Prueba: <%= rv.method || '—' %></span>
+                        </div>
+                        <div class="fb-actions">
+                            <% if (!isAdmin) { %>
+                                <button class="btn-primary btn-sm" onclick="disableDriverReview(<%= rv.userId %>, <%= rv.id %>)">Inhabilitar transportista</button>
+                                <button class="btn-secondary btn-sm" onclick="reassign(<%= rv.routeId %>)">Reasignar ruta</button>
+                            <% } %>
+                            <button class="btn-secondary btn-sm" onclick="resolveReview(<%= rv.id %>)">Descartar aviso</button>
                         </div>
                     </div>
                 <% }) %>
@@ -263,6 +294,33 @@
                 text: 'El nuevo conductor deberá rehacer consentimiento y prueba.', confirmButtonColor: '#16a34a' });
             location.reload();
         } else { toastErr(data.error || 'No se pudo reasignar.'); }
+    }
+
+    async function disableDriverReview(userId, checkId) {
+        const res = await Swal.fire({
+            icon: 'warning', title: 'Inhabilitar transportista',
+            text: 'No podrá iniciar nuevas rutas hasta que lo restablezcas. ¿Confirmás?',
+            showCancelButton: true, confirmButtonText: 'Inhabilitar', cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!res.isConfirmed) { return; }
+        const r = await fetch('/fatigue/driver/disable', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, checkId }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { document.getElementById('review-' + checkId)?.remove(); toastOk('Transportista inhabilitado'); }
+        else { toastErr(data.error || 'No se pudo inhabilitar.'); }
+    }
+
+    async function resolveReview(checkId) {
+        const r = await fetch('/fatigue/' + checkId + '/review-resolve', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note: 'Descartado desde el panel' }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { document.getElementById('review-' + checkId)?.remove(); toastOk('Aviso descartado'); }
+        else { toastErr(data.error || 'No se pudo descartar.'); }
     }
 
     async function restoreDriver(userId, kind) {

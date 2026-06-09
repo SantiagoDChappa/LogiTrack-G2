@@ -55,6 +55,22 @@ async function notifyBlock({ check, branchId, transportName, routeId, score }) {
     return recipients.length;
 }
 
+// LGT-193 — aviso sin bloqueo: el control no se superó pero autoBlock está OFF, así que
+// el conductor salió a ruta. Se notifica al Supervisor para decidir inhabilitar/reasignar.
+async function notifyReview({ check, branchId, transportName, routeId, score }) {
+    const recipients = await resolveRecipients(branchId);
+    const detail = `Ruta #${routeId}: control de fatiga NO superado (score ${score}), pero el bloqueo automático está ` +
+        `desactivado: el transportista ${transportName || 'N/D'} salió a ruta. Decidir inhabilitar o reasignar. ` +
+        `Notificados: ${recipients.length} (supervisores + admin).`;
+    await audit('NOTIFY_REVIEW', { checkId: check?.id, detail });
+    const body = `Aviso de fatiga SIN bloqueo automático.\nRuta #${routeId}\n` +
+        `Transportista: ${transportName || 'N/D'}\nScore: ${score}\n\n` +
+        `El conductor salió a ruta. Decidí si inhabilitarlo o reasignar la ruta en el panel: /fatigue`;
+    const sent = await deliverEmail(recipients, `[LogiTrack] Aviso de fatiga sin bloqueo — Ruta #${routeId}`, body);
+    await audit('NOTIFY_REVIEW_EMAIL', { checkId: check?.id, detail: `Emails enviados: ${sent}` });
+    return recipients.length;
+}
+
 // LGT-197 — notifica al Supervisor (y admin) cuando se marca patrón recurrente.
 async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     const recipients = await resolveRecipients(branchId);
@@ -67,4 +83,4 @@ async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     return recipients.length;
 }
 
-module.exports = { audit, resolveRecipients, notifyBlock, notifyPattern };
+module.exports = { audit, resolveRecipients, notifyBlock, notifyReview, notifyPattern };

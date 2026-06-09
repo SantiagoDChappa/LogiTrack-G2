@@ -56,23 +56,21 @@ function decide(scoreValue, cfg) {
 //  - PROMEDIO: apto si el promedio de los intentos ≤ reactionSlowMs (el límite).
 //  - APROBADOS: apto si la cantidad de intentos bajo el límite alcanza el requerido
 //    (UNO = ≥1, MITAD = ≥mitad redondeada hacia arriba, TODOS = todos).
-// Devuelve { score, decision }. score = puntaje graduado (avg→0..100) para registro/UI.
+// Devuelve { score, apto, decision, ...detalle }. El detalle (avg, passedCount, total,
+// limit, mode, required, need) permite explicar el veredicto en la UI (US-9/US-10).
 function evaluateReaction({ reactionsMs = [], fastMs, slowMs, mode = 'PROMEDIO', required = 'MITAD', autoBlock = true } = {}) {
     const valid = reactionsMs.map(Number).filter(n => Number.isFinite(n) && n > 0);
     const score = scoreFromReaction(valid, fastMs, slowMs);
-    if (!valid.length) { return { score: 100, apto: false, decision: autoBlock ? 'BLOCKED' : 'APTO' }; }
     const limit = Number(slowMs) || 800;
-    let apto;
-    if (mode === 'APROBADOS') {
-        const passed = valid.filter(ms => ms <= limit).length;
-        const need = required === 'UNO' ? 1 : (required === 'TODOS' ? valid.length : Math.ceil(valid.length / 2));
-        apto = passed >= need;
-    } else { // PROMEDIO
-        const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
-        apto = avg <= limit;
-    }
+    const total = valid.length;
+    const passedCount = valid.filter(ms => ms <= limit).length;
+    const avg = total ? Math.round(valid.reduce((a, b) => a + b, 0) / total) : null;
+    const need = required === 'UNO' ? 1 : (required === 'TODOS' ? total : Math.ceil(total / 2));
+    const detail = { mode, required, limit, total, passedCount, avg, need: total ? need : 0 };
+    if (!total) { return { score: 100, apto: false, decision: autoBlock ? 'BLOCKED' : 'APTO', ...detail }; }
+    const apto = mode === 'APROBADOS' ? (passedCount >= need) : (avg <= limit);
     const decision = (!autoBlock || apto) ? 'APTO' : 'BLOCKED';
-    return { score, apto, decision };
+    return { score, apto, decision, ...detail };
 }
 
 module.exports = { clamp, scoreFromReaction, scoreFromVoice, score, decide, evaluateReaction };
