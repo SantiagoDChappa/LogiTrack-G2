@@ -78,7 +78,7 @@ async function revokeConsent({ userId, actorId }) {
 async function evaluate({ checkId, userId, routeId, branchId, method, metrics, triggerType = 'INICIO', cfg }) {
     const config = cfg || await configSvc.getConfig(branchId);
     const expectedMs = config.testDurationSec * 1000;
-    const scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics } });
+    const scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
     const decision = scorer.decide(scoreValue, config);
 
     let check;

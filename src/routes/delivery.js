@@ -724,6 +724,7 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     res.json({
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
+        reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
     });
 });
 

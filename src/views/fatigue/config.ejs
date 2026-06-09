@@ -124,6 +124,19 @@
                         <div class="field">
                             <label for="testDurationSec">Duración de la prueba (seg)</label>
                             <input type="number" id="testDurationSec" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>">
+                            <small class="cfg-help">Solo para la prueba de voz: segundos que escucha el micrófono.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionFastMs">Reacción óptima (ms)</label>
+                            <input type="number" id="reactionFastMs" name="reactionFastMs" min="50" max="2000" value="<%= cfg.reactionFastMs %>"
+                                   title="Tiempo de reacción muy rápido = fatiga 0.">
+                            <small class="cfg-help">Reacción muy rápida = sin fatiga. Ej.: 250 ms.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionSlowMs">Límite de reacción (ms)</label>
+                            <input type="number" id="reactionSlowMs" name="reactionSlowMs" min="100" max="5000" value="<%= cfg.reactionSlowMs %>"
+                                   title="Tiempo de reacción tan lento que cuenta como fatiga máxima.">
+                            <small class="cfg-help">Reacción igual o más lenta = fatiga máxima (100). Es el “límite” que se muestra al conductor. Ej.: 800 ms.</small>
                         </div>
                     </div>
                 </div>

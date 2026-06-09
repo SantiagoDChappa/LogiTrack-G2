@@ -5,13 +5,16 @@
 
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
-// Test de reacción (US-9): mapea el tiempo medio de reacción a fatiga.
-// 250 ms (muy alerta) → 0 ; 800 ms (muy lento) → 100.
-function scoreFromReaction(reactionsMs = []) {
+// Test de reacción (US-9): mapea el tiempo MEDIO de reacción a fatiga.
+// fastMs (muy alerta) → 0 ; slowMs (límite, muy lento) → 100. Configurable.
+function scoreFromReaction(reactionsMs = [], fastMs = 250, slowMs = 800) {
     const valid = reactionsMs.map(Number).filter(n => Number.isFinite(n) && n > 0);
     if (valid.length === 0) { return 100; } // sin datos → fail-safe (máxima fatiga)
     const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
-    return clamp(Math.round(((avg - 250) / (800 - 250)) * 100), 0, 100);
+    const lo = Number(fastMs) || 250;
+    const hi = Number(slowMs) || 800;
+    if (hi <= lo) { return avg <= lo ? 0 : 100; }
+    return clamp(Math.round(((avg - lo) / (hi - lo)) * 100), 0, 100);
 }
 
 // Voz: deriva la fatiga de la prueba de lectura de frase (reconocimiento de voz).
@@ -33,8 +36,9 @@ function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio }
 }
 
 // Punto de entrada. method: 'VOZ' | 'REACCION'. metrics según método.
-function score({ method, metrics = {} } = {}) {
-    if (method === 'REACCION') { return scoreFromReaction(metrics.reactionsMs); }
+// cfg (opcional) aporta los límites configurables del test de reacción.
+function score({ method, metrics = {}, cfg } = {}) {
+    if (method === 'REACCION') { return scoreFromReaction(metrics.reactionsMs, cfg && cfg.reactionFastMs, cfg && cfg.reactionSlowMs); }
     if (method === 'VOZ')      { return scoreFromVoice(metrics); }
     throw new Error(`Método de prueba inválido: ${method}`);
 }

@@ -11,6 +11,8 @@ const DEFAULTS = Object.freeze({
     methodStart:       'VOZ',    // método usado al iniciar la ruta
     methodRecheck:     'REACCION', // método usado en el re-chequeo en ruta
     testDurationSec:   '5',      // duración de la prueba
+    reactionFastMs:    '250',    // reacción "muy alerta" → fatiga 0
+    reactionSlowMs:    '800',    // límite de reacción: más lento → fatiga 100
     recheckDriveMin:   '90',     // min de conducción que habilita re-chequeo
     recheckStoppedMin: '3',      // min detenido que dispara re-chequeo
     recheckRestMin:    '30',     // min de descanso para reintentar prueba tras bloqueo en ruta (LGT-199)
@@ -23,6 +25,8 @@ const DEFAULTS = Object.freeze({
 const NUMERIC_RANGES = Object.freeze({
     thresholdPct:      [0, 100],
     testDurationSec:   [1, 60],
+    reactionFastMs:    [50, 2000],
+    reactionSlowMs:    [100, 5000],
     recheckDriveMin:   [1, 1440],
     recheckStoppedMin: [1, 240],
     recheckRestMin:    [1, 720],

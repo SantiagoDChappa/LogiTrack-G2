@@ -1188,19 +1188,22 @@
 
     // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics } ,
     // 'BACK' si el conductor elige volver a elegir método (solo modo AMBOS), o null.
-    async function pruebaReaccion(canGoBack = false, attempts = 3) {
+    async function pruebaReaccion(cfg, canGoBack = false, attempts = 3) {
+        const limite = (cfg && Number(cfg.reactionSlowMs)) || 800; // ms tope de reacción
         const reactionsMs = [];
         for (let i = 0; i < attempts; i++) {
             const r = await new Promise((resolve) => {
                 Swal.fire({
                     title: `Prueba de reacción (${i + 1}/${attempts})`,
                     html: `<div id="rt-box" style="height:160px;border-radius:12px;background:#334155;display:flex;
-                            align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer">
-                            Esperá el verde…</div>`,
+                            flex-direction:column;gap:4px;align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer">
+                            Esperá el verde…</div>
+                            <div id="rt-info" style="margin-top:8px;font-size:.8rem;opacity:.85">Tocá apenas se ponga verde. Límite: ${limite} ms.</div>`,
                     showConfirmButton: false, showCancelButton: canGoBack, cancelButtonText: 'Volver a elegir',
                     allowOutsideClick: false, allowEscapeKey: false, didOpen: () => {
                         const box = document.getElementById('rt-box');
-                        let shownAt = 0, armed = false;
+                        const info = document.getElementById('rt-info');
+                        let shownAt = 0, armed = false, tapped = false;
                         const delay = 800 + Math.random() * 2500;
                         const t = setTimeout(() => {
                             if (!document.body.contains(box)) { return; }
@@ -1208,11 +1211,20 @@
                             shownAt = performance.now(); armed = true;
                         }, delay);
                         box.addEventListener('click', () => {
+                            if (tapped) { return; }
                             if (!armed) { // tocó antes del estímulo → se anula (Esc.2)
                                 clearTimeout(t); resolve('early'); Swal.close(); return;
                             }
-                            reactionsMs.push(Math.round(performance.now() - shownAt));
-                            resolve('ok'); Swal.close();
+                            tapped = true;
+                            const ms = Math.round(performance.now() - shownAt);
+                            reactionsMs.push(ms);
+                            const ok = ms <= limite;
+                            box.style.background = ok ? '#16a34a' : '#dc2626';
+                            box.textContent = `${ms} ms`;
+                            info.innerHTML = ok
+                                ? `<span style="color:#16a34a;font-weight:700">✓ Dentro del límite</span> (${limite} ms)`
+                                : `<span style="color:#dc2626;font-weight:700">✗ Superó el límite</span> de ${limite} ms`;
+                            setTimeout(() => { resolve('ok'); Swal.close(); }, 1200);
                         });
                     },
                 }).then((sw) => { if (sw.dismiss === Swal.DismissReason.cancel) { resolve('back'); } });
@@ -1426,11 +1438,11 @@
     // En AMBOS, desde cada prueba se puede "Volver a elegir" (vuelve al selector).
     async function runPrueba(method, cfg) {
         if (method !== 'AMBOS') {
-            return method === 'VOZ' ? pruebaVoz(cfg, false) : pruebaReaccion(false);
+            return method === 'VOZ' ? pruebaVoz(cfg, false) : pruebaReaccion(cfg, false);
         }
         for (;;) {
             const m = await elegirMetodo();
-            const res = m === 'VOZ' ? await pruebaVoz(cfg, true) : await pruebaReaccion(true);
+            const res = m === 'VOZ' ? await pruebaVoz(cfg, true) : await pruebaReaccion(cfg, true);
             if (res === 'BACK') { continue; } // volvió a elegir método
             return res; // métricas, o null si abortó
         }
