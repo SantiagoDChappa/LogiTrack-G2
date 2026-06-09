@@ -78,8 +78,20 @@ async function revokeConsent({ userId, actorId }) {
 async function evaluate({ checkId, userId, routeId, branchId, method, metrics, triggerType = 'INICIO', cfg }) {
     const config = cfg || await configSvc.getConfig(branchId);
     const expectedMs = config.testDurationSec * 1000;
-    const scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
-    const decision = scorer.decide(scoreValue, config);
+    let scoreValue, decision;
+    if (method === 'REACCION') {
+        // Modo de evaluación configurable (promedio vs cantidad de aprobados).
+        const r = scorer.evaluateReaction({
+            reactionsMs: metrics.reactionsMs,
+            fastMs: config.reactionFastMs, slowMs: config.reactionSlowMs,
+            mode: config.reactionEvalMode, required: config.reactionRequired,
+            autoBlock: config.autoBlock,
+        });
+        scoreValue = r.score; decision = r.decision;
+    } else {
+        scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
+        decision = scorer.decide(scoreValue, config);
+    }
 
     let check;
     if (checkId) {

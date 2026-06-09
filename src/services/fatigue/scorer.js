@@ -24,7 +24,8 @@ function scoreFromReaction(reactionsMs = [], fastMs = 250, slowMs = 800) {
 //    señal preferida: la lectura correcta de la frase es solo el "gate" de cooperación.
 //  - matchRatio (0..1): qué tan bien coincidió lo leído con la frase (fallback).
 //  - durationMs/expectedMs: fallback legacy (mock por duración).
-function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio, acousticScore } = {}) {
+function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio, acousticScore, phraseGateFailed } = {}) {
+    if (phraseGateFailed) { return 100; } // no pudo leer la frase tras los intentos → fatiga máxima
     if (Number.isFinite(mockScore)) { return clamp(Math.round(mockScore), 0, 100); }
     if (Number.isFinite(acousticScore)) { return clamp(Math.round(acousticScore), 0, 100); }
     if (Number.isFinite(matchRatio)) {
@@ -51,4 +52,27 @@ function decide(scoreValue, cfg) {
     return 'APTO';
 }
 
-module.exports = { clamp, scoreFromReaction, scoreFromVoice, score, decide };
+// Evaluación del test de reacción según el modo configurado.
+//  - PROMEDIO: apto si el promedio de los intentos ≤ reactionSlowMs (el límite).
+//  - APROBADOS: apto si la cantidad de intentos bajo el límite alcanza el requerido
+//    (UNO = ≥1, MITAD = ≥mitad redondeada hacia arriba, TODOS = todos).
+// Devuelve { score, decision }. score = puntaje graduado (avg→0..100) para registro/UI.
+function evaluateReaction({ reactionsMs = [], fastMs, slowMs, mode = 'PROMEDIO', required = 'MITAD', autoBlock = true } = {}) {
+    const valid = reactionsMs.map(Number).filter(n => Number.isFinite(n) && n > 0);
+    const score = scoreFromReaction(valid, fastMs, slowMs);
+    if (!valid.length) { return { score: 100, decision: autoBlock ? 'BLOCKED' : 'APTO' }; }
+    const limit = Number(slowMs) || 800;
+    let apto;
+    if (mode === 'APROBADOS') {
+        const passed = valid.filter(ms => ms <= limit).length;
+        const need = required === 'UNO' ? 1 : (required === 'TODOS' ? valid.length : Math.ceil(valid.length / 2));
+        apto = passed >= need;
+    } else { // PROMEDIO
+        const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+        apto = avg <= limit;
+    }
+    const decision = (!autoBlock || apto) ? 'APTO' : 'BLOCKED';
+    return { score, decision };
+}
+
+module.exports = { clamp, scoreFromReaction, scoreFromVoice, score, decide, evaluateReaction };

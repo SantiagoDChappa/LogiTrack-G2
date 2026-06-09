@@ -126,6 +126,12 @@
                             <input type="number" id="testDurationSec" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>">
                             <small class="cfg-help">Solo para la prueba de voz: segundos que escucha el micrófono.</small>
                         </div>
+                        <div class="field">
+                            <label for="voiceMaxAttempts">Intentos de voz</label>
+                            <input type="number" id="voiceMaxAttempts" name="voiceMaxAttempts" min="1" max="10" value="<%= cfg.voiceMaxAttempts %>"
+                                   title="Cuántas veces puede intentar leer la frase antes de quedar bloqueado.">
+                            <small class="cfg-help">Si no logra leer la frase en esta cantidad de intentos, queda <b>no apto</b>. Ej.: 3.</small>
+                        </div>
                         <div class="field span-full">
                             <label class="cfg-switch">
                                 <input type="checkbox" name="voiceAcousticEnabled" <%= cfg.voiceAcousticEnabled ? 'checked' : '' %>>
@@ -133,6 +139,12 @@
                                     <small>Mide la fatiga por la voz (velocidad, pausas, tono), no solo si leíste la frase. Requiere STT activo (graba el audio). Se evalúa en el navegador; el audio no se guarda.</small>
                                 </span>
                             </label>
+                        </div>
+                        <div class="field">
+                            <label for="reactionAttempts">Intentos de reacción</label>
+                            <input type="number" id="reactionAttempts" name="reactionAttempts" min="1" max="10" value="<%= cfg.reactionAttempts %>"
+                                   title="Cantidad de toques del test de reacción.">
+                            <small class="cfg-help">Cantidad de toques que hace el conductor. Ej.: 3.</small>
                         </div>
                         <div class="field">
                             <label for="reactionFastMs">Reacción óptima (ms)</label>
@@ -143,8 +155,25 @@
                         <div class="field">
                             <label for="reactionSlowMs">Límite de reacción (ms)</label>
                             <input type="number" id="reactionSlowMs" name="reactionSlowMs" min="100" max="5000" value="<%= cfg.reactionSlowMs %>"
-                                   title="Tiempo de reacción tan lento que cuenta como fatiga máxima.">
-                            <small class="cfg-help">Reacción igual o más lenta = fatiga máxima (100). Es el “límite” que se muestra al conductor. Ej.: 800 ms.</small>
+                                   title="Tiempo de reacción tan lento que cuenta como no apto / fatiga máxima.">
+                            <small class="cfg-help">El “límite”: una reacción más lenta que esto cuenta como mala. Ej.: 800 ms.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionEvalMode">Cómo se evalúa la reacción</label>
+                            <select id="reactionEvalMode" name="reactionEvalMode">
+                                <option value="PROMEDIO" <%= cfg.reactionEvalMode==='PROMEDIO'?'selected':'' %>>Por promedio (promedio de los intentos ≤ límite)</option>
+                                <option value="APROBADOS" <%= cfg.reactionEvalMode==='APROBADOS'?'selected':'' %>>Por aprobados (cuántos intentos pasan el límite)</option>
+                            </select>
+                            <small class="cfg-help">PROMEDIO: suma de ms ÷ intentos ≤ límite. APROBADOS: cuenta cuántos intentos quedaron bajo el límite.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionRequired">Aprobados requeridos (si “por aprobados”)</label>
+                            <select id="reactionRequired" name="reactionRequired">
+                                <option value="UNO" <%= cfg.reactionRequired==='UNO'?'selected':'' %>>Al menos uno</option>
+                                <option value="MITAD" <%= cfg.reactionRequired==='MITAD'?'selected':'' %>>Al menos la mitad</option>
+                                <option value="TODOS" <%= cfg.reactionRequired==='TODOS'?'selected':'' %>>Todos</option>
+                            </select>
+                            <small class="cfg-help">Solo aplica si elegiste “por aprobados”. Cuántos intentos deben quedar bajo el límite para ser apto.</small>
                         </div>
                     </div>
                 </div>

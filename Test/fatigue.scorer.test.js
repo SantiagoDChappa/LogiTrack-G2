@@ -32,6 +32,22 @@ describe('Ojo de Patrón — scorer (US-3/US-9)', () => {
         expect(scorer.score({ method: 'REACCION', metrics: { reactionsMs: [300] } })).toBeGreaterThanOrEqual(0);
         expect(() => scorer.score({ method: 'NADA' })).toThrow();
     });
+    test('voz phraseGateFailed → fatiga 100 (no leyó la frase)', () => {
+        expect(scorer.scoreFromVoice({ phraseGateFailed: true })).toBe(100);
+    });
+    test('reacción PROMEDIO: apto si avg ≤ límite', () => {
+        const base = { fastMs: 250, slowMs: 800, mode: 'PROMEDIO', autoBlock: true };
+        expect(scorer.evaluateReaction({ ...base, reactionsMs: [300, 700, 500] }).decision).toBe('APTO'); // avg 500
+        expect(scorer.evaluateReaction({ ...base, reactionsMs: [900, 950, 1000] }).decision).toBe('BLOCKED'); // avg 950
+    });
+    test('reacción APROBADOS: UNO/MITAD/TODOS', () => {
+        const base = { fastMs: 250, slowMs: 800, mode: 'APROBADOS', autoBlock: true };
+        const r = [300, 900, 950]; // 1 bajo el límite de 3
+        expect(scorer.evaluateReaction({ ...base, required: 'UNO', reactionsMs: r }).decision).toBe('APTO');
+        expect(scorer.evaluateReaction({ ...base, required: 'MITAD', reactionsMs: r }).decision).toBe('BLOCKED'); // necesita 2
+        expect(scorer.evaluateReaction({ ...base, required: 'TODOS', reactionsMs: [300, 400, 500] }).decision).toBe('APTO');
+        expect(scorer.evaluateReaction({ ...base, required: 'TODOS', reactionsMs: [300, 400, 900] }).decision).toBe('BLOCKED');
+    });
     test('decide() respeta umbral y autoBlock (US-4/US-7)', () => {
         expect(scorer.decide(90, { autoBlock: true, thresholdPct: 85 })).toBe('BLOCKED');
         expect(scorer.decide(80, { autoBlock: true, thresholdPct: 85 })).toBe('APTO');

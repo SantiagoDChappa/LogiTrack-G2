@@ -1198,7 +1198,8 @@
 
     // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics } ,
     // 'BACK' si el conductor elige volver a elegir método (solo modo AMBOS), o null.
-    async function pruebaReaccion(cfg, canGoBack = false, attempts = 3) {
+    async function pruebaReaccion(cfg, canGoBack = false) {
+        const attempts = Math.max(1, Number(cfg && cfg.reactionAttempts) || 3); // intentos configurables
         const limite = (cfg && Number(cfg.reactionSlowMs)) || 800; // ms tope de reacción
         const reactionsMs = [];
         for (let i = 0; i < attempts; i++) {
@@ -1442,6 +1443,8 @@
             });
         }
 
+        const maxIntentos = Math.max(1, Number(cfg.voiceMaxAttempts) || 3);
+        let intentosFallidos = 0;
         for (;;) {
             const g = await grabar();
             Swal.close();
@@ -1491,10 +1494,18 @@
                 return { method: 'VOZ', metrics };
             }
             Swal.close();
+            intentosFallidos++;
+            // Agotó los intentos permitidos → no apto (bloqueado).
+            if (intentosFallidos >= maxIntentos) {
+                vozLog('gate-fallido', { intentos: intentosFallidos });
+                await Swal.fire({ icon: 'error', title: 'No pudiste leer la frase',
+                    text: `Agotaste los ${maxIntentos} intentos. No quedás habilitado para salir.` });
+                return { method: 'VOZ', metrics: { phraseGateFailed: true } };
+            }
             const pct = Math.round((data.matchRatio || 0) * 100);
             const rr = await Swal.fire({ icon: 'info', title: 'No coincide la frase',
                 html: `<div style="text-align:left;font-size:.9rem">
-                        <div>Tenés que leer <b>completa</b>:</div>
+                        <div>Tenés que leer <b>completa</b> (intento ${intentosFallidos + 1} de ${maxIntentos}):</div>
                         <div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(37,99,235,.12)">“${frase}”</div>
                         ${data.dicho ? `<div>Escuché: “<i>${data.dicho}</i>” — coincidencia <b>${pct}%</b> (mínimo ${Math.round(MIN_MATCH*100)}%).</div>` : '<div>No detecté tu voz.</div>'}
                        </div>`,
@@ -1625,6 +1636,8 @@
             });
         }
 
+        const maxIntentos = Math.max(1, Number(cfg.voiceMaxAttempts) || 3);
+        let intentosFallidos = 0;
         for (;;) {
             const r = await intentar();
             Swal.close();
@@ -1637,6 +1650,13 @@
             }
             if (r.ok) {
                 return { method: 'VOZ', metrics: { matchRatio: r.matchRatio, durationMs: r.durationMs, expectedMs: (cfg.testDurationSec || 5) * 1000 } };
+            }
+            intentosFallidos++;
+            if (intentosFallidos >= maxIntentos) {
+                vozLog('gate-fallido', { intentos: intentosFallidos });
+                await Swal.fire({ icon: 'error', title: 'No pudiste leer la frase',
+                    text: `Agotaste los ${maxIntentos} intentos. No quedás habilitado para salir.` });
+                return { method: 'VOZ', metrics: { phraseGateFailed: true } };
             }
             const HINTS = {
                 'no-speech': 'No detecté tu voz. Hablá más fuerte y cerca del micrófono.',

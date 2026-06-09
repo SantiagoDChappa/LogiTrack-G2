@@ -12,8 +12,12 @@ const DEFAULTS = Object.freeze({
     methodRecheck:     'REACCION', // método usado en el re-chequeo en ruta
     testDurationSec:   '5',      // duración de la prueba
     voiceAcousticEnabled: 'true', // medir fatiga vocal por análisis acústico (requiere STT)
+    voiceMaxAttempts:  '3',      // intentos máximos de leer la frase; agotados → bloqueado
     reactionFastMs:    '250',    // reacción "muy alerta" → fatiga 0
     reactionSlowMs:    '800',    // límite de reacción: más lento → fatiga 100
+    reactionAttempts:  '3',      // cantidad de intentos del test de reacción
+    reactionEvalMode:  'PROMEDIO', // PROMEDIO (avg ≤ límite) | APROBADOS (cuántos pasan)
+    reactionRequired:  'MITAD',  // si APROBADOS: UNO | MITAD | TODOS bajo el límite
     recheckDriveMin:   '90',     // min de conducción que habilita re-chequeo
     recheckStoppedMin: '3',      // min detenido que dispara re-chequeo
     recheckRestMin:    '30',     // min de descanso para reintentar prueba tras bloqueo en ruta (LGT-199)
@@ -28,6 +32,8 @@ const NUMERIC_RANGES = Object.freeze({
     testDurationSec:   [1, 60],
     reactionFastMs:    [50, 2000],
     reactionSlowMs:    [100, 5000],
+    voiceMaxAttempts:  [1, 10],
+    reactionAttempts:  [1, 10],
     recheckDriveMin:   [1, 1440],
     recheckStoppedMin: [1, 240],
     recheckRestMin:    [1, 720],
@@ -39,6 +45,8 @@ const ENUM_VALUES = Object.freeze({
     method:        ['VOZ', 'REACCION', 'AMBOS'],
     methodStart:   ['VOZ', 'REACCION', 'AMBOS'], // AMBOS: el conductor elige voz o reacción
     methodRecheck: ['VOZ', 'REACCION', 'AMBOS'],
+    reactionEvalMode: ['PROMEDIO', 'APROBADOS'],
+    reactionRequired: ['UNO', 'MITAD', 'TODOS'],
 });
 const BOOL_PARAMS = Object.freeze(['enabled', 'autoBlock', 'voiceAcousticEnabled']);
 
