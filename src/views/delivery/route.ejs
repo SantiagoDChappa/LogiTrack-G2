@@ -1478,17 +1478,19 @@
                 if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
                 continue;
             }
-            Swal.close();
             vozLog('stt-result', { dicho: data.dicho, match: data.matchRatio });
             if (data.matchRatio >= MIN_MATCH) {
                 // Gate de frase superado → ahora evaluamos la FATIGA por análisis acústico.
+                // El loader "Evaluando…" sigue visible durante el análisis del waveform.
                 const feats = cfg.voiceAcousticEnabled !== false ? await extraerFeaturesVoz(g.blob) : null;
                 const acousticScore = scoreAcusticoVoz(feats);
                 vozLog('acustico', { feats, acousticScore });
+                Swal.close();
                 const metrics = { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 };
                 if (Number.isFinite(acousticScore)) { metrics.acousticScore = acousticScore; }
                 return { method: 'VOZ', metrics };
             }
+            Swal.close();
             const pct = Math.round((data.matchRatio || 0) * 100);
             const rr = await Swal.fire({ icon: 'info', title: 'No coincide la frase',
                 html: `<div style="text-align:left;font-size:.9rem">
