@@ -25,13 +25,24 @@ exports.index = async (req, res) => {
     const transports = await transportModel.getEnabledForBranch(branchId);
     const disabledDrivers = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
 
+    // Resolver el nombre del transportista para todos los bloques del panel.
+    const blockedJson = blocked.map(b => b.toJSON());
+    const driverIds = [...new Set([
+        ...blockedJson.map(b => b.userId),
+        ...disabledDrivers.map(d => d.userId),
+        ...patterns.map(p => p.userId),
+    ].filter(Boolean))];
+    const { User } = require('../models/user');
+    const users = driverIds.length ? await User.findAll({ where: { id: driverIds }, attributes: ['id', 'fullName'] }) : [];
+    const nameById = Object.fromEntries(users.map(x => [x.id, x.fullName]));
+
     res.render('fatigue/index', {
-        blocked: blocked.map(b => b.toJSON()),
-        patterns,
+        blocked: blockedJson.map(b => ({ ...b, driverName: nameById[b.userId] || null })),
+        patterns: patterns.map(p => ({ ...p, driverName: nameById[p.userId] || null })),
         isAdmin: isAdmin(u),
         cfg,
         transports: transports.map(t => ({ id: t.id, name: t.name, driverName: t.driver?.fullName || null })),
-        disabledDrivers,
+        disabledDrivers: disabledDrivers.map(d => ({ ...d, driverName: nameById[d.userId] || null })),
     });
 };
 

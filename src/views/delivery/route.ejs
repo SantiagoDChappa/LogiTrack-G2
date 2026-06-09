@@ -1233,14 +1233,30 @@
         return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
             .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
     }
-    // Coincidencia 0..1 = palabras de la frase que aparecen en lo dicho.
+    // Distancia de edición a nivel de palabra (Levenshtein sobre tokens).
+    function levenshteinPalabras(a, b) {
+        const m = a.length, n = b.length;
+        if (!m) { return n; }
+        if (!n) { return m; }
+        let prev = Array.from({ length: n + 1 }, (_, j) => j);
+        for (let i = 1; i <= m; i++) {
+            const cur = [i];
+            for (let j = 1; j <= n; j++) {
+                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+            }
+            prev = cur;
+        }
+        return prev[n];
+    }
+    // Coincidencia 0..1 sensible al orden y que penaliza palabras de más/faltantes.
+    // Frase exacta → 1; frase mal dicha → baja.
     function similitudFrase(dicho, esperado) {
-        const dichas = new Set(normalizarTexto(dicho).split(' ').filter(Boolean));
-        const esp = normalizarTexto(esperado).split(' ').filter(Boolean);
-        if (!esp.length) { return 0; }
-        let hit = 0;
-        for (const w of esp) { if (dichas.has(w)) { hit++; } }
-        return hit / esp.length;
+        const a = normalizarTexto(dicho).split(' ').filter(Boolean);
+        const b = normalizarTexto(esperado).split(' ').filter(Boolean);
+        if (!a.length || !b.length) { return 0; }
+        const dist = levenshteinPalabras(a, b);
+        return Math.max(0, 1 - dist / Math.max(a.length, b.length));
     }
 
     async function pruebaVoz(cfg) {
@@ -1251,7 +1267,7 @@
             return null;
         }
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
-        const MIN_MATCH = 0.6;
+        const MIN_MATCH = 0.7; // exige leer la frase casi completa y en orden
 
         // Un intento: muestra la frase, escucha y devuelve { ok, matchRatio, dicho, durationMs, denied, noSpeech }.
         function intentar() {

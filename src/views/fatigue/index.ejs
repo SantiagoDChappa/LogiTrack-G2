@@ -78,7 +78,7 @@
                         <div class="fb-card-head">
                             <div>
                                 <h3 class="fb-card-title">Ruta #<%= b.routeId %></h3>
-                                <p class="fb-meta">Transportista #<%= b.userId %> · <%= new Date(b.createdAt).toLocaleString('es-AR') %></p>
+                                <p class="fb-meta"><%= b.driverName || ('Transportista #' + b.userId) %> (#<%= b.userId %>) · <%= new Date(b.createdAt).toLocaleString('es-AR') %></p>
                             </div>
                             <span class="fb-score-badge">Fatiga <%= b.score %>/<%= b.threshold %></span>
                         </div>
@@ -114,8 +114,8 @@
                     <div class="update-card fb-card disabled" id="drv-<%= d.userId %>">
                         <div class="fb-card-head">
                             <div>
-                                <h3 class="fb-card-title">Transportista #<%= d.userId %></h3>
-                                <p class="fb-meta">Desde <%= d.disabledAt ? new Date(d.disabledAt).toLocaleString('es-AR') : '—' %></p>
+                                <h3 class="fb-card-title"><%= d.driverName || ('Transportista #' + d.userId) %></h3>
+                                <p class="fb-meta">#<%= d.userId %> · Desde <%= d.disabledAt ? new Date(d.disabledAt).toLocaleString('es-AR') : '—' %></p>
                             </div>
                             <span class="fb-chip">Motivo: <%= d.reason || '—' %></span>
                         </div>
@@ -148,7 +148,7 @@
                             <% } %>
                             <% patterns.forEach(p => { %>
                                 <tr id="pat-<%= p.userId %>">
-                                    <td>#<%= p.userId %></td>
+                                    <td><%= p.driverName || ('Transportista #' + p.userId) %> <span class="fb-meta">(#<%= p.userId %>)</span></td>
                                     <td><%= p.windowCount %> / <%= p.threshold %></td>
                                     <td><%= p.totalBlocked %></td>
                                     <td>
