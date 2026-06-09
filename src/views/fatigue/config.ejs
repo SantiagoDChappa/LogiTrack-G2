@@ -43,6 +43,7 @@
         .cfg-switch input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
         .cfg-switch .cfg-switch-label { font-weight: var(--font-weight-semibold); }
         .cfg-switch small { display: block; color: var(--color-text-secondary); font-weight: 400; }
+        .cfg-help { display: block; color: var(--color-text-secondary); font-size: var(--font-size-xs); line-height: 1.35; margin-top: .2rem; }
     </style>
 </head>
 
@@ -137,21 +138,27 @@
                         <span class="material-symbols-outlined">schedule</span>
                         Re-chequeo en ruta
                     </h2>
-                    <p class="settings-subtitle">Disparadores de re-chequeo durante el viaje.</p>
+                    <p class="settings-subtitle">Disparadores de re-chequeo durante el viaje. Se pide una nueva prueba cuando se cumplen <b>las dos primeras condiciones a la vez</b>.</p>
                     <div class="cfg-grid">
                         <div class="field">
                             <label for="recheckDriveMin">Conducción para re-chequeo (min)</label>
-                            <input type="number" id="recheckDriveMin" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>">
+                            <input type="number" id="recheckDriveMin" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>"
+                                   title="Minutos que el conductor debe haber manejado antes de que el sistema pueda pedir una nueva prueba.">
+                            <small class="cfg-help">Tiempo de manejo acumulado antes de habilitar un re-chequeo. Ej.: 90 = recién tras 1h30 de viaje.</small>
                             <small>recheckDriveMin</small>
                         </div>
                         <div class="field">
                             <label for="recheckStoppedMin">Detención que dispara re-chequeo (min)</label>
-                            <input type="number" id="recheckStoppedMin" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>">
+                            <input type="number" id="recheckStoppedMin" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>"
+                                   title="Ya cumplido el manejo mínimo, minutos detenido que disparan la nueva prueba.">
+                            <small class="cfg-help">Cumplido lo anterior, minutos detenido (botón “Estoy detenido”) que disparan la prueba. Ej.: 3 = a los 3 min parado.</small>
                             <small>recheckStoppedMin</small>
                         </div>
                         <div class="field">
                             <label for="recheckRestMin">Descanso para reintentar prueba en ruta (min)</label>
-                            <input type="number" id="recheckRestMin" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>">
+                            <input type="number" id="recheckRestMin" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>"
+                                   title="Si la prueba en ruta da fatiga, la ruta se pausa y el conductor debe descansar este tiempo antes de reintentar.">
+                            <small class="cfg-help">Si la prueba da fatiga, la ruta se pausa y el conductor descansa este tiempo antes de reintentar. Ej.: 30.</small>
                             <small>recheckRestMin (LGT-199)</small>
                         </div>
                     </div>
