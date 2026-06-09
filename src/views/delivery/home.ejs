@@ -441,6 +441,27 @@
                 confirmButtonText: 'Aceptar', confirmButtonColor: '#2563eb',
             }).then(() => history.replaceState(null, '', '/delivery'));
         }
+        // LGT-195: rechazo de consentimiento — mostramos el motivo al volver al home.
+        (function () {
+            const q = new URLSearchParams(window.location.search);
+            if (q.get('fatiga') !== 'rechazo') { return; }
+            const ruta = q.get('ruta');
+            const disabled = q.get('disabled') === '1';
+            const rej = q.get('rej');
+            const max = q.get('max');
+            const rutaTxt = ruta ? ` de la ruta #${ruta}` : '';
+            const contadorTxt = (rej && max) ? ` (rechazo ${rej}/${max})` : '';
+            const html = disabled
+                ? `<p>Rechazaste el consentimiento del control de fatiga${rutaTxt}${contadorTxt}.</p>
+                   <p><b>Quedás inhabilitado</b> para iniciar nuevas rutas hasta que tu Supervisor te restablezca.</p>`
+                : `<p>Rechazaste el consentimiento del control de fatiga${rutaTxt}${contadorTxt}.</p>
+                   <p>No iniciaste la ruta. Si alcanzás el límite de rechazos, quedarás inhabilitado y tu Supervisor será notificado.</p>`;
+            Swal.fire({
+                icon: disabled ? 'error' : 'warning',
+                title: disabled ? 'No habilitado por fatiga' : 'Ruta no iniciada',
+                html, confirmButtonText: 'Entendido', confirmButtonColor: '#dc2626',
+            }).then(() => history.replaceState(null, '', '/delivery'));
+        })();
     </script>
 </body>
 </html>

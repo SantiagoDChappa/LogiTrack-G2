@@ -1190,7 +1190,10 @@
                 body: JSON.stringify({ accepted }),
             });
             const data = await r.json();
-            return { accepted, checkId: data.checkId };
+            return {
+                accepted, checkId: data.checkId,
+                disabled: !!data.disabled, rejections: data.rejections, max: data.max,
+            };
         } catch (_) {
             hideRouteLoader();
             Swal.fire({ icon: 'error', title: 'No se pudo registrar', text: 'Reintentá en unos segundos.' });
@@ -1754,8 +1757,13 @@
         const consent = await runConsent(cfg);
         if (!consent) { return; }
         if (!consent.accepted) {
-            // Rechazo: el loader queda visible mientras navegamos al home.
-            window.location.href = '/home';
+            // Rechazo: el loader queda visible mientras navegamos al home; el popup
+            // explicando el rechazo lo muestra /delivery al detectar los flags.
+            const params = new URLSearchParams({ fatiga: 'rechazo', ruta: String(routeId) });
+            if (consent.disabled) { params.set('disabled', '1'); }
+            if (consent.rejections != null) { params.set('rej', String(consent.rejections)); }
+            if (consent.max != null) { params.set('max', String(consent.max)); }
+            window.location.href = '/delivery?' + params.toString();
             return;
         }
         hideRouteLoader();

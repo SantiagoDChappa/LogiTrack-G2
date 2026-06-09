@@ -815,11 +815,14 @@ router.post('/route/:id/consent', requireDelivery, async (req, res) => {
     const route = await ownRouteOr403(req, res); if (!route) { return; }
     const accepted = req.body.accepted === true || req.body.accepted === 'true';
     const cfg = await fatigueCfg.getConfig(route.originBranchId);
-    const check = await fatigueSvc.recordConsent({
+    const result = await fatigueSvc.recordConsent({
         userId: res.locals.currentUser.id, routeId: route.id,
         branchId: route.originBranchId, accepted, version: cfg.consentVersion,
     });
-    res.json({ ok: true, accepted, checkId: check.id });
+    res.json({
+        ok: true, accepted, checkId: result.check.id,
+        disabled: result.disabled, rejections: result.rejections, max: result.max,
+    });
 });
 
 // US-2/3/4/9: ejecutar la prueba y evaluar la fatiga.

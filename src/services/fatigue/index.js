@@ -21,20 +21,24 @@ async function recordConsent({ userId, routeId, branchId, accepted, version, tri
     // LGT-195: el rechazo inhabilita al transportista, pero solo al alcanzar el límite
     // parametrizado de rechazos (maxConsentRejections). Se cuentan los rechazos desde
     // el último restablecimiento — si nunca lo restablecieron, desde siempre.
+    let disabled = false;
+    let rejections = null;
+    let maxRej = null;
     if (!accepted) {
         const cfg = await configSvc.getConfig(branchId);
-        const maxRej = Number(cfg.maxConsentRejections) || 2;
-        const rejCount = await countRejectionsSinceRestore(userId);
-        if (rejCount >= maxRej) {
+        maxRej = Number(cfg.maxConsentRejections) || 2;
+        rejections = await countRejectionsSinceRestore(userId);
+        if (rejections >= maxRej) {
             await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId });
+            disabled = true;
         } else {
             await notify.audit('CONSENT_REJECTED_WARN', {
                 actorId: userId, checkId: check.id,
-                detail: `Rechazo ${rejCount}/${maxRej}. Si alcanza el límite queda inhabilitado.`,
+                detail: `Rechazo ${rejections}/${maxRej}. Si alcanza el límite queda inhabilitado.`,
             });
         }
     }
-    return check;
+    return { check, disabled, rejections, max: maxRej };
 }
 
 // Cuenta rechazos de consentimiento desde el último restablecimiento del transportista.
