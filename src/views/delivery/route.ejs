@@ -1303,7 +1303,7 @@
             return canGoBack ? 'BACK' : null;
         }
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
-        const MIN_MATCH = 0.7;
+        const MIN_MATCH = 0.8;
         const secs = cfg.testDurationSec || 5;
 
         function grabar() {
@@ -1392,8 +1392,13 @@
             if (data.matchRatio >= MIN_MATCH) {
                 return { method: 'VOZ', metrics: { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 } };
             }
-            const rr = await Swal.fire({ icon: 'info', title: 'No te entendí bien',
-                html: data.dicho ? `Escuché: “<i>${data.dicho}</i>”.<br>Leé la frase completa, más claro.` : 'No detecté tu voz. Probá de nuevo.',
+            const pct = Math.round((data.matchRatio || 0) * 100);
+            const rr = await Swal.fire({ icon: 'info', title: 'No coincide la frase',
+                html: `<div style="text-align:left;font-size:.9rem">
+                        <div>Tenés que leer <b>completa</b>:</div>
+                        <div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(37,99,235,.12)">“${frase}”</div>
+                        ${data.dicho ? `<div>Escuché: “<i>${data.dicho}</i>” — coincidencia <b>${pct}%</b> (mínimo ${Math.round(MIN_MATCH*100)}%).</div>` : '<div>No detecté tu voz.</div>'}
+                       </div>`,
                 showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar', allowOutsideClick: false });
             if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
         }
@@ -1447,7 +1452,7 @@
         vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
 
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
-        const MIN_MATCH = 0.7; // exige leer la frase casi completa y en orden
+        const MIN_MATCH = 0.8; // exige leer la frase casi completa y en orden
 
         // Un intento: muestra la frase, escucha y devuelve { ok, matchRatio, dicho, durationMs, denied, noSpeech }.
         function intentar() {
@@ -1534,11 +1539,16 @@
                 'aborted': 'Se interrumpió la prueba. Probá de nuevo.',
                 'no-inicia': 'El navegador no pudo iniciar el micrófono. Usá Chrome o Edge.',
             };
+            const pct = Math.round((r.matchRatio || 0) * 100);
             const msg = r.errorType
                 ? (HINTS[r.errorType] || ('Error técnico: ' + r.errorType))
-                : (r.dicho ? `Escuché: “<i>${r.dicho}</i>”.<br>Leé la frase completa, más claro.` : 'No detecté tu voz. Probá de nuevo.');
+                : `<div style="text-align:left;font-size:.9rem">
+                     <div>Tenés que leer <b>completa</b>:</div>
+                     <div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(37,99,235,.12)">“${frase}”</div>
+                     ${r.dicho ? `<div>Escuché: “<i>${r.dicho}</i>” — coincidencia <b>${pct}%</b> (mínimo ${Math.round(MIN_MATCH*100)}%).</div>` : '<div>No detecté tu voz.</div>'}
+                   </div>`;
             const retry = await Swal.fire({
-                icon: 'info', title: 'No te entendí bien',
+                icon: 'info', title: r.errorType ? 'No te entendí bien' : 'No coincide la frase',
                 html: msg,
                 showCancelButton: true, confirmButtonText: 'Reintentar',
                 cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar',
