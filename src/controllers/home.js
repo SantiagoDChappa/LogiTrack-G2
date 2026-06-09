@@ -6,7 +6,8 @@ const sequelize = require('../database/connection');
 const { QueryTypes } = require('sequelize');
 
 const getIndex = async (req, res) => {
-    if (req.user && req.user.roleId === 3) { return res.redirect('/delivery'); }
+    // Repartidor: su inicio es "Mis Envíos", no el dashboard.
+    if (res.locals.currentUser?.roleId === RoleType.DELIVERY.id) { return res.redirect('/delivery'); }
 
     const shipments = await shipmentModel.getAll();
 
