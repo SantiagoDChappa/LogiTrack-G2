@@ -848,6 +848,24 @@ const saveIncidentNotifConfig = async (req, res) => {
     }
 };
 
+// LGT-195: toggle on/off del aviso al Supervisor cuando un transportista queda
+// inhabilitado por rechazar el consentimiento de fatiga. Los destinatarios son fijos
+// por regla de negocio (supervisores de la sucursal del transportista + admins),
+// así que solo persistimos el enabled — la plantilla se edita por el modal genérico.
+const saveFatigueConsentNotifConfig = async (req, res) => {
+    try {
+        const enabled = req.body.enabled === 'on';
+        await NotificationConfigModel.NotificationConfig.update(
+            { enabled },
+            { where: { eventCode: 'FATIGUE_DRIVER_DISABLED_CONSENT' } }
+        );
+        res.redirect(settingBack(req, '?success=fatigue_notif'));
+    } catch (err) {
+        console.error('saveFatigueConsentNotifConfig:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=fatigue_notif'));
+    }
+};
+
 const triggerDelayDetection = async (req, res) => {
     try {
         const { processDelayedShipments } = require('../jobs/delayDetectionJob');
@@ -866,5 +884,6 @@ module.exports = {
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
     saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveFatigueConsentNotifConfig,
     triggerDelayDetection,
 };

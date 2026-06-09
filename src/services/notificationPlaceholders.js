@@ -57,6 +57,15 @@ const CATALOG = [
     // Incidencia — aplican al evento INCIDENT_STATUS_CHANGE (se resuelven al cambiar el estado).
     { token: 'incidentId',     label: 'N° de incidencia',       group: 'Incidencia', description: 'Identificador de la incidencia.',         resolve: s => (notNil(s._incidentId) ? String(s._incidentId) : '') },
     { token: 'incidentEstado', label: 'Estado de incidencia',   group: 'Incidencia', description: 'Nuevo estado de la incidencia.',           resolve: s => s._incidentEstado || '' },
+    // Control de fatiga — aplican al evento FATIGUE_DRIVER_DISABLED_CONSENT (se resuelven al inhabilitar al transportista).
+    { token: 'transportistaNombre',  label: 'Nombre transportista', group: 'Control de fatiga', description: 'Nombre completo del transportista inhabilitado.',         resolve: s => s._transportistaNombre || '' },
+    { token: 'transportistaId',      label: 'ID transportista',     group: 'Control de fatiga', description: 'Identificador del transportista inhabilitado.',            resolve: s => (notNil(s._transportistaId) ? String(s._transportistaId) : '') },
+    { token: 'sucursalNombre',       label: 'Sucursal transportista', group: 'Control de fatiga', description: 'Sucursal asignada al transportista.',                    resolve: s => s._sucursalNombre || '' },
+    { token: 'sucursalId',           label: 'ID sucursal',          group: 'Control de fatiga', description: 'Identificador de la sucursal asignada al transportista.', resolve: s => (notNil(s._sucursalId) ? String(s._sucursalId) : '') },
+    { token: 'rutaId',               label: 'Ruta',                 group: 'Control de fatiga', description: 'Ruta en la que el transportista rechazó el consentimiento.', resolve: s => (notNil(s._rutaId) ? String(s._rutaId) : '') },
+    { token: 'rechazos',             label: 'Rechazos acumulados',  group: 'Control de fatiga', description: 'Cantidad de rechazos de consentimiento desde el último restablecimiento.', resolve: s => (notNil(s._rechazos) ? String(s._rechazos) : '') },
+    { token: 'maxRechazos',          label: 'Límite de rechazos',   group: 'Control de fatiga', description: 'Límite parametrizado de rechazos antes de inhabilitar.',  resolve: s => (notNil(s._maxRechazos) ? String(s._maxRechazos) : '') },
+    { token: 'motivoInhabilitacion', label: 'Motivo',               group: 'Control de fatiga', description: 'Motivo registrado de la inhabilitación.',                  resolve: s => s._motivoInhabilitacion || '' },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).

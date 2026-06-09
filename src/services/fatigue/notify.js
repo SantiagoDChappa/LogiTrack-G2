@@ -87,6 +87,75 @@ async function notifyRecheckOmission({ check, branchId, transportName, routeId, 
     return recipients.length;
 }
 
+// LGT-195 — notifica al Supervisor (y admin) cuando el transportista queda inhabilitado
+// por rechazar el consentimiento del control de fatiga (al alcanzar el límite parametrizado).
+// El mail es parametrizable desde Ajustes → Comunicaciones (evento FATIGUE_DRIVER_DISABLED_CONSENT):
+// se respeta el toggle on/off y la plantilla editable. Los destinatarios son fijos por la regla
+// de negocio: Supervisores de la sucursal asignada al transportista + administradores.
+async function notifyDriverDisabledByConsent({ driverId, driverName, branchId, branchName, routeId, rejections, max, reason }) {
+    const recipients = await resolveRecipients(branchId);
+    const detail = `Transportista ${driverName || '#' + driverId} inhabilitado por rechazo de consentimiento ` +
+        `(${rejections}/${max}). Sucursal #${branchId || 'N/D'}. Notificados: ${recipients.length}.`;
+    await audit('NOTIFY_DRIVER_DISABLED_CONSENT', { actorId: driverId, detail });
+
+    // Respeta el toggle parametrizable desde Ajustes → Comunicaciones.
+    let enabled = true;
+    try {
+        const { isNotificationEnabled } = require('../../models/notificationConfig');
+        enabled = await isNotificationEnabled('FATIGUE_DRIVER_DISABLED_CONSENT');
+    } catch { /* si falla, enviamos igual: seguridad por defecto. */ }
+    if (!enabled) {
+        await audit('NOTIFY_DRIVER_DISABLED_CONSENT_SKIPPED',
+            { actorId: driverId, detail: 'Notificación deshabilitada desde Ajustes → Comunicaciones.' });
+        return 0;
+    }
+
+    // Compone subject/body desde la plantilla editable; si no existe (migración no corrida)
+    // usa texto por defecto. Render efímero — no se persiste contenido del email.
+    const tplVars = {
+        transportistaNombre: driverName || `#${driverId}`,
+        transportistaId: driverId,
+        sucursalNombre: branchName || (branchId ? `#${branchId}` : 'N/D'),
+        sucursalId: branchId || '',
+        rutaId: routeId || '',
+        rechazos: rejections !== null && rejections !== undefined ? rejections : '',
+        maxRechazos: max !== null && max !== undefined ? max : '',
+        motivoInhabilitacion: reason || 'CONSENT_REJECTED',
+    };
+    let subject = `[LogiTrack] Transportista inhabilitado por fatiga — ${tplVars.transportistaNombre}`;
+    let body = `Hola,\n\nEl transportista ${tplVars.transportistaNombre} (ID #${tplVars.transportistaId}) ` +
+        `quedó inhabilitado tras rechazar el consentimiento ${tplVars.rechazos}/${tplVars.maxRechazos} vez/veces.\n` +
+        `Sucursal: ${tplVars.sucursalNombre}\nRuta: #${tplVars.rutaId}\n\nGestionalo en: /fatigue`;
+    let format = 'text';
+    try {
+        const emailTemplateModel = require('../../models/emailTemplate');
+        const placeholders = require('../notificationPlaceholders');
+        const tpl = await emailTemplateModel.getDefaultByEventCode('FATIGUE_DRIVER_DISABLED_CONSENT');
+        if (tpl) {
+            subject = placeholders.render(tpl.subject, tplVars) || subject;
+            body    = placeholders.render(tpl.body, tplVars)    || body;
+            format  = tpl.format === 'html' ? 'html' : 'text';
+        }
+    } catch (err) {
+        console.warn('[fatigue][notify] plantilla no disponible, uso texto por defecto:', err.message);
+    }
+
+    const sent = await deliverEmailFormat(recipients, subject, body, format);
+    await audit('NOTIFY_DRIVER_DISABLED_CONSENT_EMAIL', { actorId: driverId, detail: `Emails enviados: ${sent}` });
+    return sent;
+}
+
+// Variante de deliverEmail que respeta el formato (html / text) de la plantilla.
+async function deliverEmailFormat(recipients, subject, body, format) {
+    try {
+        const emails = recipients.map(r => r.email).filter(e => EMAIL_RE.test(String(e || '').trim()));
+        if (!emails.length) { return 0; }
+        const { sendEmail } = require('../notification/emailSender');
+        await sendEmail(emails, subject, body, format === 'html' ? 'html' : 'text');
+        return emails.length;
+    } catch { return 0; }
+}
+
 // LGT-197 — notifica al Supervisor (y admin) cuando se marca patrón recurrente.
 async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     const recipients = await resolveRecipients(branchId);
@@ -99,4 +168,8 @@ async function notifyPattern({ userId, branchId, windowCount, windowDays }) {
     return recipients.length;
 }
 
-module.exports = { audit, resolveRecipients, notifyBlock, notifyReview, notifyRecheckOmission, notifyPattern };
+module.exports = {
+    audit, resolveRecipients,
+    notifyBlock, notifyReview, notifyRecheckOmission, notifyPattern,
+    notifyDriverDisabledByConsent,
+};

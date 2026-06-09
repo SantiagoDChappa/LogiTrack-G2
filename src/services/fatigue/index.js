@@ -29,7 +29,7 @@ async function recordConsent({ userId, routeId, branchId, accepted, version, tri
         maxRej = Number(cfg.maxConsentRejections) || 2;
         rejections = await countRejectionsSinceRestore(userId);
         if (rejections >= maxRej) {
-            await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId });
+            await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId, routeId, rejections, max: maxRej });
             disabled = true;
         } else {
             await notify.audit('CONSENT_REJECTED_WARN', {
@@ -52,16 +52,46 @@ async function countRejectionsSinceRestore(userId) {
 }
 
 // ── Habilitación del transportista (LGT-195 Esc.7/8) ────────────────────────
-async function disableDriver({ userId, reason, branchId }) {
+async function disableDriver({ userId, reason, branchId, routeId = null, rejections = null, max = null }) {
     const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
     await DriverFatigueStatus.upsert({
         userId, status: 'DISABLED', reason: reason || 'OTHER',
         disabledAt: new Date(), restoredBy: null, restoredAt: null, updatedAt: new Date(),
     });
     await notify.audit('DRIVER_DISABLED', { actorId: userId, detail: `Transportista #${userId} inhabilitado (${reason}).` });
-    // Notifica al Supervisor de la sucursal (canal interno + auditoría).
-    if (branchId) {
-        const recipients = await notify.resolveRecipients(branchId);
+
+    // LGT-195: el aviso real al Supervisor se hace por email + auditoría.
+    // Resolvemos sucursal y nombre del transportista para los placeholders del template.
+    // La sucursal destino es la asignada al transportista (user.branchId); si no tiene,
+    // usamos la sucursal del último contexto (originBranchId de la ruta) como respaldo.
+    let driverName = `#${userId}`;
+    let driverBranchId = branchId || null;
+    let branchName = '';
+    try {
+        const { User } = require('../../models/user');
+        const driver = await User.findByPk(userId);
+        if (driver) {
+            driverName = driver.fullName || driverName;
+            if (driver.branchId) { driverBranchId = driver.branchId; }
+        }
+        if (driverBranchId) {
+            const { Branch } = require('../../models/branch');
+            const branch = await Branch.findByPk(driverBranchId);
+            if (branch) { branchName = branch.name; }
+        }
+    } catch (err) {
+        console.warn('[fatigue][disableDriver] no se pudo resolver driver/branch:', err.message);
+    }
+
+    if (reason === 'CONSENT_REJECTED') {
+        await notify.notifyDriverDisabledByConsent({
+            driverId: userId, driverName,
+            branchId: driverBranchId, branchName,
+            routeId, rejections, max, reason,
+        }).catch((err) => console.error('[fatigue] notifyDriverDisabledByConsent:', err.message));
+    } else if (driverBranchId) {
+        // Resto de motivos: por ahora solo se registra a quién se notificaría.
+        const recipients = await notify.resolveRecipients(driverBranchId);
         await notify.audit('DRIVER_DISABLED_NOTIFY', { detail: `Notificados ${recipients.length} (supervisores + admin).` });
     }
     return { ok: true };

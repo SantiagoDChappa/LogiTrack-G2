@@ -50,6 +50,7 @@ router.post('/time-window/:id',        requireAdmin, settingController.saveTimeW
 router.post('/incident-type',          requireAdmin, settingController.saveIncidentType);
 router.post('/incident-type/:id',      requireAdmin, settingController.saveIncidentType);
 router.post('/incident-notification',  requireAdmin, settingController.saveIncidentNotifConfig);
+router.post('/fatigue-consent-notification', requireAdmin, settingController.saveFatigueConsentNotifConfig);
 router.post('/test-shipment-notification', requireAdmin, settingController.testShipmentNotification);
 // Envío manual de toda la cola de emails pendientes (sin esperar al cron).
 router.post('/flush-email-queue',          requireAdmin, settingController.flushEmailQueue);
