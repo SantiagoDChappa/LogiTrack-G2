@@ -695,20 +695,68 @@ const renderReportExport = (definition, format) => {
     throw error;
 };
 
-const buildSatisfactionExport = ({ dateFrom, dateTo, surveyType, kpis, comparison, distribution }) => {
+const DELIVERY_DIM_LABELS = ['Puntualidad', 'Estado del paquete', 'Atencion del servicio'];
+const INCIDENT_DIM_LABELS = ['Tiempo de resolucion', 'Comunicacion', 'Resultado obtenido'];
+
+const getDimLabelsForType = (surveyType) => {
+    if (surveyType === 'delivery') { return DELIVERY_DIM_LABELS; }
+    if (surveyType === 'incident') { return INCIDENT_DIM_LABELS; }
+    return DELIVERY_DIM_LABELS;
+};
+
+const getDimLabelsForRow = (rowType) =>
+    rowType === 'incident' ? INCIDENT_DIM_LABELS : DELIVERY_DIM_LABELS;
+
+const buildSatisfactionExport = ({ dateFrom, dateTo, surveyType, kpis, comparison, distribution, recentComments, incidentTypeId, deliveryStatus }) => {
+    const dimLabels = getDimLabelsForType(surveyType);
+
     const columns = ['fecha_desde', 'fecha_hasta', 'tipo', 'total', 'promedio_general', 'dim1', 'dim2', 'dim3'];
-    const rows = comparison.map((row) => ({
-        fecha_desde: dateFrom,
-        fecha_hasta: dateTo,
-        tipo: row.survey_type === 'delivery' ? 'Entregas' : 'Incidencias',
-        total: row.total,
-        promedio_general: toPercent(row.avg_overall),
-        dim1: toPercent(row.avg_dim1),
-        dim2: toPercent(row.avg_dim2),
-        dim3: toPercent(row.avg_dim3),
-    }));
+    const rows = comparison.map((row) => {
+        const rowDims = getDimLabelsForRow(row.survey_type);
+        return {
+            fecha_desde: dateFrom,
+            fecha_hasta: dateTo,
+            tipo: row.survey_type === 'delivery' ? 'Entregas' : 'Incidencias',
+            total: row.total,
+            promedio_general: toPercent(row.avg_overall),
+            dim1: toPercent(row.avg_dim1),
+            dim2: toPercent(row.avg_dim2),
+            dim3: toPercent(row.avg_dim3),
+            dim1_label: rowDims[0],
+            dim2_label: rowDims[1],
+            dim3_label: rowDims[2],
+        };
+    });
 
     const distSummary = distribution.map((d) => `${d.rating} estrellas: ${d.count}`).join(', ');
+    const rr = kpis.responseRate || {};
+    const rrText = rr.eligible
+        ? `${rr.responded} de ${rr.eligible} (${rr.pct}%)`
+        : 'Sin datos';
+    const npsValue = kpis.nps !== undefined ? kpis.nps : 0;
+
+    const pdfTableColumns = [
+        { key: 'tipo', label: 'Tipo', width: 0.20, font: 'F2' },
+        { key: 'total', label: 'Total', width: 0.10 },
+        { key: 'promedio_general', label: 'General', width: 0.12 },
+        { key: 'dim1_display', label: dimLabels[0], width: 0.20 },
+        { key: 'dim2_display', label: dimLabels[1], width: 0.20 },
+        { key: 'dim3_display', label: dimLabels[2], width: 0.18 },
+    ];
+
+    const pdfTableRows = rows.map((row) => ({
+        tipo: row.tipo,
+        total: String(row.total),
+        promedio_general: row.promedio_general,
+        dim1_display: `${row.dim1} (${row.dim1_label})`,
+        dim2_display: `${row.dim2} (${row.dim2_label})`,
+        dim3_display: `${row.dim3} (${row.dim3_label})`,
+    }));
+
+    const commentsSummary = (recentComments || []).slice(0, 5).map((c) => {
+        const typeTag = c.survey_type === 'delivery' ? 'Entrega' : 'Incidencia';
+        return `[${typeTag} ${c.ref}] ${'*'.repeat(c.rating)} - ${String(c.comment).slice(0, 120)}`;
+    }).join(' | ');
 
     return {
         type: REPORT_TYPES.SATISFACTION,
@@ -720,29 +768,18 @@ const buildSatisfactionExport = ({ dateFrom, dateTo, surveyType, kpis, compariso
             summaryItems: [
                 { label: 'Periodo', value: `${dateFrom} a ${dateTo}` },
                 { label: 'Total encuestas', value: String(kpis.totalSurveys) },
-                { label: 'Promedio general', value: toPercent(kpis.overallAvg) },
-                ...kpis.dimensions.map((d) => ({ label: d.label, value: toPercent(d.avg) })),
+                { label: 'NPS (Net Promoter Score)', value: `${npsValue > 0 ? '+' : ''}${npsValue}` },
+                { label: 'Promedio general', value: `${toPercent(kpis.overallAvg)} / 5.0` },
+                ...kpis.dimensions.map((d) => ({ label: d.label, value: `${toPercent(d.avg)} / 5.0` })),
+                { label: 'Tasa de respuesta', value: rrText },
                 { label: 'Distribucion', value: distSummary || 'Sin datos' },
+                ...(commentsSummary ? [{ label: 'Comentarios recientes', value: commentsSummary }] : []),
             ],
             table: {
                 title: 'Detalle por tipo de encuesta',
                 emptyMessage: 'No hay encuestas para el periodo seleccionado.',
-                columns: [
-                    { key: 'tipo', label: 'Tipo', width: 0.25, font: 'F2' },
-                    { key: 'total', label: 'Total', width: 0.15 },
-                    { key: 'promedio_general', label: 'General', width: 0.15 },
-                    { key: 'dim1', label: 'Dim. 1', width: 0.15 },
-                    { key: 'dim2', label: 'Dim. 2', width: 0.15 },
-                    { key: 'dim3', label: 'Dim. 3', width: 0.15 },
-                ],
-                rows: rows.map((row) => ({
-                    tipo: row.tipo,
-                    total: String(row.total),
-                    promedio_general: row.promedio_general,
-                    dim1: row.dim1,
-                    dim2: row.dim2,
-                    dim3: row.dim3,
-                })),
+                columns: pdfTableColumns,
+                rows: pdfTableRows,
             },
         },
     };
