@@ -81,16 +81,16 @@
                     <div class="cfg-grid">
                         <label class="cfg-switch">
                             <input type="checkbox" name="enabled" <%= cfg.enabled ? 'checked' : '' %>>
-                            <span class="cfg-switch-label">Control de fatiga activo <small>enabled</small></span>
+                            <span class="cfg-switch-label">Control de fatiga activo</span>
                         </label>
                         <label class="cfg-switch">
                             <input type="checkbox" name="autoBlock" <%= cfg.autoBlock ? 'checked' : '' %>>
-                            <span class="cfg-switch-label">Bloqueo automático <small>autoBlock</small></span>
+                            <span class="cfg-switch-label">Bloqueo automático</span>
                         </label>
                         <div class="field">
                             <label for="thresholdPct">Umbral de fatiga (%)</label>
                             <input type="number" id="thresholdPct" name="thresholdPct" min="0" max="100" value="<%= cfg.thresholdPct %>">
-                            <small>thresholdPct (0–100)</small>
+                            <small class="cfg-help">Si la fatiga calculada supera este %, se bloquea (0–100).</small>
                         </div>
                     </div>
                 </div>
@@ -108,26 +108,22 @@
                             <select id="method" name="method">
                                 <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.method===o?'selected':'' %>><%= o %></option><% }) %>
                             </select>
-                            <small>method</small>
                         </div>
                         <div class="field">
                             <label for="methodStart">Método al iniciar</label>
                             <select id="methodStart" name="methodStart">
                                 <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o==='AMBOS'?'Ambos (el conductor elige)':o %></option><% }) %>
                             </select>
-                            <small>methodStart</small>
                         </div>
                         <div class="field">
                             <label for="methodRecheck">Método en re-chequeo</label>
                             <select id="methodRecheck" name="methodRecheck">
                                 <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o==='AMBOS'?'Ambos (el conductor elige)':o %></option><% }) %>
                             </select>
-                            <small>methodRecheck</small>
                         </div>
                         <div class="field">
                             <label for="testDurationSec">Duración de la prueba (seg)</label>
                             <input type="number" id="testDurationSec" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>">
-                            <small>testDurationSec</small>
                         </div>
                     </div>
                 </div>
@@ -145,21 +141,18 @@
                             <input type="number" id="recheckDriveMin" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>"
                                    title="Minutos que el conductor debe haber manejado antes de que el sistema pueda pedir una nueva prueba.">
                             <small class="cfg-help">Tiempo de manejo acumulado antes de habilitar un re-chequeo. Ej.: 90 = recién tras 1h30 de viaje.</small>
-                            <small>recheckDriveMin</small>
                         </div>
                         <div class="field">
                             <label for="recheckStoppedMin">Detención que dispara re-chequeo (min)</label>
                             <input type="number" id="recheckStoppedMin" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>"
                                    title="Ya cumplido el manejo mínimo, minutos detenido que disparan la nueva prueba.">
                             <small class="cfg-help">Cumplido lo anterior, minutos detenido (botón “Estoy detenido”) que disparan la prueba. Ej.: 3 = a los 3 min parado.</small>
-                            <small>recheckStoppedMin</small>
                         </div>
                         <div class="field">
                             <label for="recheckRestMin">Descanso para reintentar prueba en ruta (min)</label>
                             <input type="number" id="recheckRestMin" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>"
                                    title="Si la prueba en ruta da fatiga, la ruta se pausa y el conductor debe descansar este tiempo antes de reintentar.">
                             <small class="cfg-help">Si la prueba da fatiga, la ruta se pausa y el conductor descansa este tiempo antes de reintentar. Ej.: 30.</small>
-                            <small>recheckRestMin (LGT-199)</small>
                         </div>
                     </div>
                 </div>
@@ -175,22 +168,19 @@
                         <div class="field">
                             <label for="patternWindowDays">Ventana de patrón (días)</label>
                             <input type="number" id="patternWindowDays" name="patternWindowDays" min="1" max="365" value="<%= cfg.patternWindowDays %>">
-                            <small>patternWindowDays</small>
                         </div>
                         <div class="field">
                             <label for="patternEventCount">Eventos para marcar patrón</label>
                             <input type="number" id="patternEventCount" name="patternEventCount" min="1" max="50" value="<%= cfg.patternEventCount %>">
-                            <small>patternEventCount</small>
                         </div>
                         <div class="field">
                             <label for="retentionDays">Retención de datos (días)</label>
                             <input type="number" id="retentionDays" name="retentionDays" min="1" max="3650" value="<%= cfg.retentionDays %>">
-                            <small>retentionDays · Ley 25.326</small>
+                            <small class="cfg-help">Borrado automático de los datos de fatiga pasado este plazo (Ley 25.326).</small>
                         </div>
                         <div class="field">
                             <label for="consentVersion">Versión de consentimiento</label>
                             <input type="text" id="consentVersion" name="consentVersion" value="<%= cfg.consentVersion %>">
-                            <small>consentVersion</small>
                         </div>
                     </div>
                 </div>
