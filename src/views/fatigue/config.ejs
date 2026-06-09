@@ -112,14 +112,14 @@
                         <div class="field">
                             <label for="methodStart">Método al iniciar</label>
                             <select id="methodStart" name="methodStart">
-                                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o %></option><% }) %>
+                                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o==='AMBOS'?'Ambos (el conductor elige)':o %></option><% }) %>
                             </select>
                             <small>methodStart</small>
                         </div>
                         <div class="field">
                             <label for="methodRecheck">Método en re-chequeo</label>
                             <select id="methodRecheck" name="methodRecheck">
-                                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o %></option><% }) %>
+                                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o==='AMBOS'?'Ambos (el conductor elige)':o %></option><% }) %>
                             </select>
                             <small>methodRecheck</small>
                         </div>

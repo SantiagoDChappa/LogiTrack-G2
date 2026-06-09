@@ -32,8 +32,8 @@ const NUMERIC_RANGES = Object.freeze({
 });
 const ENUM_VALUES = Object.freeze({
     method:        ['VOZ', 'REACCION', 'AMBOS'],
-    methodStart:   ['VOZ', 'REACCION'],
-    methodRecheck: ['VOZ', 'REACCION'],
+    methodStart:   ['VOZ', 'REACCION', 'AMBOS'], // AMBOS: el conductor elige voz o reacción
+    methodRecheck: ['VOZ', 'REACCION', 'AMBOS'],
 });
 const BOOL_PARAMS = Object.freeze(['enabled', 'autoBlock']);
 

@@ -16,6 +16,13 @@ describe('Ojo de Patrón — scorer (US-3/US-9)', () => {
     test('voz mockScore fuerza el valor', () => {
         expect(scorer.scoreFromVoice({ mockScore: 90 })).toBe(90);
     });
+    test('voz matchRatio alto (frase leída bien) → fatiga baja', () => {
+        expect(scorer.scoreFromVoice({ matchRatio: 1 })).toBeLessThanOrEqual(15);
+        expect(scorer.scoreFromVoice({ matchRatio: 0.6 })).toBeLessThanOrEqual(50);
+    });
+    test('voz matchRatio bajo → fatiga alta', () => {
+        expect(scorer.scoreFromVoice({ matchRatio: 0 })).toBeGreaterThanOrEqual(95);
+    });
     test('score() despacha por método y valida', () => {
         expect(scorer.score({ method: 'REACCION', metrics: { reactionsMs: [300] } })).toBeGreaterThanOrEqual(0);
         expect(() => scorer.score({ method: 'NADA' })).toThrow();

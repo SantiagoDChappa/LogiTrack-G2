@@ -1219,31 +1219,121 @@
         return { method: 'REACCION', metrics: { reactionsMs } };
     }
 
-    // LGT-191: prueba de voz (mantener presionado para "grabar"). Mock: usa la duración.
-    async function pruebaVoz(cfg) {
-        const expected = (cfg.testDurationSec || 5);
-        const dur = await new Promise((resolve) => {
-            Swal.fire({
-                title: 'Prueba de voz',
-                html: `<div style="font-size:.85rem;margin-bottom:8px">Mantené presionado y leé en voz alta la frase durante ~${expected}s.</div>
-                       <button id="vz-btn" style="padding:14px 18px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">
-                       Mantener presionado para grabar</button><div id="vz-tip" style="margin-top:8px;font-size:.8rem;color:#64748b"></div>`,
-                showConfirmButton: false, allowOutsideClick: false, didOpen: () => {
-                    const b = document.getElementById('vz-btn'); const tip = document.getElementById('vz-tip');
-                    let t0 = 0;
-                    const down = (e) => { e.preventDefault(); t0 = performance.now(); b.style.background = '#16a34a'; tip.textContent = 'Grabando…'; };
-                    const up = () => { if (!t0) { return; } const ms = performance.now() - t0; resolve(Math.round(ms)); Swal.close(); };
-                    b.addEventListener('mousedown', down); b.addEventListener('touchstart', down);
-                    b.addEventListener('mouseup', up); b.addEventListener('touchend', up);
-                },
-            });
-        });
-        return { method: 'VOZ', metrics: { durationMs: dur, expectedMs: expected * 1000 } };
+    // LGT-191: prueba de voz REAL. El conductor lee una frase y se valida con
+    // reconocimiento de voz (Web Speech API). La muestra es efímera: solo se
+    // envía el % de coincidencia, nunca el audio (Ley 25.326).
+    const FRASES_VOZ = [
+        'El camión sale de la sucursal a las ocho',
+        'Hoy entrego paquetes en la zona norte',
+        'Conduzco con cuidado y respeto las señales',
+        'La ruta de hoy tiene varias paradas',
+        'Reviso los bultos antes de salir de viaje',
+    ];
+    function normalizarTexto(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+    }
+    // Coincidencia 0..1 = palabras de la frase que aparecen en lo dicho.
+    function similitudFrase(dicho, esperado) {
+        const dichas = new Set(normalizarTexto(dicho).split(' ').filter(Boolean));
+        const esp = normalizarTexto(esperado).split(' ').filter(Boolean);
+        if (!esp.length) { return 0; }
+        let hit = 0;
+        for (const w of esp) { if (dichas.has(w)) { hit++; } }
+        return hit / esp.length;
     }
 
-    // Ejecuta la prueba según el método configurado.
+    async function pruebaVoz(cfg) {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            await Swal.fire({ icon: 'warning', title: 'Reconocimiento de voz no disponible',
+                text: 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
+            return null;
+        }
+        const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
+        const MIN_MATCH = 0.6;
+
+        // Un intento: muestra la frase, escucha y devuelve { ok, matchRatio, dicho, durationMs, denied, noSpeech }.
+        function intentar() {
+            return new Promise((resolve) => {
+                let resolved = false;
+                const done = (v) => { if (!resolved) { resolved = true; resolve(v); } };
+                Swal.fire({
+                    title: 'Prueba de voz',
+                    html: `<div style="font-size:.85rem;margin-bottom:8px">Tocá el botón y leé en voz alta, claro y completo:</div>
+                           <div style="font-weight:700;font-size:1.05rem;margin:8px 0;color:#1e2761">“${frase}”</div>
+                           <button id="vz-go" style="padding:12px 16px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">🎤 Empezar a hablar</button>
+                           <div id="vz-tip" style="margin-top:10px;font-size:.8rem;color:#64748b"></div>`,
+                    showConfirmButton: false, allowOutsideClick: false, allowEscapeKey: false,
+                    didOpen: () => {
+                        const go = document.getElementById('vz-go');
+                        const tip = document.getElementById('vz-tip');
+                        go.addEventListener('click', () => {
+                            const rec = new SR();
+                            rec.lang = 'es-AR'; rec.interimResults = false; rec.maxAlternatives = 3; rec.continuous = false;
+                            go.disabled = true; tip.textContent = 'Escuchando… hablá ahora.';
+                            const t0 = performance.now();
+                            rec.onresult = (e) => {
+                                let best = 0, dicho = '';
+                                const alts = e.results[0];
+                                for (let i = 0; i < alts.length; i++) {
+                                    const sim = similitudFrase(alts[i].transcript, frase);
+                                    if (sim > best) { best = sim; dicho = alts[i].transcript; }
+                                }
+                                done({ ok: best >= MIN_MATCH, matchRatio: best, dicho, durationMs: Math.round(performance.now() - t0) });
+                            };
+                            rec.onerror = (ev) => {
+                                if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { done({ denied: true }); return; }
+                                done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: ev.error === 'no-speech' });
+                            };
+                            rec.onend = () => { done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, noSpeech: true }); };
+                            try { rec.start(); } catch (_) { done({ ok: false, matchRatio: 0 }); }
+                        });
+                    },
+                });
+            });
+        }
+
+        for (;;) {
+            const r = await intentar();
+            Swal.close();
+            if (r.denied) {
+                await Swal.fire({ icon: 'error', title: 'Sin permiso de micrófono',
+                    text: 'Necesitamos el micrófono para la prueba de voz. Habilitalo y reintentá.' });
+                return null;
+            }
+            if (r.ok) {
+                return { method: 'VOZ', metrics: { matchRatio: r.matchRatio, durationMs: r.durationMs, expectedMs: (cfg.testDurationSec || 5) * 1000 } };
+            }
+            const retry = await Swal.fire({
+                icon: 'info', title: 'No te entendí bien',
+                html: r.dicho ? `Escuché: “<i>${r.dicho}</i>”.<br>Leé la frase completa, más claro.` : 'No detecté tu voz. Probá de nuevo.',
+                showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: 'Cancelar',
+                allowOutsideClick: false,
+            });
+            if (!retry.isConfirmed) { return null; }
+        }
+    }
+
+    // Cuando el método configurado es AMBOS, el conductor elige cuál hacer.
+    async function elegirMetodo() {
+        const res = await Swal.fire({
+            title: 'Elegí la prueba de fatiga',
+            html: 'Podés hacer la prueba de <b>voz</b> o la de <b>reacción</b>.',
+            showDenyButton: true,
+            confirmButtonText: '🎤 Prueba de voz',
+            denyButtonText: '⚡ Prueba de reacción',
+            confirmButtonColor: '#2563eb', denyButtonColor: '#16a34a',
+            allowOutsideClick: false, allowEscapeKey: false,
+        });
+        return res.isConfirmed ? 'VOZ' : 'REACCION';
+    }
+
+    // Ejecuta la prueba según el método configurado (VOZ, REACCION o AMBOS→elige).
     async function runPrueba(method, cfg) {
-        if (method === 'VOZ') { return pruebaVoz(cfg); }
+        let m = method;
+        if (m === 'AMBOS') { m = await elegirMetodo(); }
+        if (m === 'VOZ') { return pruebaVoz(cfg); }
         return pruebaReaccion();
     }
 
@@ -1266,6 +1356,7 @@
             return;
         }
         const prueba = await runPrueba(cfg.methodStart, cfg);
+        if (!prueba) { return; } // prueba cancelada / sin micrófono → no inicia
         showRouteLoader('Evaluando la prueba…');
         const r = await fetch(`/delivery/route/${routeId}/fatigue-check`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1314,6 +1405,7 @@
         async function launchRecheck(method) {
             const cfg = await getFatigueCfg();
             const prueba = await runPrueba(method || cfg.methodRecheck, cfg);
+            if (!prueba) { return; } // prueba cancelada / sin micrófono → no re-chequea ahora
             const r = await fetch(`/delivery/route/${routeId}/fatigue-recheck`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(prueba),

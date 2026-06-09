@@ -14,11 +14,18 @@ function scoreFromReaction(reactionsMs = []) {
     return clamp(Math.round(((avg - 250) / (800 - 250)) * 100), 0, 100);
 }
 
-// Voz (mock): deriva un pseudo-score determinístico de la duración capturada
-// respecto de la esperada. Una muestra más corta de lo pedido → más "fatiga".
-// Permite metrics.mockScore para forzar un valor (tests / demo).
-function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore } = {}) {
+// Voz: deriva la fatiga de la prueba de lectura de frase (reconocimiento de voz).
+//  - mockScore: fuerza un valor (tests / demo).
+//  - matchRatio (0..1): qué tan bien coincidió lo leído con la frase. Mejor
+//    coincidencia → menos fatiga (1 → ~10, 0.6 → ~46, 0 → 100).
+//  - durationMs/expectedMs: fallback legacy (mock por duración) cuando no hay
+//    matchRatio (una muestra más corta de lo pedido → más "fatiga").
+function scoreFromVoice({ durationMs, expectedMs = 5000, mockScore, matchRatio } = {}) {
     if (Number.isFinite(mockScore)) { return clamp(Math.round(mockScore), 0, 100); }
+    if (Number.isFinite(matchRatio)) {
+        const m = clamp(matchRatio, 0, 1);
+        return clamp(Math.round(100 - m * 90), 0, 100);
+    }
     if (!Number.isFinite(durationMs) || durationMs <= 0) { return 100; }
     const ratio = clamp(durationMs / expectedMs, 0, 1);
     // ratio 1 (muestra completa) → fatiga baja (~15); ratio 0 → alta (100).
