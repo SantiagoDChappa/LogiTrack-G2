@@ -21,6 +21,7 @@ const DEFAULTS = Object.freeze({
     recheckDriveMin:   '90',     // min de conducción que habilita re-chequeo
     recheckStoppedMin: '3',      // min detenido que dispara re-chequeo
     recheckRestMin:    '30',     // min de descanso para reintentar prueba tras bloqueo en ruta (LGT-199)
+    recheckOmitMin:    '10',     // min sin completar el re-chequeo pedido → avisa al supervisor (LGT-199 Esc.4)
     patternWindowDays: '30',     // ventana para patrón recurrente
     patternEventCount: '3',      // N.º de bloqueos que marca patrón
     retentionDays:     '90',     // retención de registros (Ley 25.326 art. 4)
@@ -37,6 +38,7 @@ const NUMERIC_RANGES = Object.freeze({
     recheckDriveMin:   [1, 1440],
     recheckStoppedMin: [1, 240],
     recheckRestMin:    [1, 720],
+    recheckOmitMin:    [1, 240],
     patternWindowDays: [1, 365],
     patternEventCount: [1, 50],
     retentionDays:     [1, 3650],

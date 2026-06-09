@@ -204,6 +204,12 @@
                                    title="Si la prueba en ruta da fatiga, la ruta se pausa y el conductor debe descansar este tiempo antes de reintentar.">
                             <small class="cfg-help">Si la prueba da fatiga, la ruta se pausa y el conductor descansa este tiempo antes de reintentar. Ej.: 30.</small>
                         </div>
+                        <div class="field">
+                            <label for="recheckOmitMin">Aviso al supervisor si omite el re-chequeo (min)</label>
+                            <input type="number" id="recheckOmitMin" name="recheckOmitMin" min="1" max="240" value="<%= cfg.recheckOmitMin %>"
+                                   title="Si el conductor no completa la prueba pedida, pasado este tiempo se avisa al supervisor y se crea un registro en Ojo de Patrón.">
+                            <small class="cfg-help">Minutos sin completar la prueba pedida antes de avisar al supervisor y registrar el caso. Ej.: 10.</small>
+                        </div>
                     </div>
                 </div>
 

@@ -1830,29 +1830,69 @@
             nextLbl.style.display = 'block';
         };
 
+        // Campo visual: tiempo de manejo acumulado vs el mínimo que habilita el re-chequeo.
+        // Así el repartidor sabe si ya "pasó ese tiempo" sin tener que adivinar.
+        const driveChip = document.createElement('div');
+        driveChip.id = 'fatigue-drive-chip';
+        driveChip.style.cssText = 'position:fixed;bottom:180px;right:16px;z-index:9999;padding:8px 12px;border-radius:10px;' +
+            'background:#0f172a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none;max-width:230px';
+        document.body.appendChild(driveChip);
+        const renderDriveChip = (s) => {
+            if (!s || s.driveMin == null || s.driveThresholdMin == null) { driveChip.style.display = 'none'; return; }
+            const ready = s.driveMin >= s.driveThresholdMin;
+            const color = ready ? '#22c55e' : '#fbbf24';
+            const pct = Math.min(100, Math.round((s.driveMin / Math.max(1, s.driveThresholdMin)) * 100));
+            driveChip.innerHTML = `🚚 Manejo: <span style="color:${color}">${s.driveMin}</span> / ${s.driveThresholdMin} min` +
+                `<div style="margin-top:5px;height:5px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden">` +
+                `<div style="height:100%;width:${pct}%;background:${color}"></div></div>` +
+                `<div style="margin-top:4px;font-weight:500;opacity:.85">${ready ? '✓ Si te detenés, se pedirá la prueba.' : 'Aún no llegás al mínimo para el re-chequeo.'}</div>`;
+            driveChip.style.display = 'block';
+        };
+        async function updateDriveChip() {
+            try {
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
+                renderDriveChip(await r.json());
+            } catch (_) { /* red */ }
+        }
+
         let stopped = false, poll = null;
 
         async function refresh() {
             try {
                 const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
                 const s = await r.json();
+                renderDriveChip(s);
                 if (s.paused) {
                     btn.textContent = `⏸ Pausada por fatiga (${s.restRemainingMin}m)`;
                     btn.style.background = '#dc2626';
                     showNext(s.nextCheckAt, 'PRÓXIMO REINTENTO');
-                    if (s.restRemainingMin <= 0) { await launchRecheck(s.methodRecheck); }
+                    if (s.restRemainingMin <= 0) { await launchRecheck(s.methodRecheck, true); }
                 } else if (s.needsRecheck) {
                     showNext(null);
-                    await launchRecheck(s.methodRecheck);
+                    await launchRecheck(s.methodRecheck, true); // obligatorio: sí o sí debe hacerlo
                 } else {
                     showNext(s.nextCheckAt, 'PRÓXIMO CHEQUEO');
                 }
             } catch (_) { /* red */ }
         }
-        async function launchRecheck(method) {
+        let launching = false;
+        async function launchRecheck(method, mandatory = false) {
+            if (launching) { return; } // evita dos pruebas en paralelo
+            launching = true;
+            try {
             const cfg = await getFatigueCfg();
             const prueba = await runPrueba(method || cfg.methodRecheck, cfg);
-            if (!prueba) { return; } // prueba cancelada / sin micrófono → no re-chequea ahora
+            if (!prueba) {
+                // No completó la prueba. Si es obligatoria (re-chequeo pendiente), no puede
+                // seguir la ruta: lo mandamos al inicio. Al reentrar, se le vuelve a pedir.
+                if (mandatory) {
+                    await Swal.fire({ icon: 'warning', title: 'Tenés que hacer el control de fatiga',
+                        html: 'No podés continuar la ruta sin completar el re-chequeo.<br>Te llevamos al inicio; cuando vuelvas a entrar, te lo pediremos de nuevo.',
+                        confirmButtonText: 'Entendido', confirmButtonColor: '#d97706', allowOutsideClick: false });
+                    window.location.href = '/delivery?rechequeo=pendiente';
+                }
+                return;
+            }
             const r = await fetch(`/delivery/route/${routeId}/fatigue-recheck`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(prueba),
@@ -1871,6 +1911,7 @@
                 showNext(null);
                 if (poll) { clearInterval(poll); poll = null; }
             }
+            } finally { launching = false; }
         }
         btn.addEventListener('click', async () => {
             if (stopped) {
@@ -1888,6 +1929,12 @@
             await refresh();
             poll = setInterval(refresh, 30000);
         });
+
+        // Al entrar a la ruta: si hay un re-chequeo pendiente, se fuerza la prueba
+        // (obligatoria). El chip de manejo se muestra y se actualiza cada minuto.
+        refresh();
+        updateDriveChip();
+        setInterval(updateDriveChip, 60000);
     }
 
     // Inicia ruta con gate de fatiga si aún no se inició (sólo modo activo).
