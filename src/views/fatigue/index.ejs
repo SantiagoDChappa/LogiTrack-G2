@@ -88,15 +88,8 @@
                         </div>
                         <div class="fb-actions">
                             <button class="btn-primary btn-sm" onclick="release(<%= b.id %>)">Liberar con motivo</button>
-                            <button class="btn-secondary btn-sm" onclick="keep(<%= b.id %>)">Mantener bloqueada</button>
                             <% if (!isAdmin) { %>
-                                <select id="tx-<%= b.routeId %>" class="fb-select">
-                                    <option value="">Reasignar a…</option>
-                                    <% transports.forEach(t => { %>
-                                        <option value="<%= t.id %>"><%= t.name %><%= t.driverName ? ' — ' + t.driverName : '' %></option>
-                                    <% }) %>
-                                </select>
-                                <button class="btn-secondary btn-sm" onclick="reassign(<%= b.routeId %>)">Reasignar ruta</button>
+                                <button class="btn-secondary btn-sm" onclick="reassign(<%= b.routeId %>)">Reasignar a otro transportista</button>
                             <% } %>
                         </div>
                     </div>
@@ -241,25 +234,28 @@
         else { toastErr(data.error || 'No se pudo liberar.'); }
     }
 
-    async function keep(id) {
-        const res = await Swal.fire({
-            icon: 'warning', title: '¿Mantener bloqueada?',
-            text: 'La ruta sigue bloqueada y el conductor no puede salir.',
-            showCancelButton: true, confirmButtonText: 'Sí, mantener', cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#dc2626',
-        });
-        if (!res.isConfirmed) { return; }
-        await fetch('/fatigue/' + id + '/keep', { method: 'POST' });
-        toastOk('La ruta sigue bloqueada.');
-    }
+    // Transportes habilitados de la sucursal (admin: de todas). El backend valida.
+    const TRANSPORTS = <%- JSON.stringify(transports || []) %>;
 
     async function reassign(routeId) {
-        const sel = document.getElementById('tx-' + routeId);
-        const transportId = sel && sel.value;
-        if (!transportId) { toastErr('Elegí un transporte para reasignar.'); return; }
+        if (!TRANSPORTS.length) {
+            toastErr('No hay transportes disponibles en tu sucursal para reasignar.');
+            return;
+        }
+        const inputOptions = {};
+        TRANSPORTS.forEach(t => { inputOptions[t.id] = t.name + (t.driverName ? ' — ' + t.driverName : ''); });
+        const res = await Swal.fire({
+            title: 'Reasignar a otro transportista',
+            text: 'Elegí el transporte que tomará la ruta.',
+            input: 'select', inputOptions, inputPlaceholder: 'Elegí un transporte…',
+            showCancelButton: true, confirmButtonText: 'Reasignar', cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#16a34a',
+            inputValidator: (v) => (!v ? 'Elegí un transporte.' : undefined),
+        });
+        if (!res.isConfirmed) { return; }
         const r = await fetch('/fatigue/reassign', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ routeId, transportId }),
+            body: JSON.stringify({ routeId, transportId: res.value }),
         });
         const data = await r.json().catch(() => ({}));
         if (r.ok) {

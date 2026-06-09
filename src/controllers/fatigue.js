@@ -14,35 +14,48 @@ const scopeBranch = (u) => (isAdmin(u) ? null : (u?.branchId || null));
 exports.index = async (req, res) => {
     const u = res.locals.currentUser;
     const branchId = scopeBranch(u);
-    const blocked = await fatigueSvc.listBlocked(branchId);
+    const blocked = await fatigueSvc.listBlocked(branchId); // ya filtra por sucursal
     const cfg = await fatigueCfg.getConfig(branchId);
 
     const { FatiguePatternCounter } = require('../models/fatiguePatternCounter');
     const counters = await FatiguePatternCounter.findAll({ order: [['blockedCount', 'DESC']], limit: 50 });
-    const patterns = [];
-    for (const c of counters) { patterns.push(await fatigueSvc.patternStatus(c.userId, cfg)); }
-
+    const disabledRaw = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
     const transports = await transportModel.getEnabledForBranch(branchId);
-    const disabledDrivers = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
 
-    // Resolver el nombre del transportista para todos los bloques del panel.
     const blockedJson = blocked.map(b => b.toJSON());
-    const driverIds = [...new Set([
+
+    // Mapa id→{fullName, branchId}. Los modelos de patrón/inhabilitados no tienen
+    // sucursal: se scopea por la sucursal del usuario. Supervisor: solo la suya.
+    // Admin (branchId === null): ve todo.
+    const candidateIds = [...new Set([
         ...blockedJson.map(b => b.userId),
-        ...disabledDrivers.map(d => d.userId),
-        ...patterns.map(p => p.userId),
+        ...disabledRaw.map(d => d.userId),
+        ...counters.map(c => c.userId),
     ].filter(Boolean))];
     const { User } = require('../models/user');
-    const users = driverIds.length ? await User.findAll({ where: { id: driverIds }, attributes: ['id', 'fullName'] }) : [];
-    const nameById = Object.fromEntries(users.map(x => [x.id, x.fullName]));
+    const users = candidateIds.length
+        ? await User.findAll({ where: { id: candidateIds }, attributes: ['id', 'fullName', 'branchId'] })
+        : [];
+    const nameById = {}; const branchById = {};
+    for (const x of users) { nameById[x.id] = x.fullName; branchById[x.id] = x.branchId; }
+    const inScope = (uid) => branchId === null || branchById[uid] === branchId;
+
+    const patterns = [];
+    for (const c of counters.filter(c => inScope(c.userId))) {
+        const p = await fatigueSvc.patternStatus(c.userId, cfg);
+        patterns.push({ ...p, driverName: nameById[c.userId] || null });
+    }
+    const disabledDrivers = disabledRaw
+        .filter(d => inScope(d.userId))
+        .map(d => ({ ...d, driverName: nameById[d.userId] || null }));
 
     res.render('fatigue/index', {
         blocked: blockedJson.map(b => ({ ...b, driverName: nameById[b.userId] || null })),
-        patterns: patterns.map(p => ({ ...p, driverName: nameById[p.userId] || null })),
+        patterns,
         isAdmin: isAdmin(u),
         cfg,
         transports: transports.map(t => ({ id: t.id, name: t.name, driverName: t.driver?.fullName || null })),
-        disabledDrivers: disabledDrivers.map(d => ({ ...d, driverName: nameById[d.userId] || null })),
+        disabledDrivers,
     });
 };
 
