@@ -727,6 +727,14 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     });
 });
 
+// Diagnóstico de la prueba de voz desde el cliente → visible en logs del server (Render).
+// El reconocimiento corre en el navegador; esto solo refleja sus eventos para depurar.
+router.post('/route/:id/fatigue/voz-log', requireDelivery, (req, res) => {
+    const uid = res.locals.currentUser?.id;
+    console.log('[fatiga-voz][cliente] user=' + uid + ' route=' + req.params.id, JSON.stringify(req.body));
+    res.status(204).end();
+});
+
 // US-1: registrar consentimiento (acepta o rechaza).
 router.post('/route/:id/consent', requireDelivery, async (req, res) => {
     const route = await ownRouteOr403(req, res); if (!route) { return; }

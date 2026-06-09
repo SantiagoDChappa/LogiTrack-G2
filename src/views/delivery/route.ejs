@@ -1260,12 +1260,27 @@
     }
 
     async function pruebaVoz(cfg) {
+        // Manda diagnóstico al server (aparece en logs de Render) y a la consola.
+        const sessionTag = Math.random().toString(36).slice(2, 8);
+        const vozLog = (stage, data) => {
+            const payload = { tag: sessionTag, stage, ...(data || {}) };
+            console.log('[fatiga-voz]', stage, JSON.stringify(data || {}));
+            try {
+                fetch(`/delivery/route/${routeId}/fatigue/voz-log`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload), keepalive: true,
+                }).catch(() => {});
+            } catch (_) {}
+        };
+
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) {
+            vozLog('no-soportado', { ua: navigator.userAgent });
             await Swal.fire({ icon: 'warning', title: 'Reconocimiento de voz no disponible',
                 text: 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
             return null;
         }
+        vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
         const MIN_MATCH = 0.7; // exige leer la frase casi completa y en orden
 
@@ -1297,7 +1312,13 @@
                             const autostop = setTimeout(() => { try { rec.stop(); } catch (_) {} }, secs * 1000);
                             const cleanup = () => { clearInterval(countdown); clearTimeout(autostop); };
                             const t0 = performance.now();
-                            rec.onstart = () => { console.log('[fatiga-voz] micrófono activo, escuchando…'); };
+                            const el = () => Math.round(performance.now() - t0);
+                            let gotSound = false, gotSpeech = false;
+                            vozLog('start', { secs, palabras: frase.split(' ').length });
+                            rec.onaudiostart  = () => vozLog('audiostart', { ms: el() });
+                            rec.onsoundstart  = () => { gotSound = true; vozLog('soundstart', { ms: el() }); };
+                            rec.onspeechstart = () => { gotSpeech = true; vozLog('speechstart', { ms: el() }); };
+                            rec.onspeechend   = () => vozLog('speechend', { ms: el() });
                             rec.onresult = (e) => {
                                 cleanup();
                                 let best = 0, dicho = '';
@@ -1306,17 +1327,21 @@
                                     const sim = similitudFrase(alts[i].transcript, frase);
                                     if (sim > best) { best = sim; dicho = alts[i].transcript; }
                                 }
-                                console.log('[fatiga-voz] escuché:', JSON.stringify(dicho), '· coincidencia:', best.toFixed(2), '· mínimo:', MIN_MATCH);
-                                done({ ok: best >= MIN_MATCH, matchRatio: best, dicho, durationMs: Math.round(performance.now() - t0) });
+                                vozLog('result', { dicho, match: Number(best.toFixed(2)), min: MIN_MATCH, ms: el() });
+                                done({ ok: best >= MIN_MATCH, matchRatio: best, dicho, durationMs: el() });
                             };
                             rec.onerror = (ev) => {
                                 cleanup();
-                                console.warn('[fatiga-voz] error de reconocimiento:', ev.error);
+                                vozLog('error', { error: ev.error, ms: el(), gotSound, gotSpeech });
                                 if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { done({ denied: true }); return; }
                                 done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: ev.error || 'desconocido' });
                             };
-                            rec.onend = () => { cleanup(); done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: 'sin-resultado' }); };
-                            try { rec.start(); } catch (err) { cleanup(); console.warn('[fatiga-voz] no se pudo iniciar:', err); done({ ok: false, matchRatio: 0, errorType: 'no-inicia' }); }
+                            rec.onend = () => {
+                                cleanup();
+                                if (!resolved) { vozLog('end-sin-resultado', { ms: el(), gotSound, gotSpeech }); }
+                                done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: 'sin-resultado' });
+                            };
+                            try { rec.start(); } catch (err) { cleanup(); vozLog('no-inicia', { msg: String((err && err.message) || err) }); done({ ok: false, matchRatio: 0, errorType: 'no-inicia' }); }
                         });
                     },
                 });
