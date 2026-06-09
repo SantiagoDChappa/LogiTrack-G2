@@ -1255,9 +1255,13 @@
         'La ruta de hoy tiene varias paradas',
         'Reviso los bultos antes de salir de viaje',
     ];
+    // El reconocedor puede devolver "8" u "ocho": unificamos a dígito para no
+    // fallar por esa variación (uno/1, dos/2, ...).
+    const NUM_PALABRA = { cero: '0', uno: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };
     function normalizarTexto(s) {
         return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-            .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+            .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
+            .split(' ').map(w => NUM_PALABRA[w] || w).join(' ');
     }
     // Distancia de edición a nivel de palabra (Levenshtein sobre tokens).
     function levenshteinPalabras(a, b) {
@@ -1313,7 +1317,7 @@
             return canGoBack ? 'BACK' : null;
         }
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
-        const MIN_MATCH = 0.8;
+        const MIN_MATCH = 0.95;
         const secs = cfg.testDurationSec || 5;
 
         function grabar() {
@@ -1462,7 +1466,7 @@
         vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
 
         const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
-        const MIN_MATCH = 0.8; // exige leer la frase casi completa y en orden
+        const MIN_MATCH = 0.95; // exige leer la frase casi completa y en orden
 
         // Un intento: muestra la frase, escucha y devuelve { ok, matchRatio, dicho, durationMs, denied, noSpeech }.
         function intentar() {

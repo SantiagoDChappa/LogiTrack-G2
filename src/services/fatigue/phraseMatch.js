@@ -2,9 +2,13 @@
 // cliente: normaliza, Levenshtein por palabra, sensible al orden.
 // Usado por la prueba de voz server-side (STT) para calcular el matchRatio.
 
+// "8" u "ocho" se unifican a dígito para no fallar por esa variación.
+const NUM_PALABRA = { cero: '0', uno: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };
+
 function normalizarTexto(s) {
     return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
+        .split(' ').map(w => NUM_PALABRA[w] || w).join(' ');
 }
 
 function levenshteinPalabras(a, b) {
