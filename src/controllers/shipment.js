@@ -582,7 +582,16 @@ const getUpdateShipment = async (req, res) => {
     const returnUrl = req.query.from || '/shipment';
     const currentUser = res.locals.currentUser;
     const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
-    const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
+    // Estados que son hechos físicos de campo (los confirma el repartidor por scan/ruta/POD):
+    // En Tránsito, En Sucursal, Entregado e Intento Fallido NO se setean a dedo desde el escritorio.
+    // La máquina de estados los sigue permitiendo por sus flujos operativos (despacho de ruta, scans);
+    // acá solo los sacamos de los botones de "modificar envío".
+    const DESK_BLOCKED_STATUSES = new Set([
+        Status.IN_TRANSIT.id, Status.AT_BRANCH.id, Status.DELIVERED.id, Status.FAILED_ATTEMPT.id,
+    ]);
+    const availableActions = stateMachine
+        .getAvailableActions({ shipment, actor: currentUser })
+        .filter(a => !DESK_BLOCKED_STATUSES.has(a.toStatusId));
     res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
 };
 
