@@ -161,6 +161,12 @@
                     <span class="detail-tracking-id"><%= shipment.trackingId %></span>
                 </div>
                 <div style="display:flex;gap:var(--space-3);align-items:center;">
+                    <% if (isAdmin) { %>
+                        <span class="status-badge" style="display:inline-flex;align-items:center;gap:.3rem;background:var(--color-surface-alt);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+                            <span class="material-symbols-outlined" style="font-size:16px">store</span>
+                            <%= currentBranch ? currentBranch.name : 'Sin sucursal' %>
+                        </span>
+                    <% } %>
                     <span class="priority-badge <%= _priCls[_pr] %>"><%= _priLabels[_pr] || '—' %></span>
                     <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
                 </div>

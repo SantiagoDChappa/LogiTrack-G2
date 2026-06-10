@@ -266,6 +266,8 @@ const getDetail = async (req, res) => {
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
+        isAdmin: isAdminUser(viewer),
+        currentBranch,
     });
 };
 

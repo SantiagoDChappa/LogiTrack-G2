@@ -164,6 +164,7 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
     const { Person } = require('./person');
     const { Status } = require('./status');
     const { Address } = require('./address');
+    const { Branch } = require('./branch');
     
     const shipmentWhere  = {};
     const senderWhere    = {};
@@ -213,6 +214,7 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
             },
             { model: Status,  as: 'status'  },
             { model: Address, as: 'address' },
+            { model: Branch,  as: 'currentBranch', required: false },
         ],
         order: [['id', 'DESC']],
         limit: 200,
