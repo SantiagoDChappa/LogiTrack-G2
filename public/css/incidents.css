@@ -118,7 +118,13 @@ html[data-theme="dark"] {
     border: 1px solid var(--inc-border);
     border-radius: var(--inc-radius-md);
     box-shadow: var(--inc-shadow-sm);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+/* En pantallas chicas la tabla mantiene ancho minimo y scrollea horizontal */
+@media (max-width: 720px) {
+    .incident-table { min-width: 760px; }
 }
 
 .incident-table {

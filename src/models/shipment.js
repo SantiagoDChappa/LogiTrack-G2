@@ -68,7 +68,9 @@ const getAll = () => {
             { model: TypeShipment, as: 'shipmentType' },
             { model: User, as: 'deliveryUser', required: false },
             { model: Branch, as: 'pickupBranch', required: false }
-        ]
+        ],
+        order: [['id', 'DESC']],
+        limit: 500,
     });
 };
 
@@ -211,7 +213,10 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
             },
             { model: Status,  as: 'status'  },
             { model: Address, as: 'address' },
-        ]
+        ],
+        order: [['id', 'DESC']],
+        limit: 200,
+        subQuery: false,
     });
 };
 

@@ -47,6 +47,7 @@ const getAllByBranch = (branchId) => {
             { model: Branch,    as: 'originBranch' },
         ],
         order: [['createdAt', 'DESC']],
+        limit: 200,
     });
 };
 
@@ -108,6 +109,7 @@ const getAllByDriver = (driverUserId) => {
             { model: RouteStop, as: 'stops', required: false, attributes: ['id', 'completed', 'skipped', 'stopType', 'sequence'] },
         ],
         order: [['createdAt', 'DESC']],
+        limit: 100,
     });
 };
 

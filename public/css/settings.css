@@ -338,3 +338,19 @@ html[data-theme="dark"] {
     box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
     transform: translateY(-1px);
 }
+
+/* ============================================================
+   Responsive — grillas de notificaciones colapsan en mobile
+   (usan !important porque los estilos inline tienen mayor prioridad)
+   ============================================================ */
+@media (max-width: 768px) {
+    .notif-config-row {
+        grid-template-columns: 1fr !important;
+        gap: .55rem !important;
+    }
+    .notif-toggle-grid,
+    .notif-type-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .notif-section-group { padding: .85rem !important; }
+}

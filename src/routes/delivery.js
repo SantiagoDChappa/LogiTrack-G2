@@ -89,10 +89,21 @@ router.get('/', requireDelivery, async (req, res) => {
     try {
         const userId = res.locals.currentUser.id;
         const { RouteStatus } = require('../models/route');
-        const [shipments, routes] = await Promise.all([
+        const [shipments, routes, driverFatigueRow] = await Promise.all([
             shipmentModel.search({ deliveryUserId: userId }),
             routeModel.getAllByDriver(userId),
+            require('../services/fatigue').getDriverStatus(userId).catch(() => null),
         ]);
+
+        // LGT-195: si el transportista quedó INHABILITADO (rechazó el consentimiento de
+        // fatiga las veces parametrizadas), el card de ruta se muestra en rojo, sin
+        // accionable, y al clickear dispara el popup explicativo.
+        const driverDisabled = (driverFatigueRow && driverFatigueRow.status === 'DISABLED')
+            ? {
+                reason:     driverFatigueRow.reason || null,
+                disabledAt: driverFatigueRow.disabledAt || null,
+              }
+            : null;
 
         // "Activa" = IN_ROUTE (en curso) o, si no hay, la PLANNED más reciente
         const inRoute = routes.find(r => r.statusId === RouteStatus.IN_ROUTE);
@@ -156,6 +167,7 @@ router.get('/', requireDelivery, async (req, res) => {
             upcomingRoutes: upcomingRoutes.map(summarizeRoute),
             finishedRoutes: finished.map(summarizeRoute),
             fatigueBlocked,
+            driverDisabled,
         });
     } catch (err) {
         console.error(err);
@@ -212,6 +224,11 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
             }
             await RoutePause.update({ endedAt: new Date() }, { where })
                 .catch(err => console.error('stale-pause cleanup err:', err.message));
+        }
+
+        // LGT-195: transportista INHABILITADO no puede entrar a ninguna ruta, ni por URL directa.
+        if (await fatigueSvc.isDriverDisabled(res.locals.currentUser.id)) {
+            return res.redirect('/delivery?inhabilitado=1');
         }
 
         const route = await routeModel.getById(req.params.id);
