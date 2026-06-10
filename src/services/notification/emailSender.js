@@ -15,12 +15,12 @@ const SENDGRID_KEY = process.env.SENDGRID_API_KEY
     || (process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('SG.') ? process.env.SMTP_PASS : null);
 const USE_SENDGRID_API = Boolean(SENDGRID_KEY);
 
-// API key de Brevo (ex-Sendinblue): empieza con "xkeysib-". Funciona por HTTPS,
+// API key de Resend: empieza con "re_". Funciona por HTTPS (api.resend.com),
 // no bloqueado por Render. Se usa como FALLBACK si SendGrid falla (o como primario
 // si SendGrid no está configurado).
-const BREVO_KEY = process.env.BREVO_API_KEY
-    || (process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('xkeysib-') ? process.env.SMTP_PASS : null);
-const USE_BREVO_API = Boolean(BREVO_KEY);
+const RESEND_KEY = process.env.RESEND_API_KEY
+    || (process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('re_') ? process.env.SMTP_PASS : null);
+const USE_RESEND_API = Boolean(RESEND_KEY);
 
 // Timeouts SMTP: si el servidor no responde preferimos fallar rápido en vez de
 // dejar la request/job colgada "cargando".
@@ -75,15 +75,15 @@ function buildTransporter() {
     });
 }
 
-// Construimos el transporter SMTP salvo que un proveedor HTTP (SendGrid/Brevo) sea
+// Construimos el transporter SMTP salvo que un proveedor HTTP (SendGrid/Resend) sea
 // el primario — igual queda disponible como último eslabón del fallback en local.
-const HAS_HTTP_PROVIDER = USE_SENDGRID_API || USE_BREVO_API;
+const HAS_HTTP_PROVIDER = USE_SENDGRID_API || USE_RESEND_API;
 const transporter = HAS_HTTP_PROVIDER ? null : buildTransporter();
 
 if (process.env.NODE_ENV !== 'test') {
     const order = [
         USE_SENDGRID_API ? 'SendGrid' : null,
-        USE_BREVO_API ? 'Brevo' : null,
+        USE_RESEND_API ? 'Resend' : null,
         transporter ? 'SMTP' : null,
     ].filter(Boolean).join(' → ') || 'SMTP/Gmail';
     console.log(`[email] cadena de envío: ${order} -> from=${fromRaw()}`);
@@ -134,46 +134,45 @@ async function sendViaSendGridApi(recipients, subject, content, format) {
     }
 }
 
-// ── Envío vía API HTTP de Brevo (HTTPS, no bloqueado por Render) ──────────────
-// Devuelve { ok, error }. Endpoint: POST https://api.brevo.com/v3/smtp/email
-async function sendViaBrevoApi(recipients, subject, content, format) {
-    const from = parseFrom();
+// ── Envío vía API HTTP de Resend (HTTPS, no bloqueado por Render) ─────────────
+// Devuelve { ok, error }. Endpoint: POST https://api.resend.com/emails
+// El dominio del remitente (EMAIL_FROM) debe estar verificado en Resend.
+async function sendViaResendApi(recipients, subject, content, format) {
     const payload = {
-        sender: from.name ? { email: from.email, name: from.name } : { email: from.email },
-        to: recipients.map((email) => ({ email })),
+        from: fromRaw(),                 // admite "Nombre <email>" o solo el email
+        to: recipients,
         subject,
     };
     if (format === 'html') {
-        payload.htmlContent = content;
-        payload.textContent = htmlToText(content);
+        payload.html = content;
+        payload.text = htmlToText(content);
     } else {
-        payload.textContent = content;
+        payload.text = content;
     }
 
-    console.log(`[email] enviando (Brevo API) -> to=${recipients.join(', ')} subject="${subject}" from=${from.email}`);
+    console.log(`[email] enviando (Resend API) -> to=${recipients.join(', ')} subject="${subject}" from=${payload.from}`);
     try {
-        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        const res = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
-                'api-key': BREVO_KEY,
+                Authorization: `Bearer ${RESEND_KEY}`,
                 'Content-Type': 'application/json',
-                accept: 'application/json',
             },
             body: JSON.stringify(payload),
             signal: AbortSignal.timeout(15000),
         });
-        if (res.ok) { // 201 Created
+        if (res.ok) { // 200 OK
             const data = await res.json().catch(() => ({}));
-            console.log(`[email] ENVIADO ✔ (Brevo API) to=${recipients.join(', ')} status=${res.status} msgId=${data.messageId || '-'}`);
+            console.log(`[email] ENVIADO ✔ (Resend API) to=${recipients.join(', ')} status=${res.status} msgId=${data.id || '-'}`);
             return { ok: true };
         }
         const errBody = await res.text().catch(() => '');
-        console.error(`[email] ERROR (Brevo API) status=${res.status} to=${recipients.join(', ')} body=${errBody}`);
-        return { ok: false, error: `Brevo ${res.status}: ${errBody.slice(0, 200)}` };
+        console.error(`[email] ERROR (Resend API) status=${res.status} to=${recipients.join(', ')} body=${errBody}`);
+        return { ok: false, error: `Resend ${res.status}: ${errBody.slice(0, 200)}` };
     } catch (error) {
         const msg = error && error.message ? error.message : String(error);
-        console.error(`[email] ERROR (Brevo API) to=${recipients.join(', ')}:`, msg);
-        return { ok: false, error: `Brevo: ${msg}` };
+        console.error(`[email] ERROR (Resend API) to=${recipients.join(', ')}:`, msg);
+        return { ok: false, error: `Resend: ${msg}` };
     }
 }
 
@@ -203,7 +202,7 @@ async function sendViaSmtp(recipients, subject, content, format) {
     }
 }
 
-// Lista de proveedores disponibles, en orden de preferencia: SendGrid → Brevo → SMTP.
+// Lista de proveedores disponibles, en orden de preferencia: SendGrid → Resend → SMTP.
 // Cada uno se intenta sólo si está configurado; si uno falla, se pasa al siguiente.
 function buildProviderChain() {
     const chain = [];
@@ -213,8 +212,8 @@ function buildProviderChain() {
             return ok ? { ok: true } : { ok: false, error: 'SendGrid: ver log [email] ERROR' };
         }});
     }
-    if (USE_BREVO_API) {
-        chain.push({ name: 'brevo', send: sendViaBrevoApi });
+    if (USE_RESEND_API) {
+        chain.push({ name: 'resend', send: sendViaResendApi });
     }
     // SMTP/Gmail como último recurso (suele estar bloqueado en Render, pero útil en local).
     // Sólo si hay transporter construido (no se arma cuando un proveedor HTTP es primario).
@@ -245,7 +244,7 @@ async function sendEmailWithResult(to, subject, content, format = 'text') {
 
     const chain = buildProviderChain();
     if (chain.length === 0) {
-        console.warn('[email] sin proveedor de email configurado (SendGrid/Brevo/SMTP)');
+        console.warn('[email] sin proveedor de email configurado (SendGrid/Resend/SMTP)');
         return { ok: false, provider: null, attempts, error: 'sin proveedor configurado' };
     }
 

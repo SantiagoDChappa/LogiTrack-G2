@@ -21,7 +21,7 @@ async function processPendingEmails() {
         }
         try {
             const result = await emailSender.sendEmailWithResult(email.recipient, email.subject, email.body, email.format);
-            // Registra en el historial cada intento de proveedor (SendGrid/Brevo/SMTP).
+            // Registra en el historial cada intento de proveedor (SendGrid/Resend/SMTP).
             for (const att of (result.attempts || [])) {
                 await NotificationEmail.logAttempt({
                     emailId:  email.id,
