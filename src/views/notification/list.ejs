@@ -17,8 +17,16 @@
         .ntf-kpi--pending .v { color: #d97706; }
         .ntf-kpi--processing .v { color: var(--color-primary); }
 
-        .ntf-filters { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-bottom: 1rem; }
-        .ntf-filters .field { display: flex; flex-direction: column; gap: .3rem; }
+        .ntf-filters {
+            display: grid;
+            grid-template-columns: minmax(140px, 200px) minmax(220px, 1fr) auto auto;
+            gap: .75rem; align-items: end; margin-bottom: 1rem;
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            border-radius: 12px; padding: 1rem;
+        }
+        .ntf-filters .field { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+        .ntf-filters .field input, .ntf-filters .field select { width: 100%; box-sizing: border-box; }
+        @media (max-width: 720px) { .ntf-filters { grid-template-columns: 1fr 1fr; } .ntf-filters .field--q { grid-column: 1 / -1; } }
         .ntf-filters label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-secondary); }
         .ntf-filters select, .ntf-filters input {
             padding: .5rem .7rem; border: 1px solid var(--color-border); border-radius: 8px;
@@ -35,11 +43,17 @@
         .ntf-table-wrap {
             background: var(--color-surface); border: 1px solid var(--color-border);
             border-radius: 12px; box-shadow: var(--shadow-sm);
-            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            overflow: auto; max-height: 65vh; -webkit-overflow-scrolling: touch;
         }
         .ntf-table { width: 100%; border-collapse: collapse; min-width: 820px; }
         .ntf-table th, .ntf-table td { padding: .7rem .9rem; text-align: left; border-bottom: 1px solid var(--color-border); font-size: .88rem; color: var(--color-text); vertical-align: top; }
-        .ntf-table th { background: var(--color-surface-alt); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-secondary); }
+        /* thead fijo: queda visible al hacer scroll vertical de la tabla */
+        .ntf-table thead th {
+            position: sticky; top: 0; z-index: 2;
+            background: var(--color-surface-alt); font-size: .72rem; text-transform: uppercase;
+            letter-spacing: .05em; color: var(--color-text-secondary);
+            box-shadow: inset 0 -1px 0 var(--color-border);
+        }
         .ntf-table tbody tr:hover { background: var(--color-surface-alt); }
 
         .ntf-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .22rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }
@@ -53,8 +67,13 @@
         .ntf-recipient { color: var(--color-text-secondary); font-size: .82rem; }
         .ntf-error { color: #dc2626; font-size: .8rem; max-width: 320px; }
 
-        .ntf-history-toggle { background: none; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; color: var(--color-text-secondary); padding: .25rem .5rem; font-size: .78rem; display: inline-flex; align-items: center; gap: .25rem; }
+        .ntf-history-toggle { background: none; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; color: var(--color-text-secondary); padding: .3rem .6rem; font-size: .78rem; display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+        .ntf-history-toggle:hover { background: var(--color-surface-alt); border-color: var(--color-primary); color: var(--color-primary); }
+        .ntf-history-toggle .count { background: var(--color-surface-alt); border-radius: 999px; padding: 0 .4rem; font-weight: 700; font-size: .7rem; }
+        .ntf-history-toggle.is-open .material-symbols-outlined { transform: rotate(180deg); transition: transform .15s; }
         .ntf-history-row td { background: var(--color-surface-alt); }
+        .ntf-detail-error { color: #dc2626; font-size: .82rem; margin: .25rem 0; word-break: break-word; }
+        .ntf-detail-meta { color: var(--color-text-secondary); font-size: .82rem; }
         .ntf-history-list { list-style: none; margin: 0; padding: .25rem 0; display: flex; flex-direction: column; gap: .4rem; }
         .ntf-history-item { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .82rem; }
         .ntf-history-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -128,18 +147,16 @@
                                 <td><%= new Date(e.createdAt).toLocaleString('es-AR') %></td>
                                 <td><%= e.sentAt ? new Date(e.sentAt).toLocaleString('es-AR') : '—' %></td>
                                 <td>
-                                    <% if (log.length > 0) { %>
-                                        <button type="button" class="ntf-history-toggle" data-target="hist-<%= e.id %>">
-                                            <span class="material-symbols-outlined" style="font-size:16px">history</span><%= log.length %>
-                                        </button>
-                                    <% } else if (e.lastError) { %>
-                                        <span class="ntf-error" title="<%= e.lastError %>"><%= e.lastError.length > 60 ? e.lastError.slice(0,60) + '…' : e.lastError %></span>
-                                    <% } else { %>—<% } %>
+                                    <%# Botón presente en TODAS las filas; abre el detalle desplegable %>
+                                    <button type="button" class="ntf-history-toggle" data-target="hist-<%= e.id %>">
+                                        <span class="material-symbols-outlined" style="font-size:16px">expand_more</span>
+                                        Detalle<% if (log.length > 0) { %><span class="count"><%= log.length %></span><% } %>
+                                    </button>
                                 </td>
                             </tr>
-                            <% if (log.length > 0) { %>
-                                <tr class="ntf-history-row" id="hist-<%= e.id %>" style="display:none">
-                                    <td colspan="7">
+                            <tr class="ntf-history-row" id="hist-<%= e.id %>" style="display:none">
+                                <td colspan="7">
+                                    <% if (log.length > 0) { %>
                                         <ul class="ntf-history-list">
                                             <% log.forEach((a, i) => { %>
                                                 <li class="ntf-history-item">
@@ -152,9 +169,15 @@
                                                 </li>
                                             <% }) %>
                                         </ul>
-                                    </td>
-                                </tr>
-                            <% } %>
+                                    <% } else if (e.lastError) { %>
+                                        <%# Sin historial de intentos: mostramos el último error acá, no suelto en la fila %>
+                                        <div class="ntf-detail-meta">Sin historial de intentos registrado. Último error:</div>
+                                        <div class="ntf-detail-error"><%= e.lastError %></div>
+                                    <% } else { %>
+                                        <div class="ntf-detail-meta">Sin intentos ni errores registrados para esta notificación.</div>
+                                    <% } %>
+                                </td>
+                            </tr>
                         <% }) %>
                     </tbody>
                 </table>
@@ -167,7 +190,10 @@
         document.querySelectorAll('.ntf-history-toggle').forEach(btn => {
             btn.addEventListener('click', () => {
                 const row = document.getElementById(btn.dataset.target);
-                if (row) { row.style.display = row.style.display === 'none' ? 'table-row' : 'none'; }
+                if (!row) { return; }
+                const open = row.style.display === 'none';
+                row.style.display = open ? 'table-row' : 'none';
+                btn.classList.toggle('is-open', open);
             });
         });
     </script>
