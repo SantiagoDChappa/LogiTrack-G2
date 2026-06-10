@@ -20,18 +20,27 @@ async function processPendingEmails() {
             continue; // Otro proceso ya lo está manejando
         }
         try {
-            const ok = await emailSender.sendEmail(email.recipient, email.subject, email.body, email.format);
-            if (ok) {
-                await NotificationEmail.markAsSent(email.id);
+            const result = await emailSender.sendEmailWithResult(email.recipient, email.subject, email.body, email.format);
+            // Registra en el historial cada intento de proveedor (SendGrid/Brevo/SMTP).
+            for (const att of (result.attempts || [])) {
+                await NotificationEmail.logAttempt({
+                    emailId:  email.id,
+                    provider: att.provider,
+                    success:  att.ok,
+                    error:    att.error,
+                }).catch(() => {});
+            }
+            if (result.ok) {
+                await NotificationEmail.markAsSentWithProvider(email.id, result.provider);
                 summary.sent += 1;
-                console.log(`[email-job] mail #${email.id} marcado como ENVIADO`);
+                console.log(`[email-job] mail #${email.id} ENVIADO por ${result.provider}`);
             } else {
-                // sendEmail devolvió false (error SMTP ya logueado): reintentar luego.
-                await NotificationEmail.scheduleRetry(email.id, email.attempts, 'sendEmail devolvió false (ver log [email] ERROR)');
+                await NotificationEmail.scheduleRetry(email.id, email.attempts, result.error || 'fallo de envío (ver log [email] ERROR)');
                 summary.retried += 1;
-                console.warn(`[email-job] mail #${email.id} NO se envió, reprogramado para reintento (intentos=${email.attempts})`);
+                console.warn(`[email-job] mail #${email.id} NO se envió, reprogramado (intentos=${email.attempts})`);
             }
         } catch (error) {
+            await NotificationEmail.logAttempt({ emailId: email.id, provider: null, success: false, error: error.message }).catch(() => {});
             await NotificationEmail.scheduleRetry(email.id, email.attempts, error.message);
             summary.retried += 1;
             console.error(`[email-job] mail #${email.id} EXCEPCIÓN, reprogramado:`, error.message);

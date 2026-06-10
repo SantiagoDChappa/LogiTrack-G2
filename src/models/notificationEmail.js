@@ -1,4 +1,4 @@
-const { DataTypes, Op, where } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 const sequelize = require('../database/connection');
 const { EmailQueueStatus } = require('../constants/enums');
 
@@ -45,6 +45,9 @@ const NotificationEmail = sequelize.define('NotificationEmail', {
     },
     sentAt: {
         type: DataTypes.DATE
+    },
+    provider: {
+        type: DataTypes.STRING(20)
     }
 }, {
     tableName: 'notification_email',
@@ -52,6 +55,73 @@ const NotificationEmail = sequelize.define('NotificationEmail', {
     timestamps: false
 }
 );
+
+// Log de intentos de envío (uno por cada try de cada proveedor).
+const NotificationEmailAttempt = sequelize.define('NotificationEmailAttempt', {
+    id:          { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    emailId:     { type: DataTypes.INTEGER, allowNull: false },
+    provider:    { type: DataTypes.STRING(20) },
+    success:     { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    error:       { type: DataTypes.TEXT },
+    attemptedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
+}, {
+    tableName: 'notification_email_attempt',
+    schema: 'logitrack',
+    timestamps: false,
+});
+
+NotificationEmail.hasMany(NotificationEmailAttempt, { as: 'attemptLog', foreignKey: 'emailId' });
+NotificationEmailAttempt.belongsTo(NotificationEmail, { as: 'email', foreignKey: 'emailId' });
+
+// Registra una fila por cada intento de envío (lo llama el processor).
+const logAttempt = ({ emailId, provider, success, error }) =>
+    NotificationEmailAttempt.create({
+        emailId,
+        provider: provider || null,
+        success: !!success,
+        error: error ? String(error).slice(0, 1000) : null,
+        attemptedAt: new Date(),
+    });
+
+// Marca como enviado registrando además el proveedor ganador.
+const markAsSentWithProvider = (id, provider) =>
+    NotificationEmail.update(
+        { status: 'SENT', sentAt: new Date(), lastError: null, provider: provider || null },
+        { where: { id, status: 'PROCESSING' } }
+    );
+
+// Listado para la vista "Fallidas" con filtros opcionales por estado / búsqueda.
+const listForAdmin = async ({ status, q, limit = 200 } = {}) => {
+    const where = {};
+    if (status && ['PENDING', 'PROCESSING', 'SENT', 'FAILED'].includes(status)) {
+        where.status = status;
+    }
+    if (q) {
+        where[Op.or] = [
+            { recipient: { [Op.iLike]: `%${q}%` } },
+            { subject:   { [Op.iLike]: `%${q}%` } },
+        ];
+    }
+    return NotificationEmail.findAll({
+        where,
+        include: [{ model: NotificationEmailAttempt, as: 'attemptLog', required: false }],
+        order: [['createdAt', 'DESC'], [{ model: NotificationEmailAttempt, as: 'attemptLog' }, 'attemptedAt', 'ASC']],
+        limit,
+        subQuery: false,
+    });
+};
+
+// Conteos por estado para los KPIs de la cabecera de la vista.
+const countsByStatus = async () => {
+    const rows = await NotificationEmail.findAll({
+        attributes: ['status', [sequelize.fn('COUNT', sequelize.col('id')), 'n']],
+        group: ['status'],
+        raw: true,
+    });
+    const out = { PENDING: 0, PROCESSING: 0, SENT: 0, FAILED: 0 };
+    for (const r of rows) { out[r.status] = Number(r.n) || 0; }
+    return out;
+};
 
 const findPending = async () => {
     return NotificationEmail.findAll({
@@ -84,8 +154,8 @@ const markAsSent = async (id) => {
             status: 'PROCESSING'
         }
     }
-    )
-}
+    );
+};
 
 const claimEmailForProcessing = async (id) => {
     const [updatedRows] = await NotificationEmail.update(
@@ -100,7 +170,7 @@ const claimEmailForProcessing = async (id) => {
         }
     );
     return updatedRows === 1;
-}
+};
 
 
 const scheduleRetry = async (id, currentAttempts, errorMessaje) => {
@@ -143,6 +213,10 @@ const calculateNextRetry = (attempts) => {
     const delay = delays[attempts] || 24 * 60 * 60 * 1000;
 
     return new Date(Date.now() + delay);
-}
+};
 
-module.exports = { NotificationEmail, findPending, markAsSent, scheduleRetry, claimEmailForProcessing };
+module.exports = {
+    NotificationEmail, NotificationEmailAttempt,
+    findPending, markAsSent, scheduleRetry, claimEmailForProcessing,
+    logAttempt, markAsSentWithProvider, listForAdmin, countsByStatus,
+};
