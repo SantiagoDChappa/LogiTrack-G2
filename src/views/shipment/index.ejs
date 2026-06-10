@@ -190,9 +190,14 @@
                                     <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
                                         <span class="material-symbols-outlined">info</span>
                                     </a>
-                                    <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia">
+                                    <button type="button" class="action-btn eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia"
+                                            data-incident-open
+                                            data-shipment-id="<%= shipment.id %>"
+                                            data-tracking-id="<%= shipment.trackingId %>"
+                                            data-branch-id="<%= shipment.currentBranchId || '' %>"
+                                            data-branch-name="<%= shipment.currentBranch ? shipment.currentBranch.name : 'Sin sucursal' %>">
                                         <span class="material-symbols-outlined">report</span>
-                                    </a>
+                                    </button>
                                     <button type="button" class="action-btn" data-tooltip="Ver QR"
                                             onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
                                         <span class="material-symbols-outlined">qr_code</span>
@@ -304,5 +309,6 @@
             });
         }
     </script>
+    <%- include('../partials/incidentQuickModal') %>
 </body>
 </html>

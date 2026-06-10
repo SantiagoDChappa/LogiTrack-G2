@@ -151,14 +151,42 @@ const getCreateForm = async (req, res) => {
         roleDescription: roleDescriptionById[u.roleId] || '',
         branchId: u.branchId
     }));
-    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: {} });
+    // Si entramos desde un envío, pre-seleccionamos su sucursal actual (o "Sin sucursal" = 0)
+    // para ahorrar clics: el picker la auto-selecciona y lista sus usuarios al cargar.
+    const prefillForm = shipment
+        ? { branchId: shipment.currentBranchId != null ? String(shipment.currentBranchId) : '0' }
+        : {};
+    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: prefillForm });
+};
+
+// Datos para el modal rápido de incidencia (acción in-situ desde detalle/tabla de envíos):
+// tipos activos + staff disponible. El front filtra los usuarios por la sucursal del envío.
+const getQuickData = async (req, res) => {
+    const [types, users] = await Promise.all([
+        incidentTypeModel.getActive(),
+        User.findAll({
+            where: { active: true, roleId: STAFF_ROLES },
+            attributes: ['id', 'fullName', 'roleId', 'branchId'],
+            order: [['fullName', 'ASC']]
+        })
+    ]);
+    res.json({
+        types: types.map(t => ({ id: t.id, code: t.code, description: t.description })),
+        users: users.map(u => ({
+            id: u.id, fullName: u.fullName, roleId: u.roleId,
+            roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
+        })),
+    });
 };
 
 const create = async (req, res) => {
     const user = res.locals.currentUser;
     const { shipmentId, incidentTypeId, description, priority, branchId, assignedToUserId } = req.body;
+    // El modal rápido envía por fetch y espera JSON; el form clásico espera redirect/render.
+    const wantsJson = (req.get('accept') || '').includes('application/json');
 
     const renderFormError = async (errorMessage) => {
+        if (wantsJson) { return res.status(400).json({ error: errorMessage }); }
         const [types, branches, users] = await Promise.all([
             incidentTypeModel.getActive(),
             branchModel.getAll(),
@@ -212,15 +240,20 @@ const create = async (req, res) => {
 
     const shipment = await shipmentModel.getById(Number(shipmentId));
     if (!shipment) {
-        return res.status(400).render('error', { message: 'Envío inválido' });
+        return wantsJson
+            ? res.status(400).json({ error: 'Envío inválido' })
+            : res.status(400).render('error', { message: 'Envío inválido' });
     }
     if (isDelivery(user) && shipment.deliveryUserId !== user.id) {
-        return res.status(403).send('Acceso denegado: el repartidor solo puede reportar incidencias sobre envíos asignados a él');
+        const msg = 'Acceso denegado: el repartidor solo puede reportar incidencias sobre envíos asignados a él';
+        return wantsJson ? res.status(403).json({ error: msg }) : res.status(403).send(msg);
     }
 
     const type = await incidentTypeModel.getById(Number(incidentTypeId));
     if (!type || !type.active) {
-        return res.status(400).render('error', { message: 'Tipo de incidencia inválido' });
+        return wantsJson
+            ? res.status(400).json({ error: 'Tipo de incidencia inválido' })
+            : res.status(400).render('error', { message: 'Tipo de incidencia inválido' });
     }
 
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
@@ -289,6 +322,9 @@ const create = async (req, res) => {
     notifyIncidentCreated(incident.id, shipment, type, { assignee, openedBy: user })
         .catch(e => console.error('[incident] notif:', e.message));
 
+    if (wantsJson) {
+        return res.json({ ok: true, incidentId: incident.id, trackingId: shipment.trackingId });
+    }
     res.redirect(`/incident/${incident.id}`);
 };
 
@@ -891,7 +927,7 @@ const searchShipments = async (req, res) => {
 };
 
 module.exports = {
-    list, getCreateForm, create, getDetail, addComment,
+    list, getCreateForm, create, getQuickData, getDetail, addComment,
     assign, changeStatus, escalate, setResolution, close, reopen, searchShipments,
     toggleTask, uploadAttachment, downloadAttachment,
     // Exportadas para que portal.js (flujo publico de confirmacion) y otros

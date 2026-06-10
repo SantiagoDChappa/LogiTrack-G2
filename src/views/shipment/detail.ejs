@@ -129,9 +129,14 @@
                 <a href="<%= returnUrl %>" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
                     <span class="material-symbols-outlined">arrow_back</span>
                 </a>
-                <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia">
+                <button type="button" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia"
+                        data-incident-open
+                        data-shipment-id="<%= shipment.id %>"
+                        data-tracking-id="<%= shipment.trackingId %>"
+                        data-branch-id="<%= shipment.currentBranchId || '' %>"
+                        data-branch-name="<%= currentBranch ? currentBranch.name : 'Sin sucursal' %>">
                     <span class="material-symbols-outlined">report</span>
-                </a>
+                </button>
                 <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
                 <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom modificar" data-tooltip="Modificar" aria-label="Modificar">
                     <span class="material-symbols-outlined">edit</span>
@@ -213,8 +218,8 @@
                                     </div>
                                     <div class="shipment-timeline-meta">
                                         <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        <%= fmtDate(h.changedAt) %>
+                                        <%= fmtTime(h.changedAt) %>
                                         <% if (h.user) { %>&nbsp;·&nbsp;<%= h.user.fullName %><% } %>
                                     </div>
                                 </div>
@@ -613,7 +618,7 @@
                         <tbody>
                             <% modifications.forEach(function(m) { %>
                             <tr>
-                                <td><%= new Date(m.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= fmtDateTime(m.createdAt) %></td>
                                 <td><%= m.typeLabel %></td>
                                 <td><%= m.statusLabel %></td>
                                 <td><%= m.summary %><% if (m.reviewComment) { %> — <%= m.reviewComment %><% } %></td>
@@ -683,8 +688,8 @@
                                     </div>
                                     <div class="shipment-timeline-meta">
                                         <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        <%= fmtDate(h.changedAt) %>
+                                        <%= fmtTime(h.changedAt) %>
                                     </div>
                                     <% if (_author3) { %>
                                         <div class="shipment-timeline-meta">
@@ -873,5 +878,6 @@
         });
     })();
     </script>
+    <%- include('../partials/incidentQuickModal') %>
 </body>
 </html>

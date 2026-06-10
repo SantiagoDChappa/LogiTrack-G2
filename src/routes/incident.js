@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-    list, getCreateForm, create, getDetail, addComment,
+    list, getCreateForm, create, getQuickData, getDetail, addComment,
     assign, changeStatus, escalate, setResolution, close, reopen, searchShipments,
     toggleTask, uploadAttachment, downloadAttachment
 } = require('../controllers/incident.js');
@@ -19,6 +19,7 @@ const optionalEvidence = (req, res, next) => {
 
 router.get('/',                   list);
 router.get('/search-shipments',   searchShipments);
+router.get('/quick-data',         getQuickData);
 router.get('/new',                getCreateForm);
 router.post('/',                  create);
 
