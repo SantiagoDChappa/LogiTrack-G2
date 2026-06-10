@@ -39,6 +39,7 @@ const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
+const notificationRoutes = require('./src/routes/notification');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
 
@@ -135,6 +136,7 @@ app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
+app.use('/notification', requireAuth, requireSupervisor, notificationRoutes);
 app.use('/fatigue',   requireAuth, fatigueRoutes);
 
 // PII (nombre/email/telefono por documento): SOLO usuarios logueados.

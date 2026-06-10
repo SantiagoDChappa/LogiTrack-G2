@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Notificaciones — Fallidas</title>
+    <style>
+        .ntf-wrap { padding: 1rem clamp(1rem, 2.5vw, 2rem); }
+        .ntf-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+        .ntf-kpi {
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            border-radius: 12px; padding: 1rem 1.1rem; box-shadow: var(--shadow-sm);
+        }
+        .ntf-kpi .v { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+        .ntf-kpi .l { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-secondary); margin-top: .35rem; }
+        .ntf-kpi--sent .v { color: #16a34a; }
+        .ntf-kpi--failed .v { color: #dc2626; }
+        .ntf-kpi--pending .v { color: #d97706; }
+        .ntf-kpi--processing .v { color: var(--color-primary); }
+
+        .ntf-filters { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-bottom: 1rem; }
+        .ntf-filters .field { display: flex; flex-direction: column; gap: .3rem; }
+        .ntf-filters label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-secondary); }
+        .ntf-filters select, .ntf-filters input {
+            padding: .5rem .7rem; border: 1px solid var(--color-border); border-radius: 8px;
+            background: var(--color-surface); color: var(--color-text); font-size: .9rem;
+        }
+        .ntf-filters select:focus, .ntf-filters input:focus { outline: none; border-color: var(--color-primary); }
+        .ntf-btn {
+            display: inline-flex; align-items: center; gap: .35rem; padding: .55rem .9rem;
+            background: var(--color-primary); color: #fff; border: none; border-radius: 8px;
+            font-weight: 600; font-size: .88rem; cursor: pointer; text-decoration: none;
+        }
+        .ntf-btn--ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+
+        .ntf-table-wrap {
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            border-radius: 12px; box-shadow: var(--shadow-sm);
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
+        .ntf-table { width: 100%; border-collapse: collapse; min-width: 820px; }
+        .ntf-table th, .ntf-table td { padding: .7rem .9rem; text-align: left; border-bottom: 1px solid var(--color-border); font-size: .88rem; color: var(--color-text); vertical-align: top; }
+        .ntf-table th { background: var(--color-surface-alt); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-secondary); }
+        .ntf-table tbody tr:hover { background: var(--color-surface-alt); }
+
+        .ntf-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .22rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+        .ntf-badge--SENT       { background: rgba(22,163,74,.15);  color: #16a34a; }
+        .ntf-badge--FAILED     { background: rgba(220,38,38,.15);  color: #dc2626; }
+        .ntf-badge--PENDING    { background: rgba(217,119,6,.15);  color: #d97706; }
+        .ntf-badge--PROCESSING { background: rgba(37,99,235,.15);  color: var(--color-primary); }
+
+        .ntf-provider { font-size: .72rem; font-weight: 600; padding: .15rem .5rem; border-radius: 6px; background: var(--color-surface-alt); border: 1px solid var(--color-border); color: var(--color-text-secondary); }
+        .ntf-subject { font-weight: 600; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ntf-recipient { color: var(--color-text-secondary); font-size: .82rem; }
+        .ntf-error { color: #dc2626; font-size: .8rem; max-width: 320px; }
+
+        .ntf-history-toggle { background: none; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; color: var(--color-text-secondary); padding: .25rem .5rem; font-size: .78rem; display: inline-flex; align-items: center; gap: .25rem; }
+        .ntf-history-row td { background: var(--color-surface-alt); }
+        .ntf-history-list { list-style: none; margin: 0; padding: .25rem 0; display: flex; flex-direction: column; gap: .4rem; }
+        .ntf-history-item { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .82rem; }
+        .ntf-history-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .ntf-history-dot--ok { background: #16a34a; }
+        .ntf-history-dot--fail { background: #dc2626; }
+        .ntf-history-when { color: var(--color-text-secondary); font-size: .78rem; }
+        .ntf-empty { text-align: center; padding: 2.5rem; color: var(--color-text-secondary); }
+        @media (max-width: 640px) { .ntf-subject { max-width: 160px; } }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="ntf-wrap">
+            <div class="page-header"><h1>Notificaciones — Fallidas / enviadas</h1></div>
+
+            <div class="ntf-kpis">
+                <div class="ntf-kpi ntf-kpi--sent"><div class="v"><%= counts.SENT %></div><div class="l">Enviadas</div></div>
+                <div class="ntf-kpi ntf-kpi--failed"><div class="v"><%= counts.FAILED %></div><div class="l">Fallidas</div></div>
+                <div class="ntf-kpi ntf-kpi--pending"><div class="v"><%= counts.PENDING %></div><div class="l">Pendientes</div></div>
+                <div class="ntf-kpi ntf-kpi--processing"><div class="v"><%= counts.PROCESSING %></div><div class="l">Procesando</div></div>
+            </div>
+
+            <form method="GET" action="/notification/fallidas" class="ntf-filters">
+                <div class="field">
+                    <label for="status">Estado</label>
+                    <select id="status" name="status">
+                        <option value="">Todos</option>
+                        <option value="FAILED"     <%= filters.status === 'FAILED'     ? 'selected' : '' %>>Fallidas</option>
+                        <option value="SENT"       <%= filters.status === 'SENT'       ? 'selected' : '' %>>Enviadas</option>
+                        <option value="PENDING"    <%= filters.status === 'PENDING'    ? 'selected' : '' %>>Pendientes</option>
+                        <option value="PROCESSING" <%= filters.status === 'PROCESSING' ? 'selected' : '' %>>Procesando</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="q">Buscar (destinatario / asunto)</label>
+                    <input type="text" id="q" name="q" value="<%= filters.q %>" placeholder="ej: cliente@mail.com">
+                </div>
+                <button type="submit" class="ntf-btn"><span class="material-symbols-outlined" style="font-size:18px">search</span>Filtrar</button>
+                <a href="/notification/fallidas" class="ntf-btn ntf-btn--ghost">Limpiar</a>
+            </form>
+
+            <div class="ntf-table-wrap">
+                <table class="ntf-table">
+                    <thead>
+                        <tr>
+                            <th>Estado</th>
+                            <th>Destinatario / Asunto</th>
+                            <th>Proveedor</th>
+                            <th>Intentos</th>
+                            <th>Creado</th>
+                            <th>Enviado</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (!emails || emails.length === 0) { %>
+                            <tr><td colspan="7" class="ntf-empty">No hay notificaciones para los filtros seleccionados.</td></tr>
+                        <% } %>
+                        <% emails.forEach(e => {
+                            const log = (e.attemptLog || []).slice().sort((a,b) => new Date(a.attemptedAt) - new Date(b.attemptedAt));
+                        %>
+                            <tr>
+                                <td><span class="ntf-badge ntf-badge--<%= e.status %>"><%= e.status %></span></td>
+                                <td>
+                                    <div class="ntf-subject" title="<%= e.subject %>"><%= e.subject %></div>
+                                    <div class="ntf-recipient"><%= e.recipient %></div>
+                                </td>
+                                <td><% if (e.provider) { %><span class="ntf-provider"><%= e.provider %></span><% } else { %>—<% } %></td>
+                                <td><%= e.attempts != null ? e.attempts : 0 %></td>
+                                <td><%= new Date(e.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= e.sentAt ? new Date(e.sentAt).toLocaleString('es-AR') : '—' %></td>
+                                <td>
+                                    <% if (log.length > 0) { %>
+                                        <button type="button" class="ntf-history-toggle" data-target="hist-<%= e.id %>">
+                                            <span class="material-symbols-outlined" style="font-size:16px">history</span><%= log.length %>
+                                        </button>
+                                    <% } else if (e.lastError) { %>
+                                        <span class="ntf-error" title="<%= e.lastError %>"><%= e.lastError.length > 60 ? e.lastError.slice(0,60) + '…' : e.lastError %></span>
+                                    <% } else { %>—<% } %>
+                                </td>
+                            </tr>
+                            <% if (log.length > 0) { %>
+                                <tr class="ntf-history-row" id="hist-<%= e.id %>" style="display:none">
+                                    <td colspan="7">
+                                        <ul class="ntf-history-list">
+                                            <% log.forEach((a, i) => { %>
+                                                <li class="ntf-history-item">
+                                                    <span class="ntf-history-dot ntf-history-dot--<%= a.success ? 'ok' : 'fail' %>"></span>
+                                                    <strong>#<%= i + 1 %></strong>
+                                                    <span class="ntf-provider"><%= a.provider || '—' %></span>
+                                                    <span><%= a.success ? 'OK ✓' : 'Falló ✗' %></span>
+                                                    <span class="ntf-history-when"><%= new Date(a.attemptedAt).toLocaleString('es-AR') %></span>
+                                                    <% if (!a.success && a.error) { %><span class="ntf-error"><%= a.error %></span><% } %>
+                                                </li>
+                                            <% }) %>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.querySelectorAll('.ntf-history-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const row = document.getElementById(btn.dataset.target);
+                if (row) { row.style.display = row.style.display === 'none' ? 'table-row' : 'none'; }
+            });
+        });
+    </script>
+</body>
+</html>

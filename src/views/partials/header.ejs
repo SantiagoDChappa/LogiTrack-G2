@@ -46,6 +46,16 @@
                             <a href="/report/satisfaction"><ul><span class="material-symbols-outlined">sentiment_satisfied</span>Satisfacción</ul></a>
                         </div>
                     </div>
+                    <div class="nav-group" id="nav-group-notificaciones">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-notificaciones')" aria-expanded="false">
+                            <span class="material-symbols-outlined">notifications</span>
+                            Notificaciones
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/notification/fallidas"><ul><span class="material-symbols-outlined">mark_email_unread</span>Fallidas</ul></a>
+                        </div>
+                    </div>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>
                     <div class="nav-group" id="nav-group-ajustes">
