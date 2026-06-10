@@ -116,7 +116,10 @@ const getSettings = async (req, res) => {
             proceso_generar_reportes_hora:     settings.proceso_generar_reportes_hora     || '04:00',
             proceso_notificaciones_hora:       settings.proceso_notificaciones_hora       || '05:00',
             test_email_override:               settings.test_email_override               || '',
-        }
+            display_timezone:                  settings.display_timezone                  || require('../utils/datetime').DEFAULT_TZ,
+            clock_24h:                         settings.clock_24h !== '0',
+        },
+        timezones: require('../utils/datetime').TIMEZONES,
     });
 };
 
@@ -440,6 +443,29 @@ const saveTestEmailOverride = async (req, res) => {
     } catch (err) {
         console.error('saveTestEmailOverride:', err.message);
         res.status(500).redirect(settingBack(req, '?error=override_save'));
+    }
+};
+
+// Zona horaria y formato de hora (12/24 hs) para todo el sistema.
+const saveDateTimeSettings = async (req, res) => {
+    try {
+        const { TIMEZONES, DEFAULT_TZ } = require('../utils/datetime');
+        const validTz = TIMEZONES.some(t => t.id === req.body.display_timezone);
+        const tz      = validTz ? req.body.display_timezone : DEFAULT_TZ;
+        const clock24 = req.body.clock_24h === 'on' ? '1' : '0';
+
+        const oldTz = await settingModel.get('display_timezone');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'display_timezone', oldTz, tz);
+        await settingModel.set('display_timezone', tz);
+
+        const oldClock = await settingModel.get('clock_24h');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'clock_24h', oldClock, clock24);
+        await settingModel.set('clock_24h', clock24);
+
+        res.redirect(settingBack(req, '?success=datetime'));
+    } catch (err) {
+        console.error('saveDateTimeSettings:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=datetime_save'));
     }
 };
 
@@ -886,4 +912,5 @@ module.exports = {
     saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
     saveFatigueConsentNotifConfig,
     triggerDelayDetection,
+    saveDateTimeSettings,
 };

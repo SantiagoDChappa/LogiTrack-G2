@@ -82,7 +82,7 @@
                         const reqSlug  = String(r.status || '').toLowerCase();
                     %>
                     <tr>
-                        <td><%= new Date(r.createdAt).toLocaleString('es-AR') %></td>
+                        <td><%= fmtDateTime(r.createdAt) %></td>
                         <td><a href="/shipment/detail/<%= r.shipmentId %>" class="incident-link"><%= r.trackingId %></a></td>
                         <td><%= r.recipientName || '-' %></td>
                         <td><span class="mod-type"><span class="material-symbols-outlined">edit_note</span><%= r.typeLabel %></span></td>

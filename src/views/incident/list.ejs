@@ -144,7 +144,7 @@
                             <td><span class="incident-priority incident-priority--<%= i.priority %>">P<%= i.priority %></span></td>
                             <td><%= i.escalated ? '🔥' : '—' %></td>
                             <td><%= i.assignedTo ? i.assignedTo.fullName : '—' %></td>
-                            <td><%= new Date(i.createdAt).toLocaleString('es-AR') %></td>
+                            <td><%= fmtDateTime(i.createdAt) %></td>
                             <td><a href="/incident/<%= i.id %>" class="action-btn detalle" data-tooltip="Ver detalle" aria-label="Ver detalle"><span class="material-symbols-outlined">visibility</span></a></td>
                         </tr>
                     <% }) %>

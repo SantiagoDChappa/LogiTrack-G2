@@ -140,8 +140,8 @@
                                     </div>
                                     <div class="shipment-timeline-meta">
                                         <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        <%= fmtDate(h.changedAt) %>
+                                        <%= fmtTime(h.changedAt) %>
                                     </div>
                                     <% if (_author) { %>
                                         <div class="shipment-timeline-meta">

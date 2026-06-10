@@ -40,6 +40,16 @@ const requireAuth = async (req, res, next) => {
             statusColors.buildCss(allSettings, statuses),
             statusColors.buildIncidentCss(allSettings),
         ].filter(Boolean).join('\n');
+
+        // Fecha/hora parametrizable (zona horaria + 12/24 hs). Helpers disponibles en todas las vistas.
+        const dt = require('../utils/datetime');
+        const tz      = allSettings.display_timezone || dt.DEFAULT_TZ;
+        const hour24  = allSettings.clock_24h !== '0';   // default 24 hs
+        res.locals.displayTimezone = tz;
+        res.locals.clock24h        = hour24;
+        res.locals.fmtDateTime = (v) => dt.formatDateTime(v, { timeZone: tz, hour24 });
+        res.locals.fmtDate     = (v) => dt.formatDate(v, { timeZone: tz });
+        res.locals.fmtTime     = (v) => dt.formatTime(v, { timeZone: tz, hour24 });
         next();
     } catch {
         const returnTo = req.originalUrl;

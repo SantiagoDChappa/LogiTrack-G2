@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+// El host (Render) corre en UTC. Fijamos GMT-03 como baseline para que las fechas
+// renderizadas con toLocaleString (vistas aún no migradas al helper) no salgan en GMT+00.
+// Override por env TZ; el formato fino (zona/12-24hs) se parametriza desde Ajustes.
+process.env.TZ = process.env.TZ || 'America/Argentina/Buenos_Aires';
+
 const express = require('express');
 const compression = require('compression');
 const swaggerUi = require('swagger-ui-express');

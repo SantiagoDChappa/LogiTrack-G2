@@ -54,7 +54,7 @@
                     <dt>Estado</dt><dd><span class="incident-badge incident-badge--<%= incident.status.toLowerCase() %>"><%= IncidentStatusLabel[incident.status] || incident.status %></span></dd>
                     <dt>Resolución</dt><dd><%= incident.resolution ? (IncidentResolutionLabel[incident.resolution] || incident.resolution) : '—' %></dd>
                     <% if (incident.damageChoice) { %>
-                    <dt>Elección del remitente</dt><dd><strong><%= incident.damageChoice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong><% if (incident.damageChoiceAt) { %> · <%= new Date(incident.damageChoiceAt).toLocaleString('es-AR') %><% } %></dd>
+                    <dt>Elección del remitente</dt><dd><strong><%= incident.damageChoice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong><% if (incident.damageChoiceAt) { %> · <%= fmtDateTime(incident.damageChoiceAt) %><% } %></dd>
                     <% } %>
                     <dt>Prioridad</dt><dd>P<%= incident.priority %></dd>
                     <dt>Escalado</dt><dd><%= incident.escalated ? 'Sí' : 'No' %></dd>
@@ -70,9 +70,9 @@
                         <% } %>
                     </dd>
                     <dt>Asignada a</dt><dd><%= incident.assignedTo ? incident.assignedTo.fullName : '—' %></dd>
-                    <dt>Creada</dt><dd><%= new Date(incident.createdAt).toLocaleString('es-AR') %></dd>
+                    <dt>Creada</dt><dd><%= fmtDateTime(incident.createdAt) %></dd>
                     <% if (incident.closedAt) { %>
-                        <dt>Cerrada</dt><dd><%= new Date(incident.closedAt).toLocaleString('es-AR') %> por <%= incident.closedBy ? incident.closedBy.fullName : '—' %></dd>
+                        <dt>Cerrada</dt><dd><%= fmtDateTime(incident.closedAt) %> por <%= incident.closedBy ? incident.closedBy.fullName : '—' %></dd>
                     <% } %>
                 </dl>
                 <h3>Descripción</h3>
@@ -379,7 +379,7 @@
                                 </span>
                             <% } %>
                             <% if (tk.done && tk.doneBy) { %>
-                                <small class="incident-checklist__meta"><%= tk.doneBy.fullName %> — <%= new Date(tk.doneAt).toLocaleString('es-AR') %></small>
+                                <small class="incident-checklist__meta"><%= tk.doneBy.fullName %> — <%= fmtDateTime(tk.doneAt) %></small>
                             <% } %>
                         </li>
                     <% }) %>
@@ -399,7 +399,7 @@
                                 <span class="material-symbols-outlined"><%= att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' %></span>
                                 <%= att.fileName %>
                             </a>
-                            <small>(<%= att.source === 'PORTAL' ? 'portal' : 'interno' %> — <%= new Date(att.createdAt).toLocaleString('es-AR') %>)</small>
+                            <small>(<%= att.source === 'PORTAL' ? 'portal' : 'interno' %> — <%= fmtDateTime(att.createdAt) %>)</small>
                         </li>
                     <% }) %>
                 </ul>
@@ -461,7 +461,7 @@
                                 <%= evCfg.label %>
                             </span>
                             <span class="incident-timeline-meta">
-                                <%= new Date(h.changedAt).toLocaleString('es-AR') %>
+                                <%= fmtDateTime(h.changedAt) %>
                                 — <%= h.user ? h.user.fullName : (h.person ? h.person.fullName : 'Portal público') %>
                             </span>
                         </div>

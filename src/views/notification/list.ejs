@@ -154,8 +154,8 @@
                                 </td>
                                 <td><% if (e.provider) { %><span class="ntf-provider"><%= e.provider %></span><% } else { %>—<% } %></td>
                                 <td><%= e.attempts != null ? e.attempts : 0 %></td>
-                                <td><%= new Date(e.createdAt).toLocaleString('es-AR') %></td>
-                                <td><%= e.sentAt ? new Date(e.sentAt).toLocaleString('es-AR') : '—' %></td>
+                                <td><%= fmtDateTime(e.createdAt) %></td>
+                                <td><%= e.sentAt ? fmtDateTime(e.sentAt) : '—' %></td>
                                 <td>
                                     <%# Botón presente en TODAS las filas; abre el detalle desplegable %>
                                     <button type="button" class="ntf-history-toggle" data-target="hist-<%= e.id %>">
@@ -174,7 +174,7 @@
                                                     <strong>#<%= i + 1 %></strong>
                                                     <span class="ntf-provider"><%= a.provider || '—' %></span>
                                                     <span><%= a.success ? 'OK ✓' : 'Falló ✗' %></span>
-                                                    <span class="ntf-history-when"><%= new Date(a.attemptedAt).toLocaleString('es-AR') %></span>
+                                                    <span class="ntf-history-when"><%= fmtDateTime(a.attemptedAt) %></span>
                                                     <% if (!a.success && a.error) { %><span class="ntf-error"><%= a.error %></span><% } %>
                                                 </li>
                                             <% }) %>

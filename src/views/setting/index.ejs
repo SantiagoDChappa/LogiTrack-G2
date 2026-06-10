@@ -292,6 +292,39 @@
                 </form>
             </div>
 
+            <!-- Fecha y hora: zona horaria + formato 12/24 hs -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Fecha y hora
+                </h2>
+                <p class="settings-subtitle">
+                    Zona horaria y formato con que se muestran todas las fechas del sistema (historial, notificaciones, envíos).
+                    El servidor guarda en UTC; acá se ajusta solo la visualización.
+                </p>
+                <form method="POST" action="/setting/datetime">
+                    <div class="field" style="max-width:420px">
+                        <label for="display_timezone">Zona horaria</label>
+                        <select id="display_timezone" name="display_timezone">
+                            <% timezones.forEach(function(tz) { %>
+                                <option value="<%= tz.id %>" <%= params.display_timezone === tz.id ? 'selected' : '' %>><%= tz.label %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field" style="margin-top:.75rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" name="clock_24h" <%= params.clock_24h ? 'checked' : '' %>>
+                            Formato 24 horas (ej: 14:30). Sin tildar usa 12 hs (02:30 p. m.).
+                        </label>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar fecha y hora" aria-label="Guardar fecha y hora">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- LGT-173: Colores de estados -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
