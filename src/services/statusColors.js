@@ -36,4 +36,34 @@ const buildCss = (settings, statuses) => {
     return rules.join('\n');
 };
 
-module.exports = { slugOf, isValidHex, keyFor, buildCss };
+// === Colores de estados de incidencias ===
+// Las incidencias usan estados de un enum fijo (no DB) que se pintan con la
+// clase `.incident-badge--<code>` (ej: .incident-badge--in_review).
+// Permitimos personalizar su color desde Ajustes igual que los estados de envío.
+const INCIDENT_STATUSES = [
+    { code: 'OPEN',      label: 'Abierta',     defaultColor: '#1e40af' },
+    { code: 'IN_REVIEW', label: 'En revisión', defaultColor: '#92400e' },
+    { code: 'CLOSED',    label: 'Cerrada',     defaultColor: '#065f46' },
+];
+
+// Clave de setting para el color de un estado de incidencia.
+const incidentKeyFor = (code) => `incident_status_color_${code}`;
+
+// CSS que sobrescribe los badges de incidencia según los colores configurados.
+const buildIncidentCss = (settings) => {
+    const rules = [];
+    for (const s of INCIDENT_STATUSES) {
+        const color = settings ? settings[incidentKeyFor(s.code)] : null;
+        if (!isValidHex(color)) { continue; }
+        const slug = s.code.toLowerCase();
+        rules.push(
+            `.incident-badge--${slug}{background:${color}22 !important;color:${color} !important;border-color:${color}33 !important;}`
+        );
+    }
+    return rules.join('\n');
+};
+
+module.exports = {
+    slugOf, isValidHex, keyFor, buildCss,
+    INCIDENT_STATUSES, incidentKeyFor, buildIncidentCss,
+};

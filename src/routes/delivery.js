@@ -89,10 +89,21 @@ router.get('/', requireDelivery, async (req, res) => {
     try {
         const userId = res.locals.currentUser.id;
         const { RouteStatus } = require('../models/route');
-        const [shipments, routes] = await Promise.all([
+        const [shipments, routes, driverFatigueRow] = await Promise.all([
             shipmentModel.search({ deliveryUserId: userId }),
             routeModel.getAllByDriver(userId),
+            require('../services/fatigue').getDriverStatus(userId).catch(() => null),
         ]);
+
+        // LGT-195: si el transportista quedó INHABILITADO (rechazó el consentimiento de
+        // fatiga las veces parametrizadas), el card de ruta se muestra en rojo, sin
+        // accionable, y al clickear dispara el popup explicativo.
+        const driverDisabled = (driverFatigueRow && driverFatigueRow.status === 'DISABLED')
+            ? {
+                reason:     driverFatigueRow.reason || null,
+                disabledAt: driverFatigueRow.disabledAt || null,
+              }
+            : null;
 
         // "Activa" = IN_ROUTE (en curso) o, si no hay, la PLANNED más reciente
         const inRoute = routes.find(r => r.statusId === RouteStatus.IN_ROUTE);
@@ -101,6 +112,17 @@ router.get('/', requireDelivery, async (req, res) => {
 
         const activeRoute = inRoute || planned[0] || null;
         const upcomingRoutes = planned.filter(r => !activeRoute || r.id !== activeRoute.id);
+
+        // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
+        const fatigueRoute = routes.find(r =>
+            r.statusId === RouteStatus.BLOCKED_FATIGUE || r.statusId === RouteStatus.PAUSED_FATIGUE) || null;
+        let fatigueBlocked = fatigueRoute
+            ? { id: fatigueRoute.id, paused: fatigueRoute.statusId === RouteStatus.PAUSED_FATIGUE }
+            : null;
+        // Bloqueo en el control de INICIO (la ruta no cambia de estado): banner por redirect.
+        if (!fatigueBlocked && req.query.fatiga === 'bloqueado') {
+            fatigueBlocked = { id: Number(req.query.ruta) || null, paused: false, gate: true };
+        }
 
         // Resumen para el card destacado
         let activeSummary = null;
@@ -144,6 +166,8 @@ router.get('/', requireDelivery, async (req, res) => {
             activeSummary,
             upcomingRoutes: upcomingRoutes.map(summarizeRoute),
             finishedRoutes: finished.map(summarizeRoute),
+            fatigueBlocked,
+            driverDisabled,
         });
     } catch (err) {
         console.error(err);
@@ -202,10 +226,20 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
                 .catch(err => console.error('stale-pause cleanup err:', err.message));
         }
 
+        // LGT-195: transportista INHABILITADO no puede entrar a ninguna ruta, ni por URL directa.
+        if (await fatigueSvc.isDriverDisabled(res.locals.currentUser.id)) {
+            return res.redirect('/delivery?inhabilitado=1');
+        }
+
         const route = await routeModel.getById(req.params.id);
         if (!route) { return res.status(404).send('Ruta no encontrada'); }
         if (route.transport?.driverUserId !== res.locals.currentUser.id) {
             return res.status(403).send('Esta ruta no te pertenece');
+        }
+        // LGT-193/199: ruta bloqueada/pausada por fatiga → no se puede operar.
+        // Redirige al inicio, donde se muestra el aviso para consultar al supervisor.
+        if (route.statusId === RouteStatus.BLOCKED_FATIGUE || route.statusId === RouteStatus.PAUSED_FATIGUE) {
+            return res.redirect('/delivery?fatigue=1');
         }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
         res.render('delivery/route', { route, readOnly });
@@ -343,6 +377,11 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
     const reason = (reasonText || reasonCode || comment || '').trim();
     if (!reason) { return res.status(400).json({ error: 'Motivo obligatorio' }); }
 
+    // Paquete dañado tiene un flujo propio: el remitente decide reembolso o reemplazo,
+    // no se le ofrece reentrega (esperar nueva fecha o retirar por sucursal).
+    const isDamaged = ['paquete_dañado', 'paquete_danado'].includes(reasonCode)
+        || /\bdanad/.test(String(reason).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+
     const failedAttemptModel = require('../models/failedAttempt');
     const { getSuggestedDate } = require('../utils/failedAttempt');
 
@@ -361,6 +400,44 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             suggestedDate:    getSuggestedDate(reason),
             status:           retrySameDay ? 'reintento_mismo_dia' : 'pendiente',
         });
+
+        // === Paquete dañado: incidencia + email de gestión (reembolso / reemplazo) al
+        // remitente, y estado terminal PACKAGE_FAILED. NO se manda el aviso de reentrega.
+        if (isDamaged) {
+            const { NotificationEvent: NED } = require('../constants/enums');
+            try {
+                const inc = await createDamageIncident({
+                    shipmentId: stop.shipmentId,
+                    description: `Paquete dañado reportado en ruta. Motivo: ${reason}.${comment ? ' Detalle: ' + comment : ''}`,
+                    userId: res.locals.currentUser?.id || null,
+                });
+                // Aviso informativo de incidencia + email accionable al remitente (reembolso/reemplazo).
+                require('../controllers/shipment').notifyShipmentEvent(NED.SHIPMENT_INCIDENT, stop.shipmentId)
+                    .catch(e => console.error('notif INCIDENT', stop.shipmentId, e.message));
+                require('../services/incidentDamageResolution').notifySenderIfDamage({
+                    incidentId: inc?.id || null,
+                    shipment: { id: stop.shipmentId, trackingId: stop.shipment?.trackingId },
+                    type: { code: 'PACKAGE_BROKEN' },
+                }).catch(e => console.error('notif damage choice', stop.shipmentId, e.message));
+            } catch (incErr) {
+                console.error('auto-incident dañado err:', incErr.message);
+            }
+            // Estado PACKAGE_FAILED (emite SHIPMENT_PACKAGE_FAILED, no reentrega).
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.PACKAGE_FAILED.id,
+                actor: res.locals.currentUser,
+                comment: reason,
+                latitude: latitude  || null,
+                longitude: longitude || null,
+            });
+            await RouteStop.update(
+                { completed: true, completedAt: new Date() },
+                { where: { id: stop.id, routeId: route.id } }
+            );
+            return res.json({ ok: true, packageFailed: true });
+        }
+
         // Verificar si superó el máximo de intentos fallidos.
         // Sprint 3 - 2.5: si el motivo configurado tiene maxAttemptsOverride, usar ese.
         // El intento recién creado YA cuenta; se cancela al alcanzar el tope, no después.
@@ -372,7 +449,7 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 const fr = await require('../models/failedAttemptReason').getByCode(reasonCode);
                 if (fr && fr.maxAttemptsOverride) { maxIntentos = fr.maxAttemptsOverride; }
             }
-        } catch (_) { /* fallback default */ }
+        } catch { /* fallback default */ }
         const intentosPrevios = await failedAttemptModel.getByShipmentId(stop.shipmentId);
         if (intentosPrevios.length >= maxIntentos) {
             const shipmentHistoryModel = require('../models/shipmentHistory');
@@ -399,7 +476,7 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 const fr = await require('../models/failedAttemptReason').getByCode(reasonCode);
                 if (fr && fr.createsIncident) { shouldCreateIncident = true; }
             }
-        } catch (_) { /* fallback */ }
+        } catch { /* fallback */ }
         if (shouldCreateIncident) {
             try {
                 await createDamageIncident({
@@ -502,6 +579,23 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
     if (route.statusId !== RouteStatus.PLANNED) {
         return res.status(409).json({ error: `No se puede iniciar una ruta en estado ${route.statusId}. Sólo rutas planificadas.` });
     }
+    // Ojo de Patrón (LGT-190/193): gate de fatiga antes de salir a reparto.
+    // Requiere consentimiento aceptado y prueba apta (o liberación del supervisor).
+    try {
+        const fatigueCfg = require('../services/fatigue/config');
+        const fatigueSvc = require('../services/fatigue');
+        const cfg = await fatigueCfg.getConfig(route.originBranchId);
+        if (cfg.enabled) {
+            // LGT-195: transportista inhabilitado (cross-ruta) no puede iniciar.
+            if (await fatigueSvc.isDriverDisabled(res.locals.currentUser.id)) {
+                return res.status(409).json({ error: 'Transportista inhabilitado por fatiga', fatigue: { reason: 'DRIVER_DISABLED' } });
+            }
+            const gate = await fatigueSvc.canStart(route.id);
+            if (!gate.ok) {
+                return res.status(409).json({ error: 'Control de fatiga requerido', fatigue: gate });
+            }
+        }
+    } catch { /* si el control de fatiga falla, no bloquear el inicio operativo */ }
     // 1 ruta activa por repartidor: si ya hay otra IN_ROUTE de este driver, bloquear.
     const { Transport } = require('../models/transport');
     const driverTransports = await Transport.findAll({
@@ -674,6 +768,171 @@ router.post('/route/:id/incident', requireDelivery, async (req, res) => {
     res.json({ ok: true, incidentId: inc.id });
 });
 
+// ===================== Ojo de Patrón — control de fatiga =====================
+const fatigueSvc = require('../services/fatigue');
+const fatigueCfg = require('../services/fatigue/config');
+
+async function ownRouteOr403(req, res) {
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        res.status(403).json({ error: 'No autorizado' });
+        return null;
+    }
+    return route;
+}
+
+// Config pública para el portal (qué método/duración) — sin datos sensibles.
+router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    res.json({
+        enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
+        testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
+        reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
+        voiceAcousticEnabled: cfg.voiceAcousticEnabled,
+        voiceMaxAttempts: cfg.voiceMaxAttempts, reactionAttempts: cfg.reactionAttempts,
+    });
+});
+
+// Diagnóstico de la prueba de voz desde el cliente → visible en logs del server (Render).
+// El reconocimiento corre en el navegador; esto solo refleja sus eventos para depurar.
+router.post('/route/:id/fatigue/voz-log', requireDelivery, (req, res) => {
+    const uid = res.locals.currentUser?.id;
+    console.log('[fatiga-voz][cliente] user=' + uid + ' route=' + req.params.id, JSON.stringify(req.body));
+    res.status(204).end();
+});
+
+// Prueba de voz SERVER-SIDE (compatible iOS): el cliente graba el audio y lo manda
+// en base64; acá se transcribe (STT) y se compara con la frase. El audio es
+// EFÍMERO: se procesa y se descarta, nunca se persiste ni se loguea (Ley 25.326).
+router.post('/route/:id/fatigue/voz-stt', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const fatigueStt = require('../services/fatigue/stt');
+    const phraseMatch = require('../services/fatigue/phraseMatch');
+    if (!fatigueStt.isEnabled()) { return res.status(501).json({ error: 'STT no configurado en el servidor' }); }
+    const { frase, audioBase64, mimeType } = req.body || {};
+    if (!frase || !audioBase64) { return res.status(400).json({ error: 'Faltan datos (frase/audio)' }); }
+    try {
+        const buffer = Buffer.from(audioBase64, 'base64');
+        if (buffer.length > 8 * 1024 * 1024) { return res.status(413).json({ error: 'Audio demasiado grande' }); }
+        const ext = (mimeType && mimeType.includes('mp4')) ? 'mp4' : (mimeType && mimeType.includes('ogg')) ? 'ogg' : 'webm';
+        const dicho = await fatigueStt.transcribe(buffer, { mimeType: mimeType || 'audio/webm', filename: `voz.${ext}` });
+        const matchRatio = phraseMatch.similitudFrase(dicho, frase);
+        // No se persiste el audio ni la transcripción cruda: solo se devuelve el match.
+        res.json({ ok: true, matchRatio, dicho });
+    } catch (e) {
+        console.warn('[fatiga-voz][stt] error:', e.message);
+        res.status(502).json({ error: 'No se pudo transcribir', detail: e.message });
+    }
+});
+
+// US-1: registrar consentimiento (acepta o rechaza).
+router.post('/route/:id/consent', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const accepted = req.body.accepted === true || req.body.accepted === 'true';
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const result = await fatigueSvc.recordConsent({
+        userId: res.locals.currentUser.id, routeId: route.id,
+        branchId: route.originBranchId, accepted, version: cfg.consentVersion,
+    });
+    res.json({
+        ok: true, accepted, checkId: result.check.id,
+        disabled: result.disabled, rejections: result.rejections, max: result.max,
+    });
+});
+
+// US-2/3/4/9: ejecutar la prueba y evaluar la fatiga.
+router.post('/route/:id/fatigue-check', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const { checkId, method, metrics, triggerType } = req.body;
+    if (!['VOZ', 'REACCION'].includes(method)) { return res.status(400).json({ error: 'Método inválido' }); }
+    try {
+        const result = await fatigueSvc.evaluate({
+            checkId, userId: res.locals.currentUser.id, routeId: route.id,
+            branchId: route.originBranchId, method, metrics: metrics || {},
+            triggerType: triggerType || 'INICIO',
+        });
+        res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// LGT-199 — re-chequeo en ruta (disparo manual: "Estoy detenido" + tiempos).
+// Route y RouteStatus ya están importados al tope del archivo.
+const fatigueRecheck = require('../services/fatigue/recheck');
+
+// Estado del re-chequeo para el portal (¿debe hacer la prueba?, ¿descanso restante?).
+router.get('/route/:id/fatigue/recheck-status', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const status = await fatigueRecheck.getStatus(route.id, route, cfg);
+    res.json({ ok: true, ...status });
+});
+
+// Esc.1/2: "Estoy detenido" — empieza a contar la detención.
+// Ruta namespaced bajo /fatigue para no colisionar con la pausa operativa (/route/:id/pause|resume).
+router.post('/route/:id/fatigue/stopped', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const status = await fatigueRecheck.markStopped(route.id, route, cfg);
+    res.json({ ok: true, ...status });
+});
+
+// Esc.7: "Reanudar marcha" antes del umbral descarta el conteo de detención.
+router.post('/route/:id/fatigue/resume', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+    const status = await fatigueRecheck.resume(route.id, route, cfg);
+    res.json({ ok: true, ...status });
+});
+
+// Esc.3/4/9/10: ejecutar la prueba de re-chequeo y aplicar el resultado.
+router.post('/route/:id/fatigue-recheck', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const { method, metrics } = req.body;
+    if (!['VOZ', 'REACCION'].includes(method)) { return res.status(400).json({ error: 'Método inválido' }); }
+    const cfg = await fatigueCfg.getConfig(route.originBranchId);
+
+    // Esc.10: no permitir reintento antes de cumplir el descanso mínimo.
+    const guard = await fatigueRecheck.guardRetry(route.id, cfg);
+    if (!guard.ok) {
+        return res.status(409).json({ error: 'Descanso en curso', restRemainingMin: guard.restRemainingMin });
+    }
+
+    const result = await fatigueSvc.evaluate({
+        userId: res.locals.currentUser.id, routeId: route.id, branchId: route.originBranchId,
+        method, metrics: metrics || {}, triggerType: 'EN_RUTA', cfg,
+    });
+
+    // Aplica el resultado al estado de la sesión y al estado de la ruta.
+    await fatigueRecheck.onRecheckResult(route.id, result.decision, cfg);
+    const newStatus = result.decision === 'BLOCKED' ? RouteStatus.PAUSED_FATIGUE : RouteStatus.IN_ROUTE;
+    await Route.update({ statusId: newStatus }, { where: { id: route.id } });
+    // LGT-199 Esc.4: el conductor completó la prueba → cerrar avisos de omisión pendientes.
+    await fatigueSvc.clearRecheckOmission({ routeId: route.id, actorId: res.locals.currentUser.id })
+        .catch(e => console.error('clearRecheckOmission', e.message));
+
+    res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
+});
+
+// US-11: revocar consentimiento.
+router.post('/fatigue/consent/revoke', requireDelivery, async (req, res) => {
+    await fatigueSvc.revokeConsent({ userId: res.locals.currentUser.id });
+    res.json({ ok: true });
+});
+
+// US-13: mis datos de fatiga (acceso).
+router.get('/fatigue/mis-datos', requireDelivery, async (req, res) => {
+    const rows = await fatigueSvc.getDriverHistory(res.locals.currentUser.id);
+    res.render('delivery/misDatosFatiga', { checks: rows.map(r => r.toJSON()) });
+});
+
+// US-13: solicitar supresión de mis datos.
+router.post('/fatigue/mis-datos/suprimir', requireDelivery, async (req, res) => {
+    const n = await fatigueSvc.suppressDriverData({ userId: res.locals.currentUser.id, actorId: res.locals.currentUser.id });
+    res.json({ ok: true, deleted: n });
+});
+
 // === Botón de pánico (puede no pertenecer a una ruta) ===
 router.post('/panic', requireDelivery, async (req, res) => {
     const { PanicEvent } = require('../models/panicEvent');
@@ -788,6 +1047,31 @@ router.get('/route/:id/summary', requireDelivery, async (req, res) => {
         const failed    = stops.filter(s => s.stopType === 'delivery' && s.completed && s.shipment?.statusId === Status.FAILED_ATTEMPT.id);
         const skipped   = stops.filter(s => s.skipped && !s.completed);
 
+        // Paquete dañado NO va a la devolución por escaneo: ese caso lo define el
+        // cliente (se abrió incidencia). Solo se devuelven a sucursal los fallidos
+        // por otros motivos (ausente, dirección errónea, etc.).
+        const isDamageReason = (code, text) => {
+            if (['paquete_dañado', 'paquete_danado'].includes(code)) { return true; }
+            const t = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            return /\bdanad/.test(t); // "dañado" / "danado"
+        };
+        const failedShipmentIds = failed.map(s => s.shipmentId).filter(Boolean);
+        const damagedShipmentIds = new Set();
+        if (failedShipmentIds.length) {
+            const { FailedAttempt } = require('../models/failedAttempt');
+            const attempts = await FailedAttempt.findAll({
+                where: { shipmentId: { [Op.in]: failedShipmentIds } },
+                order: [['attemptDate', 'DESC']],
+            });
+            // Toma el intento más reciente por envío (la lista ya viene ordenada DESC).
+            const latestByShipment = new Map();
+            for (const a of attempts) { if (!latestByShipment.has(a.shipmentId)) { latestByShipment.set(a.shipmentId, a); } }
+            for (const [sid, a] of latestByShipment) {
+                if (isDamageReason(a.reasonCode, a.reason)) { damagedShipmentIds.add(sid); }
+            }
+        }
+        const failedForReturn = failed.filter(s => !damagedShipmentIds.has(s.shipmentId));
+
         const km = Number(route.totalDistanceKm || 0);
         const startedAt  = route.startedAt  ? new Date(route.startedAt)  : null;
         const finishedAt = route.finishedAt ? new Date(route.finishedAt) : null;
@@ -806,7 +1090,7 @@ router.get('/route/:id/summary', requireDelivery, async (req, res) => {
             deliveredCount: delivered.length,
             failedCount:    failed.length,
             skippedCount:   skipped.length,
-            failedStops:    failed,
+            failedStops:    failedForReturn,
             km,
             grossSec, pauseSec, effectiveSec,
             fuelL, fuelCost, commission,

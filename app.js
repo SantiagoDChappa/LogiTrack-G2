@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const compression = require('compression');
 const swaggerUi = require('swagger-ui-express');
 const cookieParser = require('cookie-parser');
 const app     = express();
@@ -39,6 +40,7 @@ const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
+const fatigueRoutes    = require('./src/routes/fatigue');
 
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
@@ -58,15 +60,41 @@ if (process.env.NODE_ENV === 'test') {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'src', 'views'));
 
-app.use(express.static('public'));
+// Headers de seguridad (X-Frame-Options, nosniff, HSTS en prod, etc.).
+// CSP deshabilitado: las vistas usan inline scripts/styles y CDNs (Leaflet, SweetAlert).
+const helmet = require('helmet');
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+}));
+
+// Compresion gzip de todas las respuestas (HTML/CSS/JS/JSON). Reduce payload ~70%.
+// threshold 1KB: no comprime respuestas chicas (costo CPU > beneficio).
+app.use(compression({ threshold: 1024 }));
+
+// Assets estaticos con cache de 7 dias en prod (1 dia en dev). Evita re-download
+// de CSS/JS/imagenes en cada navegacion. Cambios se invalidan editando el archivo
+// (express agrega ETag por default).
+const STATIC_MAX_AGE_MS = process.env.NODE_ENV === 'production'
+    ? 7 * 24 * 60 * 60 * 1000   // 7 dias
+    : 1 * 60 * 60 * 1000;        // 1 hora dev
+app.use(express.static('public', {
+    maxAge: STATIC_MAX_AGE_MS,
+    etag: true,
+    lastModified: true,
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
 
 // Helpers globales para EJS
+const { IncidentStatusLabel, IncidentResolutionLabel } = require('./src/constants/enums');
 app.use((req, res, next) => {
     res.locals.fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     res.locals.fmtNumber = (n, dec = 2) => Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    res.locals.IncidentStatusLabel = IncidentStatusLabel;
+    res.locals.IncidentResolutionLabel = IncidentResolutionLabel;
     next();
 });
 
@@ -76,7 +104,10 @@ app.use('/chatbot', chatbotRoutes);
 app.use('/', authRoutes);
 
 
-app.use(apiHealthRoutes);
+app.use('/api/health', apiHealthRoutes);
+
+// Logo institucional servido desde la base (público: login, portal, encabezado).
+app.use('/brand', require('./src/routes/brand'));
 
 // Rutas Protegidas
 app.use('/home', requireAuth, homeRoutes);
@@ -104,22 +135,36 @@ app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
+app.use('/fatigue',   requireAuth, fatigueRoutes);
 
-;
-app.use('/api/persons',personRoutes);
+// PII (nombre/email/telefono por documento): SOLO usuarios logueados.
+app.use('/api/persons', requireAuth, personRoutes);
 
-/*app.use((req, res) => {
-    const token = req.cookies?.token;
-    if (token) {
-        try {
-            require('jsonwebtoken').verify(token, process.env.JWT_SECRET);
-            return res.redirect('/');
-        } catch {
-            res.clearCookie('token');
-        }
+// ── 404: ruta no encontrada ──────────────────────────────────────────────
+app.use((req, res) => {
+    // APIs reciben JSON; navegacion recibe la pagina de error.
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Recurso no encontrado' });
     }
-    res.redirect('/login');
-});*/
+    res.status(404).render('error', { status: 404, message: 'Página no encontrada' });
+});
+
+// ── Error handler global: evita stack traces o paginas en blanco ─────────
+// Express 5 enruta promesas rechazadas de controllers async hasta aca.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+    console.error(`[error] ${req.method} ${req.originalUrl}:`, err.message);
+    if (res.headersSent) { return; }
+    if (req.path.startsWith('/api/')) {
+        return res.status(500).json({ error: 'Error interno del servidor' });
+    }
+    res.status(500).render('error', {
+        status:  500,
+        message: 'Ocurrió un error inesperado. Intentá de nuevo.',
+        // stack solo visible fuera de produccion (error.ejs ya lo oculta en prod).
+        stack:   process.env.NODE_ENV === 'production' ? null : err.stack,
+    });
+});
 
 if (process.env.ENABLE_EMAIL_JOBS === 'true') {
     const scheduler = require('./src/cron/scheduler');

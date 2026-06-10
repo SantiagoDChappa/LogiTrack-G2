@@ -21,7 +21,9 @@ router.post('/identity',     requireAdmin, optionalLogo, settingController.saveI
 router.post('/assign-branch', requireAdmin, settingController.assignBranch);
 router.post('/route-optimizer', requireAdmin, settingController.saveRouteOptimizerSettings);
 router.post('/params',          requireAdmin, settingController.saveParams);
+router.post('/incident-params', requireAdmin, settingController.saveIncidentParams);
 router.post('/status-colors',   requireAdmin, settingController.saveStatusColors);
+router.post('/incident-status-colors', requireAdmin, settingController.saveIncidentStatusColors);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
 // Variantes de plantilla (rutas específicas antes de las genéricas por :eventCode)
 router.post('/email-template/variant/:eventCode', requireAdmin, settingController.createEmailTemplateVariant);
@@ -48,6 +50,12 @@ router.post('/time-window/:id',        requireAdmin, settingController.saveTimeW
 router.post('/incident-type',          requireAdmin, settingController.saveIncidentType);
 router.post('/incident-type/:id',      requireAdmin, settingController.saveIncidentType);
 router.post('/incident-notification',  requireAdmin, settingController.saveIncidentNotifConfig);
+router.post('/fatigue-consent-notification', requireAdmin, settingController.saveFatigueConsentNotifConfig);
 router.post('/test-shipment-notification', requireAdmin, settingController.testShipmentNotification);
+// Envío manual de toda la cola de emails pendientes (sin esperar al cron).
+router.post('/flush-email-queue',          requireAdmin, settingController.flushEmailQueue);
+// Ejecutar manualmente un proceso automático ahora (expirados | notificaciones | demoras).
+router.post('/run-process/:proc',          requireAdmin, settingController.runProcess);
+router.post('/trigger-delay-detection',   requireAdmin, settingController.triggerDelayDetection);
 
 module.exports = router;

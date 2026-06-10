@@ -1,4 +1,7 @@
 const { Shipment } = require('../models/shipment');
+const shipmentModel = require('../models/shipment');
+// NFAL07 (LGT-158): mensaje único cuando el link accionable ya no sirve.
+const SELF_SERVICE_LINK_INVALID_MSG = 'Este enlace ya no es válido. Para gestionar tu envío ingresá al portal o contactá a soporte.';
 const { Person } = require('../models/person');
 const { Status } = require('../models/status');
 const { Address } = require('../models/address');
@@ -10,6 +13,7 @@ const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
 const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
 const settingModel = require('../models/setting');
 const { URLSearchParams } = require('url');
+const { NotificationEvent } = require('../constants/enums');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -526,6 +530,12 @@ const confirmIncidentByToken = async (rawToken) => {
         matchedRole:   pending.matchedRole
     }).catch(e => console.error('[portal] notif incidencia confirmada:', e.message));
 
+    // Si el cliente reportó una demora, enviarle el email accionable con opciones de resolución.
+    if (type.code === 'DELAY') {
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_DELAYED, shipment.id)
+            .catch(e => console.error('[portal] notif SHIPMENT_DELAYED por incidencia:', e.message));
+    }
+
     return { ok: true, incident, shipment, type };
 };
 
@@ -624,17 +634,26 @@ const getSelfServiceForm = async (req, res) => {
         const shipment = await Shipment.findOne({
             where: { portalToken: token },
             include: [
-                { model: Person, as: 'recipient', attributes: ['fullName'] },
-                { model: Status, as: 'status',    attributes: ['description'] },
+                { model: Person, as: 'recipient', attributes: ['fullName'], required: false },
+                { model: Status, as: 'status',    attributes: ['description'], required: false },
                 { model: Address, as: 'address',  required: false, include: [{ model: Province, as: 'province' }] },
                 { model: Branch,  as: 'pickupBranch', required: false },
             ],
         });
         if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
+        // NFAL07: link de un solo uso + vencimiento. Si ya se usó o venció, se rechaza.
+        // Excepción: justo después de reprogramar (?saved=1) se muestra la confirmación.
+        if (shipmentModel.selfServiceTokenState(shipment) !== 'ok' && req.query.saved !== '1') {
+            return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
         const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
         const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
+        // Recalcula la fecha estimada para cada modalidad: el destinatario ve, en vivo,
+        // cuándo recibiría a domicilio vs cuándo podría retirar por sucursal y decide.
+        const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+        const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
         res.render('portal/selfService', {
             shipment,
             timeWindows,
@@ -643,6 +662,8 @@ const getSelfServiceForm = async (req, res) => {
             saved: req.query.saved === '1',
             appliedCount: Number(req.query.applied) || 0,
             pendingCount: Number(req.query.pending) || 0,
+            etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
+            etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
         });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
@@ -662,6 +683,10 @@ const saveSelfService = async (req, res) => {
             ],
         });
         if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        // NFAL07: no permitir reprogramar con un link ya usado o vencido.
+        if (shipmentModel.selfServiceTokenState(shipment) !== 'ok') {
+            return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
 
         const result = await submitPortalModification({
             shipment,
@@ -673,6 +698,8 @@ const saveSelfService = async (req, res) => {
         });
 
         if (!result.ok) {
+            const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+            const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
             return res.status(result.status || 400).render('portal/selfService', {
                 shipment,
                 timeWindows: await require('../models/deliveryTimeWindow').getActive(),
@@ -682,17 +709,30 @@ const saveSelfService = async (req, res) => {
                 appliedCount: 0,
                 pendingCount: 0,
                 error: result.message,
+                etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
+                etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
             });
         }
+
+        // NFAL07: consumir el link tras una reprogramación exitosa (un solo uso).
+        await shipmentModel.markSelfServiceTokenUsed(shipment.id)
+            .catch(e => console.error('markSelfServiceTokenUsed:', e.message));
 
         const qs = new URLSearchParams({ saved: '1' });
         if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }
         if (result.pending?.length) { qs.set('pending', String(result.pending.length)); }
-        res.redirect(`/portal/self/${token}?${qs.toString()}`);
+        res.redirect(`/portal/self-saved/${shipment.trackingId}?${qs.toString()}`);
     } catch (err) {
         console.error('saveSelfService:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService };
+const getSelfServiceSaved = (req, res) => {
+    const { trackingId } = req.params;
+    const appliedCount = Number(req.query.applied) || 0;
+    const pendingCount = Number(req.query.pending) || 0;
+    res.render('portal/selfServiceSaved', { trackingId, appliedCount, pendingCount });
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };

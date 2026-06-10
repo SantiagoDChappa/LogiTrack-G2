@@ -1,3 +1,14 @@
+<%
+    // Defensivo: este template se renderiza desde distintos lugares que no siempre
+    // pasan todas las variables. Bajo EJS un `with(locals)` NO cubre props inexistentes,
+    // así que referenciarlas directo tira ReferenceError. Normalizamos todo acá.
+    var _status  = (typeof status  !== 'undefined' && status)  ? status  : 500;
+    var _message = (typeof message !== 'undefined') ? message : null;
+    var _stack   = (typeof stack   !== 'undefined') ? stack   : null;
+    var _reason  = (typeof reason  !== 'undefined') ? reason  : null;
+    var _popup   = (typeof popup   !== 'undefined') ? popup   : false;
+    var _isProd  = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production');
+%>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,7 +19,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
-    <title><%= status || 500 %> — LogiTrack</title>
+    <title><%= _status %> — LogiTrack</title>
     <style>
         body {
             display: flex;
@@ -23,6 +34,25 @@
             text-align: center;
             max-width: 480px;
             width: 100%;
+        }
+
+        /* Modo popup/modal: card flotante sobre fondo atenuado */
+        body.is-popup {
+            background-color: rgba(0, 0, 0, 0.45);
+        }
+
+        body.is-popup .error-container {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+            padding: var(--space-8) var(--space-6);
+            animation: popup-in 0.18s ease-out;
+        }
+
+        @keyframes popup-in {
+            from { opacity: 0; transform: translateY(8px) scale(0.98); }
+            to   { opacity: 1; transform: none; }
         }
 
         .error-icon-wrap {
@@ -152,16 +182,16 @@
     </style>
     <link rel="stylesheet" href="/css/error.css">
 </head>
-<body>
+<body class="<%= _popup ? 'is-popup' : '' %>">
     <div class="error-container">
 
-        <div class="error-icon-wrap <%= status === 404 ? 'warn' : '' %>">
+        <div class="error-icon-wrap <%= _status === 404 ? 'warn' : '' %>">
             <span class="material-symbols-outlined">
-                <%= status === 404 ? 'search_off' : (status === 403 ? 'lock' : 'error') %>
+                <%= _status === 404 ? 'search_off' : (_status === 403 ? 'lock' : 'error') %>
             </span>
         </div>
 
-        <div class="error-code"><%= status || 500 %></div>
+        <div class="error-code"><%= _status %></div>
 
         <h1 class="error-title">
             <%
@@ -177,15 +207,17 @@
                     503: 'Servicio en mantenimiento',
                 };
             %>
-            <%= _titles[status] || 'Algo salió mal' %>
+            <%= _titles[_status] || 'Algo salió mal' %>
         </h1>
 
         <p class="error-message">
-            <% if (status === 404) { %>
+            <% if (_reason) { %>
+                <%= _reason %>
+            <% } else if (_status === 404) { %>
                 La página que buscás no existe o fue movida. Verificá la URL o volvé al inicio.
-            <% } else if (status === 403) { %>
+            <% } else if (_status === 403) { %>
                 No tenés permiso para acceder a este recurso. Contactá al administrador si creés que es un error.
-            <% } else if (status === 401) { %>
+            <% } else if (_status === 401) { %>
                 Necesitás iniciar sesión para acceder a este recurso.
             <% } else { %>
                 Ocurrió un error inesperado. Si el problema persiste, contactá al soporte técnico.
@@ -193,7 +225,7 @@
         </p>
 
         <div class="error-actions">
-            <% if (status === 401) { %>
+            <% if (_status === 401) { %>
                 <a href="/login" class="btn-primary">
                     <span class="material-symbols-outlined">login</span>Iniciar sesión
                 </a>
@@ -207,12 +239,12 @@
             <% } %>
         </div>
 
-        <% if (message && process && process.env && process.env.NODE_ENV !== 'production') { %>
+        <% if (_message && !_isProd) { %>
         <details class="error-detail">
             <summary>Detalle del error (solo visible en desarrollo)</summary>
-            <pre><%= message %></pre>
-            <% if (stack) { %>
-            <pre><%= stack %></pre>
+            <pre><%= _message %></pre>
+            <% if (_stack) { %>
+            <pre><%= _stack %></pre>
             <% } %>
         </details>
         <% } %>

@@ -20,7 +20,9 @@ const User = sequelize.define('user', {
     driverUnavailableUntil:  { type: DataTypes.DATEONLY,    allowNull: true, field: 'driver_unavailable_until' },
 }, { tableName: 'user', timestamps: false });
 
-const getAll = () => User.findAll();
+// Limite defensivo para que la UI de admin no se rompa con miles de usuarios.
+// La UI deberia paginar o filtrar; este limite es solo un techo de seguridad.
+const getAll = () => User.findAll({ order: [['fullName', 'ASC']], limit: 500 });
 
 const getById = (id) => User.findByPk(id);
 
@@ -59,7 +61,7 @@ const search = ({ fullName, document, roleId, active }) => {
     if (active === 'true') { where.active = true; }
     else if (active === 'false') { where.active = false; }
 
-    return User.findAll({ where });
+    return User.findAll({ where, order: [['fullName', 'ASC']], limit: 500 });
 };
 
 const existsByDocument = async (document) => {

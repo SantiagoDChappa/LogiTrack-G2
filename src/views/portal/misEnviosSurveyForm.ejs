@@ -15,12 +15,15 @@
 
     <section class="portal-mis-envios-section">
         <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <% var isPublic = (typeof publicMode !== 'undefined' && publicMode); %>
+            <% if (!isPublic) { %>
             <div class="portal-mis-envios-detail-top">
                 <a href="/portal/mis-envios/encuestas" class="portal-mis-envios-back">
                     <span class="material-symbols-outlined">arrow_back</span>
                     Volver al listado
                 </a>
             </div>
+            <% } %>
 
             <div class="portal-mis-envios-header">
                 <span class="portal-incident-eyebrow">Encuesta de satisfacción</span>
@@ -90,7 +93,7 @@
             </div>
 
             <% } else { %>
-            <form method="POST" action="/portal/mis-envios/encuesta/<%= shipment.id %>" class="portal-mis-envios-form">
+            <form method="POST" action="<%= (typeof actionUrl !== 'undefined' && actionUrl) ? actionUrl : ('/portal/mis-envios/encuesta/' + shipment.id) %>" class="portal-mis-envios-form">
                 <div class="portal-incident-detail-card">
                     <p class="portal-manage-hint">Calificá tu experiencia con esta entrega. Todas las calificaciones son obligatorias.</p>
 
@@ -147,12 +150,14 @@
             </form>
             <% } %>
 
+            <% if (!isPublic) { %>
             <div class="portal-mis-envios-actions" style="border-top:none;padding-top:0;">
                 <a href="/portal/mis-envios/envio/<%= shipment.id %>" class="portal-card-incident-cta-link">
                     <span class="material-symbols-outlined">inventory_2</span>
                     Ver envío asociado
                 </a>
             </div>
+            <% } %>
         </div>
     </section>
     <% if (!survey) { %>

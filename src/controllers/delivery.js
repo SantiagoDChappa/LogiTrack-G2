@@ -186,6 +186,11 @@ const saveEvidence = async (req, res) => {
             if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
                 return res.status(403).send('Esta ruta no te pertenece.');
             }
+            // LGT-193/199: ruta bloqueada o pausada por fatiga → no se puede registrar entrega.
+            if (route.statusId === routeModel.RouteStatus.BLOCKED_FATIGUE
+                || route.statusId === routeModel.RouteStatus.PAUSED_FATIGUE) {
+                return res.status(409).send('Ruta bloqueada por fatiga. Consultá con tu supervisor.');
+            }
             const activePause = await RoutePause.findOne({ where: { routeId, endedAt: null } });
             if (activePause) {
                 return res.status(409).send('La ruta está pausada. Reanudala antes de confirmar la entrega.');
@@ -260,6 +265,9 @@ const saveEvidence = async (req, res) => {
             // US-E09: cerrar automáticamente las incidencias auto-generadas del envío.
             await autoCloseForShipment(shipment.id, { reason: 'Cierre automático: envío entregado' }, t);
         });
+
+        // CP-ENCS01: al entregar, enviar email con el link a la encuesta (fire-and-forget).
+        require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
 
         if (routeId) {
             return res.redirect(`/delivery/route/${routeId}?delivered=true`);

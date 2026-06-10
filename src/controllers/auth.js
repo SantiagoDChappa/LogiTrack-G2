@@ -2,6 +2,39 @@ const bcrypt = require('bcryptjs');
 const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 const branchModel = require('../models/branch');
+const { RoleType } = require('../constants/enums');
+
+// Cuentas de prueba del login: se arman dinámicamente desde los usuarios activos
+// en base (agrupadas por rol), así siempre reflejan lo que hay realmente.
+const ROLE_LABEL = {
+    [RoleType.SUPERVISOR.id]: 'Supervisor',
+    [RoleType.OPERATOR.id]:   'Operador',
+    [RoleType.DELIVERY.id]:   'Repartidor',
+    [RoleType.ADMIN.id]:      'Administrador',
+};
+const ROLE_ORDER = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.DELIVERY.id, RoleType.ADMIN.id];
+
+const buildDevAccounts = async () => {
+    try {
+        const { User } = require('../models/user');
+        const users = await User.findAll({
+            where: { active: true },
+            attributes: ['email', 'fullName', 'roleId'],
+            order: [['roleId', 'ASC'], ['fullName', 'ASC']],
+        });
+        return ROLE_ORDER
+            .map((id) => ({
+                label: ROLE_LABEL[id] || 'Otros',
+                accounts: users
+                    .filter((u) => u.roleId === id && u.email)
+                    .map((u) => ({ email: u.email, name: u.fullName || u.email })),
+            }))
+            .filter((g) => g.accounts.length > 0);
+    } catch (e) {
+        console.error('[login] no se pudieron cargar cuentas de prueba:', e.message);
+        return [];
+    }
+};
 
 const getLogin = async (req, res) => {
     if (req.cookies?.token) {
@@ -18,7 +51,8 @@ const getLogin = async (req, res) => {
         settingModel.get('logo_empresa'),
     ]);
     const returnTo = req.query.returnTo || '';
-    return res.render('login', { returnTo, nombreEmpresa: nombreEmpresa || 'LogiTrack', logoEmpresa: logoEmpresa || '/images/logo.png' });
+    const devAccounts = await buildDevAccounts();
+    return res.render('login', { returnTo, devAccounts, nombreEmpresa: nombreEmpresa || 'LogiTrack', logoEmpresa: logoEmpresa || '/images/logo.png' });
 };
 
 const login = async (req, res) => {
@@ -33,12 +67,12 @@ const login = async (req, res) => {
 
     const user = await userModel.findByEmail(email);
     if(!user){
-        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa });
+        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts() });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if(!match){
-        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa });
+        return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts() });
     }
 
     const branch = user.branchId ? await branchModel.getById(user.branchId) : null;

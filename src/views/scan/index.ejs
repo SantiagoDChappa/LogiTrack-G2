@@ -77,7 +77,7 @@
                         </div>
                         <div class="detail-field">
                             <span class="detail-label">Destinatario</span>
-                            <span class="detail-value"><%= shipment.recipient.fullName %></span>
+                            <span class="detail-value"><%= shipment.recipient ? shipment.recipient.fullName : '—' %></span>
                         </div>
                         <div class="detail-field">
                             <span class="detail-label">Dirección</span>

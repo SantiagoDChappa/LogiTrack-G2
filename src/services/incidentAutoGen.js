@@ -21,6 +21,15 @@ const autoCreateIncident = async ({ shipmentId, typeCode, description }, t) => {
     const open = await incidentModel.findOpenByShipment(shipmentId);
     if (open.some(i => i.incidentTypeId === type.id)) { return null; }
 
+    // LGT-147: asignación automática al staff menos cargado de la sucursal del envío.
+    let assignee = null;
+    try {
+        const shipmentModel = require('../models/shipment');
+        const ship = await shipmentModel.getById(shipmentId);
+        const branchId = ship?.currentBranchId || ship?.originBranchId || null;
+        assignee = await require('./incidentAssignment').pickLeastLoadedAssignee(branchId);
+    } catch { /* sin asignación automática si falla */ }
+
     const created = await Incident.create({
         shipmentId,
         incidentTypeId: type.id,
@@ -29,7 +38,8 @@ const autoCreateIncident = async ({ shipmentId, typeCode, description }, t) => {
         escalated:      false,
         description:    String(description || 'Incidencia generada automáticamente por el sistema').slice(0, 2000),
         openedChannel:  IncidentChannel.SYSTEM,
-        openedByUserId: null
+        openedByUserId: null,
+        assignedToUserId: assignee ? assignee.id : null
     }, { transaction: t });
 
     await incidentHistoryModel.create({
@@ -39,6 +49,16 @@ const autoCreateIncident = async ({ shipmentId, typeCode, description }, t) => {
         comment:    `Incidencia generada automáticamente (${type.code})`,
         transaction: t
     });
+
+    if (assignee) {
+        await incidentHistoryModel.create({
+            incidentId: created.id,
+            eventType:  IncidentEventType.ASSIGNED,
+            toValue:    String(assignee.id),
+            comment:    `Asignación automática a ${assignee.fullName} (menor carga: ${assignee.openCount} abiertas)`,
+            transaction: t
+        });
+    }
 
     await snapshotChecklist(created.id, type.id, t);
 

@@ -211,6 +211,15 @@
                 <textarea id="description" name="description" rows="6" maxlength="2000" required><%= form.description || '' %></textarea>
             </div>
 
+            <% if (error && /Confirmo crear igual/i.test(error)) { %>
+                <div class="form-group" style="grid-column: span 12;">
+                    <label style="display:flex;align-items:center;gap:.5rem;font-weight:600;color:#b45309;">
+                        <input type="checkbox" name="confirmWarning" value="1" required>
+                        Confirmo crear igual la incidencia
+                    </label>
+                </div>
+            <% } %>
+
             <div class="form-actions">
                 <a href="/incident" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
                     <span class="material-symbols-outlined">close</span>

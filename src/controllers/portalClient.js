@@ -30,7 +30,8 @@ const {
     getEligibleShipments,
     isEligible,
     submitSurvey,
-    getCompletedSurvey: getCompletedDeliverySurvey,
+    verifySurveyToken,
+    clientFromShipment,
 } = require('../services/portalSurveyService');
 const {
     getEligibleIncidents,
@@ -113,14 +114,46 @@ const postRequestAccess = async (req, res) => {
     return res.render('portal/misEnviosPending', {
         support: await getSupportInfo(),
         email: result.pending.email,
+        document: result.pending.document,
         expiresAt: result.pending.expiresAt,
         mailDelivered: result.pending.mailDelivered,
-        devLink: result.pending.devLink,
+        devCode: result.pending.devCode,
+        error: null,
     });
 };
 
+const setPortalSession = (res, sessionToken) => {
+    res.cookie(COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 8 * 60 * 60 * 1000,
+    });
+};
+
+// CP-CONS01: confirmación del acceso ingresando el código de 6 dígitos enviado por email.
+const postConfirmAccess = async (req, res) => {
+    const code = req.body.code;
+    const email = req.body.email;
+    const result = await confirmAccess(code, email);
+    if (!result.ok) {
+        return res.status(result.status).render('portal/misEnviosPending', {
+            support: await getSupportInfo(),
+            email,
+            document: req.body.document,
+            expiresAt: req.body.expiresAt || new Date(),
+            mailDelivered: true,
+            devCode: null,
+            error: result.message,
+        });
+    }
+
+    setPortalSession(res, result.sessionToken);
+    return res.redirect('/portal/mis-envios/lista');
+};
+
+// Compat: confirmación por link (?token=) — opcional, usado en desarrollo.
 const getConfirmAccess = async (req, res) => {
-    const result = await confirmAccess(req.query.token);
+    const result = await confirmAccess(req.query.token, req.query.email);
     if (!result.ok) {
         return res.status(result.status).render('portal/misEnviosConfirmError', {
             support: await getSupportInfo(),
@@ -128,12 +161,7 @@ const getConfirmAccess = async (req, res) => {
         });
     }
 
-    res.cookie(COOKIE_NAME, result.sessionToken, {
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 8 * 60 * 60 * 1000,
-    });
-
+    setPortalSession(res, result.sessionToken);
     return res.redirect('/portal/mis-envios/lista');
 };
 
@@ -279,22 +307,52 @@ const getIncidentDetail = async (req, res) => {
         });
     }
 
+    // LGT-204: elección reembolso/reemplazo solo para incidencias de paquete dañado.
+    const damageSvc = require('../services/incidentDamageResolution');
+    const isDamage = damageSvc.isDamageType(incident.type);
+
     res.render('portal/misEnviosIncidentDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
         incident: await loadIncidentDetailViewModel(incident),
-        flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.' : null,
+        damage: { isDamage, choice: incident.damageChoice || null, options: damageSvc.CHOICES, closed: !!incident.closedAt },
+        flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.'
+            : (req.query.choice ? 'Registramos tu elección. El operador la verá y actuará en consecuencia.' : null),
         error: req.query.error ? String(req.query.error) : null,
     });
 };
 
-const postIncidentResponse = async (req, res) => {
+// LGT-204 — el remitente registra su elección (reembolso/reemplazo).
+const postDamageChoice = async (req, res) => {
     const incidentId = Number(req.params.id);
     const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
     if (!incident) {
         return res.status(404).render('portal/misEnviosConfirmError', {
             support: await getSupportInfo(),
             error: 'Incidencia no encontrada.',
+        });
+    }
+    try {
+        const damageSvc = require('../services/incidentDamageResolution');
+        await damageSvc.setChoice({
+            incidentId,
+            choice: req.body.choice,
+            by: res.locals.portalClient?.email || res.locals.portalClient?.document || null,
+        });
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?choice=1`);
+    } catch (e) {
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?error=${encodeURIComponent(e.message)}`);
+    }
+};
+
+const postIncidentResponse = async (req, res) => {
+    const incidentId = Number(req.params.id);
+    const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
+    if (!incident) {
+        // CP-RINC11: aislamiento de datos — no se permite interactuar con incidencias ajenas.
+        return res.status(403).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'No tiene permisos para interactuar con esta incidencia',
         });
     }
 
@@ -393,6 +451,77 @@ const postSurvey = async (req, res) => {
     return res.redirect(`/portal/mis-envios/encuesta/${shipmentId}?ok=1`);
 };
 
+// CP-ENCS03: encuesta accesible desde el email sin login (token firmado por envío).
+const getPublicSurveyForm = async (req, res) => {
+    const token = req.params.token;
+    const shipmentId = verifySurveyToken(token);
+    if (!shipmentId) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El enlace de la encuesta no es válido o expiró.',
+        });
+    }
+
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const check = await isEligible(shipmentId, clientFromShipment(shipment));
+    if (check.reason === 'not_terminal') {
+        return res.status(400).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El envío aún no finalizó su gestión.',
+        });
+    }
+
+    const survey = check.reason === 'already_answered' ? check.survey : null;
+    const json = typeof shipment.toJSON === 'function' ? shipment.toJSON() : shipment;
+
+    res.render('portal/misEnviosSurveyForm', {
+        support: await getSupportInfo(),
+        shipment: {
+            id: json.id,
+            trackingId: json.trackingId,
+            recipientName: json.recipient?.fullName || '-',
+        },
+        survey,
+        flash: req.query.ok === '1' ? 'Tu encuesta fue registrada correctamente.' : null,
+        error: req.query.error ? String(req.query.error) : null,
+        actionUrl: `/portal/encuesta/${encodeURIComponent(token)}`,
+        publicMode: true,
+    });
+};
+
+const postPublicSurvey = async (req, res) => {
+    const token = req.params.token;
+    const shipmentId = verifySurveyToken(token);
+    if (!shipmentId) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'El enlace de la encuesta no es válido o expiró.',
+        });
+    }
+
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Envío no encontrado.',
+        });
+    }
+
+    const result = await submitSurvey(shipmentId, clientFromShipment(shipment), req.body);
+    const base = `/portal/encuesta/${encodeURIComponent(token)}`;
+    if (!result.ok) {
+        return res.redirect(`${base}?error=${encodeURIComponent(result.message)}`);
+    }
+    return res.redirect(`${base}?ok=1`);
+};
+
 const getIncidentSurveyList = async (req, res) => {
     const { pending, completed } = await getEligibleIncidents(res.locals.portalClient);
     const tab = req.query.tab === 'completed' ? 'completed' : 'pending';
@@ -456,6 +585,7 @@ const postIncidentSurvey = async (req, res) => {
 module.exports = {
     getIdentifyForm,
     postRequestAccess,
+    postConfirmAccess,
     getConfirmAccess,
     getShipmentList,
     getShipmentDetail,
@@ -464,10 +594,13 @@ module.exports = {
     getIncidentList,
     getIncidentDetail,
     postIncidentResponse,
+    postDamageChoice,
     getIncidentAttachment,
     getSurveyList,
     getSurveyForm,
     postSurvey,
+    getPublicSurveyForm,
+    postPublicSurvey,
     getIncidentSurveyList,
     getIncidentSurveyForm,
     postIncidentSurvey,

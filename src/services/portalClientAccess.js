@@ -4,13 +4,15 @@ const { normalize } = require('./incidentEmailValidation');
 const shipmentModel = require('../models/shipment');
 const portalClientAccessPendingModel = require('../models/portalClientAccessPending');
 const { sendEmail } = require('./notification/emailSender');
+const emailTemplateModel = require('../models/emailTemplate');
+const placeholders = require('./notificationPlaceholders');
+const { NotificationEvent } = require('../constants/enums');
 
 const CONFIRMATION_TTL_HOURS = 24;
 const SESSION_HOURS = 8;
 const COOKIE_NAME = 'portal_client';
 
 const isDevMode = () => (process.env.NODE_ENV || 'development') !== 'production';
-const appBaseUrl = () => process.env.APP_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
 
 const parseDocument = (raw) => {
     const digits = String(raw || '').replace(/\D/g, '');
@@ -31,24 +33,24 @@ const assertClientOwnsShipment = (shipment, { document, email }) => {
     return senderMatch || recipientMatch;
 };
 
+// CP-CONS03: mensaje genérico para todos los casos de fallo (DNI/email/formato/sin envíos).
+// No se revela qué dato falló: evita enumeración de usuarios y filtración de información.
+const INVALID_CREDENTIALS_MSG = 'Credenciales inválidas. Verifique los datos e intente nuevamente.';
+
 const validateClientCredentials = async (document, email) => {
     const docNum = parseDocument(document);
     const emailNorm = normalize(email);
 
     if (!docNum) {
-        return { ok: false, code: 'invalid_document', message: 'Ingresá un DNI válido (solo números).' };
+        return { ok: false, code: 'invalid_document', message: INVALID_CREDENTIALS_MSG };
     }
     if (!emailNorm) {
-        return { ok: false, code: 'invalid_email', message: 'El email es obligatorio.' };
+        return { ok: false, code: 'invalid_email', message: INVALID_CREDENTIALS_MSG };
     }
 
     const count = await shipmentModel.countByClientIdentity({ document: docNum, email: emailNorm });
     if (count === 0) {
-        return {
-            ok: false,
-            code: 'no_shipments',
-            message: 'No se encontraron envíos vinculados a esos datos.',
-        };
+        return { ok: false, code: 'no_shipments', message: INVALID_CREDENTIALS_MSG };
     }
 
     return { ok: true, document: docNum, email: emailNorm };
@@ -72,39 +74,77 @@ const verifyPortalClientSession = (token) => {
     }
 };
 
+// CP-CONS01: genera un código numérico de 6 dígitos único entre los pendientes vigentes.
+const generateAccessCode = async () => {
+    for (let i = 0; i < 8; i += 1) {
+        const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+        const exists = await portalClientAccessPendingModel.findByToken(code);
+        if (!exists) { return code; }
+    }
+    // Fallback extremadamente improbable: agrega entropía para no fallar.
+    return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+};
+
 const requestAccess = async ({ document, email }) => {
     const validation = await validateClientCredentials(document, email);
     if (!validation.ok) { return validation; }
 
-    portalClientAccessPendingModel.deleteExpired().catch(() => {});
+    await portalClientAccessPendingModel.deleteExpired().catch(() => {});
+    // Invalida códigos previos del mismo cliente para que solo el último sea válido.
+    await portalClientAccessPendingModel.deleteByEmail(validation.email).catch(() => {});
 
-    const token = crypto.randomBytes(24).toString('hex');
+    const code = await generateAccessCode();
     const expiresAt = new Date(Date.now() + CONFIRMATION_TTL_HOURS * 60 * 60 * 1000);
 
     await portalClientAccessPendingModel.create({
-        token,
+        token: code,
         document: validation.document,
         email: validation.email,
         expiresAt,
     });
 
-    const confirmUrl = `${appBaseUrl()}/portal/mis-envios/confirm?token=${encodeURIComponent(token)}`;
-    const subject = '[LogiTrack] Confirmá el acceso a tus envíos';
-    const body = `Hola,
+    // Plantilla editable desde Ajustes → Comunicaciones (evento PORTAL_CLIENT_ACCESS).
+    // Si no existe la fila (migración no corrida), se usa el texto por defecto.
+    // Es un mail transaccional: se envía siempre (no respeta toggle de "habilitado").
+    const tplVars = { codigo: code, ttlHoras: CONFIRMATION_TTL_HOURS };
+    let subject = '[LogiTrack] Tu código de acceso a tus envíos';
+    let body = `Hola,
 
 Recibimos una solicitud para consultar tus envíos en el portal de LogiTrack.
 
-Para continuar, confirmá tu acceso haciendo click en el siguiente enlace (válido por ${CONFIRMATION_TTL_HOURS} horas):
+Tu código de acceso es: ${code}
 
-${confirmUrl}
+Ingresalo en el portal para continuar (válido por ${CONFIRMATION_TTL_HOURS} horas).
 
 Si no solicitaste este acceso, ignorá este mensaje.
 
 Saludos,
 Equipo LogiTrack`;
+    let format = 'text';
+    try {
+        const tpl = await emailTemplateModel.getDefaultByEventCode(NotificationEvent.PORTAL_CLIENT_ACCESS);
+        if (tpl) {
+            subject = placeholders.render(tpl.subject, tplVars) || subject;
+            body    = placeholders.render(tpl.body, tplVars)    || body;
+            format  = tpl.format === 'html' ? 'html' : 'text';
+        }
+    } catch (err) {
+        console.warn('[portal-access] no se pudo cargar plantilla, uso texto por defecto:', err.message);
+    }
 
-    const mailDelivered = await sendEmail(validation.email, subject, body);
-    const devLink = (!mailDelivered && isDevMode()) ? confirmUrl : null;
+    // Envío en segundo plano (fire-and-forget): no bloqueamos la respuesta para que
+    // el portal redirija de inmediato a "revisá tu correo" en vez de quedar cargando
+    // esperando al SMTP. El resultado se loguea para diagnóstico.
+    const dev = isDevMode();
+    sendEmail(validation.email, subject, body, format)
+        .then((ok) => {
+            if (ok) {
+                console.log(`[portal-access] código de acceso enviado a ${validation.email}`);
+            } else {
+                console.warn(`[portal-access] sendEmail devolvió false para ${validation.email} (revisar config SMTP / logs [email] ERROR)`);
+            }
+        })
+        .catch((err) => console.error(`[portal-access] excepción enviando mail a ${validation.email}:`, err.message));
 
     return {
         ok: true,
@@ -112,35 +152,40 @@ Equipo LogiTrack`;
             email: validation.email,
             document: validation.document,
             expiresAt,
-            mailDelivered,
-            devLink,
+            // Optimista en producción (ya disparamos el envío). En desarrollo mostramos
+            // el código directo porque normalmente no hay SMTP configurado localmente.
+            mailDelivered: !dev,
+            devCode: dev ? code : null,
         },
     };
 };
 
-const confirmAccess = async (rawToken) => {
-    const token = String(rawToken || '').trim();
-    if (!token) {
-        return { ok: false, status: 400, message: 'El enlace de confirmación no es válido.' };
+// CP-CONS01/CP-CONS12: confirma con código de 6 dígitos, ligado al email que lo solicitó.
+const confirmAccess = async (rawCode, rawEmail) => {
+    const code = String(rawCode || '').trim();
+    if (!/^\d{6}$/.test(code)) {
+        return { ok: false, status: 400, message: 'El código ingresado no es válido. Verificá los 6 dígitos.' };
     }
 
-    const pending = await portalClientAccessPendingModel.findByToken(token);
-    if (!pending) {
-        return { ok: false, status: 404, message: 'El enlace de confirmación no es válido o ya fue utilizado.' };
+    const pending = await portalClientAccessPendingModel.findByToken(code);
+    // Si se conoce el email (flujo del portal), el código debe corresponder a ese cliente.
+    const emailNorm = normalize(rawEmail);
+    if (!pending || (emailNorm && normalize(pending.email) !== emailNorm)) {
+        return { ok: false, status: 404, message: 'El código ingresado no es válido. Verificá los datos e intentá nuevamente.' };
     }
 
     if (new Date(pending.expiresAt) < new Date()) {
-        await portalClientAccessPendingModel.deleteByToken(token);
-        return { ok: false, status: 410, message: 'El enlace de confirmación expiró. Volvé a solicitar acceso desde el portal.' };
+        await portalClientAccessPendingModel.deleteByToken(code);
+        return { ok: false, status: 410, message: 'El código ingresado expiró. Solicite uno nuevo.' };
     }
 
     const validation = await validateClientCredentials(pending.document, pending.email);
     if (!validation.ok) {
-        await portalClientAccessPendingModel.deleteByToken(token);
+        await portalClientAccessPendingModel.deleteByToken(code);
         return { ok: false, status: 404, message: 'No se encontraron envíos vinculados a tu identidad.' };
     }
 
-    await portalClientAccessPendingModel.deleteByToken(token);
+    await portalClientAccessPendingModel.deleteByToken(code);
 
     const sessionToken = signPortalClientSession({
         document: pending.document,

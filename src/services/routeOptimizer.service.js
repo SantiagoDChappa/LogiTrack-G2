@@ -103,6 +103,8 @@ const loadShipments = (shipmentIds, supervisorBranchId) => {
             id:              { [Op.in]: shipmentIds },
             statusId:        { [Op.in]: ROUTABLE_STATUS_IDS },
             currentBranchId: supervisorBranchId,
+            // Retiro por sucursal: el cliente lo retira en la sucursal, no se rutea a domicilio.
+            deliveryMode:    { [Op.ne]: 'branch_pickup' },
         },
         include: [
             { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province', required: false }] },
@@ -384,6 +386,8 @@ const enrichBucketWithOpportunisticPickups = async ({ bucket, branch, cluster, t
             statusId: { [Op.in]: ROUTABLE_STATUS_IDS },
             currentBranchId: { [Op.in]: corridorBranchIds },
             id: { [Op.notIn]: bucket.shipments.map(s => s.id) },
+            // Retiro por sucursal: no entra al ruteo a domicilio (ni como pickup oportunista).
+            deliveryMode: { [Op.ne]: 'branch_pickup' },
         },
         include: [
             { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },

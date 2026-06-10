@@ -4,7 +4,29 @@
     <%- include('../../partials/head') %>
     <title>Modificaciones portal - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
     <link rel="stylesheet" href="/css/portal.css">
+    <style>
+        .mod-badge {
+            display: inline-block; padding: .2rem .6rem; border-radius: 999px;
+            font-size: .75rem; font-weight: 600; letter-spacing: .01em;
+            border: 1px solid transparent; white-space: nowrap;
+        }
+        .mod-badge--pending_review { background: #fef3c7; color: #92400e; border-color: rgba(146, 64, 14, .15); }
+        .mod-badge--applied        { background: #d1fae5; color: #065f46; border-color: rgba(6, 95, 70, .15); }
+        .mod-badge--rejected       { background: #fee2e2; color: #991b1b; border-color: rgba(153, 27, 27, .15); }
+        [data-theme="dark"] .mod-badge--pending_review { background: rgba(146,64,14,.22); color: #fcd34d; }
+        [data-theme="dark"] .mod-badge--applied        { background: rgba(6,95,70,.25);  color: #6ee7b7; }
+        [data-theme="dark"] .mod-badge--rejected       { background: rgba(153,27,27,.25); color: #fca5a5; }
+        .mod-type {
+            display: inline-flex; align-items: center; gap: .35rem;
+            font-size: .82rem; color: var(--color-text);
+        }
+        .mod-type .material-symbols-outlined { font-size: 1rem; color: var(--color-primary); }
+        .mod-detail { color: var(--color-text-secondary); }
+        .mod-actions { display: flex; gap: .35rem; }
+        .incident-empty { text-align: center; color: var(--color-text-secondary); padding: 2rem 1rem; }
+    </style>
 </head>
 <body>
     <%- include('../../partials/header') %>
@@ -22,9 +44,9 @@
         <div class="alert alert-error"><%= error %></div>
         <% } %>
 
-        <form method="GET" action="/shipment/modifications" class="incident-filters" style="margin-bottom:1rem;">
+        <form method="GET" action="/shipment/modifications" class="incident-filters">
             <div class="incident-filter">
-                <label for="status">Estado</label>
+                <label for="status"><span class="material-symbols-outlined incident-filter-icon">flag</span> Estado</label>
                 <select id="status" name="status">
                     <option value="PENDING_REVIEW" <%= filters.status === 'PENDING_REVIEW' ? 'selected' : '' %>>Pendiente de revisión</option>
                     <option value="APPLIED" <%= filters.status === 'APPLIED' ? 'selected' : '' %>>Aplicadas</option>
@@ -37,11 +59,8 @@
             </button>
         </form>
 
-        <% if (!requests.length) { %>
-        <p>No hay solicitudes para mostrar.</p>
-        <% } else { %>
-        <div class="portal-mis-envios-table-wrap">
-            <table class="portal-mis-envios-table">
+        <div class="incident-table-wrapper">
+            <table class="incident-table" data-paginate="modifications">
                 <thead>
                     <tr>
                         <th>Fecha</th>
@@ -55,24 +74,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <% requests.forEach(function(r) { %>
+                    <% if (!requests.length) { %>
+                        <tr><td colspan="8" class="incident-empty">No hay solicitudes para mostrar.</td></tr>
+                    <% } %>
+                    <% requests.forEach(function(r) {
+                        const shipSlug = String(r.shipmentStatus || '').toLowerCase().replace(/[\s-]+/g, '_');
+                        const reqSlug  = String(r.status || '').toLowerCase();
+                    %>
                     <tr>
                         <td><%= new Date(r.createdAt).toLocaleString('es-AR') %></td>
-                        <td><a href="/shipment/<%= r.shipmentId %>"><%= r.trackingId %></a></td>
+                        <td><a href="/shipment/detail/<%= r.shipmentId %>" class="incident-link"><%= r.trackingId %></a></td>
                         <td><%= r.recipientName || '-' %></td>
-                        <td><%= r.typeLabel %></td>
-                        <td><%= r.shipmentStatus || '-' %></td>
-                        <td><%= r.summary %></td>
-                        <td><%= r.statusLabel %></td>
+                        <td><span class="mod-type"><span class="material-symbols-outlined">edit_note</span><%= r.typeLabel %></span></td>
+                        <td><% if (r.shipmentStatus) { %><span class="status-badge <%= shipSlug %>"><%= r.shipmentStatus %></span><% } else { %>—<% } %></td>
+                        <td class="mod-detail"><%= r.summary %></td>
+                        <td><span class="mod-badge mod-badge--<%= reqSlug %>"><%= r.statusLabel %></span></td>
                         <td>
                             <% if (r.status === 'PENDING_REVIEW') { %>
-                            <form method="POST" action="/shipment/modifications/<%= r.id %>/approve" style="display:inline">
-                                <button type="submit" class="action-btn guardar" data-tooltip="Aprobar" aria-label="Aprobar"><span class="material-symbols-outlined">check</span></button>
-                            </form>
-                            <form method="POST" action="/shipment/modifications/<%= r.id %>/reject" style="display:inline;margin-left:.35rem;">
-                                <input type="hidden" name="reviewComment" value="Rechazada en revisión operativa">
-                                <button type="submit" class="action-btn eliminar" data-tooltip="Rechazar" aria-label="Rechazar"><span class="material-symbols-outlined">close</span></button>
-                            </form>
+                            <div class="mod-actions">
+                                <form method="POST" action="/shipment/modifications/<%= r.id %>/approve">
+                                    <button type="submit" class="action-btn guardar" data-tooltip="Aprobar" aria-label="Aprobar"><span class="material-symbols-outlined">check</span></button>
+                                </form>
+                                <form method="POST" action="/shipment/modifications/<%= r.id %>/reject">
+                                    <input type="hidden" name="reviewComment" value="Rechazada en revisión operativa">
+                                    <button type="submit" class="action-btn eliminar" data-tooltip="Rechazar" aria-label="Rechazar"><span class="material-symbols-outlined">close</span></button>
+                                </form>
+                            </div>
                             <% } else { %>
                             —
                             <% } %>
@@ -82,7 +109,8 @@
                 </tbody>
             </table>
         </div>
-        <% } %>
     </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
 </body>
 </html>

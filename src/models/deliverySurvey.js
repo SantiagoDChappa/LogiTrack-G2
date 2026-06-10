@@ -9,8 +9,8 @@ const DeliverySurvey = sequelize.define('delivery_survey', {
     packageConditionRating: { type: DataTypes.SMALLINT, allowNull: false },
     serviceRating:          { type: DataTypes.SMALLINT, allowNull: false },
     comment:                { type: DataTypes.TEXT, allowNull: true },
-    respondedByDocument:    { type: DataTypes.INTEGER, allowNull: false },
-    respondedByEmail:       { type: DataTypes.STRING(255), allowNull: false },
+    respondedByDocument:    { type: DataTypes.INTEGER, allowNull: true },
+    respondedByEmail:       { type: DataTypes.STRING(255), allowNull: true },
     createdAt:              { type: DataTypes.DATE },
 }, { tableName: 'delivery_survey', timestamps: false });
 

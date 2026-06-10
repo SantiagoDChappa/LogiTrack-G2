@@ -1,6 +1,4 @@
 const multer = require('multer');
-const fs     = require('fs');
-const path   = require('path');
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -23,15 +21,23 @@ const csvUpload = multer({
     fileFilter: csvFileFilter,
 });
 
-// Evidencias de incidencia: imágenes y PDF, hasta 5 MB, en memoria (se guardan en base64).
-const EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
+// Evidencias de incidencia: imágenes y PDF, hasta 10 MB, en memoria (se guardan en base64).
+const EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EVIDENCE_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+// Extensión en minúsculas (con punto) a partir del nombre del archivo. Ej: "virus.EXE" → ".exe".
+const fileExt = (name) => {
+    const m = String(name || '').match(/(\.[^.\\/]+)$/);
+    return m ? m[1].toLowerCase() : '';
+};
 
 const evidenceFileFilter = (req, file, cb) => {
     if (ALLOWED_EVIDENCE_MIME.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Solo se aceptan imágenes (JPG/PNG) o PDF'));
+        // CP-RINC05 Caso A: "Formato .exe no permitido" (extensión real del archivo).
+        const ext = fileExt(file.originalname);
+        cb(new Error(`Formato ${ext || 'desconocido'} no permitido`));
     }
 };
 
@@ -41,10 +47,9 @@ const evidenceUpload = multer({
     fileFilter: evidenceFileFilter,
 });
 
-// LGT-172: Logo institucional. Imágenes hasta 2 MB, guardado en disco (public/images/brand).
+// LGT-172: Logo institucional. Imágenes hasta 2 MB, persistido en base (base64).
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
-const LOGO_DIR = path.join(__dirname, '..', '..', 'public', 'images', 'brand');
 
 const logoFileFilter = (req, file, cb) => {
     if (ALLOWED_LOGO_MIME.includes(file.mimetype)) {
@@ -54,21 +59,12 @@ const logoFileFilter = (req, file, cb) => {
     }
 };
 
-const logoStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        fs.mkdirSync(LOGO_DIR, { recursive: true });
-        cb(null, LOGO_DIR);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
-        cb(null, `logo-${Date.now()}${ext}`);
-    },
-});
-
+// En memoria: el logo se persiste en la base (base64), no en disco. El disco de Render
+// es efímero y el archivo se perdía en cada deploy (logo roto).
 const logoUpload = multer({
-    storage: logoStorage,
+    storage: multer.memoryStorage(),
     limits:  { fileSize: LOGO_MAX_BYTES },
     fileFilter: logoFileFilter,
 });
 
-module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES, ALLOWED_EVIDENCE_MIME };
+module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES, ALLOWED_EVIDENCE_MIME, fileExt };

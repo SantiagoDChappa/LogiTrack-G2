@@ -36,17 +36,20 @@ async function calculateUpdatePriority(shipmentId, priorityBase) {
     return priority;
 }
 
-cron.schedule('0 0 * * *', async () => {
-    try {
-        const shipments = await getActiveShipments();
-        for (const shipment of shipments) {
-            const newPriority = await calculateUpdatePriority(shipment.id, shipment.basePriority);
-            shipment.priority = newPriority;
-            await shipment.save();
+// No agendar el cron bajo tests: mantiene handles abiertos y cuelga Jest.
+if (process.env.NODE_ENV !== 'test') {
+    cron.schedule('0 0 * * *', async () => {
+        try {
+            const shipments = await getActiveShipments();
+            for (const shipment of shipments) {
+                const newPriority = await calculateUpdatePriority(shipment.id, shipment.basePriority);
+                shipment.priority = newPriority;
+                await shipment.save();
+            }
+        } catch (err) {
+            console.error('cron updatePriority error:', err.message);
         }
-    } catch (err) {
-        console.error('cron updatePriority error:', err.message);
-    }
-});
+    });
+}
 
 module.exports = { calculateUpdatePriority, calcutaleUpdatePriority: calculateUpdatePriority };

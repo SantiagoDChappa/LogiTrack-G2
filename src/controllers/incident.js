@@ -9,6 +9,7 @@ const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
 const { sendEmail }        = require('../services/notification/emailSender');
 const incidentRules        = require('../services/incidentRules');
+const { Transport }        = require('../models/transport');
 const incidentNotifConfig  = require('../services/incidentNotifConfig');
 const { snapshotChecklist } = require('../services/incidentChecklist');
 const incidentTaskModel    = require('../models/incidentTask');
@@ -79,6 +80,8 @@ const list = async (req, res) => {
         priority:          req.query.priority ? Number(req.query.priority) : null,
         assignedToUserId:  req.query.assignedToUserId ? Number(req.query.assignedToUserId) : null,
         shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null,
+        // Búsqueda por código de envío (ej. "ENV-011").
+        trackingId:        req.query.trackingId ? String(req.query.trackingId).trim() : null,
         openedChannel:     req.query.origin === 'EXTERNO' ? IncidentChannel.PORTAL
                           : req.query.origin === 'INTERNO' ? IncidentChannel.INTERNAL
                           : null,
@@ -225,6 +228,17 @@ const create = async (req, res) => {
     if (eligibilityError) {
         return renderFormError(eligibilityError);
     }
+    // Warning soft (no bloquea): si la confirmación aún no llegó, devolvemos el form
+    // con un mensaje pidiendo marcar la casilla "confirmWarning".
+    // VEH_OUT_OF_SERVICE necesita el vehículo del driver del envío para armar el aviso.
+    let transportForWarning = null;
+    if (type.code === 'VEH_OUT_OF_SERVICE' && shipment.deliveryUserId) {
+        transportForWarning = await Transport.findOne({ where: { driverUserId: shipment.deliveryUserId } });
+    }
+    const eligibilityWarning = incidentRules.getEligibilityWarning(shipment, type, { transport: transportForWarning });
+    if (eligibilityWarning && req.body.confirmWarning !== '1') {
+        return renderFormError(eligibilityWarning + ' Marcá "Confirmo crear igual" y reenviá el formulario.');
+    }
 
     const incident = await sequelize.transaction(async (t) => {
         const created = await Incident.create({
@@ -289,9 +303,29 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
     });
 
     if (cfg.notifyShipmentRecipient) {
-        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id)
-            .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
+        // Dispatch del evento correcto según el tipo de incidencia. Se respeta el toggle
+        // global notifyShipmentRecipient + el toggle por tipo (notifyOnDelay / OnDamage / OnGeneric).
+        // Cada evento ademas respeta su propia config (template + enabled) en Ajustes → Comunicaciones.
+        let eventForType = null;
+        switch (type?.code) {
+            case 'DELAY':
+                if (cfg.notifyOnDelay !== false)  { eventForType = NotificationEvent.SHIPMENT_DELAYED; }
+                break;
+            case 'PACKAGE_BROKEN':
+                if (cfg.notifyOnDamage !== false) { eventForType = NotificationEvent.SHIPMENT_PACKAGE_FAILED; }
+                break;
+            default:
+                if (cfg.notifyOnGeneric !== false) { eventForType = NotificationEvent.SHIPMENT_INCIDENT; }
+        }
+        if (eventForType) {
+            require('./shipment').notifyShipmentEvent(eventForType, shipment.id, { _incidentId: String(incidentId) })
+                .catch(e => console.error(`[incident] notif ${eventForType}:`, e.message));
+        }
     }
+    // LGT-204: si es paquete dañado, avisar al remitente para que elija reembolso/reemplazo.
+    require('../services/incidentDamageResolution').notifySenderIfDamage({ incidentId, shipment, type })
+        .catch(e => console.error('[incident] notif daño remitente:', e.message));
+
     if (emails.length === 0) { return; }
 
     const reportedByLabel = openedBy
@@ -447,19 +481,22 @@ const changeStatus = async (req, res) => {
     const id = Number(req.params.id);
     const { status: toStatus, comment } = req.body;
 
-    if (![IncidentStatus.OPEN, IncidentStatus.IN_REVIEW].includes(toStatus)) {
-        return res.status(400).redirect(`/incident/${id}?error=invalid_status`);
+    if (!comment || String(comment).trim().length === 0) {
+        return res.status(400).redirect(`/incident/${id}?error=comment_required`);
     }
     const incident = await Incident.findByPk(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (incident.status === IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=closed`);
     }
-    if (incident.status === toStatus) {
-        return res.redirect(`/incident/${id}`);
+    // Única transición vía changeStatus: OPEN -> IN_REVIEW.
+    // CLOSED se hace por close(); reapertura por reopen(); no se vuelve de IN_REVIEW a OPEN.
+    if (!(incident.status === IncidentStatus.OPEN && toStatus === IncidentStatus.IN_REVIEW)) {
+        return res.status(400).redirect(`/incident/${id}?error=invalid_transition`);
     }
 
     const from = incident.status;
+    const cleanComment = String(comment).trim().slice(0, 2000);
     await sequelize.transaction(async (t) => {
         await incident.update({ status: toStatus }, { transaction: t });
         await incidentHistoryModel.create({
@@ -467,13 +504,26 @@ const changeStatus = async (req, res) => {
             eventType:  IncidentEventType.STATUS_CHANGE,
             fromValue:  from,
             toValue:    toStatus,
-            comment:    comment || null,
+            comment:    cleanComment,
             userId:     user.id,
             transaction: t
         });
     });
+    notifyIncidentStatusChange(incident.shipmentId, id, toStatus, cleanComment);
     res.redirect(`/incident/${id}`);
 };
+
+// Notifica al cliente el cambio de estado de una incidencia vía el sistema de
+// plantillas editables (evento INCIDENT_STATUS_CHANGE). Fire-and-forget.
+const { IncidentStatusLabel } = require('../constants/enums');
+function notifyIncidentStatusChange(shipmentId, incidentId, toStatus, comentario) {
+    if (!shipmentId) { return; }
+    require('./shipment').notifyShipmentEvent(NotificationEvent.INCIDENT_STATUS_CHANGE, shipmentId, {
+        incidentId,
+        incidentEstado: IncidentStatusLabel[toStatus] || toStatus,
+        incidentComentario: comentario || '',
+    }).catch((e) => console.error('notifyIncidentStatusChange:', e.message));
+}
 
 const escalate = async (req, res) => {
     const user = res.locals.currentUser;
@@ -529,19 +579,49 @@ const escalate = async (req, res) => {
     res.redirect(`/incident/${id}`);
 };
 
-const close = async (req, res) => {
+// Setea SOLO la resolución (procedente / no procedente). NO cierra la incidencia.
+// Cerrar es un paso separado (POST /:id/close) que requiere resolución ya marcada.
+const setResolution = async (req, res) => {
     const user = res.locals.currentUser;
     const id = Number(req.params.id);
-    const { resolution, comment, shipmentAction } = req.body;
+    const { resolution, comment } = req.body;
 
     if (![IncidentResolution.PROCEDENTE, IncidentResolution.NO_PROCEDENTE].includes(resolution)) {
         return res.status(400).redirect(`/incident/${id}?error=resolution_required`);
     }
+    if (!comment || String(comment).trim().length === 0) {
+        return res.status(400).redirect(`/incident/${id}?error=comment_required`);
+    }
+    const incident = await Incident.findByPk(id);
+    if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
+    if (incident.status === IncidentStatus.CLOSED) {
+        return res.status(400).redirect(`/incident/${id}?error=closed`);
+    }
+
+    const prev = incident.resolution || null;
+    const cleanComment = String(comment).trim().slice(0, 2000);
+    await sequelize.transaction(async (t) => {
+        await incident.update({ resolution }, { transaction: t });
+        await incidentHistoryModel.create({
+            incidentId: id,
+            eventType:  IncidentEventType.COMMENT,
+            fromValue:  prev,
+            toValue:    resolution,
+            comment:    `Resolución marcada como ${resolution}. ${cleanComment}`,
+            userId:     user.id,
+            transaction: t
+        });
+    });
+    res.redirect(`/incident/${id}`);
+};
+
+const close = async (req, res) => {
+    const user = res.locals.currentUser;
+    const id = Number(req.params.id);
+    const { comment, shipmentAction } = req.body;
+
     const VALID_ACTIONS = ['none', 'cancel'];
     const action = VALID_ACTIONS.includes(shipmentAction) ? shipmentAction : 'none';
-    if (action !== 'none' && resolution !== IncidentResolution.PROCEDENTE) {
-        return res.status(400).redirect(`/incident/${id}?error=action_requires_procedente`);
-    }
 
     if (!comment || String(comment).trim().length === 0) {
         return res.status(400).redirect(`/incident/${id}?error=comment_required`);
@@ -550,6 +630,14 @@ const close = async (req, res) => {
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (incident.status === IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=already_closed`);
+    }
+    // La resolución debe haber sido marcada antes via /resolution.
+    const resolution = incident.resolution;
+    if (![IncidentResolution.PROCEDENTE, IncidentResolution.NO_PROCEDENTE].includes(resolution)) {
+        return res.status(400).redirect(`/incident/${id}?error=resolution_required_before_close`);
+    }
+    if (action !== 'none' && resolution !== IncidentResolution.PROCEDENTE) {
+        return res.status(400).redirect(`/incident/${id}?error=action_requires_procedente`);
     }
 
     // No se puede cerrar si quedan tareas obligatorias del checklist sin completar.
@@ -601,6 +689,8 @@ const close = async (req, res) => {
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, incident.shipmentId)
             .catch(e => console.error('[incident] notif CANCELLED:', e.message));
     }
+    // Aviso al cliente: la incidencia se cerró (con comentario explicativo).
+    notifyIncidentStatusChange(incident.shipmentId, id, IncidentStatus.CLOSED, String(comment).trim());
 
     res.redirect(`/incident/${id}`);
 };
@@ -608,11 +698,16 @@ const close = async (req, res) => {
 const reopen = async (req, res) => {
     const user = res.locals.currentUser;
     const id = Number(req.params.id);
+    const { comment } = req.body;
+    if (!comment || String(comment).trim().length === 0) {
+        return res.status(400).redirect(`/incident/${id}?error=comment_required`);
+    }
     const incident = await Incident.findByPk(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (incident.status !== IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=not_closed`);
     }
+    const cleanComment = String(comment).trim().slice(0, 2000);
     await sequelize.transaction(async (t) => {
         await incident.update({
             status:         IncidentStatus.IN_REVIEW,
@@ -624,11 +719,12 @@ const reopen = async (req, res) => {
             incidentId: id,
             eventType:  IncidentEventType.REOPENED,
             toValue:    IncidentStatus.IN_REVIEW,
-            comment:    req.body.comment || null,
+            comment:    cleanComment,
             userId:     user.id,
             transaction: t
         });
     });
+    notifyIncidentStatusChange(incident.shipmentId, id, IncidentStatus.IN_REVIEW, cleanComment);
     res.redirect(`/incident/${id}`);
 };
 
@@ -796,7 +892,7 @@ const searchShipments = async (req, res) => {
 
 module.exports = {
     list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen, searchShipments,
+    assign, changeStatus, escalate, setResolution, close, reopen, searchShipments,
     toggleTask, uploadAttachment, downloadAttachment,
     // Exportadas para que portal.js (flujo publico de confirmacion) y otros
     // controllers reutilicen el mismo pipeline de mails.

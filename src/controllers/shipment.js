@@ -13,6 +13,18 @@ const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+
+// Default ETA si el operador no carga fecha estimada al crear/modificar.
+// Express → +2 días, Standard → +5, sin tipo → +3. Devuelve 'YYYY-MM-DD' (DATEONLY).
+const computeDefaultExpectedDeliveryDate = (shipmentTypeId) => {
+    const typeId = Number(shipmentTypeId);
+    let days = 3;
+    if (typeId === ShipmentType.EXPRESS.id)  { days = 2; }
+    if (typeId === ShipmentType.STANDARD.id) { days = 5; }
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+};
 const { validationResult } = require('express-validator');
 const csvImport = require('../services/csvImport');
 const csvExport = require('../services/csvExport');
@@ -27,6 +39,7 @@ const notificationVariableModel = require('../models/notificationVariable');
 const placeholders = require('../services/notificationPlaceholders');
 const notificationEventModel = require('../models/notificationEvents')
 const { queueEmail } = require('../services/notification/notificationEmailService');
+const failedAttemptModel = require('../models/failedAttempt');
 const sequelize = require('../database/connection');
 
 const isAdminUser = (user) => user?.roleId === RoleType.ADMIN.id;
@@ -246,10 +259,13 @@ const getDetail = async (req, res) => {
     })();
 
 
+    const incidentsForShipment = await require('../models/incident').list({ shipmentId: id, limit: 50 });
+
     res.render('shipment/detail', {
         shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
+        incidents: incidentsForShipment,
     });
 };
 
@@ -452,7 +468,7 @@ const createShipment = async (req, res) => {
             priority:        initialPriority,
             currentBranchId: resolvedCurrentBranchId,
             zoneId: resolvedZone?.id || null,
-            expectedDeliveryDate: body.expectedDeliveryDate || null,
+            expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
         }, { transaction: t });
@@ -866,8 +882,17 @@ const cancelShipment = async (req, res) => {
 const markPackageFailed = async (req, res) => {
     try {
         const { id } = req.params;
-        const { comment } = req.body;
+        const { comment, reason } = req.body;
         const currentUser = res.locals.currentUser;
+
+        // Mapeo motivo → variante del template del cliente. Si no llega reason valido,
+        // queda el genérico SHIPMENT_PACKAGE_FAILED (backward compatible).
+        const REASON_TO_EVENT = {
+            UNDELIVERED: NotificationEvent.SHIPMENT_PACKAGE_FAILED_UNDELIVERED,
+            DELAY:       NotificationEvent.SHIPMENT_PACKAGE_FAILED_DELAY,
+            ATTEMPT:     NotificationEvent.SHIPMENT_PACKAGE_FAILED_ATTEMPT,
+        };
+        const notificationEventOverride = REASON_TO_EVENT[String(reason || '').toUpperCase()] || null;
 
         const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
@@ -878,6 +903,7 @@ const markPackageFailed = async (req, res) => {
             branchId: actorCoords.branchId,
             latitude: actorCoords.latitude,
             longitude: actorCoords.longitude,
+            notificationEventOverride,
         });
 /*
         const shipment = await shipmentModel.getById(id);
@@ -1095,7 +1121,15 @@ async function resolveShipmentForNotification(shipmentOrId) {
     return shipmentModel.getById(id);
 }
 
-async function notifyShipmentEvent(eventCode, shipmentOrId) {
+// NFAL07 (LGT-158): eventos cuyo email lleva el link de autogestión accionable.
+// Al enviarlos se "arma" el token (vence en N días, rearmado para un uso).
+const ACTIONABLE_SELF_SERVICE_EVENTS = new Set([
+    NotificationEvent.SHIPMENT_FAILED_ATTEMPT,
+    NotificationEvent.SHIPMENT_DELAYED,
+    NotificationEvent.SHIPMENT_RETURNED_BRANCH,
+]);
+
+async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
     try {
         const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
         if (!cfg || !cfg.enabled) { return; }
@@ -1117,8 +1151,38 @@ async function notifyShipmentEvent(eventCode, shipmentOrId) {
             return;
         }
 
-        // Catálogo de datos del envío + variables custom del cliente.
-        const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap() };
+        // NFAL07: arma el link accionable cuando efectivamente se envía el aviso.
+        if (ACTIONABLE_SELF_SERVICE_EVENTS.has(eventCode)) {
+            shipmentModel.armSelfServiceToken(shipment.id)
+                .catch(e => console.error('notifyShipmentEvent armSelfServiceToken:', e.message));
+        }
+
+        // Catálogo de datos del envío + variables custom del cliente + variables extra (ej. contexto de incidencia).
+        const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap(), ...extraVars };
+        if (eventCode === NotificationEvent.SHIPMENT_FAILED_ATTEMPT) {
+            const attempts = await failedAttemptModel.getByShipmentId(shipment.id);
+            const latest = attempts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+            vars.failedReason = latest?.reason || '';
+        }
+        if (eventCode === NotificationEvent.SHIPMENT_DELAYED) {
+            const expected = new Date(shipment.expectedDeliveryDate);
+            const diffMs = Date.now() - expected.getTime();
+            const diffDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+            vars.daysDelayed = String(diffDays);
+        }
+        // Avisos sobre una incidencia ya creada (paquete dañado / incidencia / cambio de
+        // estado): el enlace debe llevar a ESA incidencia, no al alta de una nueva.
+        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED];
+        if (!vars._incidentId && INCIDENT_EVENTS.includes(eventCode)) {
+            try {
+                const { Incident } = require('../models/incident');
+                const inc = await Incident.findOne({ where: { shipmentId: shipment.id }, order: [['id', 'DESC']] });
+                if (inc) { vars._incidentId = String(inc.id); }
+            } catch { /* sin incidencia → queda el enlace de alta */ }
+        }
+        if (vars._incidentId) {
+            vars.incidentUrl = `${placeholders.baseUrl()}/portal/mis-envios/incidencia/${vars._incidentId}`;
+        }
         const fill = (s) => placeholders.render(s, vars);
 
         await queueEmail({

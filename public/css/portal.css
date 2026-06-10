@@ -19,6 +19,19 @@
     --c-info:         #0284c7;
     --radius:         12px;
     --shadow:         0 4px 20px rgba(0,0,0,.08);
+
+    /* Colores de estado (mismos del sistema — style.css). Tema claro. */
+    --badge-pending-bg:         #fef3c7;  --badge-pending-text:        #92400e;
+    --badge-transit-bg:         #dbeafe;  --badge-transit-text:        #1d4ed8;
+    --badge-delivered-bg:       #dcfce7;  --badge-delivered-text:      #166534;
+    --badge-cancelled-bg:       #fee2e2;  --badge-cancelled-text:      #991b1b;
+    --badge-warehouse-bg:       #ede9fe;  --badge-warehouse-text:      #6d28d9;
+    --badge-delayed-bg:         #ffedd5;  --badge-delayed-text:        #9a3412;
+    --badge-initial-bg:         #f1f5f9;  --badge-initial-text:        #475569;
+    --badge-assigned-bg:        #cffafe;  --badge-assigned-text:       #155e75;
+    --badge-preparing-bg:       #fed7aa;  --badge-preparing-text:      #9a3412;
+    --badge-package-failed-bg:  #ffe4e6;  --badge-package-failed-text: #9f1239;
+    --badge-failed-attempt-bg:  #fef08a;  --badge-failed-attempt-text: #854d0e;
 }
 
 html { scroll-behavior: smooth; }
@@ -34,6 +47,19 @@ html { scroll-behavior: smooth; }
     --c-text:       #f1f5f9;
     --c-text-2:     #94a3b8;
     --c-text-3:     #475569;
+
+    /* Colores de estado — tema oscuro. */
+    --badge-pending-bg:         #451a03;  --badge-pending-text:        #fcd34d;
+    --badge-transit-bg:         #172554;  --badge-transit-text:        #93c5fd;
+    --badge-delivered-bg:       #052e16;  --badge-delivered-text:      #86efac;
+    --badge-cancelled-bg:       #450a0a;  --badge-cancelled-text:      #fca5a5;
+    --badge-warehouse-bg:       #2e1065;  --badge-warehouse-text:      #c4b5fd;
+    --badge-delayed-bg:         #431407;  --badge-delayed-text:        #fdba74;
+    --badge-initial-bg:         #1e293b;  --badge-initial-text:        #94a3b8;
+    --badge-assigned-bg:        #164e63;  --badge-assigned-text:       #67e8f9;
+    --badge-preparing-bg:       #7c2d12;  --badge-preparing-text:      #fdba74;
+    --badge-package-failed-bg:  #881337;  --badge-package-failed-text: #fda4af;
+    --badge-failed-attempt-bg:  #713f12;  --badge-failed-attempt-text: #fde047;
 }
 
 [data-theme="dark"] .portal-nav         { background: #0f172a; border-color: #334155; }
@@ -404,26 +430,23 @@ ul { list-style: none; }
     border-radius: 999px;
     font-size: .8125rem;
     font-weight: 600;
+    /* Fallback neutro: cualquier estado sin clase específica igual se ve como chip. */
+    background: var(--badge-initial-bg);
+    color: var(--badge-initial-text);
 }
 
-.portal-badge.pendiente, .portal-badge.inicial {
-    background: #fef3c7; color: #92400e;
-}
-.portal-badge.en_transito {
-    background: #dbeafe; color: #1d4ed8;
-}
-.portal-badge.entregado {
-    background: #dcfce7; color: #166534;
-}
-.portal-badge.cancelado, .portal-badge.cancelada {
-    background: #fee2e2; color: #991b1b;
-}
-.portal-badge.retrasado {
-    background: #ffedd5; color: #9a3412;
-}
-.portal-badge.en_sucursal {
-    background: #ede9fe; color: #6d28d9;
-}
+.portal-badge.pendiente       { background: var(--badge-pending-bg);        color: var(--badge-pending-text); }
+.portal-badge.inicial         { background: var(--badge-initial-bg);        color: var(--badge-initial-text); }
+.portal-badge.asignado        { background: var(--badge-assigned-bg);       color: var(--badge-assigned-text); }
+.portal-badge.en_preparacion  { background: var(--badge-preparing-bg);      color: var(--badge-preparing-text); }
+.portal-badge.en_transito     { background: var(--badge-transit-bg);        color: var(--badge-transit-text); }
+.portal-badge.en_sucursal     { background: var(--badge-warehouse-bg);      color: var(--badge-warehouse-text); }
+.portal-badge.entregado       { background: var(--badge-delivered-bg);      color: var(--badge-delivered-text); }
+.portal-badge.cancelado,
+.portal-badge.cancelada       { background: var(--badge-cancelled-bg);      color: var(--badge-cancelled-text); }
+.portal-badge.retrasado       { background: var(--badge-delayed-bg);        color: var(--badge-delayed-text); }
+.portal-badge.paquete_fallido { background: var(--badge-package-failed-bg); color: var(--badge-package-failed-text); }
+.portal-badge.intento_fallido { background: var(--badge-failed-attempt-bg); color: var(--badge-failed-attempt-text); }
 
 /* ─── TIMELINE ─── */
 .portal-timeline {
@@ -1399,7 +1422,7 @@ ul { list-style: none; }
     text-decoration: none;
     transition: background .18s, border-color .18s, color .18s;
 }
-.portal-nav-link:hover { background: var(--c-bg); color: var(--c-text); border-color: var(--c-text-2); }
+.portal-nav-link:hover { background: var(--c-bg); color: var(--c-text); border-color: var(--c-text-2); text-decoration: none; }
 .portal-nav-link .material-symbols-outlined { font-size: 1rem; }
 
 .portal-mis-envios-section {
@@ -1453,6 +1476,73 @@ ul { list-style: none; }
 }
 .portal-mis-envios-tab.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
 .portal-mis-envios-tab:hover { color: var(--c-text); }
+
+/* ── Pantalla de ingreso de código de acceso (misEnviosPending) ───────────── */
+.portal-access-form {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
+    align-items: center;
+}
+.portal-access-code-input {
+    font-size: 1.6rem;
+    letter-spacing: .4em;
+    text-align: center;
+    width: 7em;
+    padding: .6rem .5rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 10px;
+    background: var(--c-surface, #fff);
+    color: var(--c-text);
+    font-family: 'Inter', sans-serif;
+    transition: border-color .18s, box-shadow .18s;
+}
+.portal-access-code-input:focus {
+    outline: none;
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
+}
+.portal-access-confirm { width: 100%; max-width: 280px; }
+
+.portal-access-secondary {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .6rem;
+}
+.portal-access-resend {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    background: none;
+    border: none;
+    padding: .25rem .5rem;
+    color: var(--c-primary);
+    font-family: inherit;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background .15s, color .15s;
+}
+.portal-access-resend .material-symbols-outlined { font-size: 1.1rem; }
+.portal-access-resend:hover { background: rgba(37, 99, 235, .08); color: var(--c-primary-dk); }
+.portal-access-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .55rem 1.4rem;
+    border: 1.5px solid var(--c-border);
+    border-radius: 9999px;
+    color: var(--c-text-2);
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 500;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.portal-access-back:hover { background: var(--c-bg); color: var(--c-text); border-color: var(--c-text-3); }
 
 .portal-mis-envios-table-wrap { overflow-x: auto; }
 .portal-mis-envios-table {
@@ -1572,6 +1662,15 @@ ul { list-style: none; }
 }
 
 .portal-incident-section { margin-top: 1.25rem; }
+/* En el detalle de "Mis Envíos" la clase .portal-incident-section se usa solo como
+   separador entre cards. incidents.css (página de creación) define esa misma clase
+   como "sección a pantalla completa" (min-height 100vh + padding enorme + gradiente),
+   y al cargarse después pisaba el alto de cada card. Lo anulamos acotado al detalle. */
+.portal-mis-envios-detail-wrapper .portal-incident-section {
+    min-height: 0;
+    padding: 1.25rem 1.5rem;
+    background: var(--c-surface, #fff);
+}
 .portal-incident-section-title {
     margin: 0 0 1rem;
     font-size: 1.05rem;

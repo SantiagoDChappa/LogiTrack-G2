@@ -21,7 +21,7 @@ const statusModel = require('../models/status');
 const statusColors = require('../services/statusColors');
 
 // LGT-174: secciones de Ajustes (cada una es su propia página, navegada desde el menú).
-const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'auditoria'];
+const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'incidencias', 'auditoria'];
 
 // Tras guardar, vuelve a la sección desde la que se envió el formulario (vía Referer).
 function settingBack(req, suffix = '') {
@@ -59,6 +59,14 @@ const getSettings = async (req, res) => {
         color: settings[statusColors.keyFor(s.id)] || '',
     }));
 
+    // Colores personalizables de los estados de incidencia (enum fijo).
+    const incidentStatusColorList = statusColors.INCIDENT_STATUSES.map(s => ({
+        code: s.code,
+        label: s.label,
+        color: settings[statusColors.incidentKeyFor(s.code)] || '',
+        defaultColor: s.defaultColor,
+    }));
+
     // Variantes de plantilla agrupadas por evento (lista). La 1ra es la predeterminada.
     const templatesByEvent = {};
     for (const t of emailTemplates) {
@@ -86,7 +94,7 @@ const getSettings = async (req, res) => {
         settings, notifConfig, templatesByEvent, provinces, branches, users, routeOpt, settingLogs,
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         placeholderGroups, customVariables, emailSnippets, sampleVars,
-        statusColorList, activeSection,
+        statusColorList, incidentStatusColorList, activeSection,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -141,6 +149,26 @@ const saveNotificationConfig = async (req, res) => {
     }
 };
 
+// CP-CNNF04: valida que la plantilla no use variables {{token}} inexistentes.
+// Devuelve un mensaje de error (string) o null si está OK.
+const validateTemplateVars = async (subject, body) => {
+    let customVars = {};
+    try { customVars = await notificationVariableModel.getAllAsMap(); } catch { customVars = {}; }
+    const allowedExtra = Object.keys(customVars || {});
+    const unknown = [...new Set([
+        ...placeholders.findUnknownTokens(subject, allowedExtra),
+        ...placeholders.findUnknownTokens(body, allowedExtra),
+    ])];
+    if (!unknown.length) { return null; }
+    const available = placeholders.catalogMeta().map((p) => `{{${p.token}}}`)
+        .concat(allowedExtra.map((k) => `{{${k}}}`));
+    const malas = unknown.map((t) => `{{${t}}}`).join(' y ');
+    return `Las variables ${malas} no son válidas. Variables disponibles: ${available.join(', ')}`;
+};
+
+const tplVarsRedirect = (req, res, msg) =>
+    res.redirect(settingBack(req, `?error=tpl_vars&msg=${encodeURIComponent(msg)}`));
+
 // Edita la plantilla predeterminada del evento (compatibilidad).
 const saveEmailTemplate = async (req, res) => {
     try {
@@ -150,6 +178,8 @@ const saveEmailTemplate = async (req, res) => {
         const format  = req.body.format === 'html' ? 'html' : 'text';
         const name    = (req.body.name || '').trim() || undefined;
         if (!subject || !body) { return res.redirect(settingBack(req, '?error=template_empty')); }
+        const varsErr = await validateTemplateVars(subject, body);
+        if (varsErr) { return tplVarsRedirect(req, res, varsErr); }
         const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body, format, name });
         if (!updated) { return res.redirect(settingBack(req, '?error=template_not_found')); }
         res.redirect(settingBack(req, '?success=tpl'));
@@ -168,6 +198,8 @@ const updateEmailTemplateById = async (req, res) => {
         const format  = req.body.format === 'html' ? 'html' : 'text';
         const name    = (req.body.name || '').trim() || undefined;
         if (!subject || !body) { return res.redirect(settingBack(req, '?error=template_empty')); }
+        const varsErr = await validateTemplateVars(subject, body);
+        if (varsErr) { return tplVarsRedirect(req, res, varsErr); }
         const updated = await emailTemplateModel.updateById(id, { subject, body, format, name });
         if (!updated) { return res.redirect(settingBack(req, '?error=template_not_found')); }
         res.redirect(settingBack(req, '?success=tpl'));
@@ -184,6 +216,8 @@ const createEmailTemplateVariant = async (req, res) => {
         const subject = (req.body.subject || '').trim() || '(sin asunto)';
         const body    = (req.body.body    || '').trim();
         const format  = req.body.format === 'html' ? 'html' : 'text';
+        const varsErr = await validateTemplateVars(subject, body);
+        if (varsErr) { return tplVarsRedirect(req, res, varsErr); }
         await emailTemplateModel.createVariant(eventCode, { name, subject, body, format });
         res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
@@ -272,6 +306,46 @@ const testShipmentNotification = async (req, res) => {
     } catch (err) {
         console.error('testShipmentNotification:', err.message);
         res.status(500).redirect(settingBack(req, '?error=test_notif'));
+    }
+};
+
+// Ejecuta manualmente un proceso automático "ahora" (sin esperar al horario programado).
+const runProcess = async (req, res) => {
+    const proc = String(req.params.proc || '');
+    try {
+        let detail = '';
+        if (proc === 'expirados') {
+            const n = await expireShipments();
+            detail = `${n || 0} envío(s) expirado(s)`;
+        } else if (proc === 'notificaciones') {
+            const { processPendingEmails } = require('../jobs/emailProcessorJob');
+            const s = await processPendingEmails();
+            detail = `${s?.sent || 0} email(s) enviado(s)`;
+        } else if (proc === 'demoras') {
+            const { processDelayedShipments } = require('../jobs/delayDetectionJob');
+            await processDelayedShipments();
+            detail = 'Detección de demoras ejecutada';
+        } else {
+            return res.redirect(settingBack(req, '?error=proc_desconocido'));
+        }
+        return res.redirect(settingBack(req, `?success=proc&proc=${encodeURIComponent(proc)}&detail=${encodeURIComponent(detail)}`));
+    } catch (err) {
+        console.error(`runProcess(${proc}):`, err.message);
+        return res.status(500).redirect(settingBack(req, '?error=proc_run'));
+    }
+};
+
+// Envía manualmente toda la cola de emails pendientes (sin esperar al cron).
+const flushEmailQueue = async (req, res) => {
+    try {
+        const { processPendingEmails } = require('../jobs/emailProcessorJob');
+        const summary = await processPendingEmails();
+        const sent = summary?.sent || 0;
+        const retried = summary?.retried || 0;
+        return res.redirect(settingBack(req, `?success=flush&sent=${sent}&retried=${retried}`));
+    } catch (err) {
+        console.error('flushEmailQueue:', err.message);
+        return res.status(500).redirect(settingBack(req, '?error=flush'));
     }
 };
 
@@ -392,6 +466,52 @@ const saveStatusColors = async (req, res) => {
     }
 };
 
+// Guarda el color personalizado de cada estado de incidencia (enum fijo).
+const saveIncidentStatusColors = async (req, res) => {
+    try {
+        for (const s of statusColors.INCIDENT_STATUSES) {
+            const key        = statusColors.incidentKeyFor(s.code);
+            const useDefault = req.body[`default_${s.code}`] === 'on';
+            // Checkbox "usar color del tema" tildado => se borra la personalización.
+            const value = useDefault ? '' : (req.body[key] || '').trim();
+            if (value && !statusColors.isValidHex(value)) {
+                return res.redirect(settingBack(req, '?error=color_invalido'));
+            }
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(settingBack(req, '?success=status_colors'));
+    } catch (err) {
+        console.error('saveIncidentStatusColors:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=status_colors_save'));
+    }
+};
+
+// LGT-160 — parámetros de demora (sección Incidencias). Se guardan en `setting`.
+const saveIncidentParams = async (req, res) => {
+    try {
+        const pct  = Number(req.body.delay_threshold_pct);
+        const days = Number(req.body.delay_reminder_days);
+        if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+            return res.redirect(settingBack(req, '?error=delay_pct'));
+        }
+        if (!Number.isFinite(days) || days < 1 || days > 365) {
+            return res.redirect(settingBack(req, '?error=delay_days'));
+        }
+        const pairs = { delay_threshold_pct: String(pct), delay_reminder_days: String(days) };
+        for (const [key, value] of Object.entries(pairs)) {
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(settingBack(req, '?success=incident_params'));
+    } catch (err) {
+        console.error('saveIncidentParams:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=incident_params_save'));
+    }
+};
+
 // LGT-172: Identidad visual (nombre + logo institucional).
 const saveIdentity = async (req, res) => {
     try {
@@ -409,21 +529,18 @@ const saveIdentity = async (req, res) => {
         await settingLogModel.logChange(res.locals.currentUser?.id, 'nombre_empresa', oldNombre, nombre);
         await settingModel.set('nombre_empresa', nombre);
 
-        // Logo opcional: si se subió un archivo válido, guardar su ruta pública y borrar el anterior.
+        // Logo opcional: se persiste en la base (base64) y se sirve por /brand/logo.
+        // Antes se guardaba en disco, pero el filesystem de Render es efímero y el
+        // archivo se perdía en cada deploy (logo roto). La base sobrevive al deploy.
         if (req.file) {
-            const fs        = require('fs');
-            const path      = require('path');
-            const publicUrl = `/images/brand/${req.file.filename}`;
-            const oldLogo   = await settingModel.get('logo_empresa');
+            const oldLogo = await settingModel.get('logo_empresa');
+            // URL estable con versión para invalidar la caché del navegador al cambiar el logo.
+            const publicUrl = `/brand/logo?v=${Date.now()}`;
 
+            await settingModel.set('logo_empresa_data', req.file.buffer.toString('base64'));
+            await settingModel.set('logo_empresa_mime', req.file.mimetype || 'image/png');
             await settingLogModel.logChange(res.locals.currentUser?.id, 'logo_empresa', oldLogo, publicUrl);
             await settingModel.set('logo_empresa', publicUrl);
-
-            // Limpieza del logo previo (solo si vivía en el directorio de marca).
-            if (oldLogo && oldLogo.startsWith('/images/brand/')) {
-                const oldPath = path.join(__dirname, '..', '..', 'public', oldLogo);
-                fs.promises.unlink(oldPath).catch(() => { /* ya no existe */ });
-            }
         }
 
         res.redirect(settingBack(req, '?success=identity'));
@@ -731,11 +848,42 @@ const saveIncidentNotifConfig = async (req, res) => {
     }
 };
 
+// LGT-195: toggle on/off del aviso al Supervisor cuando un transportista queda
+// inhabilitado por rechazar el consentimiento de fatiga. Los destinatarios son fijos
+// por regla de negocio (supervisores de la sucursal del transportista + admins),
+// así que solo persistimos el enabled — la plantilla se edita por el modal genérico.
+const saveFatigueConsentNotifConfig = async (req, res) => {
+    try {
+        const enabled = req.body.enabled === 'on';
+        await NotificationConfigModel.NotificationConfig.update(
+            { enabled },
+            { where: { eventCode: 'FATIGUE_DRIVER_DISABLED_CONSENT' } }
+        );
+        res.redirect(settingBack(req, '?success=fatigue_notif'));
+    } catch (err) {
+        console.error('saveFatigueConsentNotifConfig:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=fatigue_notif'));
+    }
+};
+
+const triggerDelayDetection = async (req, res) => {
+    try {
+        const { processDelayedShipments } = require('../jobs/delayDetectionJob');
+        await processDelayedShipments();
+        res.redirect(settingBack(req, '?success=delay_triggered'));
+    } catch (err) {
+        console.error('triggerDelayDetection:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=delay_triggered'));
+    }
+};
+
 module.exports = {
     getSettings, saveSettings, assignBranch, saveRouteOptimizerSettings, getRouteOptimizerSettings,
     saveParams, saveIdentity, saveNotificationConfig, saveEmailTemplate, sendTestTemplate, saveTestEmailOverride,
     updateEmailTemplateById, createEmailTemplateVariant, setDefaultEmailTemplate, deleteEmailTemplate,
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
-    saveIncidentNotifConfig, testShipmentNotification, saveStatusColors,
+    saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveFatigueConsentNotifConfig,
+    triggerDelayDetection,
 };

@@ -159,20 +159,21 @@
                                                     const drvName  = s.deliveryUser ? s.deliveryUser.fullName : '';
                                                     const drvId    = s.deliveryUserId ? String(s.deliveryUserId) : '';
                                                     const provName = (s.address && s.address.province) ? s.address.province.name : '';
+                                                    const recName  = s.recipient ? s.recipient.fullName : '—';
                                                 %>
                                                 <div class="k-card"
                                                      draggable="true"
                                                      data-id="<%= s.id %>"
                                                      data-sid="<%= s.statusId %>"
                                                      data-trk="<%= s.trackingId %>"
-                                                     data-rec="<%= s.recipient.fullName.toLowerCase() %>"
-                                                     data-rec-full="<%= s.recipient.fullName %>"
+                                                     data-rec="<%= recName.toLowerCase() %>"
+                                                     data-rec-full="<%= recName %>"
                                                      data-prov="<%= provName %>"
                                                      data-drv-id="<%= drvId %>"
                                                      data-drv-name="<%= drvName.toLowerCase() %>"
                                                      data-drv-full="<%= drvName %>">
                                                     <div class="card-track"><%= s.trackingId %></div>
-                                                    <div class="card-recip"><%= s.recipient.fullName %></div>
+                                                    <div class="card-recip"><%= recName %></div>
                                                     <% if (provName) { %>
                                                     <div class="card-meta">
                                                         <span class="material-symbols-outlined">location_on</span><%= provName %>
@@ -206,21 +207,22 @@
                                     const drvName  = s.deliveryUser ? s.deliveryUser.fullName : '';
                                     const drvId    = s.deliveryUserId ? String(s.deliveryUserId) : '';
                                     const provName = (s.address && s.address.province) ? s.address.province.name : '';
+                                    const recName  = s.recipient ? s.recipient.fullName : '—';
                                 %>
                                 <div class="k-card"
                                      draggable="true"
                                      data-id="<%= s.id %>"
                                      data-sid="<%= s.statusId %>"
                                      data-trk="<%= s.trackingId %>"
-                                     data-rec="<%= s.recipient.fullName.toLowerCase() %>"
-                                     data-rec-full="<%= s.recipient.fullName %>"
+                                     data-rec="<%= recName.toLowerCase() %>"
+                                     data-rec-full="<%= recName %>"
                                      data-prov="<%= provName %>"
                                      data-drv-id="<%= drvId %>"
                                      data-drv-name="<%= drvName.toLowerCase() %>"
                                      data-drv-full="<%= drvName %>">
 
                                     <div class="card-track"><%= s.trackingId %></div>
-                                    <div class="card-recip"><%= s.recipient.fullName %></div>
+                                    <div class="card-recip"><%= recName %></div>
 
                                     <% if (provName) { %>
                                     <div class="card-meta">

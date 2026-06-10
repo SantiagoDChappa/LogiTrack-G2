@@ -16,7 +16,7 @@ const Person = sequelize.define('person', {
     { tableName: 'person' }
 );
 
-const getAll = () => Person.findAll();
+const getAll = () => Person.findAll({ order: [['id', 'DESC']], limit: 1000 });
 
 const create = (data, options = {}) => Person.create({
     fullName:     data.name,
@@ -47,7 +47,7 @@ const search = ({ senderName, senderDocument, recipientName, recipientDocument }
     if (recipientName) { where.fullName = { [Op.iLike]: `%${recipientName}%` }; }
     if (recipientDocument) { where.document = recipientDocument; }
 
-    return Person.findAll({ where });
+    return Person.findAll({ where, order: [['id', 'DESC']], limit: 500 });
 };
 
 const findByDocument = (document) => Person.findOne({ where: { document } });

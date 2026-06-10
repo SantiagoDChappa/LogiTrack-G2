@@ -3,6 +3,7 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/portal.css">
     <% const _hasRoute = mapData && mapData.route && mapData.route.stops && mapData.route.stops.length > 0; %>
     <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0) || _hasRoute); %>
     <% if (_hasMap) { %>
@@ -142,9 +143,10 @@
         <div class="page-update-wrapper">
 
             <%
-                const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                const _sdesc = shipment.status && shipment.status.description ? shipment.status.description : '';
+                const _sk  = _sdesc.toLowerCase().replace(/[\s-]+/g, '_');
                 const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
-                const _slLabel = _sl[_sk] || shipment.status.description;
+                const _slLabel = _sl[_sk] || _sdesc || 'Sin estado';
             %>
 
             <!-- Tracking ID + estado -->
@@ -255,24 +257,24 @@
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 
-                   <div id="prediction-widget"
-                    class="pred-card pred-card--embedded"
-                    data-province-id="<%= shipment.address.provinceId %>"
-                    data-street="<%= shipment.address.street || '' %>"
-                    data-number="<%= shipment.address.number || '' %>"
-                    data-weight-kg="<%= shipment.weightKg || '' %>"
-                    data-package-qty="<%= shipment.packageQty || '' %>"
-                    data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
-                    data-autoload="true"
-                    data-shipment-id="<%= shipment.id %>"
-                    data-delivery-user-id="<%= shipment.deliveryUserId || '' %>">
-                         
-                        <h3>
-                            <span class="material-symbols-outlined">query_stats</span>
-                            Detalles de la entrega
-                        </h3>
-                        <div id="prediction-result"></div>
-                    </div>
+                    <% if (shipment.expectedDeliveryDate) {
+                        const _ed = new Date(shipment.expectedDeliveryDate);
+                        const _edLabel = _ed.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                        const _today = new Date(); _today.setHours(0,0,0,0); _ed.setHours(0,0,0,0);
+                        const _diffDays = Math.round((_ed - _today) / (1000*60*60*24));
+                        const _edHint = _diffDays > 0 ? `en ${_diffDays} día${_diffDays===1?'':'s'}`
+                                       : _diffDays === 0 ? 'hoy'
+                                       : `hace ${Math.abs(_diffDays)} día${Math.abs(_diffDays)===1?'':'s'}`;
+                    %>
+                        <div style="margin-top:1rem;padding:.75rem;border-radius:8px;background:var(--color-bg);border:1px solid var(--color-border);">
+                            <strong style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem;color:var(--color-primary,#2563eb);">event</span>
+                                Fecha estimada de entrega
+                            </strong>
+                            <span style="font-size:.95rem;font-weight:600;text-transform:capitalize"><%= _edLabel %></span>
+                            <span style="display:block;margin-top:.15rem;font-size:.8rem;color:var(--color-text-secondary)">(<%= _edHint %>)</span>
+                        </div>
+                    <% } %>
 
                     <% if (typeof sla !== 'undefined' && sla) { %>
                         <div style="margin-top:1rem;padding:.75rem;border-radius:8px;background:<%= sla.delivered && sla.onTime ? 'var(--color-success-bg)' : (sla.delivered ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)') %>;border:1px solid <%= sla.delivered && sla.onTime ? 'var(--color-success)' : (sla.delivered ? 'var(--color-danger)' : 'var(--color-warning)') %>;">
@@ -392,12 +394,46 @@
                 </div>
                 <% } %>
 
-                <!-- ── Repartidor Asignado ── -->
-                <div class="update-card">
-                    <h3><span class="material-symbols-outlined">person_pin_circle</span> Repartidor</h3>
-                    <div class="detail-field">
-                        <span class="detail-label">Nombre y apellido</span>
-                        <span class="detail-value"><%= shipment.deliveryUser ? shipment.deliveryUser.fullName : 'Sin asignar' %></span>
+                <% const _hasIncidents = typeof incidents !== 'undefined' && incidents && incidents.length > 0; %>
+
+                <!-- ── Repartidor + Incidencias (fila inferior del top-grid) ── -->
+                <div class="ship-bottom-row">
+                    <div class="update-card">
+                        <h3><span class="material-symbols-outlined">person_pin_circle</span> Repartidor</h3>
+                        <div class="detail-field">
+                            <span class="detail-label">Nombre y apellido</span>
+                            <span class="detail-value"><%= shipment.deliveryUser ? shipment.deliveryUser.fullName : 'Sin asignar' %></span>
+                        </div>
+                    </div>
+
+                    <div class="update-card update-card--incidents">
+                        <h3>
+                            <span class="material-symbols-outlined" style="color:#dc2626;">report</span>
+                            Incidencias accionadas<% if (_hasIncidents) { %> (<%= incidents.length %>)<% } %>
+                        </h3>
+                        <% if (_hasIncidents) { %>
+                            <div class="ship-incidents-list">
+                                <% incidents.forEach(inc => {
+                                    const sCls = inc.status === 'OPEN' ? 'incident-badge--open'
+                                               : inc.status === 'IN_REVIEW' ? 'incident-badge--in_review'
+                                               : 'incident-badge--closed';
+                                    const sLabel = IncidentStatusLabel[inc.status] || inc.status;
+                                %>
+                                    <a href="/incident/<%= inc.id %>" class="ship-incident-row">
+                                        <span class="ship-incident-id">#<%= inc.id %></span>
+                                        <span class="ship-incident-type"><%= inc.type ? inc.type.description : '—' %></span>
+                                        <span class="incident-badge <%= sCls %>"><%= sLabel %></span>
+                                        <span class="ship-incident-date"><%= new Date(inc.createdAt).toLocaleDateString('es-AR') %></span>
+                                        <span class="material-symbols-outlined ship-incident-arrow">chevron_right</span>
+                                    </a>
+                                <% }) %>
+                            </div>
+                        <% } else { %>
+                            <div class="ship-incidents-empty">
+                                <span class="material-symbols-outlined">inbox</span>
+                                <p>Sin incidencias registradas para este envío.</p>
+                            </div>
+                        <% } %>
                     </div>
                 </div>
 
@@ -411,19 +447,19 @@
                     <h3>Remitente</h3>
                     <div class="detail-field">
                         <span class="detail-label">Nombre y apellido</span>
-                        <span class="detail-value"><%= shipment.sender.fullName %></span>
+                        <span class="detail-value"><%= shipment.sender ? shipment.sender.fullName : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Documento</span>
-                        <span class="detail-value"><%= shipment.sender.document %></span>
+                        <span class="detail-value"><%= shipment.sender ? shipment.sender.document : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Teléfono</span>
-                        <span class="detail-value"><%= shipment.sender.phone || '-' %></span>
+                        <span class="detail-value"><%= shipment.sender && shipment.sender.phone ? shipment.sender.phone : '-' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Email</span>
-                        <span class="detail-value"><%= shipment.sender.email || '-' %></span>
+                        <span class="detail-value"><%= shipment.sender && shipment.sender.email ? shipment.sender.email : '-' %></span>
                     </div>
                 </div>
 
@@ -431,19 +467,19 @@
                     <h3>Destinatario</h3>
                     <div class="detail-field">
                         <span class="detail-label">Nombre y apellido</span>
-                        <span class="detail-value"><%= shipment.recipient.fullName %></span>
+                        <span class="detail-value"><%= shipment.recipient ? shipment.recipient.fullName : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Documento</span>
-                        <span class="detail-value"><%= shipment.recipient.document %></span>
+                        <span class="detail-value"><%= shipment.recipient ? shipment.recipient.document : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Teléfono</span>
-                        <span class="detail-value"><%= shipment.recipient.phone || '-' %></span>
+                        <span class="detail-value"><%= shipment.recipient && shipment.recipient.phone ? shipment.recipient.phone : '-' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Email</span>
-                        <span class="detail-value"><%= shipment.recipient.email || '-' %></span>
+                        <span class="detail-value"><%= shipment.recipient && shipment.recipient.email ? shipment.recipient.email : '-' %></span>
                     </div>
                 </div>
 
@@ -677,7 +713,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
-    <script src="/js/prediction.js" defer></script>
 
     <% if (_hasMap) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>

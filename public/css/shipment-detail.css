@@ -496,3 +496,98 @@ html[data-theme="dark"] {
     .summary-addresses { grid-template-columns: 1fr; }
     .detail-top { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Incidencias del envío (sección en detail) ── */
+.ship-incidents-list {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+.ship-incident-row {
+    display: grid;
+    grid-template-columns: 70px 1fr auto auto 24px;
+    align-items: center;
+    gap: 1rem;
+    padding: .85rem 1.1rem;
+    background: var(--shp-surface-alt);
+    border: 1px solid var(--shp-border);
+    border-left: 3px solid #ef4444;
+    border-radius: 12px;
+    text-decoration: none !important;
+    color: var(--shp-text);
+    transition: background .15s ease, transform .12s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.ship-incident-row:hover,
+.ship-incident-row:focus,
+.ship-incident-row:focus-visible {
+    background: var(--shp-surface);
+    transform: translateX(3px);
+    box-shadow: var(--shp-shadow-md);
+    border-left-color: #dc2626;
+    text-decoration: none !important;
+    outline: none;
+}
+.ship-incident-row,
+.ship-incident-row:hover,
+.ship-incident-row:visited,
+.ship-incident-row * { text-decoration: none !important; }
+
+.ship-incident-id   { font-weight: 700; color: #ef4444; font-size: .92rem; letter-spacing: .02em; }
+.ship-incident-type { font-weight: 600; color: var(--shp-text); font-size: .92rem; }
+.ship-incident-date { font-size: .78rem; color: var(--shp-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ship-incident-arrow { color: var(--shp-muted); font-size: 1.2rem !important; transition: transform .15s ease, color .15s ease; }
+.ship-incident-row:hover .ship-incident-arrow { transform: translateX(2px); color: var(--shp-text); }
+
+/* Badges de estado dentro del card — adaptados al theme */
+.ship-incident-row .incident-badge {
+    padding: .25rem .7rem;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border-radius: 999px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+}
+.ship-incident-row .incident-badge--open      { background: rgba(37, 99, 235, .22); color: #93c5fd; border-color: rgba(96,165,250,.35); }
+.ship-incident-row .incident-badge--in_review { background: rgba(245, 158, 11, .22); color: #fcd34d; border-color: rgba(252,211,77,.35); }
+.ship-incident-row .incident-badge--closed    { background: rgba(34, 197, 94, .22); color: #86efac; border-color: rgba(134,239,172,.35); }
+
+html:not([data-theme="dark"]) .ship-incident-row .incident-badge--open      { background: #dbeafe; color: #1e40af; border-color: rgba(30,64,175,.15); }
+html:not([data-theme="dark"]) .ship-incident-row .incident-badge--in_review { background: #fef3c7; color: #92400e; border-color: rgba(146,64,14,.15); }
+html:not([data-theme="dark"]) .ship-incident-row .incident-badge--closed    { background: #d1fae5; color: #065f46; border-color: rgba(6,95,70,.15); }
+
+@media (max-width: 720px) {
+    .ship-incident-row { grid-template-columns: 60px 1fr auto; gap: .6rem; }
+    .ship-incident-date, .ship-incident-arrow { display: none; }
+}
+
+/* ── Fila inferior del top-grid: Repartidor + (opcional) Incidencias ── */
+.ship-bottom-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 1rem;
+}
+@media (max-width: 900px) {
+    .ship-bottom-row { grid-template-columns: 1fr; }
+}
+
+/* Estado vacio del card de incidencias */
+.ship-incidents-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: 1.5rem 1rem;
+    color: var(--shp-muted, #94a3b8);
+    text-align: center;
+}
+.ship-incidents-empty .material-symbols-outlined {
+    font-size: 2.2rem;
+    opacity: .55;
+}
+.ship-incidents-empty p {
+    margin: 0;
+    font-size: .88rem;
+}

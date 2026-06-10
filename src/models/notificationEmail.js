@@ -145,4 +145,4 @@ const calculateNextRetry = (attempts) => {
     return new Date(Date.now() + delay);
 }
 
-module.exports = { NotificationEmail, findPending, markAsSent, scheduleRetry };
+module.exports = { NotificationEmail, findPending, markAsSent, scheduleRetry, claimEmailForProcessing };

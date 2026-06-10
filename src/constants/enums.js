@@ -40,9 +40,20 @@ const IncidentStatus = Object.freeze({
     CLOSED:    'CLOSED',
 });
 
+const IncidentStatusLabel = Object.freeze({
+    OPEN:      'Abierta',
+    IN_REVIEW: 'En revisión',
+    CLOSED:    'Cerrada',
+});
+
 const IncidentResolution = Object.freeze({
     PROCEDENTE:    'PROCEDENTE',
     NO_PROCEDENTE: 'NO_PROCEDENTE',
+});
+
+const IncidentResolutionLabel = Object.freeze({
+    PROCEDENTE:    'Procedente',
+    NO_PROCEDENTE: 'No procedente',
 });
 
 const IncidentChannel = Object.freeze({
@@ -82,7 +93,10 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_CANCELLED:           'SHIPMENT_CANCELLED',
     SHIPMENT_ASSIGNED:            'SHIPMENT_ASSIGNED',
     SHIPMENT_IN_PREPARATION:      'SHIPMENT_IN_PREPARATION',
-    SHIPMENT_PACKAGE_FAILED:      'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_PACKAGE_FAILED:              'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_PACKAGE_FAILED_UNDELIVERED:  'SHIPMENT_PACKAGE_FAILED_UNDELIVERED',
+    SHIPMENT_PACKAGE_FAILED_DELAY:        'SHIPMENT_PACKAGE_FAILED_DELAY',
+    SHIPMENT_PACKAGE_FAILED_ATTEMPT:      'SHIPMENT_PACKAGE_FAILED_ATTEMPT',
     SHIPMENT_FAILED_ATTEMPT:      'SHIPMENT_FAILED_ATTEMPT',
     // Sprint 3 — eventos extendidos PDF 2.3
     SHIPMENT_OUT_FOR_DELIVERY:    'SHIPMENT_OUT_FOR_DELIVERY',   // Salida a reparto
@@ -93,6 +107,16 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_INCIDENT:            'SHIPMENT_INCIDENT',           // Incidencia / demora
     ROUTE_CANCELLED:              'ROUTE_CANCELLED',
     ROUTE_INTERRUPTED:            'ROUTE_INTERRUPTED',
+    SHIPMENT_DELAYED:             'SHIPMENT_DELAYED',
+    SHIPMENT_DELAY_RECOVERED:     'SHIPMENT_DELAY_RECOVERED', // LGT-160 Esc.6
+    // Mail transaccional del portal cliente "Mis Envíos" (confirmación de acceso).
+    // Editable desde Ajustes → Comunicaciones; siempre activo (no es un evento de envío).
+    PORTAL_CLIENT_ACCESS:         'PORTAL_CLIENT_ACCESS',
+    // Cambio de estado de una incidencia → aviso al cliente. Editable desde Ajustes.
+    INCIDENT_STATUS_CHANGE:       'INCIDENT_STATUS_CHANGE',
+    // LGT-195: el transportista rechazó el consentimiento de fatiga las veces parametrizadas
+    // → queda inhabilitado y se notifica a los Supervisores de su sucursal + administradores.
+    FATIGUE_DRIVER_DISABLED_CONSENT: 'FATIGUE_DRIVER_DISABLED_CONSENT',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
@@ -156,12 +180,13 @@ const EmailQueueStatus = {
     PROCESSING: 'PROCESSING',
     SENT: 'SENT',
     FAILED: 'FAILED'
-}
+};
 
 
 module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
-    IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority,
+    IncidentStatus, IncidentStatusLabel, IncidentResolution, IncidentResolutionLabel,
+    IncidentChannel, IncidentEventType, IncidentPriority,
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,
     ModificationRequestStatus, ModificationChangeType, ModificationChannel,

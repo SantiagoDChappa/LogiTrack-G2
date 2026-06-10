@@ -88,8 +88,8 @@
                        title="Ingresá el número o el código INC-XXX">
             </div>
             <div class="incident-filter">
-                <label for="shipmentId"><span class="material-symbols-outlined incident-filter-icon">local_shipping</span> Envío (ID)</label>
-                <input type="number" id="shipmentId" name="shipmentId" value="<%= filters.shipmentId || '' %>">
+                <label for="trackingId"><span class="material-symbols-outlined incident-filter-icon">local_shipping</span> Envío (código)</label>
+                <input type="text" id="trackingId" name="trackingId" placeholder="Ej: ENV-011" value="<%= filters.trackingId || '' %>">
             </div>
             <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Filtrar" aria-label="Filtrar">
                 <span class="material-symbols-outlined">filter_alt</span>
@@ -139,7 +139,7 @@
                             <td><%= i.shipment ? i.shipment.trackingId : '-' %></td>
                             <td><%= i.type ? i.type.description : '-' %></td>
                             <td><span class="incident-origin incident-origin--<%= isExterno ? 'externo' : 'interno' %>"><%= originLabel %></span></td>
-                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= i.status %></span></td>
+                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= IncidentStatusLabel[i.status] || i.status %></span></td>
                             <td><span class="incident-resolution <%= resCls %>"><%= resLabel %></span></td>
                             <td><span class="incident-priority incident-priority--<%= i.priority %>">P<%= i.priority %></span></td>
                             <td><%= i.escalated ? '🔥' : '—' %></td>

@@ -18,6 +18,10 @@ const Incident = sequelize.define('incident', {
     assignedToUserId: { type: DataTypes.INTEGER,     allowNull: true },
     closedByUserId:   { type: DataTypes.INTEGER,     allowNull: true },
     closedAt:         { type: DataTypes.DATE,        allowNull: true },
+    // LGT-204 — elección del remitente ante paquete dañado.
+    damageChoice:     { type: DataTypes.STRING(12),  allowNull: true, field: 'damage_choice' }, // REEMBOLSO | REEMPLAZO
+    damageChoiceAt:   { type: DataTypes.DATE,        allowNull: true, field: 'damage_choice_at' },
+    damageChoiceBy:   { type: DataTypes.STRING(160), allowNull: true, field: 'damage_choice_by' },
     createdAt:        { type: DataTypes.DATE },
     updatedAt:        { type: DataTypes.DATE }
 }, { tableName: 'incident', timestamps: true });
@@ -39,7 +43,7 @@ const includesFull = () => {
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, trackingId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const where = {};
     if (id)                { where.id = id; }
@@ -60,6 +64,8 @@ const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, o
     const shipmentWhere = {};
     if (deliveryUserId) { shipmentWhere.deliveryUserId = deliveryUserId; }
     if (branchId)       { shipmentWhere.currentBranchId = branchId; }
+    // Búsqueda por código de envío (ej. "ENV-011"), parcial e insensible a mayúsculas.
+    if (trackingId)     { shipmentWhere.trackingId = { [Op.iLike]: `%${String(trackingId).trim()}%` }; }
     if (Object.keys(shipmentWhere).length > 0) {
         shipmentInclude.where = shipmentWhere;
         shipmentInclude.required = true;
@@ -108,13 +114,15 @@ const findOpenByShipment = (shipmentId) => Incident.findAll({
     attributes: ['id', 'incidentTypeId', 'status']
 });
 
-const findByShipmentIds = (shipmentIds, { statusIn, limit = 200 } = {}) => {
+const findByShipmentIds = (shipmentIds, { statusIn, excludeChannels, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const ids = Array.isArray(shipmentIds) ? shipmentIds.filter(Boolean) : [];
     if (!ids.length) { return Promise.resolve([]); }
 
     const where = { shipmentId: { [Op.in]: ids } };
     if (statusIn?.length) { where.status = { [Op.in]: statusIn }; }
+    // CP-CINC01: el portal del cliente no debe mostrar incidencias autogeneradas (canal SYSTEM).
+    if (excludeChannels?.length) { where.openedChannel = { [Op.notIn]: excludeChannels }; }
 
     const { Shipment } = require('./shipment');
     const { IncidentType } = require('./incidentType');

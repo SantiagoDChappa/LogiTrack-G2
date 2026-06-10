@@ -116,7 +116,7 @@
         .tplm-event { font-size:.8rem; color:var(--color-text-secondary); }
         .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
             display:inline-flex; padding:.2rem; border-radius:6px; }
-        .tplm-close:hover { background:var(--color-bg-secondary,#f1f3f5); color:var(--color-text); }
+        .tplm-close:hover { background:var(--color-surface-alt); color:var(--color-text); }
         .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
             padding:1.1rem 1.25rem; overflow:hidden; }
         .tplm-editor { display:contents; }
@@ -133,7 +133,7 @@
         .tplm-segmented button.is-active { background:var(--color-primary,#2563eb); color:#fff; }
         .tplm-chips { display:flex; flex-wrap:wrap; gap:.4rem; }
         .tplm-chip { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.78rem;
-            background:var(--color-bg-secondary,#eef2ff); color:var(--color-primary,#2563eb);
+            background:var(--color-surface-alt); color:var(--color-primary,#2563eb);
             border:1px solid var(--color-border,#dbe1ea); border-radius:999px;
             padding:.25rem .6rem; cursor:grab; transition:all .12s ease; }
         .tplm-chip:hover { background:var(--color-primary,#2563eb); color:#fff; }
@@ -163,11 +163,11 @@
         .abm-snip-form { flex:1; display:flex; flex-direction:column; gap:.4rem; min-width:0; }
         .abm-snip-head { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
         .abm-snip-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-secondary); }
-        .abm-badge { font-size:.68rem; background:var(--color-bg-secondary,#eef2ff); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:999px; padding:.1rem .5rem; }
+        .abm-badge { font-size:.68rem; background:var(--color-surface-alt); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:999px; padding:.1rem .5rem; }
         .tplm-hint { display:block; margin-top:.4rem; font-size:.78rem; color:var(--color-text-secondary); line-height:1.4; }
         .tplm-ph-desc { display:flex; align-items:flex-start; gap:.45rem; margin-top:.5rem;
             padding:.5rem .65rem; border:1px solid var(--color-border); border-radius:8px;
-            background:var(--color-bg-secondary,#f8fafc); color:var(--color-text-secondary);
+            background:var(--color-surface-alt); color:var(--color-text-secondary);
             font-size:.8rem; line-height:1.35; box-sizing:border-box;
             height:3.6rem; overflow:auto; transition:border-color .15s ease; }
         .tplm-ph-desc-text { display:block; }
@@ -177,7 +177,7 @@
         .tplm-ph-desc em { color:var(--color-text-secondary); font-style:italic; }
         .tplm-snippets { display:flex; flex-wrap:wrap; gap:.4rem; }
         .tplm-snip { display:inline-flex; align-items:center; gap:.35rem; font-size:.8rem;
-            background:var(--color-bg-secondary,#f1f5f9); color:var(--color-text);
+            background:var(--color-surface-alt); color:var(--color-text);
             border:1px solid var(--color-border,#dbe1ea); border-radius:8px;
             padding:.35rem .7rem; cursor:pointer; transition:all .12s ease; }
         .tplm-snip:hover { border-color:var(--color-primary,#2563eb); color:var(--color-primary,#2563eb); }
@@ -341,6 +341,55 @@
                 </script>
             </div>
 
+            <!-- Colores de estados de incidencias -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">format_color_fill</span>
+                    Colores de estados de incidencias
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el color de cada estado de incidencia. Se aplica en los listados y el detalle de incidencias. Dejá tildado "Color del tema" para usar el predeterminado.
+                </p>
+                <form method="POST" action="/setting/incident-status-colors">
+                    <div class="status-colors-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem">
+                        <% (incidentStatusColorList || []).forEach(function(st) { %>
+                            <% var _icolor = st.color || st.defaultColor; %>
+                            <div class="status-color-row" style="display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-alt)">
+                                <input type="color" name="incident_status_color_<%= st.code %>" value="<%= _icolor %>"
+                                       style="width:38px;height:38px;border:none;background:none;cursor:pointer;flex-shrink:0"
+                                       data-incident-status-preview="<%= st.code %>">
+                                <div style="flex:1;min-width:0">
+                                    <span class="status-badge" id="incident-status-preview-<%= st.code %>"
+                                          style="display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.78rem;font-weight:600;background-color:<%= _icolor %>22;color:<%= _icolor %>"><%= st.label %></span>
+                                    <label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;font-size:var(--font-size-xs);text-transform:none;font-weight:500;color:var(--color-text-secondary)">
+                                        <input type="checkbox" name="default_<%= st.code %>" <%= st.color ? '' : 'checked' %> style="width:auto">
+                                        Color del tema
+                                    </label>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar colores
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    document.querySelectorAll('[data-incident-status-preview]').forEach(function (inp) {
+                        var code = inp.getAttribute('data-incident-status-preview');
+                        var badge = document.getElementById('incident-status-preview-' + code);
+                        var chk = inp.closest('.status-color-row').querySelector('input[type="checkbox"]');
+                        inp.addEventListener('input', function () {
+                            badge.style.backgroundColor = inp.value + '22';
+                            badge.style.color = inp.value;
+                            if (chk) chk.checked = false;
+                        });
+                    });
+                </script>
+            </div>
+
             <!-- Card 2: Parámetros del sistema -->
             <!-- LGT-172: Identidad visual (nombre + logo de la empresa) -->
             <div class="settings-card">
@@ -383,9 +432,54 @@
                         var input = document.getElementById('logo');
                         var preview = document.getElementById('logo-preview');
                         if (!input || !preview) return;
+
+                        var ALLOWED = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+                        var MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+
+                        function logoPopup(message) {
+                            var overlay = document.createElement('div');
+                            overlay.setAttribute('role', 'alertdialog');
+                            overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+                            var box = document.createElement('div');
+                            box.style.cssText = 'background:var(--color-surface,#fff);color:var(--color-text,#1a1a1a);border:1px solid var(--color-border,#ddd);border-radius:var(--radius-md,8px);padding:1.25rem 1.5rem;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.2);text-align:center';
+                            box.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:.5rem;margin-bottom:.5rem;font-weight:600">'
+                                + '<span class="material-symbols-outlined" style="color:var(--color-danger,#d32f2f)">error</span>Logo no válido</div>'
+                                + '<p style="margin:0 0 1rem;color:var(--color-text-secondary,#555)"></p>';
+                            box.querySelector('p').textContent = message;
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'btn-primary';
+                            btn.textContent = 'Entendido';
+                            function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
+                            function onKey(e) { if (e.key === 'Escape') close(); }
+                            btn.addEventListener('click', close);
+                            overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+                            document.addEventListener('keydown', onKey);
+                            box.appendChild(btn);
+                            overlay.appendChild(box);
+                            document.body.appendChild(overlay);
+                            btn.focus();
+                        }
+
+                        function reset() {
+                            input.value = '';
+                            preview.src = '<%= params.logo_empresa || '/images/logo.png' %>';
+                        }
+
                         input.addEventListener('change', function () {
                             var file = this.files && this.files[0];
-                            if (file) preview.src = URL.createObjectURL(file);
+                            if (!file) return;
+                            if (ALLOWED.indexOf(file.type) === -1) {
+                                reset();
+                                logoPopup('El archivo no cumple el formato permitido. Subí una imagen PNG, JPG, SVG o WEBP.');
+                                return;
+                            }
+                            if (file.size > MAX_BYTES) {
+                                reset();
+                                logoPopup('El archivo supera el tamaño máximo de 2 MB. Subí una imagen más liviana.');
+                                return;
+                            }
+                            preview.src = URL.createObjectURL(file);
                         });
                     })();
                 </script>
@@ -512,6 +606,22 @@
                             <small style="color:var(--color-text-secondary)">Procesa y envía notificaciones acumuladas al cliente.</small>
                         </div>
 
+                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
+                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">bolt</span>
+                                Ejecución manual
+                            </label>
+                            <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
+                                Disparar el análisis de demoras ahora, sin esperar al horario programado.
+                            </small>
+                            <form method="POST" action="/setting/trigger-delay-detection" style="margin-top:var(--space-2)">
+                                <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                                    <span class="material-symbols-outlined" style="font-size:1.1rem">play_arrow</span>
+                                    Ejecutar detección de demoras ahora
+                                </button>
+                            </form>
+                        </div>
+
                     </div>
 
                     <div class="settings-actions">
@@ -520,6 +630,37 @@
                         </button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Card: Ejecutar procesos manualmente (sin esperar al horario programado) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">play_circle</span>
+                    Ejecutar procesos ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Ejecutá manualmente un proceso en este momento, sin esperar al horario programado arriba. Útil para pruebas o para forzar el procesamiento.
+                </p>
+                <div style="display:flex;flex-direction:column;gap:.6rem">
+                    <% var _procs = [
+                        { id: 'expirados',      label: 'Revisar pedidos expirados', hint: 'Cancela envíos pendientes que superaron el límite de días.' },
+                        { id: 'demoras',        label: 'Detección de demoras',      hint: 'Avisa al cliente de envíos con demora significativa (y recuperaciones).' },
+                        { id: 'notificaciones', label: 'Envío de notificaciones pendientes', hint: 'Procesa y envía la cola de emails acumulados.' }
+                    ]; %>
+                    <% _procs.forEach(function(p) { %>
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                        <div>
+                            <strong><%= p.label %></strong>
+                            <small style="display:block;color:var(--color-text-secondary)"><%= p.hint %></small>
+                        </div>
+                        <form method="POST" action="/setting/run-process/<%= p.id %>" style="margin:0">
+                            <button type="submit" class="action-btn modificar" data-tooltip="Ejecutar ahora" aria-label="Ejecutar ahora">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>
+                        </form>
+                    </div>
+                    <% }); %>
+                </div>
             </div>
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
@@ -540,47 +681,158 @@
                     Por cada evento podés elegir si se notifica, a quién (destinatario / remitente / ambos / un email personalizado) y editar el texto del email.
                 </p>
                 <form method="POST" action="/setting/notification-config">
-                    <div style="display:flex;flex-direction:column;gap:.6rem">
-                        <% notifConfig.forEach(config => { %>
-                            <div style="padding:.75rem 1rem;background:var(--color-bg-secondary,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
-                                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
-                                    <input type="checkbox" name="enabled_<%= config.eventCode %>"
-                                        <%= config.enabled ? 'checked' : '' %>>
-                                    <%= config.description %>
-                                </label>
-
-                                <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
-                                    <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
-                                    <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
-                                    <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
-                                    <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
-                                </select>
-
-                                <input type="email" name="custom_<%= config.eventCode %>"
-                                    placeholder="email@dominio.com"
-                                    value="<%= config.customEmail || '' %>"
-                                    data-event="<%= config.eventCode %>"
-                                    class="notif-custom-input"
-                                    <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
-
-                                <button type="button" class="action-btn modificar notif-edit-tpl-btn"
-                                    data-event="<%= config.eventCode %>"
-                                    data-description="<%= config.description %>"
-                                    data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
-                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
-                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
-                                    data-tooltip="Editar mail" aria-label="Editar mail">
-                                    <span class="material-symbols-outlined">edit_note</span>
-                                </button>
+                    <%
+                        // Agrupacion semantica por evento. Los codigos que no matchean caen en "Otros".
+                        const sectionFor = (code) => {
+                            if (code === 'FATIGUE_DRIVER_DISABLED_CONSENT') { return null; } // gestionado en card aparte
+                            if (code === 'PORTAL_CLIENT_ACCESS')            { return null; } // card propia
+                            if (code === 'SHIPMENT_INCIDENT' || code === 'INCIDENT_STATUS_CHANGE') { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_PACKAGE_FAILED')) { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_'))               { return 'envios'; }
+                            if (code.startsWith('ROUTE_'))                  { return 'rutas'; }
+                            return 'otros';
+                        };
+                        const SECTION_META = {
+                            envios:      { title: 'Envíos',     icon: 'local_shipping', desc: 'Cambios de estado del envío y avisos accionables al cliente.' },
+                            incidencias: { title: 'Incidencias', icon: 'report',         desc: 'Aperturas, cambios de estado y resoluciones de incidencias (incluye paquete fallido por motivo).' },
+                            rutas:       { title: 'Rutas',       icon: 'route',          desc: 'Eventos de las rutas de reparto.' },
+                            otros:       { title: 'Otros',       icon: 'mail',           desc: 'Notificaciones varias.' }
+                        };
+                        const grouped = { envios: [], incidencias: [], rutas: [], otros: [] };
+                        notifConfig.forEach(c => {
+                            const sec = sectionFor(c.eventCode);
+                            if (sec) { grouped[sec].push(c); }
+                        });
+                    %>
+                    <% ['envios','incidencias','rutas','otros'].forEach(secKey => {
+                        const items = grouped[secKey];
+                        if (!items || items.length === 0) { return; }
+                        const meta = SECTION_META[secKey];
+                    %>
+                        <div class="notif-section-group" style="margin-bottom:1.25rem;padding:1rem 1.1rem;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:10px;">
+                            <h3 style="display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;font-size:1rem;color:var(--color-text,#0f172a);">
+                                <span class="material-symbols-outlined" style="font-size:1.2rem;color:var(--inc-blue,#2563eb);"><%= meta.icon %></span>
+                                <%= meta.title %>
+                                <span style="margin-left:auto;font-size:.78rem;font-weight:500;color:var(--color-text-secondary,#64748b);"><%= items.length %> plantilla<%= items.length === 1 ? '' : 's' %></span>
+                            </h3>
+                            <p style="margin:0 0 .8rem;font-size:.82rem;color:var(--color-text-secondary,#64748b);"><%= meta.desc %></p>
+                            <div style="display:flex;flex-direction:column;gap:.5rem;">
+                                <% items.forEach(config => { %>
+                                    <div class="notif-config-row" style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                                            <input type="checkbox" name="enabled_<%= config.eventCode %>"
+                                                <%= config.enabled ? 'checked' : '' %>>
+                                            <%= config.description %>
+                                        </label>
+                                        <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
+                                            <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
+                                            <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
+                                            <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
+                                            <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
+                                        </select>
+                                        <input type="email" name="custom_<%= config.eventCode %>"
+                                            placeholder="email@dominio.com"
+                                            value="<%= config.customEmail || '' %>"
+                                            data-event="<%= config.eventCode %>"
+                                            class="notif-custom-input"
+                                            <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
+                                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                                            data-event="<%= config.eventCode %>"
+                                            data-description="<%= config.description %>"
+                                            data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
+                                            data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
+                                            data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
+                                            data-tooltip="Editar mail" aria-label="Editar mail">
+                                            <span class="material-symbols-outlined">edit_note</span>
+                                        </button>
+                                    </div>
+                                <% }) %>
                             </div>
-                        <% }) %>
-                    </div>
+                        </div>
+                    <% }) %>
                     <div class="settings-actions">
                         <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones" aria-label="Guardar notificaciones">
                             <span class="material-symbols-outlined">save</span>
                         </button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Card: Mail de acceso al portal cliente (Mis Envíos) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">mail_lock</span>
+                    Mail de acceso al portal (Mis Envíos)
+                </h2>
+                <p class="settings-subtitle">
+                    Mail de confirmación que recibe el cliente al pedir acceso a sus envíos desde el portal público.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar) porque sin él el cliente no puede ingresar.
+                    Placeholders disponibles: <code>{{codigo}}</code> (código de 6 dígitos) y <code>{{ttlHoras}}</code> (validez en horas).
+                </p>
+                <% if (templatesByEvent['PORTAL_CLIENT_ACCESS']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla de confirmación de acceso</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="PORTAL_CLIENT_ACCESS"
+                        data-description="Mail de acceso al portal (Mis Envíos)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
+                    mientras tanto se usa el texto por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Aviso al Supervisor por rechazo de consentimiento de fatiga (LGT-195) -->
+            <% var fatigueNotif = (notifConfig || []).find(function(c){ return c.eventCode === 'FATIGUE_DRIVER_DISABLED_CONSENT'; }); %>
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">notifications_active</span>
+                    Aviso de transportista inhabilitado por fatiga
+                </h2>
+                <p class="settings-subtitle">
+                    Cuando un transportista rechaza el consentimiento del control de fatiga
+                    <strong>tantas veces como esté parametrizado</strong> (Ajustes → Ojo de Patrón → "Rechazos permitidos"),
+                    queda inhabilitado y se envía un email a <strong>todos los Supervisores de la sucursal asignada al transportista</strong>
+                    y a los administradores. Podés activar/desactivar el aviso y editar la plantilla del email.
+                </p>
+                <% if (!fatigueNotif) { %>
+                <p style="color:var(--color-text-secondary)">
+                    El evento aún no está cargado. Corré las migraciones <code>045</code> y <code>046</code> para parametrizarlo;
+                    mientras tanto se envía con el texto por defecto si ocurre la inhabilitación.
+                </p>
+                <% } else { %>
+                <form method="POST" action="/setting/fatigue-consent-notification">
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:600">
+                            <input type="checkbox" name="enabled" <%= fatigueNotif.enabled ? 'checked' : '' %>>
+                            Enviar email al Supervisor cuando el transportista queda inhabilitado
+                        </label>
+                        <% if (templatesByEvent['FATIGUE_DRIVER_DISABLED_CONSENT']) { %>
+                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                            data-event="FATIGUE_DRIVER_DISABLED_CONSENT"
+                            data-description="Aviso de transportista inhabilitado por fatiga"
+                            data-tooltip="Editar mail" aria-label="Editar mail">
+                            <span class="material-symbols-outlined">edit_note</span>
+                        </button>
+                        <% } %>
+                    </div>
+                    <p style="font-size:.8rem;color:var(--color-text-secondary);margin-top:.5rem">
+                        Placeholders disponibles: <code>{{transportistaNombre}}</code>, <code>{{transportistaId}}</code>,
+                        <code>{{sucursalNombre}}</code>, <code>{{sucursalId}}</code>, <code>{{rutaId}}</code>,
+                        <code>{{rechazos}}</code>, <code>{{maxRechazos}}</code>, <code>{{motivoInhabilitacion}}</code>.
+                    </p>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar configuración" aria-label="Guardar configuración">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+                <% } %>
             </div>
 
             <!-- Card: Notificaciones de incidencias (destinatarios internos) -->
@@ -593,7 +845,7 @@
                     Elegí quiénes reciben un email cuando se registra una nueva incidencia interna. Se pueden combinar destinatarios por rol y emails personalizados.
                 </p>
                 <form method="POST" action="/setting/incident-notification">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
+                    <div class="notif-toggle-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
                             <input type="checkbox" name="notifySupervisorBranch" <%= incidentNotif.notifySupervisorBranch ? 'checked' : '' %>>
                             <span>Supervisor de la sucursal del usuario asignado</span>
@@ -612,9 +864,27 @@
                         </label>
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;grid-column:1/-1">
                             <input type="checkbox" name="notifyShipmentRecipient" <%= incidentNotif.notifyShipmentRecipient ? 'checked' : '' %>>
-                            <span>Destinatario del envío (usa template de <code>SHIPMENT_INCIDENT</code>)</span>
+                            <span>Destinatario del envío (template según tipo: <code>SHIPMENT_DELAYED</code>, <code>SHIPMENT_PACKAGE_FAILED</code> o <code>SHIPMENT_INCIDENT</code>)</span>
                         </label>
                     </div>
+
+                    <fieldset style="margin-top:1rem;padding:.8rem 1rem;border:1px solid var(--color-border,#e5e7eb);border-radius:8px;">
+                        <legend style="padding:0 .5rem;font-size:.85rem;font-weight:600;color:var(--color-text-secondary);">Filtro por tipo de incidencia (aplica solo si "Destinatario del envío" está activo)</legend>
+                        <div class="notif-type-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem 1rem;margin-top:.4rem;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDelay" <%= incidentNotif.notifyOnDelay !== false ? 'checked' : '' %>>
+                                <span>Demoras</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDamage" <%= incidentNotif.notifyOnDamage !== false ? 'checked' : '' %>>
+                                <span>Paquete dañado</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnGeneric" <%= incidentNotif.notifyOnGeneric !== false ? 'checked' : '' %>>
+                                <span>Otros tipos (genérico)</span>
+                            </label>
+                        </div>
+                    </fieldset>
                     <div class="field" style="margin-top:1rem">
                         <label for="incident_notif_custom">Emails personalizados extra</label>
                         <input type="text" id="incident_notif_custom" name="customEmails"
@@ -666,6 +936,25 @@
                     <div class="settings-actions">
                         <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
                             <span class="material-symbols-outlined">send</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Envío manual de la cola de emails -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">outbox</span>
+                    Enviar cola de emails ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Procesa y envía <strong>inmediatamente</strong> todos los emails pendientes en la cola, sin esperar al proceso automático programado.
+                    Los que fallen quedan reprogramados para reintento.
+                </p>
+                <form method="POST" action="/setting/flush-email-queue">
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Enviar pendientes ahora" aria-label="Enviar pendientes ahora">
+                            <span class="material-symbols-outlined">outbox</span>
                         </button>
                     </div>
                 </form>
@@ -779,7 +1068,11 @@
                     <textarea name="text" rows="2" class="abm-in tplm-textarea" placeholder="Versión texto (ej: Seguí tu envío: {{trackingUrl}})"></textarea>
                 </form>
             </div>
+            <% } %>
 
+            <%/* El modal de edición de templates y su JS viven con la sección Comunicaciones,
+                 que es donde están los botones "editar mail" y los selects de destinatario. */%>
+            <% if (activeSection === 'comunicaciones') { %>
             <!-- Modal: Editar template de email (interactivo) -->
             <div id="tpl-modal-backdrop" class="tplm-backdrop">
                 <div class="tplm-dialog">
@@ -1351,7 +1644,7 @@
                         gap:.5rem;
                         align-items:center;
                         padding:.5rem .75rem;
-                        background: var(--color-bg-secondary, #f8fafc);
+                        background: var(--color-surface-alt);
                         border:1px solid var(--color-border, #e2e8f0);
                         border-radius:8px;
                     }
@@ -1423,6 +1716,114 @@
 
             <!-- Card 5: Historial de cambios -->
             <% } %>
+
+            <% if (activeSection === 'incidencias') { %>
+            <span class="settings-anchor" id="sec-incidencias"></span>
+            <section class="settings-category" id="cat-incidencias">
+                <span class="material-symbols-outlined">report</span>
+                <div><h3>Incidencias</h3><p>Demoras, plantillas de gestión y tipos de incidencia.</p></div>
+            </section>
+
+            <!-- Card: Parámetros de demora (LGT-160) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Demora significativa
+                </h2>
+                <p class="settings-subtitle">Cuándo se considera que un envío está demorado y cada cuánto se recuerda.</p>
+                <form method="POST" action="/setting/incident-params">
+                    <div class="settings-addr">
+                        <div class="field">
+                            <label for="delay_threshold_pct">Umbral (% de la duración del viaje)</label>
+                            <input type="number" id="delay_threshold_pct" name="delay_threshold_pct" min="1" max="100"
+                                   value="<%= settings.delay_threshold_pct || '15' %>">
+                        </div>
+                        <div class="field">
+                            <label for="delay_reminder_days">Intervalo de recordatorio (días)</label>
+                            <input type="number" id="delay_reminder_days" name="delay_reminder_days" min="1" max="365"
+                                   value="<%= settings.delay_reminder_days || '1' %>">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="action-btn action-btn--lg guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Plantillas de checklist -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">checklist</span>
+                    Plantillas de gestión (checklist)
+                </h2>
+                <p class="settings-subtitle">Pasos de resolución por tipo de incidencia.</p>
+                <a class="btn-primary" href="/incident/config/templates" style="display:inline-flex;align-items:center;gap:.4rem;text-decoration:none;width:auto">
+                    <span class="material-symbols-outlined">open_in_new</span> Administrar plantillas
+                </a>
+            </div>
+
+            <!-- Card: Tipos de incidencia (catálogo) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">category</span>
+                    Tipos de incidencia
+                </h2>
+                <p class="settings-subtitle">Catálogo de tipos disponibles.</p>
+                <div class="incident-type-grid">
+                    <% (incidentTypes || []).forEach(t => { %>
+                    <div class="incident-type<%= t.active === false ? ' is-inactive' : '' %>">
+                        <span class="material-symbols-outlined incident-type-ico">label</span>
+                        <div class="incident-type-text">
+                            <code class="incident-type-code"><%= t.code %></code>
+                            <span class="incident-type-desc"><%= t.description %></span>
+                        </div>
+                        <% if (t.active === false) { %><span class="incident-type-badge">inactivo</span><% } %>
+                    </div>
+                    <% }) %>
+                    <% if (!incidentTypes || !incidentTypes.length) { %>
+                    <p style="color:var(--color-text-secondary);grid-column:1/-1;margin:0">Sin tipos cargados.</p>
+                    <% } %>
+                </div>
+                <style>
+                    .incident-type-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                        gap: .6rem;
+                    }
+                    .incident-type {
+                        display: flex; align-items: center; gap: .65rem;
+                        padding: .6rem .75rem;
+                        border: 1px solid var(--color-border);
+                        border-radius: var(--radius-md);
+                        background: var(--color-surface-alt);
+                        transition: border-color .15s ease, transform .15s ease;
+                    }
+                    .incident-type:hover { border-color: var(--color-primary); transform: translateY(-1px); }
+                    .incident-type-ico {
+                        font-size: 1.2rem; color: var(--color-primary);
+                        background: var(--color-primary-light);
+                        border-radius: var(--radius-sm); padding: .3rem; flex-shrink: 0;
+                    }
+                    .incident-type-text { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+                    .incident-type-code {
+                        font-family: ui-monospace, Menlo, Consolas, monospace;
+                        font-size: .78rem; font-weight: 600;
+                        color: var(--color-text); letter-spacing: .02em;
+                    }
+                    .incident-type-desc { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+                    .incident-type-badge {
+                        margin-left: auto; flex-shrink: 0;
+                        font-size: .68rem; text-transform: uppercase; letter-spacing: .04em;
+                        color: var(--color-text-secondary);
+                        background: var(--color-surface); border: 1px solid var(--color-border);
+                        border-radius: 999px; padding: .1rem .5rem;
+                    }
+                    .incident-type.is-inactive { opacity: .55; }
+                    .incident-type.is-inactive .incident-type-ico { color: var(--color-text-secondary); background: var(--color-border); }
+                </style>
+            </div>
+            <% } %>
+
             <% if (activeSection === 'auditoria') { %>
             <span class="settings-anchor" id="sec-auditoria"></span>
             <section class="settings-category" id="cat-auditoria">
@@ -1502,8 +1903,9 @@
             });
         }
 
-        const _param = new URLSearchParams(window.location.search).get('success');
-        if (_param === '1' || _param === '2' || _param === '3' || _param === '4') {
+        const _qs = new URLSearchParams(window.location.search);
+        const _param = _qs.get('success');
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             const _titles = {
                 '1': 'Ajustes guardados',
@@ -1511,10 +1913,38 @@
                 '3': 'Configuración de ruteo guardada',
                 '4': 'Parámetros guardados correctamente'
             };
+            let _title = _titles[_param];
+            let _text;
+            if (_param === 'flush') {
+                const _sent = parseInt(_qs.get('sent') || '0', 10);
+                const _retried = parseInt(_qs.get('retried') || '0', 10);
+                _title = _sent > 0 ? `${_sent} email(s) enviado(s)` : 'No había emails pendientes';
+                _text = _retried > 0 ? `${_retried} quedaron reprogramados para reintento.` : undefined;
+            }
+            if (_param === 'proc') {
+                _title = 'Proceso ejecutado';
+                _text = _qs.get('detail') || undefined;
+            }
             Swal.fire({
                 icon: 'success',
-                title: _titles[_param],
+                title: _title,
+                text: _text,
                 confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color:      isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
+        }
+
+        // CP-CNNF04: error de variables inválidas en plantilla (mensaje dinámico en ?msg).
+        const _err = _qs.get('error');
+        if (_err === 'tpl_vars') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'error',
+                title: 'Variables no válidas',
+                text: _qs.get('msg') || 'La plantilla usa variables que no existen.',
+                confirmButtonText: 'Entendido',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color:      isDark ? '#f1f5f9' : '#1e293b',
