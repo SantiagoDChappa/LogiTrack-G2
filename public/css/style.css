@@ -376,7 +376,11 @@ button {
   background: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  /* overflow-x: auto permite scroll horizontal de tablas anchas en mobile
+     en vez de cortarlas. -webkit-overflow-scrolling para inercia en iOS. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .shipments-table {

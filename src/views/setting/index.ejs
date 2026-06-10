@@ -718,7 +718,7 @@
                             <p style="margin:0 0 .8rem;font-size:.82rem;color:var(--color-text-secondary,#64748b);"><%= meta.desc %></p>
                             <div style="display:flex;flex-direction:column;gap:.5rem;">
                                 <% items.forEach(config => { %>
-                                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                    <div class="notif-config-row" style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
                                         <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
                                             <input type="checkbox" name="enabled_<%= config.eventCode %>"
                                                 <%= config.enabled ? 'checked' : '' %>>
@@ -845,7 +845,7 @@
                     Elegí quiénes reciben un email cuando se registra una nueva incidencia interna. Se pueden combinar destinatarios por rol y emails personalizados.
                 </p>
                 <form method="POST" action="/setting/incident-notification">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
+                    <div class="notif-toggle-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
                             <input type="checkbox" name="notifySupervisorBranch" <%= incidentNotif.notifySupervisorBranch ? 'checked' : '' %>>
                             <span>Supervisor de la sucursal del usuario asignado</span>
@@ -870,7 +870,7 @@
 
                     <fieldset style="margin-top:1rem;padding:.8rem 1rem;border:1px solid var(--color-border,#e5e7eb);border-radius:8px;">
                         <legend style="padding:0 .5rem;font-size:.85rem;font-weight:600;color:var(--color-text-secondary);">Filtro por tipo de incidencia (aplica solo si "Destinatario del envío" está activo)</legend>
-                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem 1rem;margin-top:.4rem;">
+                        <div class="notif-type-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem 1rem;margin-top:.4rem;">
                             <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
                                 <input type="checkbox" name="notifyOnDelay" <%= incidentNotif.notifyOnDelay !== false ? 'checked' : '' %>>
                                 <span>Demoras</span>
