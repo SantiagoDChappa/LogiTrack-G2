@@ -14,19 +14,49 @@ const scopeBranch = (u) => (isAdmin(u) ? null : (u?.branchId || null));
 exports.index = async (req, res) => {
     const u = res.locals.currentUser;
     const branchId = scopeBranch(u);
-    const blocked = await fatigueSvc.listBlocked(branchId);
+    const blocked = await fatigueSvc.listBlocked(branchId); // ya filtra por sucursal
+    const reviews = await fatigueSvc.listReview(branchId); // avisos sin bloqueo (autoBlock off)
     const cfg = await fatigueCfg.getConfig(branchId);
 
     const { FatiguePatternCounter } = require('../models/fatiguePatternCounter');
     const counters = await FatiguePatternCounter.findAll({ order: [['blockedCount', 'DESC']], limit: 50 });
-    const patterns = [];
-    for (const c of counters) { patterns.push(await fatigueSvc.patternStatus(c.userId, cfg)); }
-
+    const disabledRaw = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
     const transports = await transportModel.getEnabledForBranch(branchId);
-    const disabledDrivers = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
+
+    const blockedJson = blocked.map(b => b.toJSON());
+    const reviewsJson = reviews.map(r => r.toJSON());
+
+    // Mapa id→{fullName, branchId}. Los modelos de patrón/inhabilitados no tienen
+    // sucursal: se scopea por la sucursal del usuario. Supervisor: solo la suya.
+    // Admin (branchId === null): ve todo.
+    const candidateIds = [...new Set([
+        ...blockedJson.map(b => b.userId),
+        ...reviewsJson.map(r => r.userId),
+        ...disabledRaw.map(d => d.userId),
+        ...counters.map(c => c.userId),
+    ].filter(Boolean))];
+    const { User } = require('../models/user');
+    const users = candidateIds.length
+        ? await User.findAll({ where: { id: candidateIds }, attributes: ['id', 'fullName', 'branchId'] })
+        : [];
+    const nameById = {}; const branchById = {};
+    for (const x of users) { nameById[x.id] = x.fullName; branchById[x.id] = x.branchId; }
+    const inScope = (uid) => branchId === null || branchById[uid] === branchId;
+
+    const patterns = [];
+    for (const c of counters.filter(c => inScope(c.userId))) {
+        const p = await fatigueSvc.patternStatus(c.userId, cfg);
+        patterns.push({ ...p, driverName: nameById[c.userId] || null });
+    }
+    const disabledDrivers = disabledRaw
+        .filter(d => inScope(d.userId))
+        .map(d => ({ ...d, driverName: nameById[d.userId] || null }));
 
     res.render('fatigue/index', {
-        blocked: blocked.map(b => b.toJSON()),
+        blocked: blockedJson.map(b => ({ ...b, driverName: nameById[b.userId] || null })),
+        reviews: reviewsJson
+            .filter(r => inScope(r.userId))
+            .map(r => ({ ...r, driverName: nameById[r.userId] || null })),
         patterns,
         isAdmin: isAdmin(u),
         cfg,
@@ -45,6 +75,37 @@ exports.restoreDriver = async (req, res) => {
     if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
     try {
         await fatigueSvc.restoreDriver({ userId: Number(userId), actorId: u.id, kind });
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/driver/disable — inhabilitar transportista a raíz de un aviso sin bloqueo (LGT-193).
+// Exclusivo del Supervisor de la sucursal (el Admin solo configura).
+exports.disableDriver = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'La inhabilitación es exclusiva del Supervisor' });
+    }
+    const { userId, checkId } = req.body;
+    if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
+    try {
+        await fatigueSvc.disableDriver({ userId: Number(userId), reason: 'REVIEW_DECISION', branchId: u.branchId });
+        if (checkId) { await fatigueSvc.resolveReview({ checkId: Number(checkId), actorId: u.id, note: 'Inhabilitado por el supervisor' }); }
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/:checkId/review-resolve — descartar un aviso sin bloqueo (decisión tomada).
+exports.resolveReview = async (req, res) => {
+    const u = res.locals.currentUser;
+    const { FatigueCheck } = require('../models/fatigueCheck');
+    const check = await FatigueCheck.findByPk(req.params.checkId);
+    if (!check) { return res.status(404).json({ error: 'Aviso no encontrado' }); }
+    if (!isAdmin(u) && check.branchId !== u.branchId) {
+        return res.status(403).json({ error: 'No autorizado: la ruta es de otra sucursal' });
+    }
+    try {
+        await fatigueSvc.resolveReview({ checkId: check.id, actorId: u.id, note: req.body.note });
         res.json({ ok: true });
     } catch (e) { res.status(400).json({ error: e.message }); }
 };

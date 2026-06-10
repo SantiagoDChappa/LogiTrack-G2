@@ -109,21 +109,22 @@
         const el = document.getElementById('prediction-result');
         if (!el) return;
 
-        // Semáforo de 3 colores
+        // Semáforo de fiabilidad (3 niveles, umbrales LGT-111 sobre la prob. de demora).
         const prob = pred.probability;
+        const fiabilidad = Math.max(0, Math.min(100, 100 - prob));
         let semaforoColor, semaforoLabel, semaforoClass;
         if (prob < 20) {
             semaforoColor = '🟢';
-            semaforoLabel = 'Riesgo bajo';
-            semaforoClass = 'entregado';
+            semaforoLabel = 'Alta fiabilidad';
+            semaforoClass = 'alta';
         } else if (prob <= 50) {
             semaforoColor = '🟡';
-            semaforoLabel = 'Riesgo medio';
-            semaforoClass = 'en_sucursal';
+            semaforoLabel = 'Fiabilidad media';
+            semaforoClass = 'media';
         } else {
             semaforoColor = '🔴';
-            semaforoLabel = 'Riesgo alto';
-            semaforoClass = 'retrasado';
+            semaforoLabel = 'Baja fiabilidad';
+            semaforoClass = 'baja';
         }
 
         // Fecha estimada en lenguaje natural
@@ -134,17 +135,19 @@
             weekday: 'long', day: 'numeric', month: 'long'
         });
 
-        // Etiquetas de justificación
+        // Etiquetas de justificación (factores objetivos; el nivel ya lo dice el semáforo).
         const etiquetas = [];
-        if (distKm > 800)        etiquetas.push('Larga distancia');
+        if (distKm > 800)           etiquetas.push('Larga distancia');
         if (pred.delivery_days > 5) etiquetas.push('Entrega lenta');
-        if (prob > 50)           etiquetas.push('Riesgo alto');
-        if (prob <= 20)          etiquetas.push('Alta fiabilidad');
 
         el.innerHTML = `
             <div class="pred-row">
-                <span class="status-badge ${semaforoClass}">${semaforoColor} ${semaforoLabel}</span>
-                <span class="pred-prob">Prob. de demora: <strong>${prob}%</strong></span>
+                <span class="pred-semaforo pred-semaforo--${semaforoClass}">${semaforoColor} ${semaforoLabel}</span>
+                <span class="pred-prob"><strong>${fiabilidad}%</strong> de fiabilidad</span>
+            </div>
+            <div class="pred-prob pred-prob--sub">
+                <span class="material-symbols-outlined">schedule</span>
+                Prob. de demora: <strong>${prob}%</strong>
             </div>
             <div class="pred-days">
                 <span class="material-symbols-outlined">event</span>
@@ -161,7 +164,7 @@
             ${prob > 50 ? `
             <div class="pred-alert" id="pred-alert-high-risk">
                 <span class="material-symbols-outlined">warning</span>
-                Riesgo alto — cargando sugerencia...
+                Fiabilidad baja — cargando sugerencia...
             </div>` : ''}
         `;
 
@@ -173,17 +176,14 @@
                     const alertEl = document.getElementById('pred-alert-high-risk');
                     if (!alertEl) return;
                     if (data.suggested) {
-                       const widget = document.getElementById('prediction-widget');
-                        const shipmentId = widget?.dataset.shipmentId;
-                        const alreadyAssigned = widget?.dataset.deliveryUserId && widget.dataset.deliveryUserId !== '';
-                        alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Riesgo alto — Repartidor sugerido: <strong>${data.suggested.fullName}</strong> (${data.suggested.activeShipments} envío${data.suggested.activeShipments !== 1 ? 's' : ''} activo${data.suggested.activeShipments !== 1 ? 's' : ''})`;
+                        alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Fiabilidad baja — Repartidor sugerido: <strong>${data.suggested.fullName}</strong> (${data.suggested.activeShipments} envío${data.suggested.activeShipments !== 1 ? 's' : ''} activo${data.suggested.activeShipments !== 1 ? 's' : ''})`;
                     } else {
-                        alertEl.innerHTML = '<span class="material-symbols-outlined">warning</span> Riesgo alto — No hay repartidores disponibles';
+                        alertEl.innerHTML = '<span class="material-symbols-outlined">warning</span> Fiabilidad baja — No hay repartidores disponibles';
                     }
                 })
                 .catch(() => {
                     const alertEl = document.getElementById('pred-alert-high-risk');
-                    if (alertEl) alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Riesgo alto`;
+                    if (alertEl) alertEl.innerHTML = `<span class="material-symbols-outlined">warning</span> Fiabilidad baja`;
                 });
         }
     }

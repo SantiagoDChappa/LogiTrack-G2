@@ -39,6 +39,8 @@ const Shipment = sequelize.define('shipment', {
     deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
     // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
     portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
+    // NFAL07 (LGT-158) — link accionable de un solo uso + vencimiento.
+    portalTokenUsedAt:    { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_used_at' },
     portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
     // Sprint 4 - Notificación de demora (LGT-160)
     delayNotifiedAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'delayNotifiedAt' },
@@ -423,9 +425,41 @@ const countByClientIdentity = async ({ document, email }) => {
     return list.length;
 };
 
+// ── NFAL07 (LGT-158): ciclo de vida del link accionable de autogestión ──────
+const SELF_SERVICE_TOKEN_TTL_DAYS = 7;
+
+// Estado del link de autogestión para un envío.
+//   'used'    → ya se reprogramó con él (un solo uso consumido)
+//   'expired' → venció (expiresAt en el pasado)
+//   'ok'      → utilizable (incluye legacy: ambos campos en null)
+const selfServiceTokenState = (shipment) => {
+    const json = typeof shipment?.toJSON === 'function' ? shipment.toJSON() : (shipment || {});
+    if (json.portalTokenUsedAt) { return 'used'; }
+    if (json.portalTokenExpiresAt && new Date(json.portalTokenExpiresAt) < new Date()) { return 'expired'; }
+    return 'ok';
+};
+
+// Arma el link al enviar un aviso accionable: vence en N días y se "rearma" (usedAt = null).
+const armSelfServiceToken = (shipmentId, ttlDays = SELF_SERVICE_TOKEN_TTL_DAYS) => {
+    const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+    return Shipment.update(
+        { portalTokenUsedAt: null, portalTokenExpiresAt: expiresAt },
+        { where: { id: shipmentId } }
+    );
+};
+
+// Marca el link como consumido (al reprogramar desde /portal/self/:token).
+const markSelfServiceTokenUsed = (shipmentId, options = {}) => {
+    return Shipment.update(
+        { portalTokenUsedAt: new Date() },
+        { where: { id: shipmentId }, ...options }
+    );
+};
+
 module.exports = {
     Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId,
     findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId,
     updatePriority, getActiveShipments, findByClientIdentity, countByClientIdentity,
     clientIdentityIncludes, TERMINAL_STATUS_IDS,
+    SELF_SERVICE_TOKEN_TTL_DAYS, selfServiceTokenState, armSelfServiceToken, markSelfServiceTokenUsed,
 };

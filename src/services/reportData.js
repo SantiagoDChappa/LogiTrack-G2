@@ -229,21 +229,73 @@ const getIncidentsByPeriodData = async (query = {}, deps = { sequelize, QueryTyp
     return viewModel;
 };
 
+const DELIVERY_DIMS = [
+    { key: 'dim1', label: 'Puntualidad' },
+    { key: 'dim2', label: 'Estado del paquete' },
+    { key: 'dim3', label: 'Atención del servicio' },
+];
+const INCIDENT_DIMS = [
+    { key: 'dim1', label: 'Tiempo de resolución' },
+    { key: 'dim2', label: 'Comunicación' },
+    { key: 'dim3', label: 'Resultado obtenido' },
+];
+
+const getDimensionLabels = (surveyType) => {
+    if (surveyType === 'delivery') { return DELIVERY_DIMS; }
+    if (surveyType === 'incident') { return INCIDENT_DIMS; }
+    return DELIVERY_DIMS;
+};
+
+const getComparisonDimLabels = (surveyType) => ({
+    delivery: DELIVERY_DIMS.map((d) => d.label),
+    incident: INCIDENT_DIMS.map((d) => d.label),
+});
+
+const ELIGIBLE_DELIVERY_STATUSES = [4, 5];
+
+const computeNps = (distribution) => {
+    let promoters = 0;
+    let detractors = 0;
+    let total = 0;
+    (distribution || []).forEach((d) => {
+        const count = d.count || 0;
+        total += count;
+        if (d.rating >= 4) { promoters += count; }
+        if (d.rating <= 2) { detractors += count; }
+    });
+    if (total === 0) { return 0; }
+    return Math.round((promoters - detractors) / total * 100);
+};
+
 const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes }) => {
     const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
     const surveyType = query.type || 'all';
+    const branchId = query.branchId ? Number(query.branchId) : null;
+    const incidentTypeId = query.incidentTypeId ? Number(query.incidentTypeId) : null;
+    const deliveryStatus = query.deliveryStatus ? Number(query.deliveryStatus) : null;
 
     const viewModel = {
         dateFrom,
         dateTo,
         surveyType,
+        branchId,
+        incidentTypeId,
+        deliveryStatus,
         error: null,
-        kpis: { totalSurveys: 0, overallAvg: 0, dimensions: [] },
+        kpis: { totalSurveys: 0, overallAvg: 0, nps: 0, dimensions: [], responseRate: null },
         trend: [],
         comparison: [],
         distribution: [],
+        recentComments: [],
+        incidentTypes: [],
+        comparisonDimLabels: getComparisonDimLabels(surveyType),
         hasQuery,
-        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo, type: surveyType }),
+        exportQuery: buildExportQuery({
+            from: dateFrom, to: dateTo, type: surveyType,
+            ...(branchId ? { branchId } : {}),
+            ...(incidentTypeId ? { incidentTypeId } : {}),
+            ...(deliveryStatus ? { deliveryStatus } : {}),
+        }),
     };
 
     if (dateFrom > dateTo) {
@@ -251,27 +303,46 @@ const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes })
         return viewModel;
     }
 
+    viewModel.incidentTypes = await deps.sequelize.query(
+        `SELECT id, description FROM logitrack.incident_type WHERE active = true ORDER BY id`,
+        { type: deps.QueryTypes.SELECT }
+    );
+
+    const branchFilter = branchId ? `AND s."currentBranchId" = :branchId` : '';
+    const deliveryStatusFilter = deliveryStatus
+        ? `AND s."statusId" = :deliveryStatus`
+        : `AND s."statusId" IN (${ELIGIBLE_DELIVERY_STATUSES.join(',')})`;
+    const incidentTypeFilter = incidentTypeId ? `AND i."incidentTypeId" = :incidentTypeId` : '';
+
+    const replacements = { from: dateFrom, to: dateTo };
+    if (branchId) { replacements.branchId = branchId; }
+    if (incidentTypeId) { replacements.incidentTypeId = incidentTypeId; }
+    if (deliveryStatus) { replacements.deliveryStatus = deliveryStatus; }
+
     const deliveryCte = `
         SELECT 'delivery' AS survey_type,
-               "overallRating"           AS overall,
-               "punctualityRating"       AS dim1,
-               "packageConditionRating"  AS dim2,
-               "serviceRating"           AS dim3,
-               NULL::smallint            AS dim4,
-               "createdAt"
-          FROM logitrack.delivery_survey
-         WHERE "createdAt"::date >= :from AND "createdAt"::date <= :to`;
+               ds."overallRating"           AS overall,
+               ds."punctualityRating"       AS dim1,
+               ds."packageConditionRating"  AS dim2,
+               ds."serviceRating"           AS dim3,
+               ds."createdAt"
+          FROM logitrack.delivery_survey ds
+          JOIN logitrack.shipment s ON s.id = ds."shipmentId"
+         WHERE ds."createdAt"::date >= :from AND ds."createdAt"::date <= :to
+           ${deliveryStatusFilter} ${branchFilter}`;
 
     const incidentCte = `
         SELECT 'incident' AS survey_type,
-               "overallRating"           AS overall,
-               "resolutionTimeRating"    AS dim1,
-               "communicationRating"     AS dim2,
-               "outcomeRating"           AS dim3,
-               NULL::smallint            AS dim4,
-               "createdAt"
-          FROM logitrack.incident_survey
-         WHERE "createdAt"::date >= :from AND "createdAt"::date <= :to`;
+               isv."overallRating"           AS overall,
+               isv."resolutionTimeRating"    AS dim1,
+               isv."communicationRating"     AS dim2,
+               isv."outcomeRating"           AS dim3,
+               isv."createdAt"
+          FROM logitrack.incident_survey isv
+          JOIN logitrack.incident i ON i.id = isv."incidentId"
+          JOIN logitrack.shipment s ON s.id = i."shipmentId"
+         WHERE isv."createdAt"::date >= :from AND isv."createdAt"::date <= :to
+           ${incidentTypeFilter} ${branchFilter}`;
 
     let unionCte;
     if (surveyType === 'delivery') {
@@ -283,7 +354,6 @@ const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes })
     }
 
     const baseCte = `WITH surveys AS (${unionCte})`;
-    const replacements = { from: dateFrom, to: dateTo };
 
     const kpiRows = await deps.sequelize.query(
         `${baseCte}
@@ -300,36 +370,72 @@ const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes })
     viewModel.kpis.totalSurveys = kpi.total || 0;
     viewModel.kpis.overallAvg = kpi.overall_avg || 0;
 
-    if (surveyType === 'incident') {
-        viewModel.kpis.dimensions = [
-            { label: 'Tiempo de resolución', avg: kpi.dim1_avg || 0 },
-            { label: 'Comunicación', avg: kpi.dim2_avg || 0 },
-            { label: 'Resultado obtenido', avg: kpi.dim3_avg || 0 },
-        ];
-    } else if (surveyType === 'delivery') {
-        viewModel.kpis.dimensions = [
-            { label: 'Puntualidad', avg: kpi.dim1_avg || 0 },
-            { label: 'Estado del paquete', avg: kpi.dim2_avg || 0 },
-            { label: 'Atención del servicio', avg: kpi.dim3_avg || 0 },
-        ];
-    } else {
-        viewModel.kpis.dimensions = [
-            { label: 'Dimensión 1', avg: kpi.dim1_avg || 0 },
-            { label: 'Dimensión 2', avg: kpi.dim2_avg || 0 },
-            { label: 'Dimensión 3', avg: kpi.dim3_avg || 0 },
-        ];
+    const dims = getDimensionLabels(surveyType);
+    viewModel.kpis.dimensions = dims.map((d) => ({
+        label: d.label,
+        avg: kpi[`${d.key}_avg`] || 0,
+    }));
+
+    const responseRateParts = [];
+    if (surveyType !== 'incident') {
+        responseRateParts.push(`
+            SELECT 'delivery' AS src,
+                   COUNT(*)::int AS eligible,
+                   COUNT(ds.id)::int AS responded
+              FROM logitrack.shipment s
+              LEFT JOIN logitrack.delivery_survey ds ON ds."shipmentId" = s.id
+             WHERE s."statusId" IN (${ELIGIBLE_DELIVERY_STATUSES.join(',')})
+               AND s."updatedAt"::date >= :from AND s."updatedAt"::date <= :to
+               ${deliveryStatus ? `AND s."statusId" = :deliveryStatus` : ''}
+               ${branchFilter}`);
     }
+    if (surveyType !== 'delivery') {
+        responseRateParts.push(`
+            SELECT 'incident' AS src,
+                   COUNT(*)::int AS eligible,
+                   COUNT(isv.id)::int AS responded
+              FROM logitrack.incident i
+              LEFT JOIN logitrack.incident_survey isv ON isv."incidentId" = i.id
+              ${branchId ? `JOIN logitrack.shipment s ON s.id = i."shipmentId"` : ''}
+             WHERE i.status = 'CLOSED'
+               AND i."updatedAt"::date >= :from AND i."updatedAt"::date <= :to
+               ${incidentTypeFilter}
+               ${branchId ? `AND s."currentBranchId" = :branchId` : ''}`);
+    }
+
+    const responseRateRows = await deps.sequelize.query(
+        `SELECT SUM(eligible)::int AS eligible, SUM(responded)::int AS responded
+           FROM (${responseRateParts.join(' UNION ALL ')}) sub`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    const rr = responseRateRows[0] || {};
+    const eligible = rr.eligible || 0;
+    const responded = rr.responded || 0;
+    viewModel.kpis.responseRate = {
+        eligible,
+        responded,
+        pending: eligible - responded,
+        pct: eligible > 0 ? Math.round(responded / eligible * 100) : 0,
+    };
 
     viewModel.trend = await deps.sequelize.query(
         `${baseCte}
          SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month,
                 ROUND(AVG(overall), 2)::float AS avg_overall,
-                COUNT(*)::int AS total
+                COUNT(*)::int AS total,
+                COUNT(CASE WHEN overall >= 4 THEN 1 END)::int AS promoters,
+                COUNT(CASE WHEN overall <= 2 THEN 1 END)::int AS detractors
            FROM surveys
           GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
           ORDER BY month`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
+
+    viewModel.trend = viewModel.trend.map((row) => ({
+        ...row,
+        nps: row.total > 0 ? Math.round((row.promoters - row.detractors) / row.total * 100) : 0,
+    }));
 
     viewModel.comparison = await deps.sequelize.query(
         `${baseCte}
@@ -354,11 +460,45 @@ const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes })
         { type: deps.QueryTypes.SELECT, replacements }
     );
 
+    viewModel.kpis.nps = computeNps(viewModel.distribution);
+
+    const commentParts = [];
+    if (surveyType !== 'incident') {
+        commentParts.push(`
+            SELECT 'delivery' AS survey_type, ds."overallRating" AS rating,
+                   ds.comment, ds."createdAt",
+                   'ENV-' || ds."shipmentId" AS ref
+              FROM logitrack.delivery_survey ds
+              JOIN logitrack.shipment s ON s.id = ds."shipmentId"
+             WHERE ds.comment IS NOT NULL AND ds.comment <> ''
+               AND ds."createdAt"::date >= :from AND ds."createdAt"::date <= :to
+               ${deliveryStatusFilter} ${branchFilter}`);
+    }
+    if (surveyType !== 'delivery') {
+        commentParts.push(`
+            SELECT 'incident' AS survey_type, isv."overallRating" AS rating,
+                   isv.comment, isv."createdAt",
+                   'INC-' || isv."incidentId" AS ref
+              FROM logitrack.incident_survey isv
+              JOIN logitrack.incident i ON i.id = isv."incidentId"
+              JOIN logitrack.shipment s ON s.id = i."shipmentId"
+             WHERE isv.comment IS NOT NULL AND isv.comment <> ''
+               AND isv."createdAt"::date >= :from AND isv."createdAt"::date <= :to
+               ${incidentTypeFilter} ${branchFilter}`);
+    }
+
+    viewModel.recentComments = await deps.sequelize.query(
+        `SELECT * FROM (${commentParts.join(' UNION ALL ')}) c
+          ORDER BY c."createdAt" DESC LIMIT 10`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
     return viewModel;
 };
 
 module.exports = {
     buildExportQuery,
+    computeNps,
     formatIsoDate,
     getDeliveryPerformanceData,
     getIncidentsByPeriodData,

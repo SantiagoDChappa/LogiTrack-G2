@@ -105,9 +105,13 @@ router.get('/', requireDelivery, async (req, res) => {
         // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
         const fatigueRoute = routes.find(r =>
             r.statusId === RouteStatus.BLOCKED_FATIGUE || r.statusId === RouteStatus.PAUSED_FATIGUE) || null;
-        const fatigueBlocked = fatigueRoute
+        let fatigueBlocked = fatigueRoute
             ? { id: fatigueRoute.id, paused: fatigueRoute.statusId === RouteStatus.PAUSED_FATIGUE }
             : null;
+        // Bloqueo en el control de INICIO (la ruta no cambia de estado): banner por redirect.
+        if (!fatigueBlocked && req.query.fatiga === 'bloqueado') {
+            fatigueBlocked = { id: Number(req.query.ruta) || null, paused: false, gate: true };
+        }
 
         // Resumen para el card destacado
         let activeSummary = null;
@@ -356,6 +360,11 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
     const reason = (reasonText || reasonCode || comment || '').trim();
     if (!reason) { return res.status(400).json({ error: 'Motivo obligatorio' }); }
 
+    // Paquete dañado tiene un flujo propio: el remitente decide reembolso o reemplazo,
+    // no se le ofrece reentrega (esperar nueva fecha o retirar por sucursal).
+    const isDamaged = ['paquete_dañado', 'paquete_danado'].includes(reasonCode)
+        || /\bdanad/.test(String(reason).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+
     const failedAttemptModel = require('../models/failedAttempt');
     const { getSuggestedDate } = require('../utils/failedAttempt');
 
@@ -374,6 +383,44 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             suggestedDate:    getSuggestedDate(reason),
             status:           retrySameDay ? 'reintento_mismo_dia' : 'pendiente',
         });
+
+        // === Paquete dañado: incidencia + email de gestión (reembolso / reemplazo) al
+        // remitente, y estado terminal PACKAGE_FAILED. NO se manda el aviso de reentrega.
+        if (isDamaged) {
+            const { NotificationEvent: NED } = require('../constants/enums');
+            try {
+                const inc = await createDamageIncident({
+                    shipmentId: stop.shipmentId,
+                    description: `Paquete dañado reportado en ruta. Motivo: ${reason}.${comment ? ' Detalle: ' + comment : ''}`,
+                    userId: res.locals.currentUser?.id || null,
+                });
+                // Aviso informativo de incidencia + email accionable al remitente (reembolso/reemplazo).
+                require('../controllers/shipment').notifyShipmentEvent(NED.SHIPMENT_INCIDENT, stop.shipmentId)
+                    .catch(e => console.error('notif INCIDENT', stop.shipmentId, e.message));
+                require('../services/incidentDamageResolution').notifySenderIfDamage({
+                    incidentId: inc?.id || null,
+                    shipment: { id: stop.shipmentId, trackingId: stop.shipment?.trackingId },
+                    type: { code: 'PACKAGE_BROKEN' },
+                }).catch(e => console.error('notif damage choice', stop.shipmentId, e.message));
+            } catch (incErr) {
+                console.error('auto-incident dañado err:', incErr.message);
+            }
+            // Estado PACKAGE_FAILED (emite SHIPMENT_PACKAGE_FAILED, no reentrega).
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.PACKAGE_FAILED.id,
+                actor: res.locals.currentUser,
+                comment: reason,
+                latitude: latitude  || null,
+                longitude: longitude || null,
+            });
+            await RouteStop.update(
+                { completed: true, completedAt: new Date() },
+                { where: { id: stop.id, routeId: route.id } }
+            );
+            return res.json({ ok: true, packageFailed: true });
+        }
+
         // Verificar si superó el máximo de intentos fallidos.
         // Sprint 3 - 2.5: si el motivo configurado tiene maxAttemptsOverride, usar ese.
         // El intento recién creado YA cuenta; se cancela al alcanzar el tope, no después.
@@ -724,7 +771,43 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     res.json({
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
+        reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
+        voiceAcousticEnabled: cfg.voiceAcousticEnabled,
+        voiceMaxAttempts: cfg.voiceMaxAttempts, reactionAttempts: cfg.reactionAttempts,
     });
+});
+
+// Diagnóstico de la prueba de voz desde el cliente → visible en logs del server (Render).
+// El reconocimiento corre en el navegador; esto solo refleja sus eventos para depurar.
+router.post('/route/:id/fatigue/voz-log', requireDelivery, (req, res) => {
+    const uid = res.locals.currentUser?.id;
+    console.log('[fatiga-voz][cliente] user=' + uid + ' route=' + req.params.id, JSON.stringify(req.body));
+    res.status(204).end();
+});
+
+// Prueba de voz SERVER-SIDE (compatible iOS): el cliente graba el audio y lo manda
+// en base64; acá se transcribe (STT) y se compara con la frase. El audio es
+// EFÍMERO: se procesa y se descarta, nunca se persiste ni se loguea (Ley 25.326).
+router.post('/route/:id/fatigue/voz-stt', requireDelivery, async (req, res) => {
+    const route = await ownRouteOr403(req, res); if (!route) { return; }
+    const fatigueStt = require('../services/fatigue/stt');
+    const phraseMatch = require('../services/fatigue/phraseMatch');
+    if (!fatigueStt.isEnabled()) { return res.status(501).json({ error: 'STT no configurado en el servidor' }); }
+    const { frase, audioBase64, mimeType } = req.body || {};
+    if (!frase || !audioBase64) { return res.status(400).json({ error: 'Faltan datos (frase/audio)' }); }
+    try {
+        const buffer = Buffer.from(audioBase64, 'base64');
+        if (buffer.length > 8 * 1024 * 1024) { return res.status(413).json({ error: 'Audio demasiado grande' }); }
+        const ext = (mimeType && mimeType.includes('mp4')) ? 'mp4' : (mimeType && mimeType.includes('ogg')) ? 'ogg' : 'webm';
+        const dicho = await fatigueStt.transcribe(buffer, { mimeType: mimeType || 'audio/webm', filename: `voz.${ext}` });
+        const matchRatio = phraseMatch.similitudFrase(dicho, frase);
+        // No se persiste el audio ni la transcripción cruda: solo se devuelve el match.
+        res.json({ ok: true, matchRatio, dicho });
+    } catch (e) {
+        console.warn('[fatiga-voz][stt] error:', e.message);
+        res.status(502).json({ error: 'No se pudo transcribir', detail: e.message });
+    }
 });
 
 // US-1: registrar consentimiento (acepta o rechaza).
@@ -732,11 +815,14 @@ router.post('/route/:id/consent', requireDelivery, async (req, res) => {
     const route = await ownRouteOr403(req, res); if (!route) { return; }
     const accepted = req.body.accepted === true || req.body.accepted === 'true';
     const cfg = await fatigueCfg.getConfig(route.originBranchId);
-    const check = await fatigueSvc.recordConsent({
+    const result = await fatigueSvc.recordConsent({
         userId: res.locals.currentUser.id, routeId: route.id,
         branchId: route.originBranchId, accepted, version: cfg.consentVersion,
     });
-    res.json({ ok: true, accepted, checkId: check.id });
+    res.json({
+        ok: true, accepted, checkId: result.check.id,
+        disabled: result.disabled, rejections: result.rejections, max: result.max,
+    });
 });
 
 // US-2/3/4/9: ejecutar la prueba y evaluar la fatiga.
@@ -805,6 +891,9 @@ router.post('/route/:id/fatigue-recheck', requireDelivery, async (req, res) => {
     await fatigueRecheck.onRecheckResult(route.id, result.decision, cfg);
     const newStatus = result.decision === 'BLOCKED' ? RouteStatus.PAUSED_FATIGUE : RouteStatus.IN_ROUTE;
     await Route.update({ statusId: newStatus }, { where: { id: route.id } });
+    // LGT-199 Esc.4: el conductor completó la prueba → cerrar avisos de omisión pendientes.
+    await fatigueSvc.clearRecheckOmission({ routeId: route.id, actorId: res.locals.currentUser.id })
+        .catch(e => console.error('clearRecheckOmission', e.message));
 
     res.json({ ok: true, ...result, blocked: result.decision === 'BLOCKED' });
 });
@@ -941,6 +1030,31 @@ router.get('/route/:id/summary', requireDelivery, async (req, res) => {
         const failed    = stops.filter(s => s.stopType === 'delivery' && s.completed && s.shipment?.statusId === Status.FAILED_ATTEMPT.id);
         const skipped   = stops.filter(s => s.skipped && !s.completed);
 
+        // Paquete dañado NO va a la devolución por escaneo: ese caso lo define el
+        // cliente (se abrió incidencia). Solo se devuelven a sucursal los fallidos
+        // por otros motivos (ausente, dirección errónea, etc.).
+        const isDamageReason = (code, text) => {
+            if (['paquete_dañado', 'paquete_danado'].includes(code)) { return true; }
+            const t = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            return /\bdanad/.test(t); // "dañado" / "danado"
+        };
+        const failedShipmentIds = failed.map(s => s.shipmentId).filter(Boolean);
+        const damagedShipmentIds = new Set();
+        if (failedShipmentIds.length) {
+            const { FailedAttempt } = require('../models/failedAttempt');
+            const attempts = await FailedAttempt.findAll({
+                where: { shipmentId: { [Op.in]: failedShipmentIds } },
+                order: [['attemptDate', 'DESC']],
+            });
+            // Toma el intento más reciente por envío (la lista ya viene ordenada DESC).
+            const latestByShipment = new Map();
+            for (const a of attempts) { if (!latestByShipment.has(a.shipmentId)) { latestByShipment.set(a.shipmentId, a); } }
+            for (const [sid, a] of latestByShipment) {
+                if (isDamageReason(a.reasonCode, a.reason)) { damagedShipmentIds.add(sid); }
+            }
+        }
+        const failedForReturn = failed.filter(s => !damagedShipmentIds.has(s.shipmentId));
+
         const km = Number(route.totalDistanceKm || 0);
         const startedAt  = route.startedAt  ? new Date(route.startedAt)  : null;
         const finishedAt = route.finishedAt ? new Date(route.finishedAt) : null;
@@ -959,7 +1073,7 @@ router.get('/route/:id/summary', requireDelivery, async (req, res) => {
             deliveredCount: delivered.length,
             failedCount:    failed.length,
             skippedCount:   skipped.length,
-            failedStops:    failed,
+            failedStops:    failedForReturn,
             km,
             grossSec, pauseSec, effectiveSec,
             fuelL, fuelCost, commission,

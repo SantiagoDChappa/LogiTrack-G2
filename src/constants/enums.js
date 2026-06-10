@@ -100,6 +100,9 @@ const NotificationEvent = Object.freeze({
     PORTAL_CLIENT_ACCESS:         'PORTAL_CLIENT_ACCESS',
     // Cambio de estado de una incidencia → aviso al cliente. Editable desde Ajustes.
     INCIDENT_STATUS_CHANGE:       'INCIDENT_STATUS_CHANGE',
+    // LGT-195: el transportista rechazó el consentimiento de fatiga las veces parametrizadas
+    // → queda inhabilitado y se notifica a los Supervisores de su sucursal + administradores.
+    FATIGUE_DRIVER_DISABLED_CONSENT: 'FATIGUE_DRIVER_DISABLED_CONSENT',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)

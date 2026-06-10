@@ -143,9 +143,10 @@
         <div class="page-update-wrapper">
 
             <%
-                const _sk  = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                const _sdesc = shipment.status && shipment.status.description ? shipment.status.description : '';
+                const _sk  = _sdesc.toLowerCase().replace(/[\s-]+/g, '_');
                 const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
-                const _slLabel = _sl[_sk] || shipment.status.description;
+                const _slLabel = _sl[_sk] || _sdesc || 'Sin estado';
             %>
 
             <!-- Tracking ID + estado -->
@@ -270,7 +271,7 @@
                          
                         <h3>
                             <span class="material-symbols-outlined">query_stats</span>
-                            Detalles de la entrega
+                            Semáforo de fiabilidad
                         </h3>
                         <div id="prediction-result"></div>
                     </div>
@@ -412,19 +413,19 @@
                     <h3>Remitente</h3>
                     <div class="detail-field">
                         <span class="detail-label">Nombre y apellido</span>
-                        <span class="detail-value"><%= shipment.sender.fullName %></span>
+                        <span class="detail-value"><%= shipment.sender ? shipment.sender.fullName : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Documento</span>
-                        <span class="detail-value"><%= shipment.sender.document %></span>
+                        <span class="detail-value"><%= shipment.sender ? shipment.sender.document : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Teléfono</span>
-                        <span class="detail-value"><%= shipment.sender.phone || '-' %></span>
+                        <span class="detail-value"><%= shipment.sender && shipment.sender.phone ? shipment.sender.phone : '-' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Email</span>
-                        <span class="detail-value"><%= shipment.sender.email || '-' %></span>
+                        <span class="detail-value"><%= shipment.sender && shipment.sender.email ? shipment.sender.email : '-' %></span>
                     </div>
                 </div>
 
@@ -432,19 +433,19 @@
                     <h3>Destinatario</h3>
                     <div class="detail-field">
                         <span class="detail-label">Nombre y apellido</span>
-                        <span class="detail-value"><%= shipment.recipient.fullName %></span>
+                        <span class="detail-value"><%= shipment.recipient ? shipment.recipient.fullName : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Documento</span>
-                        <span class="detail-value"><%= shipment.recipient.document %></span>
+                        <span class="detail-value"><%= shipment.recipient ? shipment.recipient.document : '—' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Teléfono</span>
-                        <span class="detail-value"><%= shipment.recipient.phone || '-' %></span>
+                        <span class="detail-value"><%= shipment.recipient && shipment.recipient.phone ? shipment.recipient.phone : '-' %></span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Email</span>
-                        <span class="detail-value"><%= shipment.recipient.email || '-' %></span>
+                        <span class="detail-value"><%= shipment.recipient && shipment.recipient.email ? shipment.recipient.email : '-' %></span>
                     </div>
                 </div>
 

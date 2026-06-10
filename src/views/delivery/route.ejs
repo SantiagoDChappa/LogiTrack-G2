@@ -215,6 +215,13 @@
         transition: opacity .2s ease, width .2s ease;
     }
     .sheet-grab:hover .sheet-handle { opacity: .7; width: 52px; }
+    .sheet-grab { flex-direction: column; gap: 3px; }
+    .sheet-hint {
+        font-size: 11px; font-weight: 600; color: var(--lt-muted);
+        opacity: 0; max-height: 0; overflow: hidden;
+        transition: opacity .25s ease, max-height .25s ease;
+    }
+    .bottom-sheet.is-tucked .sheet-hint { opacity: .8; max-height: 18px; }
     .bottom-sheet.collapsed { max-height: 80px !important; overflow: hidden; }
     .bottom-sheet.collapsed .stops-list, .bottom-sheet.collapsed .section-title { opacity: 0; pointer-events: none; }
 
@@ -625,6 +632,7 @@
         <section class="bottom-sheet" id="bottom-sheet">
             <div class="sheet-grab" id="sheet-grab" role="button" aria-label="Mostrar u ocultar lista de envíos">
                 <div class="sheet-handle"></div>
+                <div class="sheet-hint" id="sheet-hint">Deslizá para ver la entrega</div>
             </div>
 
             <ol class="stops-list" id="stops-list">
@@ -980,6 +988,7 @@
         const pts = snapPoints();
         currentSnap = name;
         setSheetY(pts[name]);
+        sheet.classList.toggle('is-tucked', name === 'tucked'); // muestra el hint "Deslizá…"
         setTimeout(() => map.invalidateSize(), 380);
     }
 
@@ -1005,9 +1014,10 @@
         return best;
     }
 
-    // Inicializa posición mid en mobile, full (sin transform) en desktop
+    // Inicializa el sheet plegado en mobile (solo el handle; mapa al máximo).
+    // El conductor lo arrastra hacia arriba para ver el envío. Desktop: full.
     function initSheet() {
-        if (isMobile()) snapTo('mid');
+        if (isMobile()) snapTo('tucked');
         else setSheetY(0);
     }
     initSheet();
@@ -1120,6 +1130,32 @@
 
     // ===================== Ojo de Patrón — UI del conductor =====================
     // LGT-190 (consentimiento) · LGT-191/198 (prueba) · LGT-199 (re-chequeo en ruta).
+
+    // Overlay de carga: bloquea toda la ruta mientras se resuelve el gate de fatiga.
+    function showRouteLoader(msg) {
+        let el = document.getElementById('route-fatigue-loader');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'route-fatigue-loader';
+            el.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,.82);' +
+                'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;' +
+                'color:#fff;font-family:system-ui,sans-serif';
+            el.innerHTML = '<div style="width:54px;height:54px;border-radius:50%;border:5px solid rgba(255,255,255,.25);' +
+                'border-top-color:#fff;animation:rflspin 1s linear infinite"></div>' +
+                '<div id="route-fatigue-loader-msg" style="font-size:.95rem;font-weight:600"></div>';
+            const st = document.createElement('style');
+            st.textContent = '@keyframes rflspin{to{transform:rotate(360deg)}}';
+            el.appendChild(st);
+            document.body.appendChild(el);
+        }
+        document.getElementById('route-fatigue-loader-msg').textContent = msg || 'Cargando…';
+        el.style.display = 'flex';
+    }
+    function hideRouteLoader() {
+        const el = document.getElementById('route-fatigue-loader');
+        if (el) { el.style.display = 'none'; }
+    }
+
     let fatigueCfgCache = null;
     async function getFatigueCfg() {
         if (fatigueCfgCache) { return fatigueCfgCache; }
@@ -1142,110 +1178,643 @@
                   <li><b>Responsable:</b> LogiTrack. <b>No</b> se guarda el dato biométrico crudo, solo un puntaje.</li>
                   <li><b>Tus derechos (Ley 25.326):</b> acceso, revocación y supresión desde "Mis datos de fatiga".</li>
                 </ul>
-                <p style="font-size:.8rem;color:#64748b">Versión ${cfg.consentVersion || 'v1'}</p></div>`,
+                <p style="font-size:.8rem;opacity:.7">Versión ${cfg.consentVersion || 'v1'}</p></div>`,
             showCancelButton: true, confirmButtonText: 'Acepto', cancelButtonText: 'No acepto',
             confirmButtonColor: '#16a34a', cancelButtonColor: '#dc2626', allowOutsideClick: false,
         });
         const accepted = res.isConfirmed;
+        showRouteLoader(accepted ? 'Preparando prueba…' : 'Registrando rechazo…');
         try {
             const r = await fetch(`/delivery/route/${routeId}/consent`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ accepted }),
             });
             const data = await r.json();
-            return { accepted, checkId: data.checkId };
+            return {
+                accepted, checkId: data.checkId,
+                disabled: !!data.disabled, rejections: data.rejections, max: data.max,
+            };
         } catch (_) {
+            hideRouteLoader();
             Swal.fire({ icon: 'error', title: 'No se pudo registrar', text: 'Reintentá en unos segundos.' });
             return null;
         }
     }
 
-    // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics:{reactionsMs} } o null.
-    async function pruebaReaccion(attempts = 3) {
+    // LGT-198: prueba de reacción (tap). Devuelve { method:'REACCION', metrics } ,
+    // 'BACK' si el conductor elige volver a elegir método (solo modo AMBOS), o null.
+    async function pruebaReaccion(cfg, canGoBack = false) {
+        const attempts = Math.max(1, Number(cfg && cfg.reactionAttempts) || 3); // intentos configurables
+        const limite = (cfg && Number(cfg.reactionSlowMs)) || 800; // ms tope de reacción
         const reactionsMs = [];
         for (let i = 0; i < attempts; i++) {
-            const ok = await new Promise((resolve) => {
+            // Entre cada paso mostramos la carga a pantalla completa: la ruta no se puede tocar.
+            showRouteLoader(i === 0 ? 'Iniciando prueba de reacción…' : `Preparando intento ${i + 1} de ${attempts}…`);
+            await new Promise((res) => setTimeout(res, 650));
+            const r = await new Promise((resolve) => {
                 Swal.fire({
                     title: `Prueba de reacción (${i + 1}/${attempts})`,
                     html: `<div id="rt-box" style="height:160px;border-radius:12px;background:#334155;display:flex;
-                            align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer">
-                            Esperá el verde…</div>`,
-                    showConfirmButton: false, allowOutsideClick: false, didOpen: () => {
+                            flex-direction:column;gap:4px;align-items:center;justify-content:center;color:#fff;font-weight:700;cursor:pointer">
+                            Esperá el verde…</div>
+                            <div id="rt-info" style="margin-top:8px;font-size:.8rem;opacity:.85">Tocá apenas se ponga verde. Límite: ${limite} ms.</div>`,
+                    showConfirmButton: false, showCancelButton: canGoBack, cancelButtonText: 'Volver a elegir',
+                    allowOutsideClick: false, allowEscapeKey: false, didOpen: () => {
+                        hideRouteLoader(); // el modal ya cubre la pantalla; ocultamos el loader
                         const box = document.getElementById('rt-box');
-                        let shownAt = 0, armed = false;
+                        const info = document.getElementById('rt-info');
+                        let shownAt = 0, armed = false, tapped = false;
                         const delay = 800 + Math.random() * 2500;
                         const t = setTimeout(() => {
+                            if (!document.body.contains(box)) { return; }
                             box.style.background = '#16a34a'; box.textContent = '¡TOCÁ!';
                             shownAt = performance.now(); armed = true;
                         }, delay);
                         box.addEventListener('click', () => {
+                            if (tapped) { return; }
                             if (!armed) { // tocó antes del estímulo → se anula (Esc.2)
-                                clearTimeout(t); resolve(false); Swal.close(); return;
+                                clearTimeout(t); resolve('early'); Swal.close(); return;
                             }
-                            reactionsMs.push(Math.round(performance.now() - shownAt));
-                            resolve(true); Swal.close();
+                            tapped = true;
+                            const ms = Math.round(performance.now() - shownAt);
+                            reactionsMs.push(ms);
+                            const ok = ms <= limite;
+                            box.style.background = ok ? '#16a34a' : '#dc2626';
+                            box.textContent = `${ms} ms`;
+                            info.innerHTML = ok
+                                ? `<span style="color:#16a34a;font-weight:700">✓ Dentro del límite</span> (${limite} ms)`
+                                : `<span style="color:#dc2626;font-weight:700">✗ Superó el límite</span> de ${limite} ms`;
+                            setTimeout(() => { resolve('ok'); Swal.close(); }, 1200);
+                        });
+                    },
+                }).then((sw) => { if (sw.dismiss === Swal.DismissReason.cancel) { resolve('back'); } });
+            });
+            if (r === 'back') { hideRouteLoader(); return 'BACK'; }
+            if (r === 'early') { i--; } // intento anulado, se repite sin penalización
+        }
+        showRouteLoader('Calculando resultado…'); // bloquea la ruta hasta mostrar el veredicto
+        return { method: 'REACCION', metrics: { reactionsMs } };
+    }
+
+    // LGT-191: prueba de voz REAL. El conductor lee una frase y se valida con
+    // reconocimiento de voz (Web Speech API). La muestra es efímera: solo se
+    // envía el % de coincidencia, nunca el audio (Ley 25.326).
+    const FRASES_VOZ = [
+        'El camión sale de la sucursal a las ocho',
+        'Hoy entrego paquetes en la zona norte',
+        'Conduzco con cuidado y respeto las señales',
+        'La ruta de hoy tiene varias paradas',
+        'Reviso los bultos antes de salir de viaje',
+    ];
+    // El reconocedor puede devolver "8" u "ocho": unificamos a dígito para no
+    // fallar por esa variación (uno/1, dos/2, ...).
+    const NUM_PALABRA = { cero: '0', uno: '1', una: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9', diez: '10' };
+    function normalizarTexto(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
+            .split(' ').map(w => NUM_PALABRA[w] || w).join(' ');
+    }
+    // Distancia de edición a nivel de palabra (Levenshtein sobre tokens).
+    function levenshteinPalabras(a, b) {
+        const m = a.length, n = b.length;
+        if (!m) { return n; }
+        if (!n) { return m; }
+        let prev = Array.from({ length: n + 1 }, (_, j) => j);
+        for (let i = 1; i <= m; i++) {
+            const cur = [i];
+            for (let j = 1; j <= n; j++) {
+                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+            }
+            prev = cur;
+        }
+        return prev[n];
+    }
+    // Coincidencia 0..1 sensible al orden y que penaliza palabras de más/faltantes.
+    // Frase exacta → 1; frase mal dicha → baja.
+    function similitudFrase(dicho, esperado) {
+        const a = normalizarTexto(dicho).split(' ').filter(Boolean);
+        const b = normalizarTexto(esperado).split(' ').filter(Boolean);
+        if (!a.length || !b.length) { return 0; }
+        const dist = levenshteinPalabras(a, b);
+        return Math.max(0, 1 - dist / Math.max(a.length, b.length));
+    }
+
+    // Elige un mimeType de grabación soportado (iOS usa audio/mp4).
+    function pickMimeAudio() {
+        const cands = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/ogg'];
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+            for (const c of cands) { if (MediaRecorder.isTypeSupported(c)) { return c; } }
+        }
+        return '';
+    }
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => { const s = String(fr.result); resolve(s.slice(s.indexOf(',') + 1)); };
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+        });
+    }
+
+    // === Análisis ACÚSTICO de fatiga vocal (Web Audio, 100% en el navegador, $0) ===
+    // Extrae marcadores reales del waveform: velocidad de habla, pausas, tono (F0) y
+    // su variabilidad, dinámica de energía. El audio es efímero: se analiza y se
+    // descarta (Ley 25.326); al server solo va el puntaje, nunca el audio.
+    async function extraerFeaturesVoz(blob) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC || !blob || !blob.size) { return null; }
+        const ctx = new AC();
+        let audio;
+        try { audio = await ctx.decodeAudioData(await blob.arrayBuffer()); }
+        catch (_) { try { await ctx.close(); } catch (e) {} return null; }
+        const data = audio.getChannelData(0);
+        const sr = audio.sampleRate;
+        try { await ctx.close(); } catch (e) {}
+        if (!data || data.length < sr * 0.3) { return null; }
+
+        const frameLen = Math.max(1, Math.round(0.03 * sr)); // 30 ms
+        const hop = Math.max(1, Math.round(0.01 * sr));       // 10 ms
+        const rms = [];
+        for (let i = 0; i + frameLen <= data.length; i += hop) {
+            let s = 0;
+            for (let j = 0; j < frameLen; j++) { const v = data[i + j]; s += v * v; }
+            rms.push(Math.sqrt(s / frameLen));
+        }
+        if (rms.length < 3) { return null; }
+        const maxRms = Math.max.apply(null, rms);
+        if (maxRms <= 1e-4) { return null; } // sin audio útil
+        const thr = maxRms * 0.18; // umbral voz/silencio
+        const voiced = rms.map(r => r > thr);
+        const voicedFrames = voiced.filter(Boolean).length;
+        const pauseRatio = 1 - voicedFrames / voiced.length;
+        let onsets = 0;
+        for (let i = 1; i < voiced.length; i++) { if (voiced[i] && !voiced[i - 1]) { onsets++; } }
+        const durSec = data.length / sr;
+        const speechRate = onsets / Math.max(0.5, durSec); // arranques de voz por seg
+
+        // F0 por autocorrelación en frames con voz (70–350 Hz)
+        const minLag = Math.floor(sr / 350), maxLag = Math.floor(sr / 70);
+        const f0s = [];
+        for (let i = 0; i + frameLen <= data.length; i += hop * 2) {
+            if (!voiced[Math.floor(i / hop)]) { continue; }
+            let best = 0, bestLag = 0;
+            for (let lag = minLag; lag <= maxLag; lag++) {
+                let s = 0;
+                for (let j = 0; j < frameLen - lag; j++) { s += data[i + j] * data[i + j + lag]; }
+                if (s > best) { best = s; bestLag = lag; }
+            }
+            if (bestLag) { f0s.push(sr / bestLag); }
+        }
+        const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+        const f0mean = f0s.length ? mean(f0s) : 0;
+        const f0std = f0s.length ? Math.sqrt(mean(f0s.map(x => (x - f0mean) * (x - f0mean)))) : 0;
+        const f0cv = f0mean ? f0std / f0mean : 0;
+        const rmsMean = mean(rms);
+        const rmsStd = Math.sqrt(mean(rms.map(x => (x - rmsMean) * (x - rmsMean))));
+        const energyCv = rmsMean ? rmsStd / rmsMean : 0;
+
+        return {
+            durSec: +durSec.toFixed(2), speechRate: +speechRate.toFixed(2),
+            pauseRatio: +pauseRatio.toFixed(2), f0mean: Math.round(f0mean),
+            f0cv: +f0cv.toFixed(3), energyCv: +energyCv.toFixed(3), voicedFrames,
+        };
+    }
+
+    // Mapa de features → fatiga 0..100 (heurística sobre marcadores reales, calibrable).
+    // Más fatiga: habla lenta, muchas pausas, tono monótono, poca dinámica de energía.
+    function scoreAcusticoVoz(f) {
+        if (!f) { return null; }
+        const c01 = (x) => Math.max(0, Math.min(1, x));
+        const lento   = c01((2.6 - f.speechRate) / 2.2);
+        const pausas  = c01((f.pauseRatio - 0.40) / 0.40);
+        const monoton = c01((0.12 - f.f0cv) / 0.12);
+        const planoEn = c01((0.55 - f.energyCv) / 0.55);
+        const fatiga = 0.35 * lento + 0.30 * pausas + 0.20 * monoton + 0.15 * planoEn;
+        return Math.round(fatiga * 100);
+    }
+
+    // Prueba de voz SERVER-SIDE (iOS/compatibilidad): graba con MediaRecorder, sube
+    // el audio en base64 y el server lo transcribe (STT) y compara con la frase.
+    // El audio es efímero (Ley 25.326): no se guarda. Devuelve métricas, 'BACK' o null.
+    async function pruebaVozSTT(cfg, canGoBack, vozLog) {
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+            vozLog('stt-sin-mediarecorder', {});
+            await Swal.fire({ icon: 'warning', title: 'Grabación no disponible',
+                text: 'Tu dispositivo no permite grabar audio. Usá el test de reacción.' });
+            return canGoBack ? 'BACK' : null;
+        }
+        const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
+        const MIN_MATCH = 0.95;
+        const secs = cfg.testDurationSec || 5;
+
+        function grabar() {
+            return new Promise((resolve) => {
+                let resolved = false;
+                const done = (v) => { if (!resolved) { resolved = true; resolve(v); } };
+                Swal.fire({
+                    title: 'Prueba de voz',
+                    html: `<div style="font-size:.85rem;margin-bottom:8px">Tocá el botón y leé en voz alta, claro y completo:</div>
+                           <div style="font-weight:700;font-size:1.05rem;margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(37,99,235,.12);color:inherit">“${frase}”</div>
+                           <button id="vz-go" style="padding:12px 16px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">🎤 Empezar prueba</button>
+                           <div id="vz-tip" style="margin-top:10px;font-size:.85rem;opacity:.85"></div>`,
+                    showConfirmButton: false, showCancelButton: canGoBack, cancelButtonText: 'Volver a elegir',
+                    allowOutsideClick: false, allowEscapeKey: false,
+                    didOpen: () => {
+                        const go = document.getElementById('vz-go');
+                        const tip = document.getElementById('vz-tip');
+                        go.addEventListener('click', async () => {
+                            go.disabled = true;
+                            let stream;
+                            try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+                            catch (e) { vozLog('stt-denied', { e: String(e && e.name) }); done({ denied: true }); return; }
+                            const mime = pickMimeAudio();
+                            let rec;
+                            try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+                            catch (_) { rec = new MediaRecorder(stream); }
+                            const chunks = [];
+                            rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) { chunks.push(ev.data); } };
+                            rec.onstop = () => {
+                                stream.getTracks().forEach(t => t.stop());
+                                const blob = new Blob(chunks, { type: rec.mimeType || mime || 'audio/webm' });
+                                vozLog('stt-grabado', { bytes: blob.size, mime: blob.type });
+                                done({ blob });
+                            };
+                            let left = secs;
+                            const paint = () => { tip.innerHTML = `<span style="color:#dc2626;font-weight:700">🔴 Micrófono activado</span> — leé ahora (${Math.max(0, left)}s)`; };
+                            paint();
+                            const iv = setInterval(() => { left--; paint(); }, 1000);
+                            vozLog('stt-rec-start', { mime: mime || '(default)', secs });
+                            try { rec.start(); } catch (e) { clearInterval(iv); vozLog('stt-no-inicia', { msg: String(e && e.message) }); done({ error: true }); return; }
+                            setTimeout(() => { clearInterval(iv); try { rec.stop(); } catch (_) {} }, secs * 1000);
+                        });
+                    },
+                }).then((sw) => { if (sw.dismiss === Swal.DismissReason.cancel) { done({ back: true }); } });
+            });
+        }
+
+        const maxIntentos = Math.max(1, Number(cfg.voiceMaxAttempts) || 3);
+        let intentosFallidos = 0;
+        for (;;) {
+            const g = await grabar();
+            Swal.close();
+            if (g.back) { return canGoBack ? 'BACK' : null; }
+            if (g.denied) {
+                await Swal.fire({ icon: 'error', title: 'Sin permiso de micrófono',
+                    text: canGoBack ? 'Podés elegir el test de reacción.' : 'Habilitá el micrófono y reintentá.' });
+                return canGoBack ? 'BACK' : null;
+            }
+            if (g.error || !g.blob || !g.blob.size) {
+                const rr = await Swal.fire({ icon: 'error', title: 'No se grabó audio',
+                    text: 'No se pudo capturar tu voz. Probá de nuevo.',
+                    showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar' });
+                if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
+                continue;
+            }
+            Swal.fire({ title: 'Evaluando…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let data, httpOk = false;
+            try {
+                const audioBase64 = await blobToBase64(g.blob);
+                const resp = await fetch(`/delivery/route/${routeId}/fatigue/voz-stt`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ frase, audioBase64, mimeType: g.blob.type }),
+                });
+                httpOk = resp.ok;
+                data = await resp.json().catch(() => ({}));
+                if (!httpOk) { throw new Error(data.error || ('HTTP ' + resp.status)); }
+            } catch (e) {
+                vozLog('stt-error', { msg: String(e.message) });
+                Swal.close();
+                const rr = await Swal.fire({ icon: 'error', title: 'No se pudo evaluar',
+                    text: 'Hubo un problema al transcribir tu voz. Probá de nuevo.',
+                    showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar' });
+                if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
+                continue;
+            }
+            vozLog('stt-result', { dicho: data.dicho, match: data.matchRatio });
+            if (data.matchRatio >= MIN_MATCH) {
+                // Gate de frase superado → ahora evaluamos la FATIGA por análisis acústico.
+                // El loader "Evaluando…" sigue visible durante el análisis del waveform.
+                const feats = cfg.voiceAcousticEnabled !== false ? await extraerFeaturesVoz(g.blob) : null;
+                const acousticScore = scoreAcusticoVoz(feats);
+                vozLog('acustico', { feats, acousticScore });
+                Swal.close();
+                const metrics = { matchRatio: data.matchRatio, durationMs: secs * 1000, expectedMs: secs * 1000 };
+                if (Number.isFinite(acousticScore)) { metrics.acousticScore = acousticScore; }
+                return { method: 'VOZ', metrics };
+            }
+            Swal.close();
+            intentosFallidos++;
+            // Agotó los intentos permitidos → el verdicto (bloquear o avisar) lo decide
+            // quien llamó a la prueba, según autoBlock.
+            if (intentosFallidos >= maxIntentos) {
+                vozLog('gate-fallido', { intentos: intentosFallidos });
+                return { method: 'VOZ', metrics: { phraseGateFailed: true } };
+            }
+            const pct = Math.round((data.matchRatio || 0) * 100);
+            const rr = await Swal.fire({ icon: 'info', title: 'No coincide la frase',
+                html: `<div style="text-align:left;font-size:.9rem">
+                        <div>Tenés que leer <b>completa</b> (intento ${intentosFallidos + 1} de ${maxIntentos}):</div>
+                        <div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(37,99,235,.12)">“${frase}”</div>
+                        ${data.dicho ? `<div>Escuché: “<i>${data.dicho}</i>” — coincidencia <b>${pct}%</b> (mínimo ${Math.round(MIN_MATCH*100)}%).</div>` : '<div>No detecté tu voz.</div>'}
+                       </div>`,
+                showCancelButton: true, confirmButtonText: 'Reintentar', cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar', allowOutsideClick: false });
+            if (!rr.isConfirmed) { return canGoBack ? 'BACK' : null; }
+        }
+    }
+
+    async function pruebaVoz(cfg, canGoBack = false) {
+        // Manda diagnóstico al server (aparece en logs de Render) y a la consola.
+        const sessionTag = Math.random().toString(36).slice(2, 8);
+        const vozLog = (stage, data) => {
+            const payload = { tag: sessionTag, stage, ...(data || {}) };
+            console.log('[fatiga-voz]', stage, JSON.stringify(data || {}));
+            try {
+                fetch(`/delivery/route/${routeId}/fatigue/voz-log`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload), keepalive: true,
+                }).catch(() => {});
+            } catch (_) {}
+        };
+
+        // Modo ACÚSTICO: si está activo y el server tiene STT, usamos SIEMPRE el camino
+        // de grabación (sirve en cualquier dispositivo, incl. iOS): el servidor valida la
+        // frase y el navegador analiza la onda para medir la fatiga vocal real.
+        if (cfg.voiceAcousticEnabled !== false && cfg.voiceSttEnabled) {
+            vozLog('modo-acustico', {});
+            return pruebaVozSTT(cfg, canGoBack, vozLog);
+        }
+
+        // iOS (iPhone/iPad): la Web Speech API dice estar soportada pero NO capta
+        // audio (todos los navegadores son WebKit). Si el server tiene STT, grabamos
+        // y transcribimos del lado del servidor; si no, derivamos al test de reacción.
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+            vozLog('ios-detectado', { stt: !!cfg.voiceSttEnabled });
+            if (cfg.voiceSttEnabled) { return pruebaVozSTT(cfg, canGoBack, vozLog); }
+            const r = await Swal.fire({
+                icon: 'warning', title: 'Voz no disponible en iPhone/iPad',
+                text: 'El reconocimiento de voz no funciona en iPhone ni iPad. Usá el test de reacción.',
+                showCancelButton: true,
+                confirmButtonText: canGoBack ? 'Usar test de reacción' : 'Intentar igual',
+                cancelButtonText: canGoBack ? 'Intentar voz igual' : 'Cancelar',
+                confirmButtonColor: '#16a34a',
+            });
+            if (canGoBack) { if (r.isConfirmed) { return 'BACK'; } } // si no, intenta voz igual
+            else if (!r.isConfirmed) { return null; }
+        }
+
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            vozLog('no-soportado', { ua: navigator.userAgent });
+            // Si el server tiene STT, lo usamos también en navegadores sin Web Speech.
+            if (cfg.voiceSttEnabled) { return pruebaVozSTT(cfg, canGoBack, vozLog); }
+            await Swal.fire({ icon: 'warning', title: 'Reconocimiento de voz no disponible',
+                text: canGoBack
+                    ? 'Tu navegador no soporta la prueba de voz. Elegí el test de reacción.'
+                    : 'Tu navegador no soporta la prueba de voz. Usá Chrome o Edge, o pedile a tu supervisor el test de reacción.' });
+            return canGoBack ? 'BACK' : null;
+        }
+        vozLog('soportado', { ua: navigator.userAgent.slice(0, 140), https: location.protocol });
+
+        const frase = FRASES_VOZ[Math.floor(Math.random() * FRASES_VOZ.length)];
+        const MIN_MATCH = 0.95; // exige leer la frase casi completa y en orden
+
+        // Un intento: muestra la frase, escucha y devuelve { ok, matchRatio, dicho, durationMs, denied, noSpeech }.
+        function intentar() {
+            return new Promise((resolve) => {
+                let resolved = false;
+                const done = (v) => { if (!resolved) { resolved = true; resolve(v); } };
+                Swal.fire({
+                    title: 'Prueba de voz',
+                    html: `<div style="font-size:.85rem;margin-bottom:8px">Tocá el botón y leé en voz alta, claro y completo:</div>
+                           <div style="font-weight:700;font-size:1.05rem;margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(37,99,235,.12);color:inherit">“${frase}”</div>
+                           <button id="vz-go" style="padding:12px 16px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">🎤 Empezar prueba</button>
+                           <div id="vz-tip" style="margin-top:10px;font-size:.85rem;opacity:.85"></div>`,
+                    showConfirmButton: false, allowOutsideClick: false, allowEscapeKey: false,
+                    didOpen: () => {
+                        const go = document.getElementById('vz-go');
+                        const tip = document.getElementById('vz-tip');
+                        go.addEventListener('click', () => {
+                            const rec = new SR();
+                            rec.lang = 'es-AR'; rec.interimResults = false; rec.maxAlternatives = 3; rec.continuous = false;
+                            go.disabled = true;
+                            // Mic activo en rojo + cuenta regresiva. Corta solo según testDurationSec (ajustes).
+                            const secs = cfg.testDurationSec || 5;
+                            let left = secs;
+                            const paint = () => { tip.innerHTML = `<span style="color:#dc2626;font-weight:700">🔴 Micrófono activado</span> — leé ahora (${Math.max(0, left)}s)`; };
+                            paint();
+                            const countdown = setInterval(() => { left--; paint(); }, 1000);
+                            const autostop = setTimeout(() => { try { rec.stop(); } catch (_) {} }, secs * 1000);
+                            const cleanup = () => { clearInterval(countdown); clearTimeout(autostop); };
+                            const t0 = performance.now();
+                            const el = () => Math.round(performance.now() - t0);
+                            let gotSound = false, gotSpeech = false;
+                            vozLog('start', { secs, palabras: frase.split(' ').length });
+                            rec.onaudiostart  = () => vozLog('audiostart', { ms: el() });
+                            rec.onsoundstart  = () => { gotSound = true; vozLog('soundstart', { ms: el() }); };
+                            rec.onspeechstart = () => { gotSpeech = true; vozLog('speechstart', { ms: el() }); };
+                            rec.onspeechend   = () => vozLog('speechend', { ms: el() });
+                            rec.onresult = (e) => {
+                                cleanup();
+                                let best = 0, dicho = '';
+                                const alts = e.results[0];
+                                for (let i = 0; i < alts.length; i++) {
+                                    const sim = similitudFrase(alts[i].transcript, frase);
+                                    if (sim > best) { best = sim; dicho = alts[i].transcript; }
+                                }
+                                vozLog('result', { dicho, match: Number(best.toFixed(2)), min: MIN_MATCH, ms: el() });
+                                done({ ok: best >= MIN_MATCH, matchRatio: best, dicho, durationMs: el() });
+                            };
+                            rec.onerror = (ev) => {
+                                cleanup();
+                                vozLog('error', { error: ev.error, ms: el(), gotSound, gotSpeech });
+                                if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { done({ denied: true }); return; }
+                                done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: ev.error || 'desconocido' });
+                            };
+                            rec.onend = () => {
+                                cleanup();
+                                if (!resolved) { vozLog('end-sin-resultado', { ms: el(), gotSound, gotSpeech }); }
+                                done({ ok: false, matchRatio: 0, dicho: '', durationMs: 0, errorType: 'sin-resultado' });
+                            };
+                            try { rec.start(); } catch (err) { cleanup(); vozLog('no-inicia', { msg: String((err && err.message) || err) }); done({ ok: false, matchRatio: 0, errorType: 'no-inicia' }); }
                         });
                     },
                 });
             });
-            if (!ok) { i--; } // intento anulado, se repite sin penalización
         }
-        return { method: 'REACCION', metrics: { reactionsMs } };
-    }
 
-    // LGT-191: prueba de voz (mantener presionado para "grabar"). Mock: usa la duración.
-    async function pruebaVoz(cfg) {
-        const expected = (cfg.testDurationSec || 5);
-        const dur = await new Promise((resolve) => {
-            Swal.fire({
-                title: 'Prueba de voz',
-                html: `<div style="font-size:.85rem;margin-bottom:8px">Mantené presionado y leé en voz alta la frase durante ~${expected}s.</div>
-                       <button id="vz-btn" style="padding:14px 18px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700">
-                       Mantener presionado para grabar</button><div id="vz-tip" style="margin-top:8px;font-size:.8rem;color:#64748b"></div>`,
-                showConfirmButton: false, allowOutsideClick: false, didOpen: () => {
-                    const b = document.getElementById('vz-btn'); const tip = document.getElementById('vz-tip');
-                    let t0 = 0;
-                    const down = (e) => { e.preventDefault(); t0 = performance.now(); b.style.background = '#16a34a'; tip.textContent = 'Grabando…'; };
-                    const up = () => { if (!t0) { return; } const ms = performance.now() - t0; resolve(Math.round(ms)); Swal.close(); };
-                    b.addEventListener('mousedown', down); b.addEventListener('touchstart', down);
-                    b.addEventListener('mouseup', up); b.addEventListener('touchend', up);
-                },
+        const maxIntentos = Math.max(1, Number(cfg.voiceMaxAttempts) || 3);
+        let intentosFallidos = 0;
+        for (;;) {
+            const r = await intentar();
+            Swal.close();
+            if (r.denied) {
+                await Swal.fire({ icon: 'error', title: 'Sin permiso de micrófono',
+                    text: canGoBack
+                        ? 'Necesitamos el micrófono para la voz. Podés elegir el test de reacción.'
+                        : 'Necesitamos el micrófono para la prueba de voz. Habilitalo y reintentá.' });
+                return canGoBack ? 'BACK' : null;
+            }
+            if (r.ok) {
+                return { method: 'VOZ', metrics: { matchRatio: r.matchRatio, durationMs: r.durationMs, expectedMs: (cfg.testDurationSec || 5) * 1000 } };
+            }
+            intentosFallidos++;
+            if (intentosFallidos >= maxIntentos) {
+                vozLog('gate-fallido', { intentos: intentosFallidos });
+                return { method: 'VOZ', metrics: { phraseGateFailed: true } };
+            }
+            const HINTS = {
+                'no-speech': 'No detecté tu voz. Hablá más fuerte y cerca del micrófono.',
+                'sin-resultado': 'No detecté tu voz. Hablá apenas toques el botón, sin esperar.',
+                'audio-capture': 'No se detecta el micrófono. Revisá que esté conectado y permitido en el navegador.',
+                'network': 'Falló la conexión del reconocimiento de voz (requiere internet).',
+                'aborted': 'Se interrumpió la prueba. Probá de nuevo.',
+                'no-inicia': 'El navegador no pudo iniciar el micrófono. Usá Chrome o Edge.',
+            };
+            const pct = Math.round((r.matchRatio || 0) * 100);
+            const msg = r.errorType
+                ? (HINTS[r.errorType] || ('Error técnico: ' + r.errorType))
+                : `<div style="text-align:left;font-size:.9rem">
+                     <div>Tenés que leer <b>completa</b>:</div>
+                     <div style="margin:6px 0;padding:8px 10px;border-radius:8px;background:rgba(37,99,235,.12)">“${frase}”</div>
+                     ${r.dicho ? `<div>Escuché: “<i>${r.dicho}</i>” — coincidencia <b>${pct}%</b> (mínimo ${Math.round(MIN_MATCH*100)}%).</div>` : '<div>No detecté tu voz.</div>'}
+                   </div>`;
+            const retry = await Swal.fire({
+                icon: 'info', title: r.errorType ? 'No te entendí bien' : 'No coincide la frase',
+                html: msg,
+                showCancelButton: true, confirmButtonText: 'Reintentar',
+                cancelButtonText: canGoBack ? 'Volver a elegir' : 'Cancelar',
+                allowOutsideClick: false,
             });
-        });
-        return { method: 'VOZ', metrics: { durationMs: dur, expectedMs: expected * 1000 } };
+            if (!retry.isConfirmed) { return canGoBack ? 'BACK' : null; }
+        }
     }
 
-    // Ejecuta la prueba según el método configurado.
+    // Cuando el método configurado es AMBOS, el conductor elige cuál hacer.
+    async function elegirMetodo() {
+        const res = await Swal.fire({
+            title: 'Elegí la prueba de fatiga',
+            html: 'Podés hacer la prueba de <b>voz</b> o la de <b>reacción</b>.',
+            showDenyButton: true,
+            confirmButtonText: '🎤 Prueba de voz',
+            denyButtonText: '⚡ Prueba de reacción',
+            confirmButtonColor: '#2563eb', denyButtonColor: '#16a34a',
+            allowOutsideClick: false, allowEscapeKey: false,
+        });
+        return res.isConfirmed ? 'VOZ' : 'REACCION';
+    }
+
+    // Ejecuta la prueba según el método configurado (VOZ, REACCION o AMBOS→elige).
+    // En AMBOS, desde cada prueba se puede "Volver a elegir" (vuelve al selector).
     async function runPrueba(method, cfg) {
-        if (method === 'VOZ') { return pruebaVoz(cfg); }
-        return pruebaReaccion();
+        if (method !== 'AMBOS') {
+            return method === 'VOZ' ? pruebaVoz(cfg, false) : pruebaReaccion(cfg, false);
+        }
+        for (;;) {
+            const m = await elegirMetodo();
+            const res = m === 'VOZ' ? await pruebaVoz(cfg, true) : await pruebaReaccion(cfg, true);
+            if (res === 'BACK') { continue; } // volvió a elegir método
+            return res; // métricas, o null si abortó
+        }
+    }
+
+    // Desglose del test de reacción para que el conductor entienda el veredicto:
+    // promedio, intentos dentro del límite y el criterio configurado (US-9/US-10).
+    function reaccionResumenHtml(data) {
+        const rx = data && data.reaction;
+        if (!rx || !rx.total) { return ''; }
+        const avgOk = rx.avg != null && rx.avg <= rx.limit;
+        const critTxt = rx.mode === 'APROBADOS'
+            ? `aprobás si al menos <b>${rx.need} de ${rx.total}</b> intentos quedan dentro de <b>${rx.limit} ms</b>`
+            : `aprobás si el <b>promedio</b> queda dentro de <b>${rx.limit} ms</b>`;
+        const verdictColor = rx.apto ? '#16a34a' : '#dc2626';
+        return `<div style="text-align:left;font-size:.88rem;line-height:1.6;margin-top:12px;padding:10px 12px;
+                    border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#0f172a">
+                <div>⏱ <b>Promedio:</b> ${rx.avg} ms
+                    <span style="color:${avgOk ? '#16a34a' : '#dc2626'};font-weight:700">${avgOk ? '✓ dentro' : '✗ supera'}</span>
+                    del límite (${rx.limit} ms)</div>
+                <div>✅ <b>Intentos dentro del límite:</b> ${rx.passedCount} de ${rx.total}
+                    <span style="opacity:.75">(se requieren ${rx.need})</span></div>
+                <div style="opacity:.8;margin-top:4px">Criterio (${rx.mode === 'APROBADOS' ? 'por intentos' : 'por promedio'}): ${critTxt}.</div>
+                <div style="margin-top:8px;font-weight:800;color:${verdictColor}">
+                    ${rx.apto ? '✔ APTO' : '✗ NO APTO'} según la parametrización</div>
+            </div>`;
     }
 
     // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
     async function startWithFatigue() {
+        // Bloquea la ruta mientras se carga la config y se resuelve el gate (no se puede operar antes).
+        showRouteLoader('Preparando control de fatiga…');
         const cfg = await getFatigueCfg();
         if (!cfg.enabled) {
-            fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            window.location.reload();
             return;
         }
+        hideRouteLoader();
         const consent = await runConsent(cfg);
         if (!consent) { return; }
         if (!consent.accepted) {
-            Swal.fire({ icon: 'warning', title: 'Ruta no iniciada',
-                text: 'Rechazaste el consentimiento. Quedás inhabilitado hasta que tu Supervisor te restablezca.' });
+            // Rechazo: el loader queda visible mientras navegamos al home; el popup
+            // explicando el rechazo lo muestra /delivery al detectar los flags.
+            const params = new URLSearchParams({ fatiga: 'rechazo', ruta: String(routeId) });
+            if (consent.disabled) { params.set('disabled', '1'); }
+            if (consent.rejections != null) { params.set('rej', String(consent.rejections)); }
+            if (consent.max != null) { params.set('max', String(consent.max)); }
+            window.location.href = '/delivery?' + params.toString();
             return;
         }
+        hideRouteLoader();
         const prueba = await runPrueba(cfg.methodStart, cfg);
+        if (!prueba) { return; } // prueba cancelada / sin micrófono → no inicia
+        showRouteLoader('Evaluando la prueba…');
         const r = await fetch(`/delivery/route/${routeId}/fatigue-check`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ checkId: consent.checkId, ...prueba, triggerType: 'INICIO' }),
         });
         const data = await r.json().catch(() => ({}));
+        hideRouteLoader();
+        const gateFail = !!(prueba.metrics && prueba.metrics.phraseGateFailed);
+        const failed = data.failed === true;
+        const resumen = reaccionResumenHtml(data); // desglose si fue prueba de reacción
+
+        // autoBlock ON → bloqueado: no queda habilitado. Redirige a Mis Envíos con banner rojo.
         if (data.blocked) {
-            await Swal.fire({ icon: 'error', title: 'Ruta bloqueada por fatiga',
-                text: `Puntaje ${data.score}. Pedí revisión a tu Supervisor desde el portal.` });
+            await Swal.fire({ icon: 'error',
+                title: gateFail ? 'No pudiste leer la frase' : 'No pasaste el control de fatiga',
+                html: (gateFail
+                    ? 'No quedás habilitado para salir.<br>Tu supervisor fue notificado.'
+                    : `Puntaje <b>${data.score}/${data.threshold}</b>. No quedás habilitado para salir.<br>Tu supervisor fue notificado.`)
+                    + resumen,
+                confirmButtonText: 'Entendido', confirmButtonColor: '#dc2626', allowOutsideClick: false });
+            window.location.href = `/delivery?fatiga=bloqueado&ruta=${routeId}`;
             return;
         }
+
+        // autoBlock OFF pero no pasó → puede iniciar, el supervisor lo contactará.
+        // Queda un aviso en "Ojo de Patrón" para que el supervisor decida (inhabilitar/reasignar).
+        if (failed) {
+            await Swal.fire({ icon: 'warning', title: 'No pasaste las pruebas',
+                html: 'Pronto el supervisor se va a contactar con vos.<br>Por ahora <b>podés iniciar la ruta</b>.' + resumen,
+                confirmButtonText: 'Iniciar ruta', confirmButtonColor: '#d97706', allowOutsideClick: false });
+            showRouteLoader('Iniciando ruta…');
+            await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
+            window.location.reload();
+            return;
+        }
+
+        // Apto.
+        const metodoLbl = prueba.method === 'VOZ' ? 'de voz' : 'de reacción';
+        const aptoHtml = resumen
+            ? `Prueba ${metodoLbl} superada.${resumen}<p style="margin-top:8px">¡Buen viaje!</p>`
+            : `Prueba ${metodoLbl} superada.<br><b>Puntaje ${data.score}/${data.threshold}</b>. ¡Buen viaje!`;
+        await Swal.fire({ icon: 'success', title: 'Apto para salir',
+            html: aptoHtml,
+            confirmButtonText: 'Iniciar ruta', confirmButtonColor: '#16a34a', allowOutsideClick: false,
+            showCloseButton: true, timer: 10000, timerProgressBar: true });
+        showRouteLoader('Iniciando ruta…');
         await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
         window.location.reload();
     }
@@ -1258,24 +1827,83 @@
             'border-radius:999px;background:#b45309;color:#fff;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.3)';
         btn.textContent = '🛑 Estoy detenido';
         document.body.appendChild(btn);
+
+        // Cartel flotante con la hora del próximo chequeo / reintento.
+        const nextLbl = document.createElement('div');
+        nextLbl.id = 'fatigue-next-check';
+        nextLbl.style.cssText = 'position:fixed;bottom:132px;right:16px;z-index:9999;padding:8px 12px;border-radius:10px;' +
+            'background:#0f172a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none';
+        document.body.appendChild(nextLbl);
+        const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return '--:--'; } };
+        const showNext = (iso, label) => {
+            if (!iso) { nextLbl.style.display = 'none'; return; }
+            nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span>`;
+            nextLbl.style.display = 'block';
+        };
+
+        // Campo visual: tiempo de manejo acumulado vs el mínimo que habilita el re-chequeo.
+        // Así el repartidor sabe si ya "pasó ese tiempo" sin tener que adivinar.
+        const driveChip = document.createElement('div');
+        driveChip.id = 'fatigue-drive-chip';
+        driveChip.style.cssText = 'position:fixed;bottom:180px;right:16px;z-index:9999;padding:8px 12px;border-radius:10px;' +
+            'background:#0f172a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none;max-width:230px';
+        document.body.appendChild(driveChip);
+        const renderDriveChip = (s) => {
+            if (!s || s.driveMin == null || s.driveThresholdMin == null) { driveChip.style.display = 'none'; return; }
+            const ready = s.driveMin >= s.driveThresholdMin;
+            const color = ready ? '#22c55e' : '#fbbf24';
+            const pct = Math.min(100, Math.round((s.driveMin / Math.max(1, s.driveThresholdMin)) * 100));
+            driveChip.innerHTML = `🚚 Manejo: <span style="color:${color}">${s.driveMin}</span> / ${s.driveThresholdMin} min` +
+                `<div style="margin-top:5px;height:5px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden">` +
+                `<div style="height:100%;width:${pct}%;background:${color}"></div></div>` +
+                `<div style="margin-top:4px;font-weight:500;opacity:.85">${ready ? '✓ Si te detenés, se pedirá la prueba.' : 'Aún no llegás al mínimo para el re-chequeo.'}</div>`;
+            driveChip.style.display = 'block';
+        };
+        async function updateDriveChip() {
+            try {
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
+                renderDriveChip(await r.json());
+            } catch (_) { /* red */ }
+        }
+
         let stopped = false, poll = null;
 
         async function refresh() {
             try {
                 const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
                 const s = await r.json();
+                renderDriveChip(s);
                 if (s.paused) {
                     btn.textContent = `⏸ Pausada por fatiga (${s.restRemainingMin}m)`;
                     btn.style.background = '#dc2626';
-                    if (s.restRemainingMin <= 0) { await launchRecheck(s.methodRecheck); }
+                    showNext(s.nextCheckAt, 'PRÓXIMO REINTENTO');
+                    if (s.restRemainingMin <= 0) { await launchRecheck(s.methodRecheck, true); }
                 } else if (s.needsRecheck) {
-                    await launchRecheck(s.methodRecheck);
+                    showNext(null);
+                    await launchRecheck(s.methodRecheck, true); // obligatorio: sí o sí debe hacerlo
+                } else {
+                    showNext(s.nextCheckAt, 'PRÓXIMO CHEQUEO');
                 }
             } catch (_) { /* red */ }
         }
-        async function launchRecheck(method) {
+        let launching = false;
+        async function launchRecheck(method, mandatory = false) {
+            if (launching) { return; } // evita dos pruebas en paralelo
+            launching = true;
+            try {
             const cfg = await getFatigueCfg();
             const prueba = await runPrueba(method || cfg.methodRecheck, cfg);
+            if (!prueba) {
+                // No completó la prueba. Si es obligatoria (re-chequeo pendiente), no puede
+                // seguir la ruta: lo mandamos al inicio. Al reentrar, se le vuelve a pedir.
+                if (mandatory) {
+                    await Swal.fire({ icon: 'warning', title: 'Tenés que hacer el control de fatiga',
+                        html: 'No podés continuar la ruta sin completar el re-chequeo.<br>Te llevamos al inicio; cuando vuelvas a entrar, te lo pediremos de nuevo.',
+                        confirmButtonText: 'Entendido', confirmButtonColor: '#d97706', allowOutsideClick: false });
+                    window.location.href = '/delivery?rechequeo=pendiente';
+                }
+                return;
+            }
             const r = await fetch(`/delivery/route/${routeId}/fatigue-recheck`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(prueba),
@@ -1291,21 +1919,33 @@
             } else {
                 Swal.fire({ icon: 'success', title: 'Apto', text: 'Podés continuar la ruta.' });
                 stopped = false; btn.textContent = '🛑 Estoy detenido'; btn.style.background = '#b45309';
+                showNext(null);
                 if (poll) { clearInterval(poll); poll = null; }
             }
+            } finally { launching = false; }
         }
         btn.addEventListener('click', async () => {
             if (stopped) {
                 await fetch(`/delivery/route/${routeId}/fatigue/resume`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
                 stopped = false; btn.textContent = '🛑 Estoy detenido'; btn.style.background = '#b45309';
+                showNext(null);
                 if (poll) { clearInterval(poll); poll = null; }
                 return;
             }
-            await fetch(`/delivery/route/${routeId}/fatigue/stopped`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            const sr = await fetch(`/delivery/route/${routeId}/fatigue/stopped`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                .then(r => r.json()).catch(() => null);
             stopped = true; btn.textContent = '▶ Reanudar marcha'; btn.style.background = '#2563eb';
+            // El próximo chequeo se carga en pantalla apenas el conductor se detiene.
+            if (sr && sr.nextCheckAt) { showNext(sr.nextCheckAt, 'PRÓXIMO CHEQUEO'); }
             await refresh();
             poll = setInterval(refresh, 30000);
         });
+
+        // Al entrar a la ruta: si hay un re-chequeo pendiente, se fuerza la prueba
+        // (obligatoria). El chip de manejo se muestra y se actualiza cada minuto.
+        refresh();
+        updateDriveChip();
+        setInterval(updateDriveChip, 60000);
     }
 
     // Inicia ruta con gate de fatiga si aún no se inició (sólo modo activo).

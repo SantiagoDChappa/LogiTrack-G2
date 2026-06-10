@@ -149,6 +149,26 @@ const saveNotificationConfig = async (req, res) => {
     }
 };
 
+// CP-CNNF04: valida que la plantilla no use variables {{token}} inexistentes.
+// Devuelve un mensaje de error (string) o null si está OK.
+const validateTemplateVars = async (subject, body) => {
+    let customVars = {};
+    try { customVars = await notificationVariableModel.getAllAsMap(); } catch { customVars = {}; }
+    const allowedExtra = Object.keys(customVars || {});
+    const unknown = [...new Set([
+        ...placeholders.findUnknownTokens(subject, allowedExtra),
+        ...placeholders.findUnknownTokens(body, allowedExtra),
+    ])];
+    if (!unknown.length) { return null; }
+    const available = placeholders.catalogMeta().map((p) => `{{${p.token}}}`)
+        .concat(allowedExtra.map((k) => `{{${k}}}`));
+    const malas = unknown.map((t) => `{{${t}}}`).join(' y ');
+    return `Las variables ${malas} no son válidas. Variables disponibles: ${available.join(', ')}`;
+};
+
+const tplVarsRedirect = (req, res, msg) =>
+    res.redirect(settingBack(req, `?error=tpl_vars&msg=${encodeURIComponent(msg)}`));
+
 // Edita la plantilla predeterminada del evento (compatibilidad).
 const saveEmailTemplate = async (req, res) => {
     try {
@@ -158,6 +178,8 @@ const saveEmailTemplate = async (req, res) => {
         const format  = req.body.format === 'html' ? 'html' : 'text';
         const name    = (req.body.name || '').trim() || undefined;
         if (!subject || !body) { return res.redirect(settingBack(req, '?error=template_empty')); }
+        const varsErr = await validateTemplateVars(subject, body);
+        if (varsErr) { return tplVarsRedirect(req, res, varsErr); }
         const updated = await emailTemplateModel.updateTemplate(eventCode, { subject, body, format, name });
         if (!updated) { return res.redirect(settingBack(req, '?error=template_not_found')); }
         res.redirect(settingBack(req, '?success=tpl'));
@@ -176,6 +198,8 @@ const updateEmailTemplateById = async (req, res) => {
         const format  = req.body.format === 'html' ? 'html' : 'text';
         const name    = (req.body.name || '').trim() || undefined;
         if (!subject || !body) { return res.redirect(settingBack(req, '?error=template_empty')); }
+        const varsErr = await validateTemplateVars(subject, body);
+        if (varsErr) { return tplVarsRedirect(req, res, varsErr); }
         const updated = await emailTemplateModel.updateById(id, { subject, body, format, name });
         if (!updated) { return res.redirect(settingBack(req, '?error=template_not_found')); }
         res.redirect(settingBack(req, '?success=tpl'));
@@ -192,6 +216,8 @@ const createEmailTemplateVariant = async (req, res) => {
         const subject = (req.body.subject || '').trim() || '(sin asunto)';
         const body    = (req.body.body    || '').trim();
         const format  = req.body.format === 'html' ? 'html' : 'text';
+        const varsErr = await validateTemplateVars(subject, body);
+        if (varsErr) { return tplVarsRedirect(req, res, varsErr); }
         await emailTemplateModel.createVariant(eventCode, { name, subject, body, format });
         res.redirect(settingBack(req, '?success=tpl'));
     } catch (err) {
@@ -822,6 +848,25 @@ const saveIncidentNotifConfig = async (req, res) => {
     }
 };
 
+// LGT-195: toggle on/off del aviso al Supervisor cuando un transportista queda
+// inhabilitado por rechazar el consentimiento de fatiga. Los destinatarios son fijos
+// por regla de negocio (supervisores de la sucursal del transportista + admins),
+// así que solo persistimos el enabled — la plantilla se edita por el modal genérico.
+const saveFatigueConsentNotifConfig = async (req, res) => {
+    try {
+        const enabled = req.body.enabled === 'on';
+        await NotificationConfigModel.NotificationConfig.update(
+            { enabled },
+            { where: { eventCode: 'FATIGUE_DRIVER_DISABLED_CONSENT' } }
+        );
+        res.redirect(settingBack(req, '?success=fatigue_notif'));
+    } catch (err) {
+        console.error('saveFatigueConsentNotifConfig:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=fatigue_notif'));
+    }
+};
+
+
 const triggerDelayDetection = async (req, res) => {
     try {
         const { processDelayedShipments } = require('../jobs/delayDetectionJob');
@@ -840,5 +885,6 @@ module.exports = {
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
     saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveFatigueConsentNotifConfig,
     triggerDelayDetection,
 };

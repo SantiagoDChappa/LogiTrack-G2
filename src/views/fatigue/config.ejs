@@ -43,6 +43,7 @@
         .cfg-switch input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
         .cfg-switch .cfg-switch-label { font-weight: var(--font-weight-semibold); }
         .cfg-switch small { display: block; color: var(--color-text-secondary); font-weight: 400; }
+        .cfg-help { display: block; color: var(--color-text-secondary); font-size: var(--font-size-xs); line-height: 1.35; margin-top: .2rem; }
     </style>
 </head>
 
@@ -80,16 +81,16 @@
                     <div class="cfg-grid">
                         <label class="cfg-switch">
                             <input type="checkbox" name="enabled" <%= cfg.enabled ? 'checked' : '' %>>
-                            <span class="cfg-switch-label">Control de fatiga activo <small>enabled</small></span>
+                            <span class="cfg-switch-label">Control de fatiga activo</span>
                         </label>
                         <label class="cfg-switch">
                             <input type="checkbox" name="autoBlock" <%= cfg.autoBlock ? 'checked' : '' %>>
-                            <span class="cfg-switch-label">Bloqueo automático <small>autoBlock</small></span>
+                            <span class="cfg-switch-label">Bloqueo automático</span>
                         </label>
                         <div class="field">
                             <label for="thresholdPct">Umbral de fatiga (%)</label>
                             <input type="number" id="thresholdPct" name="thresholdPct" min="0" max="100" value="<%= cfg.thresholdPct %>">
-                            <small>thresholdPct (0–100)</small>
+                            <small class="cfg-help">Si la fatiga calculada supera este %, se bloquea (0–100).</small>
                         </div>
                     </div>
                 </div>
@@ -107,26 +108,72 @@
                             <select id="method" name="method">
                                 <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.method===o?'selected':'' %>><%= o %></option><% }) %>
                             </select>
-                            <small>method</small>
                         </div>
                         <div class="field">
                             <label for="methodStart">Método al iniciar</label>
                             <select id="methodStart" name="methodStart">
-                                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o %></option><% }) %>
+                                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodStart===o?'selected':'' %>><%= o==='AMBOS'?'Ambos (el conductor elige)':o %></option><% }) %>
                             </select>
-                            <small>methodStart</small>
                         </div>
                         <div class="field">
                             <label for="methodRecheck">Método en re-chequeo</label>
                             <select id="methodRecheck" name="methodRecheck">
-                                <% ['VOZ','REACCION'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o %></option><% }) %>
+                                <% ['VOZ','REACCION','AMBOS'].forEach(o => { %><option value="<%= o %>" <%= cfg.methodRecheck===o?'selected':'' %>><%= o==='AMBOS'?'Ambos (el conductor elige)':o %></option><% }) %>
                             </select>
-                            <small>methodRecheck</small>
                         </div>
                         <div class="field">
                             <label for="testDurationSec">Duración de la prueba (seg)</label>
                             <input type="number" id="testDurationSec" name="testDurationSec" min="1" max="60" value="<%= cfg.testDurationSec %>">
-                            <small>testDurationSec</small>
+                            <small class="cfg-help">Solo para la prueba de voz: segundos que escucha el micrófono.</small>
+                        </div>
+                        <div class="field">
+                            <label for="voiceMaxAttempts">Intentos de voz</label>
+                            <input type="number" id="voiceMaxAttempts" name="voiceMaxAttempts" min="1" max="10" value="<%= cfg.voiceMaxAttempts %>"
+                                   title="Cuántas veces puede intentar leer la frase antes de quedar bloqueado.">
+                            <small class="cfg-help">Si no logra leer la frase en esta cantidad de intentos, queda <b>no apto</b>. Ej.: 3.</small>
+                        </div>
+                        <div class="field span-full">
+                            <label class="cfg-switch">
+                                <input type="checkbox" name="voiceAcousticEnabled" <%= cfg.voiceAcousticEnabled ? 'checked' : '' %>>
+                                <span class="cfg-switch-label">Análisis acústico de fatiga vocal
+                                    <small>Mide la fatiga por la voz (velocidad, pausas, tono), no solo si leíste la frase. Requiere STT activo (graba el audio). Se evalúa en el navegador; el audio no se guarda.</small>
+                                </span>
+                            </label>
+                        </div>
+                        <div class="field">
+                            <label for="reactionAttempts">Intentos de reacción</label>
+                            <input type="number" id="reactionAttempts" name="reactionAttempts" min="1" max="10" value="<%= cfg.reactionAttempts %>"
+                                   title="Cantidad de toques del test de reacción.">
+                            <small class="cfg-help">Cantidad de toques que hace el conductor. Ej.: 3.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionFastMs">Reacción óptima (ms)</label>
+                            <input type="number" id="reactionFastMs" name="reactionFastMs" min="50" max="2000" value="<%= cfg.reactionFastMs %>"
+                                   title="Tiempo de reacción muy rápido = fatiga 0.">
+                            <small class="cfg-help">Reacción muy rápida = sin fatiga. Ej.: 250 ms.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionSlowMs">Límite de reacción (ms)</label>
+                            <input type="number" id="reactionSlowMs" name="reactionSlowMs" min="100" max="5000" value="<%= cfg.reactionSlowMs %>"
+                                   title="Tiempo de reacción tan lento que cuenta como no apto / fatiga máxima.">
+                            <small class="cfg-help">El “límite”: una reacción más lenta que esto cuenta como mala. Ej.: 800 ms.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionEvalMode">Cómo se evalúa la reacción</label>
+                            <select id="reactionEvalMode" name="reactionEvalMode">
+                                <option value="PROMEDIO" <%= cfg.reactionEvalMode==='PROMEDIO'?'selected':'' %>>Por promedio (promedio de los intentos ≤ límite)</option>
+                                <option value="APROBADOS" <%= cfg.reactionEvalMode==='APROBADOS'?'selected':'' %>>Por aprobados (cuántos intentos pasan el límite)</option>
+                            </select>
+                            <small class="cfg-help">PROMEDIO: suma de ms ÷ intentos ≤ límite. APROBADOS: cuenta cuántos intentos quedaron bajo el límite.</small>
+                        </div>
+                        <div class="field">
+                            <label for="reactionRequired">Aprobados requeridos (si “por aprobados”)</label>
+                            <select id="reactionRequired" name="reactionRequired">
+                                <option value="UNO" <%= cfg.reactionRequired==='UNO'?'selected':'' %>>Al menos uno</option>
+                                <option value="MITAD" <%= cfg.reactionRequired==='MITAD'?'selected':'' %>>Al menos la mitad</option>
+                                <option value="TODOS" <%= cfg.reactionRequired==='TODOS'?'selected':'' %>>Todos</option>
+                            </select>
+                            <small class="cfg-help">Solo aplica si elegiste “por aprobados”. Cuántos intentos deben quedar bajo el límite para ser apto.</small>
                         </div>
                     </div>
                 </div>
@@ -137,22 +184,31 @@
                         <span class="material-symbols-outlined">schedule</span>
                         Re-chequeo en ruta
                     </h2>
-                    <p class="settings-subtitle">Disparadores de re-chequeo durante el viaje.</p>
+                    <p class="settings-subtitle">Disparadores de re-chequeo durante el viaje. Se pide una nueva prueba cuando se cumplen <b>las dos primeras condiciones a la vez</b>.</p>
                     <div class="cfg-grid">
                         <div class="field">
                             <label for="recheckDriveMin">Conducción para re-chequeo (min)</label>
-                            <input type="number" id="recheckDriveMin" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>">
-                            <small>recheckDriveMin</small>
+                            <input type="number" id="recheckDriveMin" name="recheckDriveMin" min="1" max="1440" value="<%= cfg.recheckDriveMin %>"
+                                   title="Minutos que el conductor debe haber manejado antes de que el sistema pueda pedir una nueva prueba.">
+                            <small class="cfg-help">Tiempo de manejo acumulado antes de habilitar un re-chequeo. Ej.: 90 = recién tras 1h30 de viaje.</small>
                         </div>
                         <div class="field">
                             <label for="recheckStoppedMin">Detención que dispara re-chequeo (min)</label>
-                            <input type="number" id="recheckStoppedMin" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>">
-                            <small>recheckStoppedMin</small>
+                            <input type="number" id="recheckStoppedMin" name="recheckStoppedMin" min="1" max="240" value="<%= cfg.recheckStoppedMin %>"
+                                   title="Ya cumplido el manejo mínimo, minutos detenido que disparan la nueva prueba.">
+                            <small class="cfg-help">Cumplido lo anterior, minutos detenido (botón “Estoy detenido”) que disparan la prueba. Ej.: 3 = a los 3 min parado.</small>
                         </div>
                         <div class="field">
                             <label for="recheckRestMin">Descanso para reintentar prueba en ruta (min)</label>
-                            <input type="number" id="recheckRestMin" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>">
-                            <small>recheckRestMin (LGT-199)</small>
+                            <input type="number" id="recheckRestMin" name="recheckRestMin" min="1" max="720" value="<%= cfg.recheckRestMin %>"
+                                   title="Si la prueba en ruta da fatiga, la ruta se pausa y el conductor debe descansar este tiempo antes de reintentar.">
+                            <small class="cfg-help">Si la prueba da fatiga, la ruta se pausa y el conductor descansa este tiempo antes de reintentar. Ej.: 30.</small>
+                        </div>
+                        <div class="field">
+                            <label for="recheckOmitMin">Aviso al supervisor si omite el re-chequeo (min)</label>
+                            <input type="number" id="recheckOmitMin" name="recheckOmitMin" min="1" max="240" value="<%= cfg.recheckOmitMin %>"
+                                   title="Si el conductor no completa la prueba pedida, pasado este tiempo se avisa al supervisor y se crea un registro en Ojo de Patrón.">
+                            <small class="cfg-help">Minutos sin completar la prueba pedida antes de avisar al supervisor y registrar el caso. Ej.: 10.</small>
                         </div>
                     </div>
                 </div>
@@ -168,22 +224,25 @@
                         <div class="field">
                             <label for="patternWindowDays">Ventana de patrón (días)</label>
                             <input type="number" id="patternWindowDays" name="patternWindowDays" min="1" max="365" value="<%= cfg.patternWindowDays %>">
-                            <small>patternWindowDays</small>
                         </div>
                         <div class="field">
                             <label for="patternEventCount">Eventos para marcar patrón</label>
                             <input type="number" id="patternEventCount" name="patternEventCount" min="1" max="50" value="<%= cfg.patternEventCount %>">
-                            <small>patternEventCount</small>
                         </div>
                         <div class="field">
                             <label for="retentionDays">Retención de datos (días)</label>
                             <input type="number" id="retentionDays" name="retentionDays" min="1" max="3650" value="<%= cfg.retentionDays %>">
-                            <small>retentionDays · Ley 25.326</small>
+                            <small class="cfg-help">Borrado automático de los datos de fatiga pasado este plazo (Ley 25.326).</small>
                         </div>
                         <div class="field">
                             <label for="consentVersion">Versión de consentimiento</label>
                             <input type="text" id="consentVersion" name="consentVersion" value="<%= cfg.consentVersion %>">
-                            <small>consentVersion</small>
+                        </div>
+                        <div class="field">
+                            <label for="maxConsentRejections">Rechazos permitidos antes de inhabilitar</label>
+                            <input type="number" id="maxConsentRejections" name="maxConsentRejections" min="1" max="20" value="<%= cfg.maxConsentRejections %>"
+                                   title="Cantidad de veces que el transportista puede rechazar el consentimiento antes de quedar inhabilitado y notificar al supervisor.">
+                            <small class="cfg-help">Al alcanzar este número de rechazos, el transportista queda inhabilitado hasta que el supervisor lo restablezca. Ej.: 2 = puede dudar una vez, al segundo rechazo se notifica al supervisor.</small>
                         </div>
                     </div>
                 </div>

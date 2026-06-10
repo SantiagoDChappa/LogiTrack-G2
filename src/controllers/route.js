@@ -49,6 +49,8 @@ const optimizeForm = async (req, res) => {
             where: {
                 statusId: { [Op.in]: [StatusEnum.PENDING.id, StatusEnum.AT_BRANCH.id, StatusEnum.IN_PREPARATION.id] },
                 currentBranchId: branchId,
+                // Retiro por sucursal: el cliente lo retira en la sucursal → no es candidato a ruta de reparto.
+                deliveryMode: { [Op.ne]: 'branch_pickup' },
             },
             include: [
                 { model: Address, as: 'address', required: false },
@@ -531,6 +533,9 @@ const appendToRoute = async (req, res) => {
             return res.status(422).json({ error: 'Algún envío no pertenece a la sucursal o no existe.' });
         }
         for (const s of newShipments) {
+            if (s.deliveryMode === 'branch_pickup') {
+                return res.status(422).json({ error: `Envío ${s.trackingId} es retiro por sucursal; el cliente lo retira en la sucursal, no se rutea a domicilio.` });
+            }
             if (![StatusEnum.PENDING.id, StatusEnum.AT_BRANCH.id, StatusEnum.IN_PREPARATION.id].includes(s.statusId)) {
                 return res.status(422).json({ error: `Envío ${s.trackingId} no está en estado ruteable (actual: ${s.statusId}).` });
             }

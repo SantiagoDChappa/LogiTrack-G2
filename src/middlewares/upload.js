@@ -21,15 +21,23 @@ const csvUpload = multer({
     fileFilter: csvFileFilter,
 });
 
-// Evidencias de incidencia: imágenes y PDF, hasta 5 MB, en memoria (se guardan en base64).
-const EVIDENCE_MAX_BYTES = 5 * 1024 * 1024;
+// Evidencias de incidencia: imágenes y PDF, hasta 10 MB, en memoria (se guardan en base64).
+const EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EVIDENCE_MIME = ['image/jpeg', 'image/png', 'application/pdf'];
+
+// Extensión en minúsculas (con punto) a partir del nombre del archivo. Ej: "virus.EXE" → ".exe".
+const fileExt = (name) => {
+    const m = String(name || '').match(/(\.[^.\\/]+)$/);
+    return m ? m[1].toLowerCase() : '';
+};
 
 const evidenceFileFilter = (req, file, cb) => {
     if (ALLOWED_EVIDENCE_MIME.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Solo se aceptan imágenes (JPG/PNG) o PDF'));
+        // CP-RINC05 Caso A: "Formato .exe no permitido" (extensión real del archivo).
+        const ext = fileExt(file.originalname);
+        cb(new Error(`Formato ${ext || 'desconocido'} no permitido`));
     }
 };
 
@@ -59,4 +67,4 @@ const logoUpload = multer({
     fileFilter: logoFileFilter,
 });
 
-module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES, ALLOWED_EVIDENCE_MIME };
+module.exports = { csvUpload, evidenceUpload, logoUpload, MAX_BYTES, EVIDENCE_MAX_BYTES, LOGO_MAX_BYTES, ALLOWED_EVIDENCE_MIME, fileExt };

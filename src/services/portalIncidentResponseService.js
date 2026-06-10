@@ -3,9 +3,8 @@ const { Incident } = require('../models/incident');
 const incidentHistoryModel = require('../models/incidentHistory');
 const incidentAttachmentModel = require('../models/incidentAttachment');
 const shipmentModel = require('../models/shipment');
-const { EVIDENCE_MAX_BYTES, ALLOWED_EVIDENCE_MIME } = require('../middlewares/upload');
+const { EVIDENCE_MAX_BYTES, ALLOWED_EVIDENCE_MIME, fileExt } = require('../middlewares/upload');
 const { assertClientOwnsShipment } = require('./portalClientAccess');
-const { statusLabel } = require('./portalIncidentView');
 const { IncidentStatus, IncidentEventType } = require('../constants/enums');
 
 const canClientInteract = (incident) => {
@@ -31,15 +30,18 @@ const resolveClientPersonId = (shipment, client) => {
 const validateAttachmentFile = (file) => {
     if (!file) { return { ok: true }; }
     if (!ALLOWED_EVIDENCE_MIME.includes(file.mimetype)) {
+        // CP-RINC05 Caso A: mensaje con la extensión real (ej. "Formato .exe no permitido").
+        const ext = fileExt(file.originalname);
         return {
             ok: false,
-            message: 'Solo se aceptan imágenes JPG/PNG o documentos PDF.',
+            message: `Formato ${ext || 'desconocido'} no permitido`,
         };
     }
     if (file.size > EVIDENCE_MAX_BYTES) {
+        // CP-RINC05 Caso B.
         return {
             ok: false,
-            message: 'El archivo supera el tamaño máximo permitido de 5 MB.',
+            message: 'Archivo excede los 10MB',
         };
     }
     return { ok: true };
@@ -63,7 +65,7 @@ const submitClientResponse = async ({ incident, client, comment, file }) => {
         return {
             ok: false,
             status: 409,
-            message: 'Esta incidencia ya no admite nuevas interacciones.',
+            message: 'La incidencia está cerrada y no admite nuevas respuestas',
         };
     }
 

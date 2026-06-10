@@ -110,7 +110,17 @@ INSERT INTO "logitrack"."email_template" ("id", "eventCode", "subject", "body") 
     (5, 'SHIPMENT_CANCELLED', 'Tu envío ha sido cancelado', 'Hola {{fullName}}, tu envío con ID {{trackingCode}} ha sido cancelado.'),
     (6, 'SHIPMENT_ASSIGNED', 'Tu envío ha sido asignado', 'Hola {{fullName}}, tu envío con ID {{trackingCode}} ha sido asignado a un repartidor.'),
     (7, 'SHIPMENT_IN_PREPARATION', 'Tu envío está en preparación', 'Hola {{fullName}}, tu envío con ID {{trackingCode}} está siendo preparado para su entrega.'),
-    (8, 'SHIPMENT_PACKAGE_FAILED', 'Hubo un problema con tu paquete', 'Hola {{fullName}}, lamentamos informarte que hubo un problema con tu paquete con ID {{trackingCode}}. Por favor contacta a soporte para más información.'),
+    (8, 'SHIPMENT_PACKAGE_FAILED', 'Tu paquete sufrió un daño — incidencia #{{incidentId}} ({{trackingCode}})', 'Hola {{fullName}},
+
+Lamentamos informarte que tu paquete {{trackingCode}} sufrió un daño y no pudo entregarse.
+
+Generamos automáticamente la incidencia #{{incidentId}} para gestionarlo. Podés ver el detalle y, si corresponde, elegir cómo resolverlo (reembolso o reemplazo) desde el portal:
+{{incidentUrl}}
+
+Si tenés alguna consulta, podés escribirnos respondiendo este correo.
+
+Saludos,
+{{senderName}}'),
     (9, 'SHIPMENT_FAILED_ATTEMPT', 'Intento de entrega fallido', 'Hola {{fullName}}, lamentamos informarte que el repartidor intentó entregar tu paquete con ID {{trackingCode}} pero no tuvo éxito. Por favor contacta a soporte para reprogramar la entrega.');
 
 

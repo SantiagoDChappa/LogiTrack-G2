@@ -682,7 +682,7 @@
                 </p>
                 <form method="POST" action="/setting/notification-config">
                     <div style="display:flex;flex-direction:column;gap:.6rem">
-                        <% notifConfig.forEach(config => { %>
+                        <% notifConfig.filter(c => c.eventCode !== 'FATIGUE_DRIVER_DISABLED_CONSENT').forEach(config => { %>
                             <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
                                 <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
                                     <input type="checkbox" name="enabled_<%= config.eventCode %>"
@@ -750,6 +750,54 @@
                     La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
                     mientras tanto se usa el texto por defecto del sistema.
                 </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Aviso al Supervisor por rechazo de consentimiento de fatiga (LGT-195) -->
+            <% var fatigueNotif = (notifConfig || []).find(function(c){ return c.eventCode === 'FATIGUE_DRIVER_DISABLED_CONSENT'; }); %>
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">notifications_active</span>
+                    Aviso de transportista inhabilitado por fatiga
+                </h2>
+                <p class="settings-subtitle">
+                    Cuando un transportista rechaza el consentimiento del control de fatiga
+                    <strong>tantas veces como esté parametrizado</strong> (Ajustes → Ojo de Patrón → "Rechazos permitidos"),
+                    queda inhabilitado y se envía un email a <strong>todos los Supervisores de la sucursal asignada al transportista</strong>
+                    y a los administradores. Podés activar/desactivar el aviso y editar la plantilla del email.
+                </p>
+                <% if (!fatigueNotif) { %>
+                <p style="color:var(--color-text-secondary)">
+                    El evento aún no está cargado. Corré las migraciones <code>045</code> y <code>046</code> para parametrizarlo;
+                    mientras tanto se envía con el texto por defecto si ocurre la inhabilitación.
+                </p>
+                <% } else { %>
+                <form method="POST" action="/setting/fatigue-consent-notification">
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:600">
+                            <input type="checkbox" name="enabled" <%= fatigueNotif.enabled ? 'checked' : '' %>>
+                            Enviar email al Supervisor cuando el transportista queda inhabilitado
+                        </label>
+                        <% if (templatesByEvent['FATIGUE_DRIVER_DISABLED_CONSENT']) { %>
+                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                            data-event="FATIGUE_DRIVER_DISABLED_CONSENT"
+                            data-description="Aviso de transportista inhabilitado por fatiga"
+                            data-tooltip="Editar mail" aria-label="Editar mail">
+                            <span class="material-symbols-outlined">edit_note</span>
+                        </button>
+                        <% } %>
+                    </div>
+                    <p style="font-size:.8rem;color:var(--color-text-secondary);margin-top:.5rem">
+                        Placeholders disponibles: <code>{{transportistaNombre}}</code>, <code>{{transportistaId}}</code>,
+                        <code>{{sucursalNombre}}</code>, <code>{{sucursalId}}</code>, <code>{{rutaId}}</code>,
+                        <code>{{rechazos}}</code>, <code>{{maxRechazos}}</code>, <code>{{motivoInhabilitacion}}</code>.
+                    </p>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar configuración" aria-label="Guardar configuración">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
                 <% } %>
             </div>
 
@@ -1830,6 +1878,21 @@
                 title: _title,
                 text: _text,
                 confirmButtonText: 'Aceptar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color:      isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
+        }
+
+        // CP-CNNF04: error de variables inválidas en plantilla (mensaje dinámico en ?msg).
+        const _err = _qs.get('error');
+        if (_err === 'tpl_vars') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'error',
+                title: 'Variables no válidas',
+                text: _qs.get('msg') || 'La plantilla usa variables que no existen.',
+                confirmButtonText: 'Entendido',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color:      isDark ? '#f1f5f9' : '#1e293b',

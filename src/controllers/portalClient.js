@@ -349,9 +349,10 @@ const postIncidentResponse = async (req, res) => {
     const incidentId = Number(req.params.id);
     const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
     if (!incident) {
-        return res.status(404).render('portal/misEnviosConfirmError', {
+        // CP-RINC11: aislamiento de datos — no se permite interactuar con incidencias ajenas.
+        return res.status(403).render('portal/misEnviosConfirmError', {
             support: await getSupportInfo(),
-            error: 'Incidencia no encontrada.',
+            error: 'No tiene permisos para interactuar con esta incidencia',
         });
     }
 

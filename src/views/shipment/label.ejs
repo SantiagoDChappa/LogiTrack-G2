@@ -58,11 +58,11 @@
         <div class="label-info">
             <div class="label-row">
                 <span class="label-key">Remitente</span>
-                <span class="label-val"><%= shipment.sender.fullName %></span>
+                <span class="label-val"><%= shipment.sender ? shipment.sender.fullName : '—' %></span>
             </div>
             <div class="label-row">
                 <span class="label-key">Destinatario</span>
-                <span class="label-val"><%= shipment.recipient.fullName %></span>
+                <span class="label-val"><%= shipment.recipient ? shipment.recipient.fullName : '—' %></span>
             </div>
             <% if (shipment.deliveryMode === 'branch_pickup' && shipment.pickupBranch) { %>
             <div class="label-row" style="background:#fef3c7;padding:6px;border-radius:4px;">

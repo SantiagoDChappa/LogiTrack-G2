@@ -18,25 +18,80 @@ async function recordConsent({ userId, routeId, branchId, accepted, version, tri
     });
     await notify.audit(accepted ? 'CONSENT_ACCEPTED' : 'CONSENT_REJECTED',
         { actorId: userId, checkId: check.id, detail: `Ruta #${routeId}, versión ${version}` });
-    // LGT-195: el rechazo inhabilita al transportista para iniciar nuevas rutas
-    // (cross-ruta) hasta que un Supervisor lo restablezca.
+    // LGT-195: el rechazo inhabilita al transportista, pero solo al alcanzar el límite
+    // parametrizado de rechazos (maxConsentRejections). Se cuentan los rechazos desde
+    // el último restablecimiento — si nunca lo restablecieron, desde siempre.
+    let disabled = false;
+    let rejections = null;
+    let maxRej = null;
     if (!accepted) {
-        await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId });
+        const cfg = await configSvc.getConfig(branchId);
+        maxRej = Number(cfg.maxConsentRejections) || 2;
+        rejections = await countRejectionsSinceRestore(userId);
+        if (rejections >= maxRej) {
+            await disableDriver({ userId, reason: 'CONSENT_REJECTED', branchId, routeId, rejections, max: maxRej });
+            disabled = true;
+        } else {
+            await notify.audit('CONSENT_REJECTED_WARN', {
+                actorId: userId, checkId: check.id,
+                detail: `Rechazo ${rejections}/${maxRej}. Si alcanza el límite queda inhabilitado.`,
+            });
+        }
     }
-    return check;
+    return { check, disabled, rejections, max: maxRej };
+}
+
+// Cuenta rechazos de consentimiento desde el último restablecimiento del transportista.
+async function countRejectionsSinceRestore(userId) {
+    const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
+    const row = await DriverFatigueStatus.findByPk(userId).catch(() => null);
+    const since = row && row.restoredAt ? new Date(row.restoredAt) : null;
+    const where = { userId, consentStatus: 'REJECTED' };
+    if (since) { where.consentAt = { [Op.gt]: since }; }
+    return FatigueCheck.count({ where });
 }
 
 // ── Habilitación del transportista (LGT-195 Esc.7/8) ────────────────────────
-async function disableDriver({ userId, reason, branchId }) {
+async function disableDriver({ userId, reason, branchId, routeId = null, rejections = null, max = null }) {
     const { DriverFatigueStatus } = require('../../models/driverFatigueStatus');
     await DriverFatigueStatus.upsert({
         userId, status: 'DISABLED', reason: reason || 'OTHER',
         disabledAt: new Date(), restoredBy: null, restoredAt: null, updatedAt: new Date(),
     });
     await notify.audit('DRIVER_DISABLED', { actorId: userId, detail: `Transportista #${userId} inhabilitado (${reason}).` });
-    // Notifica al Supervisor de la sucursal (canal interno + auditoría).
-    if (branchId) {
-        const recipients = await notify.resolveRecipients(branchId);
+
+    // LGT-195: el aviso real al Supervisor se hace por email + auditoría.
+    // Resolvemos sucursal y nombre del transportista para los placeholders del template.
+    // La sucursal destino es la asignada al transportista (user.branchId); si no tiene,
+    // usamos la sucursal del último contexto (originBranchId de la ruta) como respaldo.
+    let driverName = `#${userId}`;
+    let driverBranchId = branchId || null;
+    let branchName = '';
+    try {
+        const { User } = require('../../models/user');
+        const driver = await User.findByPk(userId);
+        if (driver) {
+            driverName = driver.fullName || driverName;
+            if (driver.branchId) { driverBranchId = driver.branchId; }
+        }
+        if (driverBranchId) {
+            const { Branch } = require('../../models/branch');
+            const branch = await Branch.findByPk(driverBranchId);
+            if (branch) { branchName = branch.name; }
+        }
+    } catch (err) {
+        console.warn('[fatigue][disableDriver] no se pudo resolver driver/branch:', err.message);
+    }
+
+    if (reason === 'CONSENT_REJECTED') {
+        await notify.notifyDriverDisabledByConsent({
+            driverId: userId, driverName,
+            branchId: driverBranchId, branchName,
+            routeId, rejections, max, reason,
+        }).catch((err) => console.error('[fatigue] notifyDriverDisabledByConsent:', err.message));
+    } else if (driverBranchId) {
+        // Resto de motivos: por ahora solo se registra a quién se notificaría.
+        const recipients = await notify.resolveRecipients(driverBranchId);
         await notify.audit('DRIVER_DISABLED_NOTIFY', { detail: `Notificados ${recipients.length} (supervisores + admin).` });
     }
     return { ok: true };
@@ -78,8 +133,32 @@ async function revokeConsent({ userId, actorId }) {
 async function evaluate({ checkId, userId, routeId, branchId, method, metrics, triggerType = 'INICIO', cfg }) {
     const config = cfg || await configSvc.getConfig(branchId);
     const expectedMs = config.testDurationSec * 1000;
-    const scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics } });
-    const decision = scorer.decide(scoreValue, config);
+    let scoreValue, decision, failed, reaction = null;
+    if (method === 'REACCION') {
+        // Modo de evaluación configurable (promedio vs cantidad de aprobados).
+        const r = scorer.evaluateReaction({
+            reactionsMs: metrics.reactionsMs,
+            fastMs: config.reactionFastMs, slowMs: config.reactionSlowMs,
+            mode: config.reactionEvalMode, required: config.reactionRequired,
+            autoBlock: config.autoBlock,
+        });
+        scoreValue = r.score; decision = r.decision; failed = !r.apto;
+        // Detalle para que el portal explique el veredicto (promedio + aprobados + criterio).
+        reaction = {
+            avg: r.avg, passedCount: r.passedCount, total: r.total, limit: r.limit,
+            mode: r.mode, required: r.required, need: r.need, apto: r.apto,
+        };
+    } else {
+        scoreValue = scorer.score({ method, metrics: { expectedMs, ...metrics }, cfg: config });
+        decision = scorer.decide(scoreValue, config);
+        failed = scoreValue > config.thresholdPct; // "no pasó" independiente de autoBlock
+    }
+
+    // LGT-193 — autoBlock OFF + no apto al INICIO: se deja salir, pero queda un registro
+    // REVIEW para que el Supervisor decida (inhabilitar o reasignar). decision='REVIEW'
+    // no bloquea el gate de inicio (canStart lo trata como apto), solo alerta al supervisor.
+    const review = decision !== 'BLOCKED' && failed && !config.autoBlock && triggerType === 'INICIO';
+    if (review) { decision = 'REVIEW'; }
 
     let check;
     if (checkId) {
@@ -101,8 +180,11 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
         await bumpPatternCounter(check.userId, config, branchId);
         const transportName = await driverName(check.userId);
         await notify.notifyBlock({ check, branchId, transportName, routeId, score: scoreValue });
+    } else if (review) {
+        const transportName = await driverName(check.userId);
+        await notify.notifyReview({ check, branchId, transportName, routeId, score: scoreValue });
     }
-    return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision };
+    return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision, failed, reaction, review };
 }
 
 // ── Gate de inicio de ruta (US-1 / US-4) ────────────────────────────────────
@@ -119,7 +201,8 @@ async function canStart(routeId) {
     if (!check) { return { ok: false, reason: 'FATIGUE_REQUIRED' }; }
     if (check.consentStatus !== 'ACCEPTED') { return { ok: false, reason: 'CONSENT_REQUIRED', checkId: check.id }; }
     if (check.decision === 'BLOCKED' && !check.releasedAt) { return { ok: false, reason: 'BLOCKED', checkId: check.id, score: check.score }; }
-    if (check.decision !== 'APTO' && !check.releasedAt) { return { ok: false, reason: 'PENDING', checkId: check.id }; }
+    // REVIEW = no pasó pero autoBlock OFF: el conductor fue advertido y puede salir; queda para revisión.
+    if (check.decision !== 'APTO' && check.decision !== 'REVIEW' && !check.releasedAt) { return { ok: false, reason: 'PENDING', checkId: check.id }; }
     return { ok: true, checkId: check.id };
 }
 
@@ -128,6 +211,58 @@ function listBlocked(branchId) {
     const where = { decision: 'BLOCKED', releasedAt: null };
     if (branchId) { where.branchId = branchId; }
     return FatigueCheck.findAll({ where, order: [['createdAt', 'DESC']] });
+}
+
+// LGT-193 — avisos sin bloqueo (autoBlock OFF + no apto): el conductor salió igual,
+// pero el supervisor debe decidir si inhabilitarlo o reasignar la ruta.
+function listReview(branchId) {
+    const where = { decision: 'REVIEW', releasedAt: null };
+    if (branchId) { where.branchId = branchId; }
+    return FatigueCheck.findAll({ where, order: [['createdAt', 'DESC']] });
+}
+
+// LGT-199 Esc.4 — el conductor no completó el re-chequeo pedido a tiempo. Crea un
+// registro REVIEW en Ojo de Patrón (visible en el panel) y avisa al supervisor.
+// Idempotente: si ya hay un aviso de omisión abierto para la ruta, no duplica.
+async function escalateRecheckOmission({ routeId, userId, branchId, minutes, cfg }) {
+    const config = cfg || await configSvc.getConfig(branchId);
+    const existing = await FatigueCheck.findOne({
+        where: { routeId, triggerType: 'EN_RUTA', decision: 'REVIEW', releaseReason: 'recheck_omitido', releasedAt: null },
+    });
+    if (existing) { return existing; }
+    const check = await FatigueCheck.create({
+        userId, routeId, branchId, triggerType: 'EN_RUTA', method: null,
+        consentStatus: 'ACCEPTED', consentVersion: config.consentVersion, consentAt: new Date(),
+        score: null, threshold: config.thresholdPct, decision: 'REVIEW',
+        // Marca el motivo del aviso para distinguirlo de "no apto sin bloqueo".
+        releaseReason: 'recheck_omitido',
+    });
+    const transportName = await driverName(userId);
+    await notify.notifyRecheckOmission({ check, branchId, transportName, routeId, minutes });
+    return check;
+}
+
+// Cierra los avisos de omisión de re-chequeo de una ruta (al completarse la prueba).
+async function clearRecheckOmission({ routeId, actorId }) {
+    const rows = await FatigueCheck.findAll({
+        where: { routeId, triggerType: 'EN_RUTA', decision: 'REVIEW', releaseReason: 'recheck_omitido', releasedAt: null },
+    });
+    for (const r of rows) {
+        await r.update({ releasedAt: new Date(), releasedBy: actorId || null, releaseDetail: 'Re-chequeo completado' });
+    }
+    return rows.length;
+}
+
+// Cierra el aviso (decisión tomada o descartado) sin tocar el estado de la ruta.
+async function resolveReview({ checkId, actorId, note }) {
+    const check = await FatigueCheck.findByPk(checkId);
+    if (!check) { throw new Error('Aviso no encontrado'); }
+    await check.update({
+        releasedAt: new Date(), releasedBy: actorId,
+        releaseReason: 'revisado_sin_bloqueo', releaseDetail: note || null,
+    });
+    await notify.audit('REVIEW_RESOLVED', { actorId, checkId, detail: note || 'Aviso de fatiga revisado.' });
+    return check;
 }
 
 // LGT-195: liberar un bloqueo. "falso_positivo" deja la ruta apta sin nueva
@@ -304,7 +439,8 @@ async function driverName(userId) {
 
 module.exports = {
     recordConsent, revokeConsent, evaluate, latestForRoute, canStart,
-    listBlocked, release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
+    listBlocked, listReview, resolveReview, escalateRecheckOmission, clearRecheckOmission,
+    release, reassignRoute, bumpPatternCounter, patternStatus, reviewPattern,
     disableDriver, restoreDriver, getDriverStatus, isDriverDisabled, listDisabledDrivers,
     getDriverHistory, suppressDriverData, purgeExpired,
 };

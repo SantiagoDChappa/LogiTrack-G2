@@ -1,4 +1,7 @@
 const { Shipment } = require('../models/shipment');
+const shipmentModel = require('../models/shipment');
+// NFAL07 (LGT-158): mensaje único cuando el link accionable ya no sirve.
+const SELF_SERVICE_LINK_INVALID_MSG = 'Este enlace ya no es válido. Para gestionar tu envío ingresá al portal o contactá a soporte.';
 const { Person } = require('../models/person');
 const { Status } = require('../models/status');
 const { Address } = require('../models/address');
@@ -637,14 +640,20 @@ const getSelfServiceForm = async (req, res) => {
                 { model: Branch,  as: 'pickupBranch', required: false },
             ],
         });
-        if (!shipment) { return res.status(404).render('error', { status: 404, reason: 'Este enlace ya no es válido. Para gestionar tu envío ingresá al portal o contactá a soporte.' }); }
-        if (shipment.portalTokenExpiresAt && new Date() > new Date(shipment.portalTokenExpiresAt)) {
-            return res.status(404).render('error', { status: 404, reason: 'Este enlace expiró. Para gestionar tu envío ingresá al portal o contactá a soporte.' });
+        if (!shipment) { return res.status(404).render('error', { message: 'Envío no encontrado' }); }
+        // NFAL07: link de un solo uso + vencimiento. Si ya se usó o venció, se rechaza.
+        // Excepción: justo después de reprogramar (?saved=1) se muestra la confirmación.
+        if (shipmentModel.selfServiceTokenState(shipment) !== 'ok' && req.query.saved !== '1') {
+            return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
         }
         // Sólo permite cambios mientras el envío esté Pendiente / En preparación / Asignado / En sucursal.
         const editable = canModifyShipment(shipment);
         const timeWindows = await require('../models/deliveryTimeWindow').getActive();
         const branches = await Branch.findAll({ where: { pickupEnabled: true, closed: false } });
+        // Recalcula la fecha estimada para cada modalidad: el destinatario ve, en vivo,
+        // cuándo recibiría a domicilio vs cuándo podría retirar por sucursal y decide.
+        const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+        const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
         res.render('portal/selfService', {
             shipment,
             timeWindows,
@@ -653,6 +662,8 @@ const getSelfServiceForm = async (req, res) => {
             saved: req.query.saved === '1',
             appliedCount: Number(req.query.applied) || 0,
             pendingCount: Number(req.query.pending) || 0,
+            etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
+            etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
         });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
@@ -672,6 +683,10 @@ const saveSelfService = async (req, res) => {
             ],
         });
         if (!shipment) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        // NFAL07: no permitir reprogramar con un link ya usado o vencido.
+        if (shipmentModel.selfServiceTokenState(shipment) !== 'ok') {
+            return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
 
         const result = await submitPortalModification({
             shipment,
@@ -683,6 +698,8 @@ const saveSelfService = async (req, res) => {
         });
 
         if (!result.ok) {
+            const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
+            const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
             return res.status(result.status || 400).render('portal/selfService', {
                 shipment,
                 timeWindows: await require('../models/deliveryTimeWindow').getActive(),
@@ -692,12 +709,14 @@ const saveSelfService = async (req, res) => {
                 appliedCount: 0,
                 pendingCount: 0,
                 error: result.message,
+                etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
+                etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
             });
         }
 
-        // Invalidar el token usado para que el link del email no pueda reutilizarse.
-        const { generatePortalToken, generatePortalTokenExpiry } = require('../utils/shipmentTokens');
-        await shipment.update({ portalToken: generatePortalToken(), portalTokenExpiresAt: generatePortalTokenExpiry() });
+        // NFAL07: consumir el link tras una reprogramación exitosa (un solo uso).
+        await shipmentModel.markSelfServiceTokenUsed(shipment.id)
+            .catch(e => console.error('markSelfServiceTokenUsed:', e.message));
 
         const qs = new URLSearchParams({ saved: '1' });
         if (result.applied?.length) { qs.set('applied', String(result.applied.length)); }

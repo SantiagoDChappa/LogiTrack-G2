@@ -74,8 +74,8 @@
                         %>
                         <tr>
                             <td><strong><%= s.trackingId %></strong></td>
-                            <td><%= s.recipient.fullName %></td>
-                            <td><span class="portal-badge <%= sk %>"><%= s.status.description %></span></td>
+                            <td><%= s.recipient ? s.recipient.fullName : '—' %></td>
+                            <td><span class="portal-badge <%= sk %>"><%= s.status ? s.status.description : 'Sin estado' %></span></td>
                             <td><%= new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
                             <td><%= s.deliveryMode === 'branch_pickup' ? 'Retiro por sucursal' : 'Envío a domicilio' %></td>
                             <td>

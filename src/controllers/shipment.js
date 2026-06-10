@@ -1096,6 +1096,14 @@ async function resolveShipmentForNotification(shipmentOrId) {
     return shipmentModel.getById(id);
 }
 
+// NFAL07 (LGT-158): eventos cuyo email lleva el link de autogestión accionable.
+// Al enviarlos se "arma" el token (vence en N días, rearmado para un uso).
+const ACTIONABLE_SELF_SERVICE_EVENTS = new Set([
+    NotificationEvent.SHIPMENT_FAILED_ATTEMPT,
+    NotificationEvent.SHIPMENT_DELAYED,
+    NotificationEvent.SHIPMENT_RETURNED_BRANCH,
+]);
+
 async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
     try {
         const cfg = await notificationConfigModel.getConfigByEvent(eventCode);
@@ -1118,6 +1126,12 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
             return;
         }
 
+        // NFAL07: arma el link accionable cuando efectivamente se envía el aviso.
+        if (ACTIONABLE_SELF_SERVICE_EVENTS.has(eventCode)) {
+            shipmentModel.armSelfServiceToken(shipment.id)
+                .catch(e => console.error('notifyShipmentEvent armSelfServiceToken:', e.message));
+        }
+
         // Catálogo de datos del envío + variables custom del cliente + variables extra (ej. contexto de incidencia).
         const vars = { ...placeholders.buildVars(shipment), ...await notificationVariableModel.getAllAsMap(), ...extraVars };
         if (eventCode === NotificationEvent.SHIPMENT_FAILED_ATTEMPT) {
@@ -1130,6 +1144,19 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
             const diffMs = Date.now() - expected.getTime();
             const diffDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
             vars.daysDelayed = String(diffDays);
+        }
+        // Avisos sobre una incidencia ya creada (paquete dañado / incidencia / cambio de
+        // estado): el enlace debe llevar a ESA incidencia, no al alta de una nueva.
+        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED];
+        if (!vars._incidentId && INCIDENT_EVENTS.includes(eventCode)) {
+            try {
+                const { Incident } = require('../models/incident');
+                const inc = await Incident.findOne({ where: { shipmentId: shipment.id }, order: [['id', 'DESC']] });
+                if (inc) { vars._incidentId = String(inc.id); }
+            } catch { /* sin incidencia → queda el enlace de alta */ }
+        }
+        if (vars._incidentId) {
+            vars.incidentUrl = `${placeholders.baseUrl()}/portal/mis-envios/incidencia/${vars._incidentId}`;
         }
         const fill = (s) => placeholders.render(s, vars);
 

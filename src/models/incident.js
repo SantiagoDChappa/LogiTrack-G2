@@ -43,7 +43,7 @@ const includesFull = () => {
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, trackingId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const where = {};
     if (id)                { where.id = id; }
@@ -64,6 +64,8 @@ const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, o
     const shipmentWhere = {};
     if (deliveryUserId) { shipmentWhere.deliveryUserId = deliveryUserId; }
     if (branchId)       { shipmentWhere.currentBranchId = branchId; }
+    // Búsqueda por código de envío (ej. "ENV-011"), parcial e insensible a mayúsculas.
+    if (trackingId)     { shipmentWhere.trackingId = { [Op.iLike]: `%${String(trackingId).trim()}%` }; }
     if (Object.keys(shipmentWhere).length > 0) {
         shipmentInclude.where = shipmentWhere;
         shipmentInclude.required = true;

@@ -48,7 +48,24 @@ const CATALOG = [
     // URLs accionables
     { token: 'trackingUrl',    label: 'Enlace seguimiento',  group: 'Enlaces',      description: '🔗 Ver el seguimiento del envío en el portal.', resolve: s => (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl()) },
     { token: 'selfServiceUrl', label: 'Enlace autogestión',  group: 'Enlaces',      description: '🔗 Reprogramar o elegir retiro en sucursal (sin login).', resolve: s => (s.portalToken ? `${baseUrl()}/portal/self/${s.portalToken}` : (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl())) },
-    { token: 'incidentUrl',    label: 'Enlace incidencia',   group: 'Enlaces',      description: '🔗 Reportar o responder una incidencia del envío.', resolve: s => (s.trackingId ? `${baseUrl()}/portal/incident/new?trackingId=${encodeURIComponent(s.trackingId)}` : `${baseUrl()}/portal/incident/new`) },
+    { token: 'incidentUrl',    label: 'Enlace incidencia',   group: 'Enlaces',      description: '🔗 Ver la incidencia creada (o reportar una nueva si no existe).', resolve: s => (notNil(s._incidentId)
+        ? `${baseUrl()}/portal/mis-envios/incidencia/${s._incidentId}`
+        : (s.trackingId ? `${baseUrl()}/portal/incident/new?trackingId=${encodeURIComponent(s.trackingId)}` : `${baseUrl()}/portal/incident/new`)) },
+    // Acceso al portal — solo aplican al evento PORTAL_CLIENT_ACCESS (se resuelven al pedir el código).
+    { token: 'codigo',         label: 'Código de verificación', group: 'Acceso al portal', description: 'Código de 6 dígitos para acceder a "Mis envíos".', resolve: s => s._codigo || '' },
+    { token: 'ttlHoras',       label: 'Validez (horas)',        group: 'Acceso al portal', description: 'Cantidad de horas que el código sigue siendo válido.', resolve: s => (notNil(s._ttlHoras) ? String(s._ttlHoras) : '') },
+    // Incidencia — aplican al evento INCIDENT_STATUS_CHANGE (se resuelven al cambiar el estado).
+    { token: 'incidentId',     label: 'N° de incidencia',       group: 'Incidencia', description: 'Identificador de la incidencia.',         resolve: s => (notNil(s._incidentId) ? String(s._incidentId) : '') },
+    { token: 'incidentEstado', label: 'Estado de incidencia',   group: 'Incidencia', description: 'Nuevo estado de la incidencia.',           resolve: s => s._incidentEstado || '' },
+    // Control de fatiga — aplican al evento FATIGUE_DRIVER_DISABLED_CONSENT (se resuelven al inhabilitar al transportista).
+    { token: 'transportistaNombre',  label: 'Nombre transportista', group: 'Control de fatiga', description: 'Nombre completo del transportista inhabilitado.',         resolve: s => s._transportistaNombre || '' },
+    { token: 'transportistaId',      label: 'ID transportista',     group: 'Control de fatiga', description: 'Identificador del transportista inhabilitado.',            resolve: s => (notNil(s._transportistaId) ? String(s._transportistaId) : '') },
+    { token: 'sucursalNombre',       label: 'Sucursal transportista', group: 'Control de fatiga', description: 'Sucursal asignada al transportista.',                    resolve: s => s._sucursalNombre || '' },
+    { token: 'sucursalId',           label: 'ID sucursal',          group: 'Control de fatiga', description: 'Identificador de la sucursal asignada al transportista.', resolve: s => (notNil(s._sucursalId) ? String(s._sucursalId) : '') },
+    { token: 'rutaId',               label: 'Ruta',                 group: 'Control de fatiga', description: 'Ruta en la que el transportista rechazó el consentimiento.', resolve: s => (notNil(s._rutaId) ? String(s._rutaId) : '') },
+    { token: 'rechazos',             label: 'Rechazos acumulados',  group: 'Control de fatiga', description: 'Cantidad de rechazos de consentimiento desde el último restablecimiento.', resolve: s => (notNil(s._rechazos) ? String(s._rechazos) : '') },
+    { token: 'maxRechazos',          label: 'Límite de rechazos',   group: 'Control de fatiga', description: 'Límite parametrizado de rechazos antes de inhabilitar.',  resolve: s => (notNil(s._maxRechazos) ? String(s._maxRechazos) : '') },
+    { token: 'motivoInhabilitacion', label: 'Motivo',               group: 'Control de fatiga', description: 'Motivo registrado de la inhabilitación.',                  resolve: s => s._motivoInhabilitacion || '' },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
@@ -61,6 +78,21 @@ const buildVars = (shipment) => {
     return vars;
 };
 
+// CP-CNNF04: detección de variables {{token}} no válidas en una plantilla.
+const TOKEN_RE = /\{\{\s*([\w]+)\s*\}\}/g;
+const knownTokens = () => new Set(CATALOG.map((p) => p.token));
+const extractTokens = (str) => {
+    const out = new Set();
+    String(str || '').replace(TOKEN_RE, (_, k) => { out.add(k); return _; });
+    return [...out];
+};
+// Tokens usados en `str` que NO están permitidos. `allowedExtra`: tokens válidos extra (ej. variables custom).
+const findUnknownTokens = (str, allowedExtra = []) => {
+    const allowed = knownTokens();
+    for (const t of allowedExtra) { allowed.add(t); }
+    return extractTokens(str).filter((t) => !allowed.has(t));
+};
+
 // Reemplazo genérico {{key}} (mismo criterio que standardMessage.render).
 const render = (str, vars = {}) => String(str || '')
     .replace(/\{\{\s*([\w]+)\s*\}\}/g, (_, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : ''));
@@ -71,6 +103,8 @@ const catalogMeta = () => CATALOG.map(({ token, label, description, group }) => 
 // Shipment de ejemplo para previsualización / email de prueba.
 const sampleShipment = () => ({
     trackingId: 'ENV-001234',
+    _codigo: '482913',
+    _ttlHoras: 24,
     expectedDeliveryDate: new Date(),
     expectedDeliveryFrom: '09:00', expectedDeliveryTo: '13:00',
     codAmount: 15000,
@@ -78,6 +112,8 @@ const sampleShipment = () => ({
     portalToken: 'demo-token-1234',
     _failedReason: 'Destinatario ausente',
     _daysDelayed: '3',
+    _incidentId: '1024',
+    _incidentEstado: 'En revisión',
     recipient: { fullName: 'Juan Pérez', email: 'juan@ejemplo.com', phone: '11-5555-0000', document: 30111222 },
     sender:    { fullName: 'Tienda Online SA' },
     status:    { description: 'En Sucursal' },
@@ -86,4 +122,4 @@ const sampleShipment = () => ({
     currentBranch: { name: 'Sucursal Centro' },
 });
 
-module.exports = { CATALOG, buildVars, render, catalogMeta, sampleShipment };
+module.exports = { CATALOG, buildVars, render, catalogMeta, sampleShipment, findUnknownTokens, extractTokens, baseUrl };
