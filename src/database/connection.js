@@ -21,8 +21,23 @@ if (process.env.NODE_ENV === 'test') {
             schema: "logitrack",
             timestamps: false,
         },
+        // Pool tuneado para Neon serverless: connections caras (handshake SSL),
+        // pero Neon corta tras inactividad. Mantenemos un minimo caliente.
+        // max: techo razonable para Render free/starter (1 worker).
+        // idle 10s: conexiones se reciclan si no se usan, alineado con Neon.
+        // acquire 20s: si pool lleno, espera 20s antes de fallar.
+        // evict cada 5s: chequea idle para devolver al pool / cerrar.
+        pool: {
+            max:     10,
+            min:     2,
+            idle:    10000,
+            acquire: 20000,
+            evict:   5000,
+        },
+        // Reintenta si la conexion fue cerrada por inactividad (Neon).
+        retry: { max: 3, match: [/ECONNRESET/, /ETIMEDOUT/, /Connection terminated unexpectedly/] },
         dialectOptions: dbUrl.hostname !== "localhost"
-            ? { ssl: { require: true, rejectUnauthorized: false } }
+            ? { ssl: { require: true, rejectUnauthorized: false }, keepAlive: true }
             : {},
     });
 }

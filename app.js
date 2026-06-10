@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const compression = require('compression');
 const swaggerUi = require('swagger-ui-express');
 const cookieParser = require('cookie-parser');
 const app     = express();
@@ -59,7 +60,22 @@ if (process.env.NODE_ENV === 'test') {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'src', 'views'));
 
-app.use(express.static('public'));
+// Compresion gzip de todas las respuestas (HTML/CSS/JS/JSON). Reduce payload ~70%.
+// threshold 1KB: no comprime respuestas chicas (costo CPU > beneficio).
+app.use(compression({ threshold: 1024 }));
+
+// Assets estaticos con cache de 7 dias en prod (1 dia en dev). Evita re-download
+// de CSS/JS/imagenes en cada navegacion. Cambios se invalidan editando el archivo
+// (express agrega ETag por default).
+const STATIC_MAX_AGE_MS = process.env.NODE_ENV === 'production'
+    ? 7 * 24 * 60 * 60 * 1000   // 7 dias
+    : 1 * 60 * 60 * 1000;        // 1 hora dev
+app.use(express.static('public', {
+    maxAge: STATIC_MAX_AGE_MS,
+    etag: true,
+    lastModified: true,
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
