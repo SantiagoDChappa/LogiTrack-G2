@@ -10,6 +10,7 @@ const INCIDENT_TYPE_BLOCKED_STATUSES = Object.freeze({
     WRONG_ADDRESS:  [Status.DELIVERED.id, Status.CANCELLED.id, Status.PACKAGE_FAILED.id],
     LOST:           [Status.PENDING.id, Status.DELIVERED.id, Status.CANCELLED.id, Status.IN_PREPARATION.id],
     DELIVERY_FAILED: [],
+    VEH_OUT_OF_SERVICE: [Status.DELIVERED.id, Status.CANCELLED.id],
     OTHER:          []
 });
 
@@ -48,22 +49,42 @@ const getEligibilityError = (shipment, type, existingOpenIncidents = []) => {
 };
 
 // Warnings (no bloqueantes): el operador puede igual abrir la incidencia confirmando.
-// Hoy solo aplicamos a DELAY cuando el envío aún está dentro del plazo estimado.
-const getEligibilityWarning = (shipment, type) => {
+// - DELAY: envío todavía dentro del plazo estimado.
+// - VEH_OUT_OF_SERVICE: muestra estado actual del vehículo (habilitado / ya fuera) para
+//   que el operador verifique antes de crear. extras.transport opcional (puede no haber
+//   vehículo asignado al driver).
+const getEligibilityWarning = (shipment, type, extras = {}) => {
     if (!shipment || !type) { return null; }
-    if (type.code !== 'DELAY') { return null; }
-    if (!shipment.expectedDeliveryDate) { return null; }
 
-    const expected = new Date(shipment.expectedDeliveryDate);
-    if (Number.isNaN(expected.getTime())) { return null; }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    expected.setHours(0, 0, 0, 0);
-
-    if (expected >= today) {
-        const fmt = expected.toLocaleDateString('es-AR');
-        return `El envío todavía está dentro del plazo estimado (entrega prevista ${fmt}). ¿Confirmás abrir igual una incidencia por demora?`;
+    if (type.code === 'DELAY') {
+        if (!shipment.expectedDeliveryDate) { return null; }
+        const expected = new Date(shipment.expectedDeliveryDate);
+        if (Number.isNaN(expected.getTime())) { return null; }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        expected.setHours(0, 0, 0, 0);
+        if (expected >= today) {
+            const fmt = expected.toLocaleDateString('es-AR');
+            return `El envío todavía está dentro del plazo estimado (entrega prevista ${fmt}). ¿Confirmás abrir igual una incidencia por demora?`;
+        }
+        return null;
     }
+
+    if (type.code === 'VEH_OUT_OF_SERVICE') {
+        const t = extras.transport;
+        if (!t) {
+            return 'No se encontró un vehículo asignado al repartidor del envío en el sistema. ¿Confirmás crear igual la incidencia?';
+        }
+        const label = `"${t.name}"${t.plate ? ` (${t.plate})` : ''}`;
+        if (t.outOfService) {
+            return `El vehículo ${label} ya figura fuera de servicio en el sistema. ¿Confirmás crear igual la incidencia?`;
+        }
+        if (!t.enabled) {
+            return `El vehículo ${label} está deshabilitado en el sistema. ¿Confirmás crear igual la incidencia?`;
+        }
+        return `El vehículo ${label} figura habilitado y operativo en el sistema. ¿Confirmás crear igual la incidencia para reportarlo fuera de servicio?`;
+    }
+
     return null;
 };
 

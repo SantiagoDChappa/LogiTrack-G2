@@ -9,6 +9,7 @@ const { User }             = require('../models/user');
 const branchModel          = require('../models/branch');
 const { sendEmail }        = require('../services/notification/emailSender');
 const incidentRules        = require('../services/incidentRules');
+const { Transport }        = require('../models/transport');
 const incidentNotifConfig  = require('../services/incidentNotifConfig');
 const { snapshotChecklist } = require('../services/incidentChecklist');
 const incidentTaskModel    = require('../models/incidentTask');
@@ -229,7 +230,12 @@ const create = async (req, res) => {
     }
     // Warning soft (no bloquea): si la confirmación aún no llegó, devolvemos el form
     // con un mensaje pidiendo marcar la casilla "confirmWarning".
-    const eligibilityWarning = incidentRules.getEligibilityWarning(shipment, type);
+    // VEH_OUT_OF_SERVICE necesita el vehículo del driver del envío para armar el aviso.
+    let transportForWarning = null;
+    if (type.code === 'VEH_OUT_OF_SERVICE' && shipment.deliveryUserId) {
+        transportForWarning = await Transport.findOne({ where: { driverUserId: shipment.deliveryUserId } });
+    }
+    const eligibilityWarning = incidentRules.getEligibilityWarning(shipment, type, { transport: transportForWarning });
     if (eligibilityWarning && req.body.confirmWarning !== '1') {
         return renderFormError(eligibilityWarning + ' Marcá "Confirmo crear igual" y reenviá el formulario.');
     }

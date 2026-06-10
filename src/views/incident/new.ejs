@@ -211,11 +211,11 @@
                 <textarea id="description" name="description" rows="6" maxlength="2000" required><%= form.description || '' %></textarea>
             </div>
 
-            <% if (error && /plazo estimado/i.test(error)) { %>
+            <% if (error && /Confirmo crear igual/i.test(error)) { %>
                 <div class="form-group" style="grid-column: span 12;">
                     <label style="display:flex;align-items:center;gap:.5rem;font-weight:600;color:#b45309;">
                         <input type="checkbox" name="confirmWarning" value="1" required>
-                        Confirmo crear igual la incidencia por demora
+                        Confirmo crear igual la incidencia
                     </label>
                 </div>
             <% } %>
