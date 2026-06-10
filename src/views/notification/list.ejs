@@ -5,28 +5,33 @@
     <title>Notificaciones — Fallidas</title>
     <style>
         .ntf-wrap { padding: 1rem clamp(1rem, 2.5vw, 2rem); }
-        .ntf-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
-        .ntf-kpi {
-            background: var(--color-surface); border: 1px solid var(--color-border);
-            border-radius: 12px; padding: 1rem 1.1rem; box-shadow: var(--shadow-sm);
+
+        /* Pestañas de estado (mismo criterio visual que los filtros de Envíos) */
+        .ntf-tabs { display: flex; flex-wrap: wrap; gap: .25rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1rem; }
+        .ntf-tab {
+            display: inline-flex; align-items: center; gap: .4rem;
+            padding: .55rem .9rem; border: none; background: none; cursor: pointer;
+            color: var(--color-text-secondary); font-size: .88rem; font-weight: 600;
+            text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
         }
-        .ntf-kpi .v { font-size: 1.8rem; font-weight: 800; line-height: 1; }
-        .ntf-kpi .l { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-secondary); margin-top: .35rem; }
-        .ntf-kpi--sent .v { color: #16a34a; }
-        .ntf-kpi--failed .v { color: #dc2626; }
-        .ntf-kpi--pending .v { color: #d97706; }
-        .ntf-kpi--processing .v { color: var(--color-primary); }
+        .ntf-tab:hover { color: var(--color-text); }
+        .ntf-tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+        .ntf-tab .ntf-tab-count {
+            font-size: .72rem; font-weight: 700; padding: .05rem .45rem; border-radius: 999px;
+            background: var(--color-surface-alt); color: var(--color-text-secondary);
+        }
+        .ntf-tab.is-active .ntf-tab-count { background: var(--color-primary); color: #fff; }
 
         .ntf-filters {
             display: grid;
-            grid-template-columns: minmax(140px, 200px) minmax(220px, 1fr) auto auto;
+            grid-template-columns: minmax(220px, 1fr) auto auto;
             gap: .75rem; align-items: end; margin-bottom: 1rem;
             background: var(--color-surface); border: 1px solid var(--color-border);
             border-radius: 12px; padding: 1rem;
         }
         .ntf-filters .field { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
-        .ntf-filters .field input, .ntf-filters .field select { width: 100%; box-sizing: border-box; }
-        @media (max-width: 720px) { .ntf-filters { grid-template-columns: 1fr 1fr; } .ntf-filters .field--q { grid-column: 1 / -1; } }
+        .ntf-filters .field input { width: 100%; box-sizing: border-box; }
+        @media (max-width: 720px) { .ntf-filters { grid-template-columns: 1fr; } }
         .ntf-filters label { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-secondary); }
         .ntf-filters select, .ntf-filters input {
             padding: .5rem .7rem; border: 1px solid var(--color-border); border-radius: 8px;
@@ -90,24 +95,29 @@
         <div class="ntf-wrap">
             <div class="page-header"><h1>Notificaciones — Fallidas / enviadas</h1></div>
 
-            <div class="ntf-kpis">
-                <div class="ntf-kpi ntf-kpi--sent"><div class="v"><%= counts.SENT %></div><div class="l">Enviadas</div></div>
-                <div class="ntf-kpi ntf-kpi--failed"><div class="v"><%= counts.FAILED %></div><div class="l">Fallidas</div></div>
-                <div class="ntf-kpi ntf-kpi--pending"><div class="v"><%= counts.PENDING %></div><div class="l">Pendientes</div></div>
-                <div class="ntf-kpi ntf-kpi--processing"><div class="v"><%= counts.PROCESSING %></div><div class="l">Procesando</div></div>
-            </div>
+            <%# Pestañas por estado (selección única). Cada una preserva la búsqueda actual (q). %>
+            <%
+                const _qStr   = filters.q ? '&q=' + encodeURIComponent(filters.q) : '';
+                const _total  = counts.SENT + counts.FAILED + counts.PENDING + counts.PROCESSING;
+                const _tabs = [
+                    { key: '',           label: 'Todas',      count: _total },
+                    { key: 'FAILED',     label: 'Fallidas',   count: counts.FAILED },
+                    { key: 'SENT',       label: 'Enviadas',   count: counts.SENT },
+                    { key: 'PENDING',    label: 'Pendientes', count: counts.PENDING },
+                    { key: 'PROCESSING', label: 'Procesando', count: counts.PROCESSING },
+                ];
+            %>
+            <nav class="ntf-tabs">
+                <% _tabs.forEach(function(t) { %>
+                    <a class="ntf-tab <%= filters.status === t.key ? 'is-active' : '' %>"
+                       href="/notification/fallidas?status=<%= t.key %><%= _qStr %>">
+                        <%= t.label %><span class="ntf-tab-count"><%= t.count %></span>
+                    </a>
+                <% }); %>
+            </nav>
 
             <form method="GET" action="/notification/fallidas" class="ntf-filters">
-                <div class="field">
-                    <label for="status">Estado</label>
-                    <select id="status" name="status">
-                        <option value="">Todos</option>
-                        <option value="FAILED"     <%= filters.status === 'FAILED'     ? 'selected' : '' %>>Fallidas</option>
-                        <option value="SENT"       <%= filters.status === 'SENT'       ? 'selected' : '' %>>Enviadas</option>
-                        <option value="PENDING"    <%= filters.status === 'PENDING'    ? 'selected' : '' %>>Pendientes</option>
-                        <option value="PROCESSING" <%= filters.status === 'PROCESSING' ? 'selected' : '' %>>Procesando</option>
-                    </select>
-                </div>
+                <input type="hidden" name="status" value="<%= filters.status %>">
                 <div class="field">
                     <label for="q">Buscar (destinatario / asunto)</label>
                     <input type="text" id="q" name="q" value="<%= filters.q %>" placeholder="ej: cliente@mail.com">
