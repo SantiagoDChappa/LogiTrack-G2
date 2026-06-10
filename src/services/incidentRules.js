@@ -47,4 +47,24 @@ const getEligibilityError = (shipment, type, existingOpenIncidents = []) => {
     return null;
 };
 
-module.exports = { INCIDENT_TYPE_BLOCKED_STATUSES, getEligibilityError };
+// Warnings (no bloqueantes): el operador puede igual abrir la incidencia confirmando.
+// Hoy solo aplicamos a DELAY cuando el envío aún está dentro del plazo estimado.
+const getEligibilityWarning = (shipment, type) => {
+    if (!shipment || !type) { return null; }
+    if (type.code !== 'DELAY') { return null; }
+    if (!shipment.expectedDeliveryDate) { return null; }
+
+    const expected = new Date(shipment.expectedDeliveryDate);
+    if (Number.isNaN(expected.getTime())) { return null; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expected.setHours(0, 0, 0, 0);
+
+    if (expected >= today) {
+        const fmt = expected.toLocaleDateString('es-AR');
+        return `El envío todavía está dentro del plazo estimado (entrega prevista ${fmt}). ¿Confirmás abrir igual una incidencia por demora?`;
+    }
+    return null;
+};
+
+module.exports = { INCIDENT_TYPE_BLOCKED_STATUSES, getEligibilityError, getEligibilityWarning };

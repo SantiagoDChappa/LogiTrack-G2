@@ -139,7 +139,7 @@
                             <td><%= i.shipment ? i.shipment.trackingId : '-' %></td>
                             <td><%= i.type ? i.type.description : '-' %></td>
                             <td><span class="incident-origin incident-origin--<%= isExterno ? 'externo' : 'interno' %>"><%= originLabel %></span></td>
-                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= i.status %></span></td>
+                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= IncidentStatusLabel[i.status] || i.status %></span></td>
                             <td><span class="incident-resolution <%= resCls %>"><%= resLabel %></span></td>
                             <td><span class="incident-priority incident-priority--<%= i.priority %>">P<%= i.priority %></span></td>
                             <td><%= i.escalated ? '🔥' : '—' %></td>

@@ -13,6 +13,18 @@ const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+
+// Default ETA si el operador no carga fecha estimada al crear/modificar.
+// Express → +2 días, Standard → +5, sin tipo → +3. Devuelve 'YYYY-MM-DD' (DATEONLY).
+const computeDefaultExpectedDeliveryDate = (shipmentTypeId) => {
+    const typeId = Number(shipmentTypeId);
+    let days = 3;
+    if (typeId === ShipmentType.EXPRESS.id)  { days = 2; }
+    if (typeId === ShipmentType.STANDARD.id) { days = 5; }
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+};
 const { validationResult } = require('express-validator');
 const csvImport = require('../services/csvImport');
 const csvExport = require('../services/csvExport');
@@ -247,10 +259,13 @@ const getDetail = async (req, res) => {
     })();
 
 
+    const incidentsForShipment = await require('../models/incident').list({ shipmentId: id, limit: 50 });
+
     res.render('shipment/detail', {
         shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
+        incidents: incidentsForShipment,
     });
 };
 
@@ -453,7 +468,7 @@ const createShipment = async (req, res) => {
             priority:        initialPriority,
             currentBranchId: resolvedCurrentBranchId,
             zoneId: resolvedZone?.id || null,
-            expectedDeliveryDate: body.expectedDeliveryDate || null,
+            expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
         }, { transaction: t });
@@ -867,8 +882,17 @@ const cancelShipment = async (req, res) => {
 const markPackageFailed = async (req, res) => {
     try {
         const { id } = req.params;
-        const { comment } = req.body;
+        const { comment, reason } = req.body;
         const currentUser = res.locals.currentUser;
+
+        // Mapeo motivo → variante del template del cliente. Si no llega reason valido,
+        // queda el genérico SHIPMENT_PACKAGE_FAILED (backward compatible).
+        const REASON_TO_EVENT = {
+            UNDELIVERED: NotificationEvent.SHIPMENT_PACKAGE_FAILED_UNDELIVERED,
+            DELAY:       NotificationEvent.SHIPMENT_PACKAGE_FAILED_DELAY,
+            ATTEMPT:     NotificationEvent.SHIPMENT_PACKAGE_FAILED_ATTEMPT,
+        };
+        const notificationEventOverride = REASON_TO_EVENT[String(reason || '').toUpperCase()] || null;
 
         const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
@@ -879,6 +903,7 @@ const markPackageFailed = async (req, res) => {
             branchId: actorCoords.branchId,
             latitude: actorCoords.latitude,
             longitude: actorCoords.longitude,
+            notificationEventOverride,
         });
 /*
         const shipment = await shipmentModel.getById(id);

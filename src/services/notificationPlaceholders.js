@@ -57,6 +57,7 @@ const CATALOG = [
     // Incidencia — aplican al evento INCIDENT_STATUS_CHANGE (se resuelven al cambiar el estado).
     { token: 'incidentId',     label: 'N° de incidencia',       group: 'Incidencia', description: 'Identificador de la incidencia.',         resolve: s => (notNil(s._incidentId) ? String(s._incidentId) : '') },
     { token: 'incidentEstado', label: 'Estado de incidencia',   group: 'Incidencia', description: 'Nuevo estado de la incidencia.',           resolve: s => s._incidentEstado || '' },
+    { token: 'incidentComentario', label: 'Comentario de la incidencia', group: 'Incidencia', description: 'Comentario que dejó el operador al cambiar el estado o cerrar la incidencia.', resolve: s => s._incidentComentario || '' },
     // Control de fatiga — aplican al evento FATIGUE_DRIVER_DISABLED_CONSENT (se resuelven al inhabilitar al transportista).
     { token: 'transportistaNombre',  label: 'Nombre transportista', group: 'Control de fatiga', description: 'Nombre completo del transportista inhabilitado.',         resolve: s => s._transportistaNombre || '' },
     { token: 'transportistaId',      label: 'ID transportista',     group: 'Control de fatiga', description: 'Identificador del transportista inhabilitado.',            resolve: s => (notNil(s._transportistaId) ? String(s._transportistaId) : '') },

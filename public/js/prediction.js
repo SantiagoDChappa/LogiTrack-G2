@@ -135,6 +135,17 @@
             weekday: 'long', day: 'numeric', month: 'long'
         });
 
+        // Si estamos en el form de alta, sincronizar la fecha estimada del ML
+        // hacia el campo del form para que se persista en DB junto con el envío.
+        // Solo se autocompleta si el operador no ingresó manualmente una fecha.
+        const dateInput = document.getElementById('expected-date');
+        if (dateInput && !dateInput.value) {
+            const yyyy = fechaEstimada.getFullYear();
+            const mm   = String(fechaEstimada.getMonth() + 1).padStart(2, '0');
+            const dd   = String(fechaEstimada.getDate()).padStart(2, '0');
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+
         // Etiquetas de justificación (factores objetivos; el nivel ya lo dice el semáforo).
         const etiquetas = [];
         if (distKm > 800)           etiquetas.push('Larga distancia');

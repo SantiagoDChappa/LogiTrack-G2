@@ -171,9 +171,9 @@ html[data-theme="dark"] {
     display: inline-flex;
     align-items: center;
     gap: .3rem;
-    padding: .2rem .6rem;
+    padding: .28rem .75rem;
     border-radius: 999px;
-    font-size: .72rem;
+    font-size: .78rem;
     font-weight: 700;
     letter-spacing: .02em;
     background: #e2e8f0;
@@ -336,13 +336,12 @@ html[data-theme="dark"] {
    ============================================================ */
 .incident-detail-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    grid-template-columns: 1fr;
     gap: 1.25rem;
     padding: 1rem clamp(1.25rem, 2.5vw, 2rem);
-}
-
-@media (max-width: 960px) {
-    .incident-detail-grid { grid-template-columns: 1fr; }
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .incident-detail-card {
@@ -351,6 +350,14 @@ html[data-theme="dark"] {
     border-radius: var(--inc-radius-lg);
     padding: 1.4rem 1.5rem;
     box-shadow: var(--inc-shadow-md);
+}
+
+/* Checklist y Evidencias: secciones sueltas fuera del grid, alinearlas al mismo ancho */
+section.incident-detail-card {
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 1rem;
 }
 
 .incident-detail-card h2 {
@@ -416,21 +423,101 @@ html[data-theme="dark"] {
 }
 
 /* ============================================================
+   Detail — Comentario maestro (obligatorio para toda acción)
+   ============================================================ */
+.incident-master-comment {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin-bottom: 1rem;
+    padding: 1rem 1.1rem;
+    background: linear-gradient(135deg, rgba(37, 99, 235, .08), rgba(37, 99, 235, .02));
+    border: 1px solid rgba(37, 99, 235, .25);
+    border-radius: var(--inc-radius-md);
+}
+
+.incident-master-comment label {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--inc-text-strong);
+}
+
+.incident-master-comment textarea {
+    padding: .65rem .8rem;
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-sm);
+    background: var(--inc-surface);
+    color: var(--inc-text);
+    font: inherit;
+    font-size: .92rem;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 4.5rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.incident-master-comment textarea:focus {
+    outline: none;
+    border-color: var(--inc-blue);
+    box-shadow: var(--inc-ring);
+}
+
+.incident-master-comment textarea.is-invalid {
+    border-color: var(--inc-red);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, .15);
+}
+
+.incident-master-comment__hint {
+    font-size: .76rem;
+    color: var(--inc-muted);
+    line-height: 1.4;
+}
+
+/* ============================================================
+   Detail — Grid de acciones (un bloque por acción)
+   ============================================================ */
+.incident-actions-grid {
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
+    margin-bottom: 1rem;
+}
+
+/* ============================================================
    Detail — sub-formularios de acción
    ============================================================ */
 .incident-action-form {
     display: flex;
     flex-wrap: wrap;
     gap: .65rem .75rem;
-    align-items: flex-end;
-    margin-bottom: 1rem;
-    padding: .9rem 1rem;
+    align-items: center;
+    margin-bottom: 0;
+    padding: .8rem 1rem;
     background: var(--inc-surface-alt);
     border: 1px solid var(--inc-border-soft);
     border-radius: var(--inc-radius-md);
 }
 
 .incident-action-form:last-child { margin-bottom: 0; }
+
+.incident-action-form--escalate {
+    margin-top: .5rem;
+    padding-top: .85rem;
+    border-top: 1px dashed var(--inc-border);
+    background: transparent;
+}
+
+.incident-action-form .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .88rem;
+    font-weight: 600;
+    padding: .55rem .9rem;
+    white-space: nowrap;
+}
 
 .incident-action-form label {
     display: inline-flex;
@@ -478,7 +565,8 @@ html[data-theme="dark"] {
    Historial — timeline
    ============================================================ */
 .incident-history {
-    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+    max-width: 1100px;
+    margin: 1rem auto;
     padding: 1.4rem 1.5rem;
     background: var(--inc-surface);
     border: 1px solid var(--inc-border);
@@ -498,70 +586,112 @@ html[data-theme="dark"] {
 
 .incident-timeline {
     list-style: none;
-    margin: 0;
-    padding: 0 0 0 1.25rem;
+    margin: .5rem 0 0 .85rem;
+    padding: 0 0 0 1.5rem;
     border-left: 2px solid var(--inc-border);
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
 }
 
 .incident-timeline-item {
-    padding: .35rem 0 1rem 1.1rem;
+    padding: .5rem 0 .5rem .25rem;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
 }
 
 .incident-timeline-item::before {
     content: '';
     position: absolute;
-    left: -1.5rem;
-    top: .55rem;
-    width: 14px;
-    height: 14px;
+    left: -1.93rem;
+    top: .85rem;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    background: var(--inc-blue);
+    background: var(--tl-color, var(--inc-blue));
     border: 3px solid var(--inc-surface);
-    box-shadow: 0 0 0 1px var(--inc-blue);
+    box-shadow: 0 0 0 1px var(--tl-color, var(--inc-blue));
 }
 
 .incident-timeline-item:last-child { padding-bottom: 0; }
 
+.incident-timeline-header {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    flex-wrap: wrap;
+}
+
 .incident-timeline-type {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
     font-weight: 700;
     font-size: .78rem;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    color: var(--inc-text-strong);
-    background: var(--inc-surface-alt);
-    padding: .15rem .55rem;
+    letter-spacing: .02em;
+    color: var(--tl-color, var(--inc-text-strong));
+    background: var(--tl-bg, var(--inc-surface-alt));
+    padding: .25rem .65rem .25rem .55rem;
     border-radius: 999px;
-    border: 1px solid var(--inc-border-soft);
+    border: 1px solid var(--tl-color, var(--inc-border-soft));
+}
+.incident-timeline-type .material-symbols-outlined {
+    font-size: 1rem;
+    color: var(--tl-color, var(--inc-blue));
 }
 
 .incident-timeline-meta {
     color: var(--inc-muted);
     font-size: .78rem;
-    margin-left: .55rem;
 }
 
 .incident-timeline-values {
-    font-size: .85rem;
-    margin-top: .35rem;
-    color: var(--inc-text);
-    font-family: 'SF Mono', Menlo, Consolas, monospace;
-    background: var(--inc-surface-alt);
-    padding: .25rem .55rem;
-    border-radius: var(--inc-radius-sm);
-    display: inline-block;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .82rem;
+    align-self: flex-start;
 }
+.tl-val {
+    padding: .18rem .55rem;
+    border-radius: 999px;
+    background: var(--inc-surface-alt);
+    border: 1px solid var(--inc-border-soft);
+    font-weight: 600;
+    color: var(--inc-text);
+}
+.tl-val--empty { background: transparent; color: var(--inc-muted); font-weight: 500; border-style: dashed; }
+.tl-arrow      { font-size: 1.1rem !important; color: var(--inc-muted); }
+
+/* Colores por tipo de evento (drive dot + chip) */
+.incident-timeline-item--created          { --tl-color: #2563eb; --tl-bg: #dbeafe; }
+.incident-timeline-item--auto_created     { --tl-color: #7c3aed; --tl-bg: #ede9fe; }
+.incident-timeline-item--status_change    { --tl-color: #2563eb; --tl-bg: #dbeafe; }
+.incident-timeline-item--assigned         { --tl-color: #0891b2; --tl-bg: #cffafe; }
+.incident-timeline-item--escalated        { --tl-color: #dc2626; --tl-bg: #fee2e2; }
+.incident-timeline-item--unescalated      { --tl-color: #64748b; --tl-bg: #e2e8f0; }
+.incident-timeline-item--priority_change  { --tl-color: #f59e0b; --tl-bg: #fef3c7; }
+.incident-timeline-item--comment          { --tl-color: #64748b; --tl-bg: #e2e8f0; }
+.incident-timeline-item--closed           { --tl-color: #16a34a; --tl-bg: #d1fae5; }
+.incident-timeline-item--auto_closed      { --tl-color: #16a34a; --tl-bg: #d1fae5; }
+.incident-timeline-item--reopened         { --tl-color: #f59e0b; --tl-bg: #fef3c7; }
+.incident-timeline-item--checklist_item   { --tl-color: #0891b2; --tl-bg: #cffafe; }
+.incident-timeline-item--evidence_added   { --tl-color: #7c3aed; --tl-bg: #ede9fe; }
+
+/* Mismo layout para todos los items — solo cambia el color del chip + dot por tipo. */
 
 .incident-timeline-comment {
-    margin: .55rem 0 0;
+    margin: 0;
     font-size: .9rem;
     line-height: 1.55;
     white-space: pre-wrap;
     color: var(--inc-text);
     padding: .55rem .75rem;
     background: var(--inc-surface-alt);
-    border-left: 3px solid var(--inc-blue-soft);
+    border-left: 3px solid var(--tl-color, var(--inc-blue-soft));
     border-radius: 0 var(--inc-radius-sm) var(--inc-radius-sm) 0;
 }
 
@@ -579,6 +709,11 @@ html[data-theme="dark"] {
     box-shadow: var(--inc-shadow-sm);
 }
 
+/* Dentro de un card del detalle, los alerts no necesitan el margin lateral */
+.incident-detail-card .alert {
+    margin: 0 0 .85rem;
+}
+
 .alert-error {
     background: linear-gradient(135deg, #fee2e2, #fecaca);
     color: #991b1b;
@@ -586,6 +721,17 @@ html[data-theme="dark"] {
 }
 
 .alert-error::before {
+    content: '⚠';
+    font-size: 1.1rem;
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+.alert-warning::before {
     content: '⚠';
     font-size: 1.1rem;
 }
@@ -1342,6 +1488,18 @@ html[data-theme="dark"] {
     background: linear-gradient(135deg, #dbeafe, #bfdbfe);
     box-shadow: 0 0 0 1px var(--inc-blue);
 }
+.branch-card.is-selected .branch-card__name  { color: #1e40af; }
+.branch-card.is-selected .branch-card__count { color: #1e3a8a; }
+
+/* Dark mode: gradient azul claro pisa texto blanco — invertimos */
+html[data-theme="dark"] .branch-card.is-selected {
+    background: linear-gradient(135deg, rgba(37, 99, 235, .32), rgba(59, 130, 246, .22));
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 1px #60a5fa;
+}
+html[data-theme="dark"] .branch-card.is-selected .branch-card__name  { color: #dbeafe; }
+html[data-theme="dark"] .branch-card.is-selected .branch-card__count { color: #93c5fd; }
+html[data-theme="dark"] .branch-card.is-selected .branch-card__icon  { color: #93c5fd; }
 
 .branch-card.is-empty { opacity: .55; }
 .branch-card.is-empty .branch-card__count { color: var(--inc-red); }
@@ -1425,10 +1583,23 @@ html[data-theme="dark"] {
 }
 
 .user-card.is-selected {
-    border-color: var(--inc-blue);
+    border-color: var(--inc-green);
     background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-    box-shadow: 0 0 0 1px var(--inc-blue);
+    box-shadow: 0 0 0 1px var(--inc-green);
 }
+.user-card.is-selected .user-card__name { color: #065f46; }
+.user-card.is-selected .user-card__role { color: #047857; }
+
+/* Dark mode: el verde claro pisa el texto blanco. Invertimos a verde oscuro
+   con texto claro para mantener contraste. */
+html[data-theme="dark"] .user-card.is-selected {
+    background: linear-gradient(135deg, rgba(22, 163, 74, .35), rgba(16, 185, 129, .22));
+    border-color: #34d399;
+    box-shadow: 0 0 0 1px #34d399;
+}
+html[data-theme="dark"] .user-card.is-selected .user-card__name { color: #ecfdf5; }
+html[data-theme="dark"] .user-card.is-selected .user-card__role { color: #a7f3d0; }
+html[data-theme="dark"] .user-card.is-selected .user-card__check { color: #34d399; }
 
 .user-card__avatar {
     width: 40px;
@@ -1605,4 +1776,293 @@ input.tpl-col-order { text-align:center; }
     .tpl-row--head { display:none; }
     .tpl-edit { flex-wrap:wrap; }
     .tpl-col-desc { flex:1 1 100%; order:-1; }
+}
+
+/* ============================================================
+   Resolución (marca procedente / no procedente, sin cerrar)
+   ============================================================ */
+.incident-resolution-block {
+    padding: .9rem 1rem;
+    background: var(--inc-surface-alt);
+    border: 1px solid var(--inc-border-soft);
+    border-radius: var(--inc-radius-md);
+    margin-bottom: 0;
+}
+.incident-resolution-block__head {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .65rem;
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--inc-muted);
+}
+.incident-resolution-block__head .material-symbols-outlined {
+    font-size: 1.1rem;
+    color: var(--inc-blue);
+}
+.incident-resolution-chip {
+    margin-left: auto;
+    padding: .22rem .65rem;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.incident-resolution-chip--ok      { background: #d1fae5; color: #065f46; }
+.incident-resolution-chip--no      { background: #fee2e2; color: #991b1b; }
+.incident-resolution-chip--pending { background: #e2e8f0; color: var(--inc-muted); }
+
+.incident-resolution-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+}
+.incident-resolution-form { margin: 0; }
+
+.btn-resolution {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .6rem .8rem;
+    border: 1px solid transparent;
+    border-radius: var(--inc-radius-sm);
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn-resolution .material-symbols-outlined { font-size: 1.1rem; }
+.btn-resolution--ok { background: var(--inc-green); color: #fff; border-color: var(--inc-green); }
+.btn-resolution--ok:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22,163,74,.35); }
+.btn-resolution--no { background: var(--inc-red); color: #fff; border-color: var(--inc-red); }
+.btn-resolution--no:hover { filter: brightness(1.05); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,.35); }
+
+/* ============================================================
+   Botón cerrar incidencia (separado)
+   ============================================================ */
+.incident-close-form { display: flex; flex-direction: column; gap: .65rem; align-items: stretch; }
+.incident-close-action-label { display: flex; flex-direction: column; gap: .3rem; }
+.btn-close-incident {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .65rem 1rem;
+    background: var(--inc-blue-dark);
+    color: #fff;
+    border: 1px solid var(--inc-blue-dark);
+    border-radius: var(--inc-radius-sm);
+    font: inherit;
+    font-size: .92rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+.btn-close-incident:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(26,53,102,.35);
+}
+.btn-close-incident:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+.btn-close-incident .material-symbols-outlined { font-size: 1.1rem; }
+
+/* Fuerza que los action-btn dentro de los forms de accion NO mantengan width fijo 2rem */
+.incident-action-form button.action-btn,
+.incident-actions-grid button.action-btn {
+    width: auto;
+    height: auto;
+    padding: .55rem .9rem;
+}
+
+/* ============================================================
+   Acciones card — layout limpio y centrado
+   ============================================================ */
+.incident-actions-card .incident-actions-inner {
+    width: 100%;
+}
+
+.incident-section-title {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin: 1.25rem 0 .6rem;
+    font-size: .85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--inc-blue);
+    padding-bottom: .35rem;
+    border-bottom: 1px solid var(--inc-border-soft);
+}
+.incident-section-title:first-child { margin-top: 0; }
+.incident-section-title .material-symbols-outlined {
+    font-size: 1.1rem;
+    color: var(--inc-blue);
+}
+
+/* Reducir alto del user-picker (asignar) que ocupa demasiado vertical */
+.incident-actions-inner .user-picker {
+    min-height: 56px;
+    padding: .55rem;
+}
+.incident-actions-inner .user-picker__empty {
+    padding: .85rem;
+    font-size: .82rem;
+}
+
+/* Resolución: chip alineado abajo en mobile */
+@media (max-width: 520px) {
+    .incident-resolution-block__head { flex-wrap: wrap; }
+    .incident-resolution-chip { margin-left: 0; }
+    .incident-resolution-buttons { grid-template-columns: 1fr; }
+}
+
+/* Cerrar incidencia: el form a la izquierda, botón a la derecha en wide */
+@media (min-width: 600px) {
+    .incident-close-form {
+        flex-direction: row;
+        align-items: end;
+        gap: 1rem;
+    }
+    .incident-close-action-label { flex: 1 1 auto; }
+    .btn-close-incident { flex: 0 0 auto; }
+}
+
+/* ============================================================
+   Solo comentar — pegado al textarea
+   ============================================================ */
+.incident-master-comment__form {
+    margin: .55rem 0 0;
+    display: flex;
+    justify-content: flex-end;
+}
+.btn-only-comment {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .45rem .85rem;
+    background: transparent;
+    color: var(--inc-blue);
+    border: 1px solid var(--inc-blue);
+    border-radius: var(--inc-radius-sm);
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.btn-only-comment:hover {
+    background: var(--inc-blue);
+    color: #fff;
+}
+.btn-only-comment .material-symbols-outlined { font-size: 1rem; }
+
+/* ============================================================
+   Cambio de estado — botones tipo pill
+   ============================================================ */
+.incident-status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .55rem;
+    margin: 1rem 0 0;
+    padding: .85rem 1rem;
+    background: var(--inc-surface-alt);
+    border: 1px solid var(--inc-border-soft);
+    border-radius: var(--inc-radius-md);
+}
+.incident-status-actions__label {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--inc-muted);
+    margin-right: .35rem;
+}
+.incident-status-form { margin: 0; display: inline-flex; gap: .45rem; align-items: center; }
+
+.btn-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .5rem .9rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn-status .material-symbols-outlined { font-size: 1rem; }
+.btn-status:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); }
+.btn-status:disabled {
+    background: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    border-color: #cbd5e1 !important;
+    cursor: not-allowed;
+    opacity: 1;
+    box-shadow: none !important;
+    filter: none !important;
+}
+html[data-theme="dark"] .btn-status:disabled {
+    background: #1e293b !important;
+    color: #64748b !important;
+    border-color: #334155 !important;
+}
+
+.btn-status--review { background: #fef3c7; color: #92400e; border-color: rgba(146,64,14,.2); }
+.btn-status--review:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(245,158,11,.25); }
+
+/* Cerrada: cuando esta habilitado va con verde fuerte (accion final exitosa).
+   Cuando esta disabled lo maneja la regla .btn-status:disabled (gris). */
+.btn-status--closed {
+    background: #16a34a;
+    color: #fff;
+    border-color: #15803d;
+}
+.btn-status--closed:hover:not(:disabled) {
+    background: #15803d;
+    box-shadow: 0 4px 12px rgba(22,163,74,.45);
+}
+html[data-theme="dark"] .btn-status--closed {
+    background: #22c55e;
+    border-color: #16a34a;
+    color: #052e16;
+}
+html[data-theme="dark"] .btn-status--closed:hover:not(:disabled) {
+    background: #16a34a;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(34,197,94,.5);
+}
+
+.btn-status--reopen { background: #dbeafe; color: #1e40af; border-color: rgba(30,64,175,.2); }
+.btn-status--reopen:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(37,99,235,.2); }
+
+.incident-close-action-inline {
+    padding: .4rem .65rem;
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-sm);
+    background: var(--inc-surface);
+    color: var(--inc-text);
+    font: inherit;
+    font-size: .82rem;
+    max-width: 220px;
+}
+
+@media (max-width: 640px) {
+    .incident-status-actions { flex-direction: column; align-items: stretch; }
+    .incident-status-actions__label { margin: 0 0 .25rem; }
+    .incident-status-form { flex-wrap: wrap; }
+    .btn-status, .incident-close-action-inline { width: 100%; max-width: none; justify-content: center; }
 }

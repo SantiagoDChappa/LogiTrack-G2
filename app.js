@@ -65,9 +65,12 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
 
 // Helpers globales para EJS
+const { IncidentStatusLabel, IncidentResolutionLabel } = require('./src/constants/enums');
 app.use((req, res, next) => {
     res.locals.fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     res.locals.fmtNumber = (n, dec = 2) => Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    res.locals.IncidentStatusLabel = IncidentStatusLabel;
+    res.locals.IncidentResolutionLabel = IncidentResolutionLabel;
     next();
 });
 

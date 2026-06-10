@@ -182,6 +182,9 @@
                                     <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
                                         <span class="material-symbols-outlined">info</span>
                                     </a>
+                                    <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia">
+                                        <span class="material-symbols-outlined">report</span>
+                                    </a>
                                     <button type="button" class="action-btn" data-tooltip="Ver QR"
                                             onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
                                         <span class="material-symbols-outlined">qr_code</span>

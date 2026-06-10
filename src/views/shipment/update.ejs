@@ -199,9 +199,19 @@
                         <div style="margin-bottom: 4px;"><strong>ORIGEN:</strong> <%= mapData.origin.label.toUpperCase() %></div>
                         <div><strong>DESTINO:</strong> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
-                    <div id="prediction-widget" class="pred-card pred-card--embedded" data-autoload="true" style="margin-top: 1rem; padding: 10px; border: 1px dashed var(--color-border); border-radius: 6px;">
-                        <div id="prediction-result" style="font-size: 0.85rem;"></div>
-                    </div>
+                    <% if (shipment.expectedDeliveryDate) {
+                        const _edU = new Date(shipment.expectedDeliveryDate);
+                        const _edULabel = _edU.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                    %>
+                        <div style="margin-top:1rem;padding:.75rem .85rem;border-radius:8px;background:var(--color-bg);border:1px solid var(--color-border);font-size:.9rem;">
+                            <strong style="display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem;color:var(--color-primary,#2563eb);">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem;">event_available</span>
+                                Fecha estimada de entrega
+                            </strong>
+                            <span style="text-transform:capitalize;font-weight:600"><%= _edULabel %></span>
+                            <small style="display:block;margin-top:.2rem;color:var(--color-text-secondary);">Valor guardado en base (cargado al alta).</small>
+                        </div>
+                    <% } %>
                 </div>
 
                 <!-- ── Mapa ── -->
@@ -645,7 +655,6 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
-    <script src="/js/prediction.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
     <script src="/js/document-format.js" defer></script>
 </body>

@@ -40,9 +40,20 @@ const IncidentStatus = Object.freeze({
     CLOSED:    'CLOSED',
 });
 
+const IncidentStatusLabel = Object.freeze({
+    OPEN:      'Abierta',
+    IN_REVIEW: 'En revisión',
+    CLOSED:    'Cerrada',
+});
+
 const IncidentResolution = Object.freeze({
     PROCEDENTE:    'PROCEDENTE',
     NO_PROCEDENTE: 'NO_PROCEDENTE',
+});
+
+const IncidentResolutionLabel = Object.freeze({
+    PROCEDENTE:    'Procedente',
+    NO_PROCEDENTE: 'No procedente',
 });
 
 const IncidentChannel = Object.freeze({
@@ -82,7 +93,10 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_CANCELLED:           'SHIPMENT_CANCELLED',
     SHIPMENT_ASSIGNED:            'SHIPMENT_ASSIGNED',
     SHIPMENT_IN_PREPARATION:      'SHIPMENT_IN_PREPARATION',
-    SHIPMENT_PACKAGE_FAILED:      'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_PACKAGE_FAILED:              'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_PACKAGE_FAILED_UNDELIVERED:  'SHIPMENT_PACKAGE_FAILED_UNDELIVERED',
+    SHIPMENT_PACKAGE_FAILED_DELAY:        'SHIPMENT_PACKAGE_FAILED_DELAY',
+    SHIPMENT_PACKAGE_FAILED_ATTEMPT:      'SHIPMENT_PACKAGE_FAILED_ATTEMPT',
     SHIPMENT_FAILED_ATTEMPT:      'SHIPMENT_FAILED_ATTEMPT',
     // Sprint 3 — eventos extendidos PDF 2.3
     SHIPMENT_OUT_FOR_DELIVERY:    'SHIPMENT_OUT_FOR_DELIVERY',   // Salida a reparto
@@ -171,7 +185,8 @@ const EmailQueueStatus = {
 
 module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
-    IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority,
+    IncidentStatus, IncidentStatusLabel, IncidentResolution, IncidentResolutionLabel,
+    IncidentChannel, IncidentEventType, IncidentPriority,
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,
     ModificationRequestStatus, ModificationChangeType, ModificationChannel,

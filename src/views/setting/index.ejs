@@ -681,41 +681,75 @@
                     Por cada evento podés elegir si se notifica, a quién (destinatario / remitente / ambos / un email personalizado) y editar el texto del email.
                 </p>
                 <form method="POST" action="/setting/notification-config">
-                    <div style="display:flex;flex-direction:column;gap:.6rem">
-                        <% notifConfig.filter(c => c.eventCode !== 'FATIGUE_DRIVER_DISABLED_CONSENT').forEach(config => { %>
-                            <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
-                                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
-                                    <input type="checkbox" name="enabled_<%= config.eventCode %>"
-                                        <%= config.enabled ? 'checked' : '' %>>
-                                    <%= config.description %>
-                                </label>
-
-                                <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
-                                    <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
-                                    <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
-                                    <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
-                                    <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
-                                </select>
-
-                                <input type="email" name="custom_<%= config.eventCode %>"
-                                    placeholder="email@dominio.com"
-                                    value="<%= config.customEmail || '' %>"
-                                    data-event="<%= config.eventCode %>"
-                                    class="notif-custom-input"
-                                    <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
-
-                                <button type="button" class="action-btn modificar notif-edit-tpl-btn"
-                                    data-event="<%= config.eventCode %>"
-                                    data-description="<%= config.description %>"
-                                    data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
-                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
-                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
-                                    data-tooltip="Editar mail" aria-label="Editar mail">
-                                    <span class="material-symbols-outlined">edit_note</span>
-                                </button>
+                    <%
+                        // Agrupacion semantica por evento. Los codigos que no matchean caen en "Otros".
+                        const sectionFor = (code) => {
+                            if (code === 'FATIGUE_DRIVER_DISABLED_CONSENT') { return null; } // gestionado en card aparte
+                            if (code === 'PORTAL_CLIENT_ACCESS')            { return null; } // card propia
+                            if (code === 'SHIPMENT_INCIDENT' || code === 'INCIDENT_STATUS_CHANGE') { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_PACKAGE_FAILED')) { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_'))               { return 'envios'; }
+                            if (code.startsWith('ROUTE_'))                  { return 'rutas'; }
+                            return 'otros';
+                        };
+                        const SECTION_META = {
+                            envios:      { title: 'Envíos',     icon: 'local_shipping', desc: 'Cambios de estado del envío y avisos accionables al cliente.' },
+                            incidencias: { title: 'Incidencias', icon: 'report',         desc: 'Aperturas, cambios de estado y resoluciones de incidencias (incluye paquete fallido por motivo).' },
+                            rutas:       { title: 'Rutas',       icon: 'route',          desc: 'Eventos de las rutas de reparto.' },
+                            otros:       { title: 'Otros',       icon: 'mail',           desc: 'Notificaciones varias.' }
+                        };
+                        const grouped = { envios: [], incidencias: [], rutas: [], otros: [] };
+                        notifConfig.forEach(c => {
+                            const sec = sectionFor(c.eventCode);
+                            if (sec) { grouped[sec].push(c); }
+                        });
+                    %>
+                    <% ['envios','incidencias','rutas','otros'].forEach(secKey => {
+                        const items = grouped[secKey];
+                        if (!items || items.length === 0) { return; }
+                        const meta = SECTION_META[secKey];
+                    %>
+                        <div class="notif-section-group" style="margin-bottom:1.25rem;padding:1rem 1.1rem;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:10px;">
+                            <h3 style="display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;font-size:1rem;color:var(--color-text,#0f172a);">
+                                <span class="material-symbols-outlined" style="font-size:1.2rem;color:var(--inc-blue,#2563eb);"><%= meta.icon %></span>
+                                <%= meta.title %>
+                                <span style="margin-left:auto;font-size:.78rem;font-weight:500;color:var(--color-text-secondary,#64748b);"><%= items.length %> plantilla<%= items.length === 1 ? '' : 's' %></span>
+                            </h3>
+                            <p style="margin:0 0 .8rem;font-size:.82rem;color:var(--color-text-secondary,#64748b);"><%= meta.desc %></p>
+                            <div style="display:flex;flex-direction:column;gap:.5rem;">
+                                <% items.forEach(config => { %>
+                                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                                            <input type="checkbox" name="enabled_<%= config.eventCode %>"
+                                                <%= config.enabled ? 'checked' : '' %>>
+                                            <%= config.description %>
+                                        </label>
+                                        <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
+                                            <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
+                                            <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
+                                            <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
+                                            <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
+                                        </select>
+                                        <input type="email" name="custom_<%= config.eventCode %>"
+                                            placeholder="email@dominio.com"
+                                            value="<%= config.customEmail || '' %>"
+                                            data-event="<%= config.eventCode %>"
+                                            class="notif-custom-input"
+                                            <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
+                                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                                            data-event="<%= config.eventCode %>"
+                                            data-description="<%= config.description %>"
+                                            data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
+                                            data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
+                                            data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
+                                            data-tooltip="Editar mail" aria-label="Editar mail">
+                                            <span class="material-symbols-outlined">edit_note</span>
+                                        </button>
+                                    </div>
+                                <% }) %>
                             </div>
-                        <% }) %>
-                    </div>
+                        </div>
+                    <% }) %>
                     <div class="settings-actions">
                         <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones" aria-label="Guardar notificaciones">
                             <span class="material-symbols-outlined">save</span>
@@ -830,9 +864,27 @@
                         </label>
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;grid-column:1/-1">
                             <input type="checkbox" name="notifyShipmentRecipient" <%= incidentNotif.notifyShipmentRecipient ? 'checked' : '' %>>
-                            <span>Destinatario del envío (usa template de <code>SHIPMENT_INCIDENT</code>)</span>
+                            <span>Destinatario del envío (template según tipo: <code>SHIPMENT_DELAYED</code>, <code>SHIPMENT_PACKAGE_FAILED</code> o <code>SHIPMENT_INCIDENT</code>)</span>
                         </label>
                     </div>
+
+                    <fieldset style="margin-top:1rem;padding:.8rem 1rem;border:1px solid var(--color-border,#e5e7eb);border-radius:8px;">
+                        <legend style="padding:0 .5rem;font-size:.85rem;font-weight:600;color:var(--color-text-secondary);">Filtro por tipo de incidencia (aplica solo si "Destinatario del envío" está activo)</legend>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem 1rem;margin-top:.4rem;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDelay" <%= incidentNotif.notifyOnDelay !== false ? 'checked' : '' %>>
+                                <span>Demoras</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDamage" <%= incidentNotif.notifyOnDamage !== false ? 'checked' : '' %>>
+                                <span>Paquete dañado</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnGeneric" <%= incidentNotif.notifyOnGeneric !== false ? 'checked' : '' %>>
+                                <span>Otros tipos (genérico)</span>
+                            </label>
+                        </div>
+                    </fieldset>
                     <div class="field" style="margin-top:1rem">
                         <label for="incident_notif_custom">Emails personalizados extra</label>
                         <input type="text" id="incident_notif_custom" name="customEmails"
