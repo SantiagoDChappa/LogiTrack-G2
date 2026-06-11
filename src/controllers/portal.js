@@ -323,7 +323,7 @@ const getPublicCreateForm = async (req, res) => {
         return res.status(404).render('portal/incidentNew', {
             shipment: null,
             trackingId,
-            types: await incidentTypeModel.getActive(),
+            types: await incidentTypeModel.getClientFacing(),
             error: 'No se encontró un envío con ese código de seguimiento.',
             form: {}
         });
@@ -332,7 +332,7 @@ const getPublicCreateForm = async (req, res) => {
     res.render('portal/incidentNew', {
         shipment,
         trackingId,
-        types: await incidentTypeModel.getActive(),
+        types: await incidentTypeModel.getClientFacing(),
         error: null,
         form: {}
     });
@@ -359,6 +359,11 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
 
     const type = await incidentTypeModel.getById(Number(incidentTypeId));
     if (!type || !type.active) { return { ok: false, status: 400, message: 'Tipo de incidencia inválido.' }; }
+    // Defensa: aunque la UI ya limita los tipos, rechazamos por las dudas si llega uno
+    // que el cliente no debería poder reportar (form manipulado / type fuera del set).
+    if (!incidentTypeModel.isClientFacing(type.code)) {
+        return { ok: false, status: 400, message: 'Ese tipo de incidencia no está disponible para reportar desde el portal.' };
+    }
 
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
     const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
@@ -553,7 +558,7 @@ const buildAttachmentFromFile = (file) => {
 const createPublic = async (req, res) => {
     const result = await createIncidentFromPortal({ ...req.body, attachment: buildAttachmentFromFile(req.file) });
     if (!result.ok) {
-        const types = await incidentTypeModel.getActive();
+        const types = await incidentTypeModel.getClientFacing();
         return res.status(result.status).render('portal/incidentNew', {
             shipment: await findShipmentByTracking((req.body.trackingId || '').trim().toUpperCase()),
             trackingId: (req.body.trackingId || '').trim().toUpperCase(),

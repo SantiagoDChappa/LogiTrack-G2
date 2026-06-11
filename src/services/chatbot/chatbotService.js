@@ -62,7 +62,8 @@ const TYPES_TTL_MS = 60 * 1000; // 1 minuto
 async function fetchActiveTypes() {
     const now = Date.now();
     if (typesCache && (now - typesCacheAt) < TYPES_TTL_MS) { return typesCache; }
-    const rows = await incidentTypeModel.getActive();
+    // Solo los tipos que un cliente externo puede reportar (no los internos de operación).
+    const rows = await incidentTypeModel.getClientFacing();
     typesCache = rows.map(t => ({ id: t.id, code: t.code, description: t.description }));
     typesCacheAt = now;
     return typesCache;
