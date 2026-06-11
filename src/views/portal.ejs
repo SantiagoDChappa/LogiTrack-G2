@@ -270,27 +270,38 @@
                     </div>
                     <% } %>
 
-                    <!-- US-E05: incidencias del envío -->
-                    <% if (s.incidents && s.incidents.length > 0) { %>
-                    <div class="portal-history portal-incidents">
-                        <span class="portal-history-title">Incidencias de tu envío</span>
-                        <ul class="portal-history-list">
-                            <% s.incidents.forEach(function(inc) { %>
-                            <li class="portal-history-item">
-                                <a href="/portal/mis-envios/incidencia/<%= inc.id %>" class="portal-incident-link"
-                                   style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%;text-decoration:none;color:inherit;">
-                                    <span class="portal-history-date"><%= inc.createdAtLabel %></span>
-                                    <span class="portal-history-to"><%= inc.typeLabel %></span>
-                                    <span class="portal-incident-state portal-incident-state--<%= inc.statusLabel === 'Cerrada' ? 'closed' : 'open' %>"><%= inc.statusLabel %></span>
-                                    <% if (inc.resolutionLabel) { %><span class="portal-history-comment">Resolución: <%= inc.resolutionLabel %><% if (inc.closedAtLabel) { %> (<%= inc.closedAtLabel %>)<% } %></span><% } %>
-                                    <span class="material-symbols-outlined" style="margin-left:auto;font-size:18px;opacity:.65;" aria-hidden="true">chevron_right</span>
-                                </a>
-                            </li>
+                    <!-- US-E05: incidencias del envío — card estilo "detalle de envío" -->
+                    <% var _incs = (s.incidents && s.incidents.length) ? s.incidents : []; %>
+                    <div class="portal-incidents-card">
+                        <h3 class="portal-incidents-card__title">
+                            <span class="material-symbols-outlined">report</span>
+                            Incidencias de tu envío<% if (_incs.length) { %> <span class="portal-incidents-card__count">(<%= _incs.length %>)</span><% } %>
+                        </h3>
+                        <% if (_incs.length) { %>
+                        <div class="portal-incidents-list">
+                            <% _incs.forEach(function(inc) {
+                                var _sk = inc.statusLabel === 'Cerrada' ? 'closed' : (inc.statusLabel === 'En revisión' ? 'in_review' : 'open');
+                            %>
+                            <a href="/portal/mis-envios/incidencia/<%= inc.id %>" class="portal-incident-row">
+                                <span class="portal-incident-id">#<%= inc.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= inc.typeLabel %></span>
+                                    <% if (inc.resolutionLabel) { %><span class="portal-incident-resolution">Resolución: <%= inc.resolutionLabel %><% if (inc.closedAtLabel) { %> · <%= inc.closedAtLabel %><% } %></span><% } %>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= _sk %>"><%= inc.statusLabel %></span>
+                                <span class="portal-incident-date"><%= inc.createdAtLabel %></span>
+                                <span class="material-symbols-outlined portal-incident-arrow" aria-hidden="true">chevron_right</span>
+                            </a>
                             <% }); %>
-                        </ul>
-                        <small style="display:block;margin-top:.4rem;opacity:.6;font-size:.78rem;">Tocá una incidencia para ver su detalle (te pedimos validar DNI + email).</small>
+                        </div>
+                        <small class="portal-incidents-card__hint">Tocá una incidencia para ver su detalle (te pedimos validar DNI + email).</small>
+                        <% } else { %>
+                        <div class="portal-incidents-empty">
+                            <span class="material-symbols-outlined">inbox</span>
+                            <p>Sin incidencias registradas para este envío.</p>
+                        </div>
+                        <% } %>
                     </div>
-                    <% } %>
 
                     <!-- US-C02: seguimiento de recuperación / reprogramación -->
                     <% if (s.recovery && s.recovery.length > 0) { %>
