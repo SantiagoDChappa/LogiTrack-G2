@@ -14,7 +14,7 @@
         </div>
 
         <% if (error) { %>
-            <div class="alert alert-error"><%= error %></div>
+            <div id="incidentErrorBanner" class="alert alert-error"><%= error %></div>
         <% } %>
 
         <form method="POST" action="/incident" class="incident-form" id="incidentForm" novalidate>
@@ -311,6 +311,28 @@
         </script>
     </main>
     <%- include('../partials/incidentFeedback.ejs') %>
+    <% if (error) { %>
+    <%# Muestra el aviso del server (duplicado, estado inválido, demora, etc.) como
+        popup al cargar, y oculta el banner. Si no hay JS, queda el banner de fallback. %>
+    <script>
+    (function () {
+        var msg = <%- JSON.stringify(error) %>;
+        var isWarning = /confirmo crear igual|confirmás|dentro del plazo|fuera de servicio|figura habilitado|deshabilitado/i.test(msg);
+        function showIt() {
+            if (typeof window.showIncidentFeedback !== 'function') { return; }
+            var banner = document.getElementById('incidentErrorBanner');
+            if (banner) { banner.style.display = 'none'; }
+            window.showIncidentFeedback({
+                icon:  isWarning ? 'warning' : 'error',
+                title: isWarning ? 'Revisá antes de continuar' : 'No se pudo crear la incidencia',
+                text:  msg
+            });
+        }
+        if (document.readyState !== 'loading') { showIt(); }
+        else { document.addEventListener('DOMContentLoaded', showIt); }
+    })();
+    </script>
+    <% } %>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <% if (!shipment) { %>
