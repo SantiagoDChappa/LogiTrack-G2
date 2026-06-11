@@ -7,6 +7,28 @@
    Compatible con tema claro/oscuro (usa variables --color-* / --badge-*).
    ============================================================ */
 
+/* ---- Iconos Material Symbols: definición base autoritativa ----
+   No depender solo del CSS de Google: fijamos font-family + ligatures acá para que
+   el glifo nunca "se desarme" mostrando el nombre crudo del icono (ej: "add",
+   "download") al repintar el botón en :hover/:focus (transform/filter dispara un
+   repaint que, sin 'liga' explícito, rompe el ligature en Chrome). */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 /* ---- Botón-icono base ---- */
 .icon-btn,
 .action-btn {
