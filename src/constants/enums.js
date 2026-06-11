@@ -97,6 +97,8 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_PACKAGE_FAILED_UNDELIVERED:  'SHIPMENT_PACKAGE_FAILED_UNDELIVERED',
     SHIPMENT_PACKAGE_FAILED_DELAY:        'SHIPMENT_PACKAGE_FAILED_DELAY',
     SHIPMENT_PACKAGE_FAILED_ATTEMPT:      'SHIPMENT_PACKAGE_FAILED_ATTEMPT',
+    // LGT-204: paquete roto o dañado → aviso al remitente para que elija reembolso o reemplazo.
+    SHIPMENT_PACKAGE_DAMAGED:             'SHIPMENT_PACKAGE_DAMAGED',
     SHIPMENT_FAILED_ATTEMPT:      'SHIPMENT_FAILED_ATTEMPT',
     // Sprint 3 — eventos extendidos PDF 2.3
     SHIPMENT_OUT_FOR_DELIVERY:    'SHIPMENT_OUT_FOR_DELIVERY',   // Salida a reparto

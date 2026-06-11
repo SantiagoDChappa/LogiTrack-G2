@@ -720,6 +720,7 @@
                             if (code === 'FATIGUE_DRIVER_DISABLED_CONSENT') { return null; } // gestionado en card aparte
                             if (code === 'PORTAL_CLIENT_ACCESS')            { return null; } // card propia
                             if (code === 'SHIPMENT_INCIDENT' || code === 'INCIDENT_STATUS_CHANGE') { return 'incidencias'; }
+                            if (code === 'SHIPMENT_PACKAGE_DAMAGED') { return 'incidencias'; }
                             if (code.startsWith('SHIPMENT_PACKAGE_FAILED')) { return 'incidencias'; }
                             if (code.startsWith('SHIPMENT_'))               { return 'envios'; }
                             if (code.startsWith('ROUTE_'))                  { return 'rutas'; }

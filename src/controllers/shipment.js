@@ -1183,7 +1183,7 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
         }
         // Avisos sobre una incidencia ya creada (paquete dañado / incidencia / cambio de
         // estado): el enlace debe llevar a ESA incidencia, no al alta de una nueva.
-        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED];
+        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED, NotificationEvent.SHIPMENT_PACKAGE_DAMAGED];
         if (!vars._incidentId && INCIDENT_EVENTS.includes(eventCode)) {
             try {
                 const { Incident } = require('../models/incident');

@@ -87,7 +87,6 @@ async function applyChoiceToShipment({ shipmentId, choice, by, userId }) {
 
 function getChoice(incident) { return incident ? incident.damageChoice || null : null; }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Matchea el código real del catálogo (PACKAGE_BROKEN) y descripciones en español.
 const DAMAGE_RE = /(package_broken|broken|da[nñ]ad|roto|damage|rotura)/i;
 
@@ -97,30 +96,27 @@ function isDamageType(type) {
 
 // LGT-204 Esc.1/2 — al crear una incidencia de paquete dañado, avisar al
 // remitente (quien pagó) con un acceso al portal para elegir reembolso/reemplazo.
+// Usa el evento configurable SHIPMENT_PACKAGE_DAMAGED (Ajustes → Comunicaciones →
+// Incidencias): respeta el toggle on/off, el destinatario y la plantilla editable.
 async function notifySenderIfDamage({ incidentId, shipment, type }) {
     try {
         if (!isDamageType(type)) { return false; }
-        let senderEmail = shipment?.sender?.email || null;
-        const trackingId = shipment?.trackingId || shipment?.id;
-        if (!senderEmail && shipment?.id) {
-            const { Shipment } = require('../models/shipment');
-            const full = await Shipment.findByPk(shipment.id, { include: [{ association: 'sender' }] });
-            senderEmail = full?.sender?.email || null;
-        }
-        if (!EMAIL_RE.test(String(senderEmail || '').trim())) { return false; }
+        const shipmentId = shipment?.id;
+        if (!shipmentId) { return false; }
 
-        // Enlace directo a la incidencia creada (no al alta de una nueva).
-        const { baseUrl } = require('./notificationPlaceholders');
-        const link = incidentId
-            ? `${baseUrl()}/portal/mis-envios/incidencia/${incidentId}`
-            : `${baseUrl()}/portal/mis-envios`;
-        const body = `Tu paquete llegó con daño (envío ${trackingId}).\n\n` +
-            `¿Querés un reembolso o un reemplazo? Ingresá al portal y elegí una opción:\n${link}\n\n` +
-            `Incidencia #${incidentId}.`;
-        const { sendEmail } = require('./notification/emailSender');
-        await sendEmail(senderEmail, '[LogiTrack] Tu paquete llegó con daño — elegí reembolso o reemplazo', body, 'text');
+        const { NotificationEvent } = require('../constants/enums');
+        // El destinatario (remitente) y el contenido los resuelve el sistema de plantillas.
+        // incidentId → token {{incidentId}}; _incidentId → habilita {{incidentUrl}} hacia ESTA incidencia.
+        await require('../controllers/shipment').notifyShipmentEvent(
+            NotificationEvent.SHIPMENT_PACKAGE_DAMAGED,
+            shipmentId,
+            { incidentId: String(incidentId), _incidentId: String(incidentId) }
+        );
         return true;
-    } catch { return false; }
+    } catch (e) {
+        console.warn('[damage] notifySenderIfDamage:', e.message);
+        return false;
+    }
 }
 
 module.exports = { CHOICES, setChoice, getChoice, isDamageType, notifySenderIfDamage };
