@@ -75,9 +75,11 @@
     document.addEventListener('submit', function (e) {
         const form = e.target;
         if (!form || form.hasAttribute('data-no-loader')) { return; }
-        // No mostramos si el form fue cancelado (preventDefault) por otro handler.
-        if (e.defaultPrevented) { return; }
-        show();
+        // Escuchamos en captura para no perdernos submits tempranos, pero esperamos
+        // al final del ciclo del evento para saber si otro handler canceló el envío.
+        window.setTimeout(function () {
+            if (!e.defaultPrevented) { show(); }
+        }, 0);
     }, true);
 
     // Oculta cuando termina de cargar (visible o restaurado de bfcache).

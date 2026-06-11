@@ -234,6 +234,17 @@
         (function () {
             const form = document.getElementById('incidentForm');
             if (!form) return;
+            const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const focusField = (el) => {
+                if (!el) { return; }
+                if (typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                if (typeof el.focus === 'function') {
+                    try { el.focus({ preventScroll: true }); }
+                    catch (_) { el.focus(); }
+                }
+            };
             form.addEventListener('submit', function (e) {
                 const missing = [];
                 if (!form.shipmentId.value)       { missing.push('envío'); }
@@ -243,12 +254,25 @@
                 if (!form.assignedToUserId.value) { missing.push('usuario asignado'); }
                 if (missing.length) {
                     e.preventDefault();
-                    alert('Faltan completar: ' + missing.join(', ') + '.');
+                    if (!form.shipmentId.value) { focusField(document.getElementById('shipmentSearch') || document.getElementById('ship-selected-row')); }
+                    if (missing[0] === 'descripciÃ³n') { focusField(form.description); }
+                    else if (!form.incidentTypeId.value) { focusField(form.incidentTypeId); }
+                    else if (!(form.description.value || '').trim()) { focusField(form.description); }
+                    if (missing[0] === 'envÃ­o') { focusField(document.getElementById('shipmentSearch') || document.getElementById('ship-selected-row')); }
+                    showIncidentFeedback({
+                        title: 'Completá los datos obligatorios',
+                        html: ''
+                            + '<p class="incident-feedback-copy">Antes de crear la incidencia, revisá estos campos:</p>'
+                            + '<ul class="incident-feedback-list">'
+                            + missing.map(item => '<li>' + escapeHtml(item) + '</li>').join('')
+                            + '</ul>'
+                    });
                 }
             });
         })();
         </script>
     </main>
+    <%- include('../partials/incidentFeedback') %>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <% if (!shipment) { %>

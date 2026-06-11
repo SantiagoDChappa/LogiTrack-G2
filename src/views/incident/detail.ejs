@@ -200,6 +200,11 @@
                         document.getElementById('assignForm').addEventListener('submit', function (e) {
                             if (!hiddenUser.value) {
                                 e.preventDefault();
+                                showIncidentFeedback({
+                                    title: 'Falta asignar responsable',
+                                    text: 'Elegí una sucursal y un usuario antes de asignar.'
+                                });
+                                return;
                                 alert('Elegí una sucursal y un usuario antes de asignar.');
                             }
                         });
@@ -336,6 +341,11 @@
                         ev.preventDefault();
                         master.focus();
                         master.classList.add('is-invalid');
+                        showIncidentFeedback({
+                            title: 'Falta comentario',
+                            text: 'Escribí un comentario antes de ejecutar la acción.'
+                        });
+                        return;
                         alert('Escribí un comentario antes de ejecutar la acción.');
                         return;
                     }
@@ -480,6 +490,7 @@
             </ol>
         </section>
     </main>
+    <%- include('../partials/incidentFeedback') %>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
 </body>

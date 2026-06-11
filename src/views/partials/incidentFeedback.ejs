@@ -1,0 +1,72 @@
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+    .incident-feedback-popup {
+        border-radius: 22px;
+        padding: 1.2rem 1.2rem 1rem;
+    }
+    .incident-feedback-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .incident-feedback-html {
+        text-align: left !important;
+        color: #334155;
+        font-size: .95rem;
+        line-height: 1.55;
+    }
+    .incident-feedback-copy {
+        margin: 0 0 .65rem;
+    }
+    .incident-feedback-list {
+        margin: 0;
+        padding-left: 1.15rem;
+    }
+    .incident-feedback-list li + li {
+        margin-top: .25rem;
+    }
+    .incident-feedback-confirm {
+        border-radius: 999px !important;
+        padding: .7rem 1.35rem !important;
+        font-weight: 700 !important;
+        box-shadow: none !important;
+    }
+    html[data-theme="dark"] .incident-feedback-popup {
+        background: #0f172a;
+        color: #e2e8f0;
+    }
+    html[data-theme="dark"] .incident-feedback-title {
+        color: #f8fafc;
+    }
+    html[data-theme="dark"] .incident-feedback-html {
+        color: #cbd5e1;
+    }
+</style>
+<script>
+(function () {
+    if (window.showIncidentFeedback) { return; }
+    window.showIncidentFeedback = function (opts) {
+        const options = Object.assign({
+            icon: 'warning',
+            title: 'Revisá este dato',
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#2563eb',
+            customClass: {
+                popup: 'incident-feedback-popup',
+                title: 'incident-feedback-title',
+                htmlContainer: 'incident-feedback-html',
+                confirmButton: 'incident-feedback-confirm'
+            }
+        }, opts || {});
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            return window.Swal.fire(options);
+        }
+
+        const fallbackText = options.text
+            || (options.title ? options.title + '\n\n' : '') + String(options.html || '').replace(/<[^>]+>/g, ' ').trim();
+        window.alert(fallbackText);
+        return Promise.resolve();
+    };
+})();
+</script>
