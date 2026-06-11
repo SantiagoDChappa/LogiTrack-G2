@@ -36,6 +36,10 @@ async function recordConsent({ userId, routeId, branchId, accepted, version, tri
                 actorId: userId, checkId: check.id,
                 detail: `Rechazo ${rejections}/${maxRej}. Si alcanza el límite queda inhabilitado.`,
             });
+            // Aviso al Supervisor de la sucursal del transportista en CADA rechazo
+            // (no solo al inhabilitar). Plantilla editable FATIGUE_CONSENT_REJECTED.
+            await notify.notifyConsentRejected({ userId, branchId, routeId, rejections, max: maxRej })
+                .catch((err) => console.error('[fatigue] notifyConsentRejected:', err.message));
         }
     }
     return { check, disabled, rejections, max: maxRej };
@@ -157,7 +161,11 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
     // LGT-193 — autoBlock OFF + no apto al INICIO: se deja salir, pero queda un registro
     // REVIEW para que el Supervisor decida (inhabilitar o reasignar). decision='REVIEW'
     // no bloquea el gate de inicio (canStart lo trata como apto), solo alerta al supervisor.
-    const review = decision !== 'BLOCKED' && failed && !config.autoBlock && triggerType === 'INICIO';
+    // "No apto sin bloqueo automático". Solo al INICIO cambia la decisión a REVIEW
+    // (afecta el gate de inicio). En ruta (re-chequeo) NO se toca la decisión, pero
+    // igual se avisa al supervisor (antes este caso quedaba silencioso).
+    const failedNoBlock = decision !== 'BLOCKED' && failed && !config.autoBlock;
+    const review = failedNoBlock && triggerType === 'INICIO';
     if (review) { decision = 'REVIEW'; }
 
     let check;
@@ -178,11 +186,10 @@ async function evaluate({ checkId, userId, routeId, branchId, method, metrics, t
 
     if (decision === 'BLOCKED') {
         await bumpPatternCounter(check.userId, config, branchId);
-        const transportName = await driverName(check.userId);
-        await notify.notifyBlock({ check, branchId, transportName, routeId, score: scoreValue });
-    } else if (review) {
-        const transportName = await driverName(check.userId);
-        await notify.notifyReview({ check, branchId, transportName, routeId, score: scoreValue });
+        await notify.notifyBlock({ check, branchId, routeId, score: scoreValue });
+    } else if (failedNoBlock) {
+        // Inicio (review) o re-chequeo en ruta: no apto sin bloqueo → aviso al supervisor.
+        await notify.notifyReview({ check, branchId, routeId, score: scoreValue });
     }
     return { checkId: check.id, score: scoreValue, threshold: config.thresholdPct, decision, failed, reaction, review };
 }
@@ -237,8 +244,7 @@ async function escalateRecheckOmission({ routeId, userId, branchId, minutes, cfg
         // Marca el motivo del aviso para distinguirlo de "no apto sin bloqueo".
         releaseReason: 'recheck_omitido',
     });
-    const transportName = await driverName(userId);
-    await notify.notifyRecheckOmission({ check, branchId, transportName, routeId, minutes });
+    await notify.notifyRecheckOmission({ check, branchId, routeId, minutes });
     return check;
 }
 
@@ -426,15 +432,6 @@ async function purgeExpired(retentionDays) {
     const n = await FatigueCheck.destroy({ where: { createdAt: { [Op.lt]: cutoff } } });
     await notify.audit('PURGED', { detail: `Purga por retención (${retentionDays} días): ${n} registros eliminados/disociados.` });
     return n;
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-async function driverName(userId) {
-    try {
-        const { User } = require('../../models/user');
-        const u = await User.findByPk(userId, { attributes: ['fullName'] });
-        return u ? u.fullName : null;
-    } catch { return null; }
 }
 
 module.exports = {

@@ -119,6 +119,13 @@ const NotificationEvent = Object.freeze({
     // LGT-195: el transportista rechazó el consentimiento de fatiga las veces parametrizadas
     // → queda inhabilitado y se notifica a los Supervisores de su sucursal + administradores.
     FATIGUE_DRIVER_DISABLED_CONSENT: 'FATIGUE_DRIVER_DISABLED_CONSENT',
+    // Avisos de fatiga a Supervisor de la sucursal del transportista + admins. Todos
+    // editables desde Ajustes → Comunicaciones (toggle + plantilla).
+    FATIGUE_ROUTE_BLOCKED:     'FATIGUE_ROUTE_BLOCKED',     // ruta bloqueada por no superar el control
+    FATIGUE_REVIEW_NO_BLOCK:   'FATIGUE_REVIEW_NO_BLOCK',   // no apto pero autoBlock OFF: salió igual, revisar
+    FATIGUE_RECHECK_OMITTED:   'FATIGUE_RECHECK_OMITTED',   // re-chequeo en ruta no realizado a tiempo
+    FATIGUE_CONSENT_REJECTED:  'FATIGUE_CONSENT_REJECTED',  // rechazó el consentimiento (cada vez, antes del límite)
+    FATIGUE_PATTERN_RECURRENT: 'FATIGUE_PATTERN_RECURRENT', // patrón de fatiga recurrente
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)

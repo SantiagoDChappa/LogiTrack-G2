@@ -67,6 +67,10 @@ const CATALOG = [
     { token: 'rechazos',             label: 'Rechazos acumulados',  group: 'Control de fatiga', description: 'Cantidad de rechazos de consentimiento desde el último restablecimiento.', resolve: s => (notNil(s._rechazos) ? String(s._rechazos) : '') },
     { token: 'maxRechazos',          label: 'Límite de rechazos',   group: 'Control de fatiga', description: 'Límite parametrizado de rechazos antes de inhabilitar.',  resolve: s => (notNil(s._maxRechazos) ? String(s._maxRechazos) : '') },
     { token: 'motivoInhabilitacion', label: 'Motivo',               group: 'Control de fatiga', description: 'Motivo registrado de la inhabilitación.',                  resolve: s => s._motivoInhabilitacion || '' },
+    { token: 'score',                label: 'Score de fatiga',      group: 'Control de fatiga', description: 'Puntaje obtenido en el control (mayor = peor).',           resolve: s => (notNil(s._score) ? String(s._score) : '') },
+    { token: 'minutos',              label: 'Minutos',              group: 'Control de fatiga', description: 'Minutos sin completar el re-chequeo pedido en ruta.',      resolve: s => (notNil(s._minutos) ? String(s._minutos) : '') },
+    { token: 'ventanaCantidad',      label: 'Cantidad de bloqueos', group: 'Control de fatiga', description: 'Bloqueos por fatiga en la ventana de patrón recurrente.',  resolve: s => (notNil(s._ventanaCantidad) ? String(s._ventanaCantidad) : '') },
+    { token: 'ventanaDias',          label: 'Ventana (días)',       group: 'Control de fatiga', description: 'Cantidad de días de la ventana de patrón recurrente.',     resolve: s => (notNil(s._ventanaDias) ? String(s._ventanaDias) : '') },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
