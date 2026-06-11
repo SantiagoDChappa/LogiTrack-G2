@@ -273,10 +273,30 @@ const INTENT_CATALOG = [
         },
     },
     {
-        action: 'show-issues',
+        action: 'show-incidents-menu',
         phrases: [
+            'consultar incidencia',
+            'consultar incidencias',
+            'consultar una incidencia',
+            'quiero consultar una incidencia',
+            'ver incidencia',
+            'ver incidencias',
+            'ver mis incidencias',
+            'mis incidencias',
             'incidencia',
             'incidencias',
+            'tengo una incidencia',
+        ],
+        keywordGroups: [
+            ['consultar', 'incidencia'],
+            ['ver', 'incidencia'],
+            ['mis', 'incidencias'],
+        ],
+        keywords: ['incidencia', 'incidencias'],
+    },
+    {
+        action: 'show-issues',
+        phrases: [
             'problema',
             'problemas',
             'demora',
@@ -300,7 +320,7 @@ const INTENT_CATALOG = [
             ['esta', 'frenado'],
             ['intento', 'fallido'],
         ],
-        keywords: ['problema', 'demora', 'retraso', 'fallido', 'frenado', 'clavado', 'avanza', 'incidencia'],
+        keywords: ['problema', 'demora', 'retraso', 'fallido', 'frenado', 'clavado', 'avanza'],
         stageBoosts: {
             con_problema: 3,
             en_sucursal: 1,

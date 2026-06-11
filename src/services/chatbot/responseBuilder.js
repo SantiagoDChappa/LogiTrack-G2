@@ -238,6 +238,32 @@ function buildIncidentsHtml(incidents) {
     ].join('');
 }
 
+// Incidencias agrupadas por envío (para "consultar incidencias de todos mis envíos").
+function buildAllIncidentsHtml(shipments) {
+    return shipments.map((s) => {
+        const items = (s.incidents || []).map((inc) => {
+            const parts = [
+                '<strong>' + escapeHtml(inc.typeLabel || 'Incidencia') + '</strong>',
+                escapeHtml(inc.statusLabel || '-'),
+            ];
+            if (inc.createdAtLabel && inc.createdAtLabel !== '-') {
+                parts.push('Abierta: ' + escapeHtml(inc.createdAtLabel));
+            }
+            if (inc.resolutionLabel) {
+                parts.push('Resolucion: ' + escapeHtml(inc.resolutionLabel));
+            }
+            return '<li>' + parts.join(' | ') + '</li>';
+        }).join('');
+        return [
+            '<div class="portal-chatbot-summary">',
+            '<div class="portal-chatbot-summary-top"><strong>' + escapeHtml(s.trackingId || '-') + '</strong>'
+                + '<span>' + (s.incidents ? s.incidents.length : 0) + ' incidencia' + ((s.incidents && s.incidents.length === 1) ? '' : 's') + '</span></div>',
+            '<ul class="portal-chatbot-rich-list">' + items + '</ul>',
+            '</div>',
+        ].join('');
+    }).join('');
+}
+
 function buildSupportHtml(support) {
     return [
         '<div class="portal-chatbot-support-card">',
@@ -249,6 +275,7 @@ function buildSupportHtml(support) {
 }
 
 module.exports = {
+    buildAllIncidentsHtml,
     buildHistoryHtml,
     buildIncidentsHtml,
     buildIssuesHtml,
