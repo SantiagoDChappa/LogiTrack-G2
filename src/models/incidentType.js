@@ -8,9 +8,13 @@ const IncidentType = sequelize.define('incident_type', {
     active:      { type: DataTypes.BOOLEAN,     allowNull: false, defaultValue: true }
 }, { tableName: 'incident_type', timestamps: false });
 
+// "Otro" (code OTHER) siempre al final del listado; el resto por id ascendente.
 const getActive = () => IncidentType.findAll({
     where: { active: true },
-    order: [['id', 'ASC']]
+    order: [
+        [sequelize.literal(`CASE WHEN "code" = 'OTHER' THEN 1 ELSE 0 END`), 'ASC'],
+        ['id', 'ASC'],
+    ],
 });
 
 const getById = (id) => IncidentType.findOne({ where: { id } });

@@ -246,7 +246,7 @@ const getDimensionLabels = (surveyType) => {
     return DELIVERY_DIMS;
 };
 
-const getComparisonDimLabels = (surveyType) => ({
+const getComparisonDimLabels = () => ({
     delivery: DELIVERY_DIMS.map((d) => d.label),
     incident: INCIDENT_DIMS.map((d) => d.label),
 });
@@ -304,7 +304,9 @@ const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes })
     }
 
     viewModel.incidentTypes = await deps.sequelize.query(
-        `SELECT id, description FROM logitrack.incident_type WHERE active = true ORDER BY id`,
+        // "Otro" al final, igual que en el resto de los dropdowns.
+        `SELECT id, description FROM logitrack.incident_type WHERE active = true
+         ORDER BY (CASE WHEN code = 'OTHER' THEN 1 ELSE 0 END), id`,
         { type: deps.QueryTypes.SELECT }
     );
 
