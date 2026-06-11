@@ -2,15 +2,19 @@ const notificationEmailModel = require('../models/notificationEmail');
 const settingModel = require('../models/setting');
 const settingLogModel = require('../models/settingLog');
 const { isAutoSendEnabled } = require('../jobs/emailProcessorJob');
+const { URLSearchParams } = require('url');
 
 // Pestaña Notificaciones → Fallidas: tabla de emails con su estado, intentos
 // e historial de envío (qué proveedor lo mandó / por qué falló).
+const VALID_SORTS = ['created_desc', 'created_asc', 'sent_desc', 'sent_asc'];
+
 const listEmails = async (req, res) => {
     const status = req.query.status || null;
     const q = req.query.q ? String(req.query.q).trim() : null;
+    const sort = VALID_SORTS.includes(req.query.sort) ? req.query.sort : 'created_desc';
 
     const [emails, counts, autoEnabled] = await Promise.all([
-        notificationEmailModel.listForAdmin({ status, q, limit: 300 }),
+        notificationEmailModel.listForAdmin({ status, q, sort, limit: 300 }),
         notificationEmailModel.countsByStatus(),
         isAutoSendEnabled(),
     ]);
@@ -20,7 +24,7 @@ const listEmails = async (req, res) => {
         counts,
         autoEnabled,
         query: req.query,   // feedback de acciones (sent/retried/auto/error)
-        filters: { status: status || '', q: q || '' },
+        filters: { status: status || '', q: q || '', sort },
     });
 };
 
@@ -39,6 +43,32 @@ const sendPending = async (req, res) => {
     }
 };
 
+// Envío de UN solo mail desde la bandeja (botón por fila). Reabre la fila a PENDING
+// (sirve para reintentar fallidos o reenviar ya enviados) y la procesa al instante,
+// sin importar el kill-switch del envío automático. Vuelve preservando los filtros.
+const sendOne = async (req, res) => {
+    const back = (params) => {
+        const qs = new URLSearchParams(params);
+        for (const k of ['status', 'q', 'sort']) { if (req.body[k]) { qs.set(k, req.body[k]); } }
+        return res.redirect(`/notification/fallidas?${qs.toString()}`);
+    };
+    try {
+        const id = Number(req.params.id);
+        const email = await notificationEmailModel.findById(id);
+        if (!email) { return back({ error: 'one_notfound' }); }
+
+        await notificationEmailModel.resetToPending(id);
+        const { processOneEmail } = require('../jobs/emailProcessorJob');
+        // Releo la fila ya en PENDING para que processOneEmail pueda reclamarla.
+        const fresh = await notificationEmailModel.findById(id);
+        const outcome = await processOneEmail(fresh);
+        return back({ one: outcome });   // one=sent | retried | skipped
+    } catch (err) {
+        console.error('sendOne:', err.message);
+        return back({ error: 'one' });
+    }
+};
+
 // Activa/desactiva el envío AUTOMÁTICO (cron + inmediato). El valor lo leen el
 // scheduler y queueEmail. Queda registrado en el log de auditoría de Ajustes.
 const toggleAutoSend = async (req, res) => {
@@ -54,4 +84,4 @@ const toggleAutoSend = async (req, res) => {
     }
 };
 
-module.exports = { listEmails, sendPending, toggleAutoSend };
+module.exports = { listEmails, sendPending, sendOne, toggleAutoSend };

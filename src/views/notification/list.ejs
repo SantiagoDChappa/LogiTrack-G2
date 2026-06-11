@@ -86,6 +86,17 @@
         .ntf-history-dot--fail { background: #dc2626; }
         .ntf-history-when { color: var(--color-text-secondary); font-size: .78rem; }
         .ntf-empty { text-align: center; padding: 2.5rem; color: var(--color-text-secondary); }
+
+        /* Encabezados ordenables (Creado / Enviado) */
+        .ntf-sort { display: inline-flex; align-items: center; gap: .25rem; color: inherit; text-decoration: none; cursor: pointer; }
+        .ntf-sort:hover { color: var(--color-primary); }
+        .ntf-sort.is-active { color: var(--color-primary); }
+        .ntf-sort .arrow { font-size: .7rem; line-height: 1; }
+
+        /* Botón "enviar este mail" por fila */
+        .ntf-send-one { background: none; border: 1px solid var(--color-border); border-radius: 6px; cursor: pointer; color: var(--color-text-secondary); padding: .3rem .6rem; font-size: .78rem; display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+        .ntf-send-one:hover { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .ntf-row-actions { display: inline-flex; gap: .4rem; align-items: center; }
         @media (max-width: 640px) { .ntf-subject { max-width: 160px; } }
 
         /* Toolbar: control del envío automático + envío manual */
@@ -120,6 +131,14 @@
                 <div class="ntf-flash">
                     Envío manual: <strong><%= query.sent %></strong> enviado(s)<% if (Number(query.retried) > 0) { %>, <strong><%= query.retried %></strong> reprogramado(s) para reintento<% } %>.
                 </div>
+            <% } else if (query && query.one) { %>
+                <% if (query.one === 'sent') { %>
+                    <div class="ntf-flash">Mail enviado correctamente. ✓</div>
+                <% } else if (query.one === 'retried') { %>
+                    <div class="ntf-flash ntf-flash--err">El mail no se pudo enviar y quedó reprogramado para reintento. Revisá el detalle.</div>
+                <% } else { %>
+                    <div class="ntf-flash ntf-flash--err">El mail ya lo estaba procesando otro envío; no se reenvió.</div>
+                <% } %>
             <% } else if (query && query.auto) { %>
                 <div class="ntf-flash">Envío automático <strong><%= query.auto === 'on' ? 'ACTIVADO' : 'DESACTIVADO' %></strong>.</div>
             <% } else if (query && query.error) { %>
@@ -163,7 +182,8 @@
 
             <%# Pestañas por estado (selección única). Cada una preserva la búsqueda actual (q). %>
             <%
-                const _qStr   = filters.q ? '&q=' + encodeURIComponent(filters.q) : '';
+                const _qStr     = filters.q ? '&q=' + encodeURIComponent(filters.q) : '';
+                const _sortStr  = filters.sort && filters.sort !== 'created_desc' ? '&sort=' + filters.sort : '';
                 const _total  = counts.SENT + counts.FAILED + counts.PENDING + counts.PROCESSING;
                 const _tabs = [
                     { key: '',           label: 'Todas',      count: _total },
@@ -176,7 +196,7 @@
             <nav class="ntf-tabs">
                 <% _tabs.forEach(function(t) { %>
                     <a class="ntf-tab <%= filters.status === t.key ? 'is-active' : '' %>"
-                       href="/notification/fallidas?status=<%= t.key %><%= _qStr %>">
+                       href="/notification/fallidas?status=<%= t.key %><%= _qStr %><%= _sortStr %>">
                         <%= t.label %><span class="ntf-tab-count"><%= t.count %></span>
                     </a>
                 <% }); %>
@@ -184,6 +204,7 @@
 
             <form method="GET" action="/notification/fallidas" class="ntf-filters">
                 <input type="hidden" name="status" value="<%= filters.status %>">
+                <input type="hidden" name="sort" value="<%= filters.sort %>">
                 <div class="field">
                     <label for="q">Buscar (destinatario / asunto)</label>
                     <input type="text" id="q" name="q" value="<%= filters.q %>" placeholder="ej: cliente@mail.com">
@@ -192,6 +213,20 @@
                 <a href="/notification/fallidas" class="ntf-btn ntf-btn--ghost">Limpiar</a>
             </form>
 
+            <%
+                // Links de orden para los encabezados Creado / Enviado. Cada click alterna
+                // asc/desc de ese campo, preservando estado y búsqueda actuales.
+                const _sortBase = '/notification/fallidas?status=' + encodeURIComponent(filters.status) + _qStr;
+                function sortLink(field) {
+                    const cur = filters.sort || 'created_desc';
+                    const isField = cur.indexOf(field + '_') === 0;
+                    const nextDir = (isField && cur.slice(-4) === 'desc') ? 'asc' : 'desc';
+                    const arrow = !isField ? '' : (cur.slice(-4) === 'desc' ? '▼' : '▲');
+                    return { href: _sortBase + '&sort=' + field + '_' + nextDir, arrow, active: isField };
+                }
+                const _sCreated = sortLink('created');
+                const _sSent    = sortLink('sent');
+            %>
             <div class="ntf-table-wrap">
                 <table class="ntf-table">
                     <thead>
@@ -200,14 +235,23 @@
                             <th>Destinatario / Asunto</th>
                             <th>Proveedor</th>
                             <th>Intentos</th>
-                            <th>Creado</th>
-                            <th>Enviado</th>
+                            <th>
+                                <a class="ntf-sort <%= _sCreated.active ? 'is-active' : '' %>" href="<%= _sCreated.href %>">
+                                    Creado<% if (_sCreated.arrow) { %><span class="arrow"><%= _sCreated.arrow %></span><% } %>
+                                </a>
+                            </th>
+                            <th>
+                                <a class="ntf-sort <%= _sSent.active ? 'is-active' : '' %>" href="<%= _sSent.href %>">
+                                    Enviado<% if (_sSent.arrow) { %><span class="arrow"><%= _sSent.arrow %></span><% } %>
+                                </a>
+                            </th>
                             <th>Detalle</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         <% if (!emails || emails.length === 0) { %>
-                            <tr><td colspan="7" class="ntf-empty">No hay notificaciones para los filtros seleccionados.</td></tr>
+                            <tr><td colspan="8" class="ntf-empty">No hay notificaciones para los filtros seleccionados.</td></tr>
                         <% } %>
                         <% emails.forEach(e => {
                             const log = (e.attemptLog || []).slice().sort((a,b) => new Date(a.attemptedAt) - new Date(b.attemptedAt));
@@ -229,9 +273,23 @@
                                         Detalle<% if (log.length > 0) { %><span class="count"><%= log.length %></span><% } %>
                                     </button>
                                 </td>
+                                <td>
+                                    <%# Envía ÚNICAMENTE este mail (reabre a PENDING y procesa al instante). %>
+                                    <div class="ntf-row-actions">
+                                        <form method="POST" action="/notification/send-one/<%= e.id %>" style="margin:0">
+                                            <input type="hidden" name="status" value="<%= filters.status %>">
+                                            <input type="hidden" name="q" value="<%= filters.q %>">
+                                            <input type="hidden" name="sort" value="<%= filters.sort %>">
+                                            <button type="submit" class="ntf-send-one" title="<%= e.status === 'SENT' ? 'Reenviar este mail' : 'Enviar este mail ahora' %>">
+                                                <span class="material-symbols-outlined" style="font-size:16px">send</span>
+                                                <%= e.status === 'SENT' ? 'Reenviar' : 'Enviar' %>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
                             </tr>
                             <tr class="ntf-history-row" id="hist-<%= e.id %>" style="display:none">
-                                <td colspan="7">
+                                <td colspan="8">
                                     <% if (log.length > 0) { %>
                                         <ul class="ntf-history-list">
                                             <% log.forEach((a, i) => { %>

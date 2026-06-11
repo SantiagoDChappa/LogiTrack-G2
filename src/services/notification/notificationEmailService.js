@@ -14,7 +14,12 @@ async function queueEmail(data) {
         status: 'PENDING'
     });
 
-    if (process.env.ENABLE_EMAIL_JOBS === 'true' && process.env.NODE_ENV !== 'test') {
+    // Envío INMEDIATO siempre (salvo en tests), igual que el envío directo de la
+    // página de prueba: NO depende de ENABLE_EMAIL_JOBS (ese flag solo controla el
+    // cron de respaldo en app.js). Antes, sin el flag, los avisos al cliente
+    // (demora / paquete dañado / entrega fallida / cambio de estado de incidencia)
+    // quedaban PENDING y NO llegaban. Sigue respetando el kill-switch de auto-envío.
+    if (process.env.NODE_ENV !== 'test') {
         // require local: evita ciclo de carga (emailProcessorJob -> emailSender -> ...).
         const emailJob = require('../../jobs/emailProcessorJob');
         // Respeta el kill-switch: si el envío auto está apagado, el mail queda PENDING

@@ -268,24 +268,31 @@ async function isResendEnabled() {
 // Lista de proveedores disponibles, en orden de preferencia: SendGrid → Resend → SMTP.
 // Cada uno se intenta sólo si está configurado; si uno falla, se pasa al siguiente.
 // Resend además se puede apagar desde Ajustes (para enviar solo por SendGrid).
+// ÚNICAMENTE SendGrid (decisión explícita): por defecto se desactiva el fallback
+// a Mailjet / Resend / SMTP para que TODOS los mails salgan por el mismo proveedor
+// que la página de prueba. Se puede reactivar el fallback con EMAIL_SENDGRID_ONLY=false.
+const SENDGRID_ONLY = process.env.EMAIL_SENDGRID_ONLY !== 'false';
+
 async function buildProviderChain() {
     const chain = [];
-    // Mailjet primero si está configurado: remitente único verificado, anda desde
-    // gmail (donde Resend exige dominio) y no depende del cupo de SendGrid.
-    if (USE_MAILJET_API) {
-        chain.push({ name: 'mailjet', send: sendViaMailjetApi });
-    }
     if (USE_SENDGRID_API) {
         chain.push({ name: 'sendgrid', send: async (r, s, c, f) => {
             const ok = await sendViaSendGridApi(r, s, c, f);
             return ok ? { ok: true } : { ok: false, error: 'SendGrid: ver log [email] ERROR' };
         }});
     }
+    if (SENDGRID_ONLY) {
+        // Solo SendGrid: no se agregan más proveedores. Si SendGrid no está
+        // configurado, no se envía (la cola lo deja PENDING y se ve en logs [email]).
+        return chain;
+    }
+    // ── Fallback opcional (EMAIL_SENDGRID_ONLY=false) ─────────────────────────
+    if (USE_MAILJET_API) {
+        chain.unshift({ name: 'mailjet', send: sendViaMailjetApi });
+    }
     if (USE_RESEND_API && await isResendEnabled()) {
         chain.push({ name: 'resend', send: sendViaResendApi });
     }
-    // SMTP/Gmail como último recurso (suele estar bloqueado en Render, pero útil en local).
-    // Sólo si hay transporter construido (no se arma cuando un proveedor HTTP es primario).
     if (transporter) {
         chain.push({ name: 'smtp', send: async (r, s, c, f) => {
             const ok = await sendViaSmtp(r, s, c, f);

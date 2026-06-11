@@ -90,8 +90,18 @@ const markAsSentWithProvider = (id, provider) =>
         { where: { id, status: 'PROCESSING' } }
     );
 
-// Listado para la vista "Fallidas" con filtros opcionales por estado / búsqueda.
-const listForAdmin = async ({ status, q, limit = 200 } = {}) => {
+// Orden del listado según la columna elegida en la bandeja. Las fechas de envío
+// (sentAt) van con NULLS LAST: los no enviados quedan al final, no arriba.
+const LIST_ORDERS = {
+    created_desc: [['createdAt', 'DESC']],
+    created_asc:  [['createdAt', 'ASC']],
+    sent_desc:    [[sequelize.literal('"NotificationEmail"."sentAt" DESC NULLS LAST')]],
+    sent_asc:     [[sequelize.literal('"NotificationEmail"."sentAt" ASC NULLS LAST')]],
+};
+
+// Listado para la vista "Fallidas" con filtros opcionales por estado / búsqueda
+// y orden configurable (por fecha de creación o de envío, asc/desc).
+const listForAdmin = async ({ status, q, sort, limit = 200 } = {}) => {
     const where = {};
     if (status && ['PENDING', 'PROCESSING', 'SENT', 'FAILED'].includes(status)) {
         where.status = status;
@@ -102,14 +112,27 @@ const listForAdmin = async ({ status, q, limit = 200 } = {}) => {
             { subject:   { [Op.iLike]: `%${q}%` } },
         ];
     }
+    const baseOrder = LIST_ORDERS[sort] || LIST_ORDERS.created_desc;
     return NotificationEmail.findAll({
         where,
         include: [{ model: NotificationEmailAttempt, as: 'attemptLog', required: false }],
-        order: [['createdAt', 'DESC'], [{ model: NotificationEmailAttempt, as: 'attemptLog' }, 'attemptedAt', 'ASC']],
+        order: [...baseOrder, [{ model: NotificationEmailAttempt, as: 'attemptLog' }, 'attemptedAt', 'ASC']],
         limit,
         subQuery: false,
     });
 };
+
+// Trae una fila por id (la usa el envío individual desde la bandeja).
+const findById = (id) => NotificationEmail.findByPk(id);
+
+// Reabre un mail para reenvío manual: lo pone PENDING, limpia el backoff y reinicia
+// el contador de intentos, de modo que processOneEmail pueda reclamarlo sin importar
+// su estado previo (FAILED/SENT) y no caiga en FAILED al instante por intentos viejos.
+const resetToPending = (id) =>
+    NotificationEmail.update(
+        { status: 'PENDING', nextRetryAt: null, attempts: 0 },
+        { where: { id } }
+    );
 
 // Conteos por estado para los KPIs de la cabecera de la vista.
 const countsByStatus = async () => {
@@ -219,4 +242,5 @@ module.exports = {
     NotificationEmail, NotificationEmailAttempt,
     findPending, markAsSent, scheduleRetry, claimEmailForProcessing,
     logAttempt, markAsSentWithProvider, listForAdmin, countsByStatus,
+    findById, resetToPending,
 };
