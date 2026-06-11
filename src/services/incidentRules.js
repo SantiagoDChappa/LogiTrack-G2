@@ -14,6 +14,10 @@ const INCIDENT_TYPE_BLOCKED_STATUSES = Object.freeze({
     OTHER:          []
 });
 
+// Tipos que un CLIENTE solo puede reportar con el envío ya ENTREGADO (los constata al
+// recibir el paquete). En canales externos se bloquean en cualquier otro estado.
+const DELIVERED_ONLY_CLIENT_TYPES = ['MISSING_ITEM', 'PACKAGE_BROKEN'];
+
 const statusDescription = (statusId) => {
     const entry = Object.values(Status).find(s => s.id === statusId);
     return entry ? entry.description : `estado ${statusId}`;
@@ -110,6 +114,14 @@ const getClientEligibilityError = (shipment, type, existingOpenIncidents = []) =
     // posible desde un canal cliente. Aplica a TODOS los tipos.
     if (shipment && shipment.statusId === Status.PENDING.id) {
         return 'El envío todavía está pendiente de despacho, así que aún no se puede reportar una incidencia desde este canal. Cuando esté en camino vas a poder hacerlo. Ante cualquier duda, contactá a soporte.';
+    }
+
+    // Faltante y paquete roto: el cliente solo puede constatarlos al RECIBIR el envío,
+    // así que únicamente se permiten cuando el envío ya figura ENTREGADO. En estados
+    // previos (asignado, en tránsito, en sucursal, etc.) no aplican por canal cliente.
+    if (type && DELIVERED_ONLY_CLIENT_TYPES.includes(type.code)
+        && shipment && shipment.statusId !== Status.DELIVERED.id) {
+        return `Solo podés reportar una incidencia de "${type.description}" cuando el envío figura como Entregado (lo recibiste y constataste el problema). Si tenés otro inconveniente, elegí el tipo que corresponda o contactá a soporte.`;
     }
 
     if (type && type.code === 'DELAY') {
