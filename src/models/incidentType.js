@@ -19,11 +19,15 @@ const getActive = () => IncidentType.findAll({
 
 // Tipos que un CLIENTE externo (portal público, autogestión, chatbot) puede elegir.
 // El staff sigue viendo TODOS via getActive(). Si querés cambiar el set, editá esta lista.
-const CLIENT_FACING_CODES = ['PACKAGE_BROKEN', 'DELAY', 'MISSING_ITEM'];
+const CLIENT_FACING_CODES = ['PACKAGE_BROKEN', 'DELAY', 'MISSING_ITEM', 'OTHER'];
 
 const getClientFacing = () => IncidentType.findAll({
     where: { active: true, code: CLIENT_FACING_CODES },
-    order: [['id', 'ASC']],
+    // "Otro" (OTHER) siempre al final; el resto por id ascendente.
+    order: [
+        [sequelize.literal(`CASE WHEN "code" = 'OTHER' THEN 1 ELSE 0 END`), 'ASC'],
+        ['id', 'ASC'],
+    ],
 });
 
 // Validación server-side: ¿este code lo puede reportar un cliente externo?

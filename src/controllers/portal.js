@@ -358,7 +358,7 @@ const getPublicCreateForm = async (req, res) => {
 // Retorna:
 //   { ok: true, pending: { token, email, expiresAt, devLink? }, shipment, type }
 //   { ok: false, status, message }
-const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, attachment }) => {
+const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, otherTypeText, attachment }) => {
     const tracking = (trackingId || '').trim().toUpperCase();
     if (!tracking)                                                        { return { ok: false, status: 400, message: 'Código de seguimiento requerido.' }; }
     if (!incidentTypeId)                                                  { return { ok: false, status: 400, message: 'Seleccione un tipo de incidencia.' }; }
@@ -398,11 +398,18 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
     const token = crypto.randomBytes(24).toString('hex'); // 48 chars hex
     const expiresAt = new Date(Date.now() + CONFIRMATION_TTL_HOURS * 60 * 60 * 1000);
 
+    // Tipo "Otro": el cliente escribe el tipo libremente; lo anteponemos a la descripción
+    // para que el operador lo vea (el tipo del catálogo sigue siendo OTHER).
+    const otherTxt = String(otherTypeText || '').trim().slice(0, 80);
+    const fullDescription = (type.code === 'OTHER' && otherTxt)
+        ? `Tipo indicado por el cliente: ${otherTxt}.\n\n${String(description).trim()}`
+        : String(description).trim();
+
     await incidentPendingModel.create({
         token,
         shipmentId:       shipment.id,
         incidentTypeId:   type.id,
-        description:      String(description).trim().slice(0, 2000),
+        description:      fullDescription.slice(0, 2000),
         reporterName:     String(reporterName).trim().slice(0, 120),
         reporterEmail:    String(reporterEmail).trim().slice(0, 160),
         reporterDocument: reporterDocument ? String(reporterDocument).trim().slice(0, 20) : null,

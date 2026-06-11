@@ -105,9 +105,18 @@
                                 <select id="incidentTypeId" name="incidentTypeId" required>
                                     <option value="">Seleccione un tipo...</option>
                                     <% types.forEach(t => { %>
-                                        <option value="<%= t.id %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
+                                        <option value="<%= t.id %>" data-code="<%= t.code %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
                                     <% }) %>
                                 </select>
+                            </div>
+
+                            <%# Texto libre del tipo cuando se elige "Otro" (OTHER). %>
+                            <div class="form-group" id="otherTypeGroup" style="display:none;">
+                                <label for="otherTypeText">¿Qué tipo de problema es?</label>
+                                <input type="text" id="otherTypeText" name="otherTypeText"
+                                       value="<%= form.otherTypeText || '' %>" maxlength="80"
+                                       placeholder="Ej: el paquete llegó a otra dirección">
+                                <small>Indicá brevemente el tipo de incidencia que querés reportar.</small>
                             </div>
 
                             <div class="form-group">
@@ -206,6 +215,22 @@
         })();
         </script>
     <% } %>
+    <script>
+    (function () {
+        var sel = document.getElementById('incidentTypeId');
+        var grp = document.getElementById('otherTypeGroup');
+        var inp = document.getElementById('otherTypeText');
+        if (!sel || !grp) { return; }
+        function sync() {
+            var opt = sel.options[sel.selectedIndex];
+            var isOther = opt && opt.getAttribute('data-code') === 'OTHER';
+            grp.style.display = isOther ? '' : 'none';
+            if (inp) { inp.required = !!isOther; if (!isOther) { inp.value = ''; } }
+        }
+        sel.addEventListener('change', sync);
+        sync();
+    })();
+    </script>
     <script src="/js/theme.js" defer></script>
 </body>
 </html>
