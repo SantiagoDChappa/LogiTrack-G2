@@ -14,23 +14,21 @@ async function queueEmail(data) {
         status: 'PENDING'
     });
 
-    // Envío INMEDIATO siempre (salvo en tests), igual que el envío directo de la
-    // página de prueba: NO depende de ENABLE_EMAIL_JOBS (ese flag solo controla el
-    // cron de respaldo en app.js). Antes, sin el flag, los avisos al cliente
-    // (demora / paquete dañado / entrega fallida / cambio de estado de incidencia)
-    // quedaban PENDING y NO llegaban. Sigue respetando el kill-switch de auto-envío.
+    // Envío INMEDIATO SIEMPRE (salvo en tests), por SendGrid, igual que el envío
+    // directo del email de confirmación del portal. NO depende de ENABLE_EMAIL_JOBS
+    // (solo controla el cron de respaldo) NI del kill-switch "Envío automático" (que
+    // ahora solo frena el cron). Antes, con el kill-switch apagado, los avisos al
+    // cliente (demora / paquete dañado / entrega fallida / cambio de estado de
+    // incidencia) quedaban PENDING y NO llegaban; el confirm sí porque no pasa por
+    // la cola. Ahora se comportan igual: ni bien ocurre el evento, sale el mail.
     if (process.env.NODE_ENV !== 'test') {
         // require local: evita ciclo de carga (emailProcessorJob -> emailSender -> ...).
         const emailJob = require('../../jobs/emailProcessorJob');
-        // Respeta el kill-switch: si el envío auto está apagado, el mail queda PENDING
-        // y se manda luego con el botón manual de la bandeja.
-        if (await emailJob.isAutoSendEnabled()) {
-            Promise.resolve()
-                .then(() => emailJob.processOneEmail(row))
-                .catch((err) => console.error(
-                    `[email-immediate] fallo envío inmediato #${row.id}:`,
-                    err && err.message ? err.message : err));
-        }
+        Promise.resolve()
+            .then(() => emailJob.processOneEmail(row))
+            .catch((err) => console.error(
+                `[email-immediate] fallo envío inmediato #${row.id}:`,
+                err && err.message ? err.message : err));
     }
     return row;
 };
