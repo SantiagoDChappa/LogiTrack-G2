@@ -1834,7 +1834,10 @@
         nextLbl.style.cssText = 'position:fixed;bottom:132px;right:16px;z-index:9999;padding:8px 12px;border-radius:10px;' +
             'background:#0f172a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none';
         document.body.appendChild(nextLbl);
-        const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return '--:--'; } };
+        // Zona horaria y formato 12/24h configurados en Ajustes (no la del navegador).
+        const FATIGUE_TZ  = '<%= typeof displayTimezone !== "undefined" && displayTimezone ? displayTimezone : "America/Argentina/Buenos_Aires" %>';
+        const FATIGUE_H12 = <%= (typeof clock24h !== "undefined" && !clock24h) ? "true" : "false" %>;
+        const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: FATIGUE_TZ, hour12: FATIGUE_H12 }); } catch (_) { return '--:--'; } };
         const showNext = (iso, label) => {
             if (!iso) { nextLbl.style.display = 'none'; return; }
             nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span>`;
