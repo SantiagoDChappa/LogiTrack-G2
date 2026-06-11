@@ -211,6 +211,33 @@ function buildIssuesHtml() {
     ].join('');
 }
 
+function buildIncidentsHtml(incidents) {
+    return [
+        '<ul class="portal-chatbot-rich-list">',
+        incidents.map((inc) => {
+            const parts = [
+                '<strong>' + escapeHtml(inc.typeLabel || 'Incidencia') + '</strong>',
+                escapeHtml(inc.statusLabel || '-'),
+            ];
+
+            if (inc.createdAtLabel && inc.createdAtLabel !== '-') {
+                parts.push('Abierta: ' + escapeHtml(inc.createdAtLabel));
+            }
+
+            if (inc.resolutionLabel) {
+                parts.push('Resolucion: ' + escapeHtml(inc.resolutionLabel));
+            }
+
+            if (inc.closedAtLabel) {
+                parts.push('Cerrada: ' + escapeHtml(inc.closedAtLabel));
+            }
+
+            return '<li>' + parts.join(' | ') + '</li>';
+        }).join(''),
+        '</ul>',
+    ].join('');
+}
+
 function buildSupportHtml(support) {
     return [
         '<div class="portal-chatbot-support-card">',
@@ -223,6 +250,7 @@ function buildSupportHtml(support) {
 
 module.exports = {
     buildHistoryHtml,
+    buildIncidentsHtml,
     buildIssuesHtml,
     buildMainMenuMessage,
     buildShipmentContextActions,

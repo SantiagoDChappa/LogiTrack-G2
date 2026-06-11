@@ -1,5 +1,6 @@
 const {
     buildHistoryHtml,
+    buildIncidentsHtml,
     buildIssuesHtml,
     createAction,
     createMessage,
@@ -231,6 +232,28 @@ function buildIssuesResponse(shipment) {
                     actions: [
                         createAction('Buscar mi envio', 'request-lookup'),
                         createAction('Significado de los estados', 'show-status-guide'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    // Si el envío tiene incidencias reales registradas, las listamos en vez de
+    // devolver solo el texto enlatado por estado. (Consulta de incidencias desde el chatbot.)
+    const incidents = Array.isArray(shipment.incidents) ? shipment.incidents : [];
+    if (incidents.length) {
+        const intro = incidents.length === 1
+            ? 'Sobre este envio hay 1 incidencia registrada. Te dejo el detalle:'
+            : 'Sobre este envio hay ' + incidents.length + ' incidencias registradas. Te dejo el detalle:';
+        return {
+            messages: [
+                createMessage({
+                    text: intro,
+                    html: buildIncidentsHtml(incidents),
+                    actions: [
+                        createAction('Reportar otra incidencia', 'report-incident-start'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
                 }),

@@ -251,13 +251,18 @@ async function handleConfirm(runtime, createIncidentFromPortal) {
     });
 
     if (!result.ok) {
+        // El error mas comun aca es que el email no coincide con el remitente/destinatario.
+        // Reintentar con los mismos datos volveria a fallar (quedaba "tildado"), asi que
+        // dejamos el wizard en el paso de email y ofrecemos cambiarlo o volver al inicio.
+        setDraft(runtime, { step: 'email' });
         return {
             messages: [
                 createMessage({
-                    text: 'No pude crear el reporte: ' + result.message,
+                    text: 'No pude crear el reporte: ' + result.message
+                        + '\n\nProbá con otro email (tiene que ser el del remitente o destinatario del envío) o volvé al inicio.',
                     actions: [
-                        createAction('Reintentar', 'report-incident-confirm'),
-                        createAction('Cancelar', 'report-incident-cancel'),
+                        createAction('Cambiar email', 'report-incident-edit-email'),
+                        createAction('Volver al inicio', 'report-incident-cancel'),
                     ],
                 }),
             ],
@@ -281,6 +286,24 @@ async function handleConfirm(runtime, createIncidentFromPortal) {
                 actions: [
                     createAction('Volver al menú', 'show-main-menu'),
                 ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
+// Vuelve al paso de email para que el usuario reingrese un mail valido (tras un
+// rechazo por no coincidir con remitente/destinatario). Re-muestra el prompt.
+function handleEditEmail(runtime) {
+    if (!runtime?.state?.incidentDraft) {
+        return handleCancel(runtime);
+    }
+    setDraft(runtime, { step: 'email', reporterEmail: null });
+    return {
+        messages: [
+            createMessage({
+                text: 'Dale. Pasame de nuevo el email del remitente o destinatario registrado en el envío.',
+                actions: cancelActions(),
             }),
         ],
         effects: [],
@@ -338,6 +361,7 @@ module.exports = {
     handleNameInput,
     handleEmailInput,
     handleSkipEmail,
+    handleEditEmail,
     handleConfirm,
     handleCancel,
     handleStepInput,

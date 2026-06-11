@@ -50,6 +50,7 @@ const ACTION_HANDLERS = {
     'report-incident-start':   async (runtime) => incidentReportHandler.buildStart(runtime, await fetchActiveTypes()),
     'report-incident-type':    async (runtime, value) => incidentReportHandler.handleTypeSelect(runtime, value, await fetchTypesById()),
     'report-incident-skip-email': (runtime) => incidentReportHandler.handleSkipEmail(runtime),
+    'report-incident-edit-email': (runtime) => incidentReportHandler.handleEditEmail(runtime),
     'report-incident-confirm': (runtime) => incidentReportHandler.handleConfirm(runtime, createIncidentFromPortal),
     'report-incident-cancel':  (runtime) => incidentReportHandler.handleCancel(runtime),
 };

@@ -22,6 +22,19 @@ function normalizeHistoryItem(item) {
     return pickAllowedFields(normalized, CHATBOT_PUBLIC_POLICY.history.allow);
 }
 
+function normalizeIncidentItem(item) {
+    const normalized = {
+        id: asString(item?.id),
+        typeLabel: asString(item?.typeLabel, 'Incidencia'),
+        statusLabel: asString(item?.statusLabel, '-'),
+        resolutionLabel: item?.resolutionLabel ? asString(item.resolutionLabel) : null,
+        createdAtLabel: asString(item?.createdAtLabel, '-'),
+        closedAtLabel: item?.closedAtLabel ? asString(item.closedAtLabel) : null,
+    };
+
+    return pickAllowedFields(normalized, CHATBOT_PUBLIC_POLICY.incidents.allow);
+}
+
 function normalizeShipment(shipment) {
     const normalized = {
         id: asString(shipment?.id),
@@ -41,6 +54,9 @@ function normalizeShipment(shipment) {
         lastComment: sanitizeChatbotComment(shipment?.lastComment),
         history: Array.isArray(shipment?.history)
             ? shipment.history.map(normalizeHistoryItem)
+            : [],
+        incidents: Array.isArray(shipment?.incidents)
+            ? shipment.incidents.map(normalizeIncidentItem)
             : [],
     };
 

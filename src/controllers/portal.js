@@ -120,6 +120,16 @@ const buildChatbotShipment = (shipment) => {
             branchName: item.branch?.name || null,
             eventType: item.eventType || null,
         })),
+        // Incidencias reales del envío (campos seguros ya armados por buildPublicIncidents),
+        // para que el chatbot pueda listarlas cuando el cliente consulta "incidencia".
+        incidents: (shipment.incidents || []).map((inc) => ({
+            id: inc.id,
+            typeLabel: inc.typeLabel,
+            statusLabel: inc.statusLabel,
+            resolutionLabel: inc.resolutionLabel,
+            createdAtLabel: inc.createdAtLabel,
+            closedAtLabel: inc.closedAtLabel,
+        })),
     });
 };
 
