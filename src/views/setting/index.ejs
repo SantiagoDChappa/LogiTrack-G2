@@ -1024,12 +1024,13 @@
                     Proveedores de email
                 </h2>
                 <p class="settings-subtitle">
-                    Orden de envío: <strong>SendGrid</strong> primero y, si falla, <strong>Resend</strong> como respaldo (ambos por HTTPS, no bloqueados por Render).
-                    Podés desactivar Resend para enviar <strong>solo por SendGrid</strong>.
+                    Orden de envío (se prueba en orden hasta que uno funcione): <strong>Mailjet → SendGrid → Resend</strong>.
+                    Mailjet va primero si está configurado (remitente único, no requiere dominio). El toggle de abajo activa/desactiva Resend.
                 </p>
                 <p class="settings-subtitle" style="margin-top:-.25rem">
                     Estado:
-                    SendGrid <strong style="color:<%= emailProviders.sendgrid ? '#16a34a' : '#dc2626' %>"><%= emailProviders.sendgrid ? 'configurado' : 'no configurado' %></strong>
+                    Mailjet <strong style="color:<%= emailProviders.mailjet ? '#16a34a' : '#dc2626' %>"><%= emailProviders.mailjet ? 'configurado' : 'no configurado' %></strong>
+                    · SendGrid <strong style="color:<%= emailProviders.sendgrid ? '#16a34a' : '#dc2626' %>"><%= emailProviders.sendgrid ? 'configurado' : 'no configurado' %></strong>
                     · Resend <strong style="color:<%= emailProviders.resend ? '#16a34a' : '#dc2626' %>"><%= emailProviders.resend ? 'configurado' : 'no configurado' %></strong>
                 </p>
                 <% if (!emailProviders.sendgrid) { %>

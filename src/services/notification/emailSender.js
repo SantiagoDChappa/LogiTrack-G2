@@ -23,6 +23,13 @@ const RESEND_KEY = process.env.RESEND_API_KEY
     || (process.env.SMTP_PASS && process.env.SMTP_PASS.startsWith('re_') ? process.env.SMTP_PASS : null);
 const USE_RESEND_API = Boolean(RESEND_KEY);
 
+// Mailjet: API Key + Secret Key (auth Basic). HTTPS (api.mailjet.com), no bloqueado
+// por Render. Usa remitente único verificado (NO requiere dominio propio), por eso
+// sirve mandando desde gmail donde Resend falla. Si está configurado, va PRIMERO.
+const MAILJET_KEY = process.env.MAILJET_API_KEY || null;
+const MAILJET_SECRET = process.env.MAILJET_SECRET_KEY || null;
+const USE_MAILJET_API = Boolean(MAILJET_KEY && MAILJET_SECRET);
+
 // Timeouts SMTP: si el servidor no responde preferimos fallar rápido en vez de
 // dejar la request/job colgada "cargando".
 const SMTP_TIMEOUTS = {
@@ -76,13 +83,14 @@ function buildTransporter() {
     });
 }
 
-// Construimos el transporter SMTP salvo que un proveedor HTTP (SendGrid/Resend) sea
-// el primario — igual queda disponible como último eslabón del fallback en local.
-const HAS_HTTP_PROVIDER = USE_SENDGRID_API || USE_RESEND_API;
+// Construimos el transporter SMTP salvo que un proveedor HTTP (Mailjet/SendGrid/Resend)
+// sea el primario — igual queda disponible como último eslabón del fallback en local.
+const HAS_HTTP_PROVIDER = USE_SENDGRID_API || USE_RESEND_API || USE_MAILJET_API;
 const transporter = HAS_HTTP_PROVIDER ? null : buildTransporter();
 
 if (process.env.NODE_ENV !== 'test') {
     const order = [
+        USE_MAILJET_API ? 'Mailjet' : null,
         USE_SENDGRID_API ? 'SendGrid' : null,
         USE_RESEND_API ? 'Resend' : null,
         transporter ? 'SMTP' : null,
@@ -177,6 +185,49 @@ async function sendViaResendApi(recipients, subject, content, format) {
     }
 }
 
+// ── Envío vía API HTTP de Mailjet (HTTPS, no bloqueado por Render) ─────────────
+// Auth Basic con API Key + Secret Key. El remitente (EMAIL_FROM) debe estar
+// verificado en Mailjet (remitente único, no requiere dominio). Endpoint v3.1.
+// Devuelve { ok, error }.
+async function sendViaMailjetApi(recipients, subject, content, format) {
+    const from = parseFrom();
+    const message = {
+        From: { Email: from.email, Name: from.name || undefined },
+        To: recipients.map((email) => ({ Email: email })),
+        Subject: subject,
+    };
+    if (format === 'html') {
+        message.HTMLPart = content;
+        message.TextPart = htmlToText(content);
+    } else {
+        message.TextPart = content;
+    }
+
+    const auth = Buffer.from(`${MAILJET_KEY}:${MAILJET_SECRET}`).toString('base64');
+    console.log(`[email] enviando (Mailjet API) -> to=${recipients.join(', ')} subject="${subject}" from=${from.email}`);
+    try {
+        const res = await fetch('https://api.mailjet.com/v3.1/send', {
+            method: 'POST',
+            headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Messages: [message] }),
+            signal: AbortSignal.timeout(15000),
+        });
+        const data = await res.json().catch(() => ({}));
+        const status = data && data.Messages && data.Messages[0] ? data.Messages[0].Status : null;
+        if (res.ok && status === 'success') {
+            console.log(`[email] ENVIADO ✔ (Mailjet API) to=${recipients.join(', ')} status=${res.status}`);
+            return { ok: true };
+        }
+        const errTxt = JSON.stringify(data).slice(0, 300);
+        console.error(`[email] ERROR (Mailjet API) status=${res.status} to=${recipients.join(', ')} body=${errTxt}`);
+        return { ok: false, error: `Mailjet ${res.status}: ${errTxt}` };
+    } catch (error) {
+        const msg = error && error.message ? error.message : String(error);
+        console.error(`[email] ERROR (Mailjet API) to=${recipients.join(', ')}:`, msg);
+        return { ok: false, error: `Mailjet: ${msg}` };
+    }
+}
+
 // ── Envío vía SMTP (nodemailer) ───────────────────────────────────────────────
 async function sendViaSmtp(recipients, subject, content, format) {
     const data = { from: fromRaw(), to: recipients.join(', '), subject };
@@ -219,6 +270,11 @@ async function isResendEnabled() {
 // Resend además se puede apagar desde Ajustes (para enviar solo por SendGrid).
 async function buildProviderChain() {
     const chain = [];
+    // Mailjet primero si está configurado: remitente único verificado, anda desde
+    // gmail (donde Resend exige dominio) y no depende del cupo de SendGrid.
+    if (USE_MAILJET_API) {
+        chain.push({ name: 'mailjet', send: sendViaMailjetApi });
+    }
     if (USE_SENDGRID_API) {
         chain.push({ name: 'sendgrid', send: async (r, s, c, f) => {
             const ok = await sendViaSendGridApi(r, s, c, f);
@@ -290,6 +346,7 @@ async function sendEmail(to, subject, content, format = 'text') {
 // Estado de configuración de cada proveedor (lo lee Ajustes para mostrar contexto).
 // resend.configured = hay API key; el toggle de Ajustes decide si se usa o no.
 const providerStatus = {
+    mailjet:  USE_MAILJET_API,
     sendgrid: USE_SENDGRID_API,
     resend:   USE_RESEND_API,
     smtp:     Boolean(transporter),
