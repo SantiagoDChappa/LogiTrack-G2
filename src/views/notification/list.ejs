@@ -87,6 +87,26 @@
         .ntf-history-when { color: var(--color-text-secondary); font-size: .78rem; }
         .ntf-empty { text-align: center; padding: 2.5rem; color: var(--color-text-secondary); }
         @media (max-width: 640px) { .ntf-subject { max-width: 160px; } }
+
+        /* Toolbar: control del envío automático + envío manual */
+        .ntf-toolbar {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            gap: .75rem; margin-bottom: 1rem; padding: .85rem 1rem;
+            background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;
+        }
+        .ntf-auto { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+        .ntf-auto-label { font-size: .82rem; font-weight: 600; color: var(--color-text-secondary); }
+        .ntf-toolbar form { margin: 0; }
+        .ntf-auto-warning {
+            margin-bottom: 1rem; padding: .7rem 1rem; border-radius: 10px;
+            background: rgba(217,119,6,.12); border: 1px solid rgba(217,119,6,.35);
+            color: #b45309; font-size: .85rem;
+        }
+        .ntf-flash {
+            margin-bottom: 1rem; padding: .7rem 1rem; border-radius: 10px; font-size: .88rem;
+            background: rgba(22,163,74,.12); border: 1px solid rgba(22,163,74,.35); color: #16a34a;
+        }
+        .ntf-flash--err { background: rgba(220,38,38,.12); border-color: rgba(220,38,38,.35); color: #dc2626; }
     </style>
 </head>
 <body>
@@ -94,6 +114,52 @@
     <main class="main-content">
         <div class="ntf-wrap">
             <div class="page-header"><h1>Notificaciones — Fallidas / enviadas</h1></div>
+
+            <%# Feedback de las acciones (envío manual / toggle). %>
+            <% if (query && query.sent !== undefined) { %>
+                <div class="ntf-flash">
+                    Envío manual: <strong><%= query.sent %></strong> enviado(s)<% if (Number(query.retried) > 0) { %>, <strong><%= query.retried %></strong> reprogramado(s) para reintento<% } %>.
+                </div>
+            <% } else if (query && query.auto) { %>
+                <div class="ntf-flash">Envío automático <strong><%= query.auto === 'on' ? 'ACTIVADO' : 'DESACTIVADO' %></strong>.</div>
+            <% } else if (query && query.error) { %>
+                <div class="ntf-flash ntf-flash--err">No se pudo completar la acción. Revisá los logs.</div>
+            <% } %>
+
+            <%# Toolbar: kill-switch del envío automático + envío manual de pendientes. %>
+            <div class="ntf-toolbar">
+                <div class="ntf-auto">
+                    <span class="ntf-auto-label">Envío automático</span>
+                    <% if (autoEnabled) { %>
+                        <span class="ntf-badge ntf-badge--SENT">ACTIVO</span>
+                        <form method="POST" action="/notification/auto-toggle">
+                            <button type="submit" class="ntf-btn ntf-btn--ghost">
+                                <span class="material-symbols-outlined" style="font-size:18px">pause_circle</span>Desactivar
+                            </button>
+                        </form>
+                    <% } else { %>
+                        <span class="ntf-badge ntf-badge--FAILED">DESACTIVADO</span>
+                        <form method="POST" action="/notification/auto-toggle">
+                            <input type="hidden" name="email_auto_send_enabled" value="on">
+                            <button type="submit" class="ntf-btn">
+                                <span class="material-symbols-outlined" style="font-size:18px">play_circle</span>Activar
+                            </button>
+                        </form>
+                    <% } %>
+                </div>
+                <form method="POST" action="/notification/send-pending">
+                    <button type="submit" class="ntf-btn">
+                        <span class="material-symbols-outlined" style="font-size:18px">outbox</span>
+                        Enviar pendientes ahora<% if (counts.PENDING) { %> (<%= counts.PENDING %>)<% } %>
+                    </button>
+                </form>
+            </div>
+
+            <% if (!autoEnabled) { %>
+            <div class="ntf-auto-warning">
+                El envío automático está <strong>apagado</strong>: los emails nuevos quedan en <strong>Pendientes</strong> y no se mandan solos (ni el cron ni el envío inmediato). Usá <strong>"Enviar pendientes ahora"</strong> cuando tengas un proveedor con cupo.
+            </div>
+            <% } %>
 
             <%# Pestañas por estado (selección única). Cada una preserva la búsqueda actual (q). %>
             <%

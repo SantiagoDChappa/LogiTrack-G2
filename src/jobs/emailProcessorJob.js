@@ -1,5 +1,20 @@
 const NotificationEmail = require('../models/notificationEmail');
 const emailSender = require('../services/notification/emailSender');
+const settingModel = require('../models/setting');
+
+// ¿Envío AUTOMÁTICO habilitado? Kill-switch desde la bandeja de Notificaciones
+// (setting 'email_auto_send_enabled'). Default ON. Apagado => el cron y el envío
+// inmediato NO procesan (los mails quedan PENDING). NO afecta el envío MANUAL
+// (botón "Enviar pendientes"), que llama processPendingEmails directo.
+// Fail-safe: si la DB falla, asume habilitado (no bloquea por un error transitorio).
+async function isAutoSendEnabled() {
+    try {
+        const v = await settingModel.get('email_auto_send_enabled');
+        return (v === null || v === undefined) ? true : (v !== '0' && v !== 'false');
+    } catch {
+        return true;
+    }
+}
 
 // Procesa UN mail: lo reclama (UPDATE atómico PENDING->PROCESSING, evita doble
 // envío entre el cron y el inmediato), lo manda y marca el resultado.
@@ -59,4 +74,4 @@ async function processPendingEmails() {
     return summary;
 };
 
-module.exports = { processPendingEmails, processOneEmail };
+module.exports = { processPendingEmails, processOneEmail, isAutoSendEnabled };

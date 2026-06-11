@@ -16,12 +16,16 @@ async function queueEmail(data) {
 
     if (process.env.ENABLE_EMAIL_JOBS === 'true' && process.env.NODE_ENV !== 'test') {
         // require local: evita ciclo de carga (emailProcessorJob -> emailSender -> ...).
-        const { processOneEmail } = require('../../jobs/emailProcessorJob');
-        Promise.resolve()
-            .then(() => processOneEmail(row))
-            .catch((err) => console.error(
-                `[email-immediate] fallo envío inmediato #${row.id}:`,
-                err && err.message ? err.message : err));
+        const emailJob = require('../../jobs/emailProcessorJob');
+        // Respeta el kill-switch: si el envío auto está apagado, el mail queda PENDING
+        // y se manda luego con el botón manual de la bandeja.
+        if (await emailJob.isAutoSendEnabled()) {
+            Promise.resolve()
+                .then(() => emailJob.processOneEmail(row))
+                .catch((err) => console.error(
+                    `[email-immediate] fallo envío inmediato #${row.id}:`,
+                    err && err.message ? err.message : err));
+        }
     }
     return row;
 };

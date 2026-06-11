@@ -22,6 +22,11 @@ function startSchedulers() {
 
     const mailCron = pickCron(MAIL_CRON, '*/5 * * * *', 'mails');
     cron.schedule(mailCron, async () => {
+        // Kill-switch: si el envío auto está apagado (bandeja Notificaciones), no procesa.
+        if (!(await emailProcessorJob.isAutoSendEnabled())) {
+            console.log('[scheduler] envío automático DESACTIVADO — se saltea el batch de mails');
+            return;
+        }
         const t0 = Date.now();
         try {
             await emailProcessorJob.processPendingEmails();
