@@ -65,7 +65,18 @@ function deliverEmail(recipients, subject, body) {
 // Variante que respeta el formato (html / text) de la plantilla.
 async function deliverEmailFormat(recipients, subject, body, format) {
     try {
-        const emails = recipients.map(r => r.email).filter(e => EMAIL_RE.test(String(e || '').trim()));
+        // Deduplicar (case-insensitive): SendGrid rechaza con 400 si una misma
+        // dirección aparece repetida en el campo `to`.
+        const seen = new Set();
+        const emails = [];
+        for (const r of recipients) {
+            const e = String(r.email || '').trim();
+            if (!EMAIL_RE.test(e)) { continue; }
+            const key = e.toLowerCase();
+            if (seen.has(key)) { continue; }
+            seen.add(key);
+            emails.push(e);
+        }
         if (!emails.length) { return 0; }
         const { sendEmail } = require('../notification/emailSender');
         await sendEmail(emails, subject, body, format === 'html' ? 'html' : 'text');
