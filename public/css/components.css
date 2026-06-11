@@ -86,9 +86,16 @@
   color: #f1f5f9;
   font-size: 0.7rem;
   font-weight: 600;
-  white-space: nowrap;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  line-height: 1.35;
+  /* El texto largo envuelve en vez de empujar la pantalla: caja ajustada al contenido
+     (max-content) pero topeada por max-width, y wrap dentro de ese ancho. */
+  white-space: normal;
+  width: max-content;
+  max-width: min(60vw, 220px);
+  text-align: center;
+  overflow-wrap: break-word;
+  padding: 0.4rem 0.65rem;
+  border-radius: 6px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease, transform 0.15s ease;
