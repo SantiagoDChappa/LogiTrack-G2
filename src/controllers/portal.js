@@ -13,7 +13,6 @@ const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
 const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
 const settingModel = require('../models/setting');
 const { URLSearchParams } = require('url');
-const { NotificationEvent } = require('../constants/enums');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -544,12 +543,8 @@ const confirmIncidentByToken = async (rawToken) => {
         reporterEmail: pending.reporterEmail,
         matchedRole:   pending.matchedRole
     }).catch(e => console.error('[portal] notif incidencia confirmada:', e.message));
-
-    // Si el cliente reportó una demora, enviarle el email accionable con opciones de resolución.
-    if (type.code === 'DELAY') {
-        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_DELAYED, shipment.id)
-            .catch(e => console.error('[portal] notif SHIPMENT_DELAYED por incidencia:', e.message));
-    }
+    // El aviso accionable de demora (SHIPMENT_DELAYED) ya lo dispara notifyIncidentCreated
+    // para el tipo DELAY, así que no se reenvía acá (evita duplicado).
 
     return { ok: true, incident, shipment, type };
 };

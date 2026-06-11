@@ -923,13 +923,24 @@ const markPackageFailed = async (req, res) => {
         // US-E02: generar incidencia automática por paquete fallido (dedup interno).
         try {
             const { autoCreateIncident } = require('../services/incidentAutoGen');
+            let createdIncident = null;
             await sequelize.transaction(async (t) => {
-                await autoCreateIncident({
+                createdIncident = await autoCreateIncident({
                     shipmentId:  Number(id),
                     typeCode:    'PACKAGE_BROKEN',
                     description: `Paquete fallido${comment ? `: ${comment}` : ''}.`
                 }, t);
             });
+            // PAQUETE DAÑADO → avisar SIEMPRE al cliente para que elija reembolso/reemplazo
+            // (mismo pipeline que el alta manual / portal). Solo si efectivamente se creó
+            // la incidencia (autoCreateIncident devuelve null por dedup).
+            if (createdIncident) {
+                require('../services/incidentDamageResolution').notifySenderIfDamage({
+                    incidentId: createdIncident.id,
+                    shipment:   { id: Number(id) },
+                    type:       { code: 'PACKAGE_BROKEN' },
+                }).catch(e => console.error('[shipment] notif daño cliente:', e.message));
+            }
         } catch (e) { console.error('[shipment] autoCreateIncident:', e.message); }
 
         res.redirect(`/shipment/update/${id}?success=6`);

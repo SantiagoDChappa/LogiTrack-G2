@@ -1,6 +1,6 @@
 const { DeliveryEvidence, Shipment } = require('../models');
 const stateMachine = require('../services/shipmentStateMachine');
-const { Status } = require('../constants/enums');
+const { Status, NotificationEvent } = require('../constants/enums');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const ShipmentModel = require('../models/shipment');
 const sequelize = require('../database/connection');
@@ -105,6 +105,11 @@ const saveFailedAttempt = async (req, res) => {
                 description: `Intento de entrega fallido. Motivo: ${reason}.`
             }, t);
         });
+
+        // "Llegada de entrega no completada": avisar SIEMPRE al cliente con el email
+        // accionable (reprogramar / retiro en sucursal), respetando la config del evento.
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_FAILED_ATTEMPT, shipment.id)
+            .catch(e => console.error('[delivery] notif SHIPMENT_FAILED_ATTEMPT:', e.message));
 
         res.redirect('/delivery?failed=true');
 

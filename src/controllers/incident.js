@@ -338,29 +338,29 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
         shipment, assignee, openedBy, reporterEmail, matchedRole
     });
 
-    if (cfg.notifyShipmentRecipient) {
-        // Dispatch del evento correcto según el tipo de incidencia. Se respeta el toggle
-        // global notifyShipmentRecipient + el toggle por tipo (notifyOnDelay / OnDamage / OnGeneric).
-        // Cada evento ademas respeta su propia config (template + enabled) en Ajustes → Comunicaciones.
-        let eventForType = null;
-        switch (type?.code) {
-            case 'DELAY':
-                if (cfg.notifyOnDelay !== false)  { eventForType = NotificationEvent.SHIPMENT_DELAYED; }
-                break;
-            case 'PACKAGE_BROKEN':
-                if (cfg.notifyOnDamage !== false) { eventForType = NotificationEvent.SHIPMENT_PACKAGE_FAILED; }
-                break;
-            default:
-                if (cfg.notifyOnGeneric !== false) { eventForType = NotificationEvent.SHIPMENT_INCIDENT; }
-        }
-        if (eventForType) {
-            require('./shipment').notifyShipmentEvent(eventForType, shipment.id, { _incidentId: String(incidentId) })
-                .catch(e => console.error(`[incident] notif ${eventForType}:`, e.message));
+    // Avisos accionables al cliente segun el tipo de incidencia. Los tipos donde el
+    // cliente DEBE poder accionar (DELAY → reprogramar/retiro; PACKAGE_BROKEN →
+    // reembolso/reemplazo) se disparan SIEMPRE, respetando solo la config propia del
+    // evento (habilitado + destinatario) en Ajustes → Comunicaciones, sin depender del
+    // toggle global de incidencias. Los tipos genericos siguen atados al toggle.
+    const typeCode = type?.code;
+    if (typeCode === 'DELAY') {
+        // ENVÍO DEMORADO → siempre el aviso accionable (reprogramar / retiro), decide
+        // la config del evento SHIPMENT_DELAYED (habilitado + destinatario).
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_DELAYED, shipment.id, { _incidentId: String(incidentId) })
+            .catch(e => console.error('[incident] notif SHIPMENT_DELAYED:', e.message));
+    } else if (typeCode !== 'PACKAGE_BROKEN') {
+        // Tipos genéricos: aviso informativo, atado al toggle global de incidencias (como antes).
+        if (cfg.notifyShipmentRecipient && cfg.notifyOnGeneric !== false) {
+            require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_INCIDENT, shipment.id, { _incidentId: String(incidentId) })
+                .catch(e => console.error('[incident] notif SHIPMENT_INCIDENT:', e.message));
         }
     }
-    // LGT-204: si es paquete dañado, avisar al remitente para que elija reembolso/reemplazo.
+    // LGT-204: PAQUETE DAÑADO → SIEMPRE avisar al cliente (destinatario/remitente/ambos según
+    // el destinatario configurado en el evento SHIPMENT_PACKAGE_DAMAGED) para que elija
+    // reembolso/reemplazo. Decide la config del evento, no el toggle global.
     require('../services/incidentDamageResolution').notifySenderIfDamage({ incidentId, shipment, type })
-        .catch(e => console.error('[incident] notif daño remitente:', e.message));
+        .catch(e => console.error('[incident] notif daño cliente:', e.message));
 
     if (emails.length === 0) { return; }
 
