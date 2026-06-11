@@ -4,9 +4,11 @@
         <span><%= support.nombre %></span>
     </a>
     <div class="portal-nav-right">
+        <%# Pestañas de sección: solo cuando el cliente está logueado / tiene token de acceso. %>
+        <% if (locals.portalClient) { %>
         <a href="/portal/mis-envios" class="portal-nav-link">
             <span class="material-symbols-outlined">inventory_2</span>
-            Portal autogestivo
+            Mis envíos
         </a>
         <a href="/portal/mis-envios/incidencias" class="portal-nav-link">
             <span class="material-symbols-outlined">report</span>
@@ -20,6 +22,7 @@
             <span class="material-symbols-outlined">feedback</span>
             Encuestas incidencias
         </a>
+        <% } %>
         <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
             <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
             <span id="theme-label">Modo claro</span>
