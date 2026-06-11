@@ -11,6 +11,8 @@ const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
 const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
 const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
+const shipmentHistoryModel = require('../models/shipmentHistory');
+const { ShipmentHistoryEvent, NotificationEvent } = require('../constants/enums');
 const settingModel = require('../models/setting');
 const { URLSearchParams } = require('url');
 
@@ -375,13 +377,18 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
     }
 
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
-    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
-    if (eligibilityError) { return { ok: false, status: 400, message: eligibilityError }; }
+    // Mismas validaciones que el alta interna: duplicado del mismo tipo + estado
+    // bloqueado, y además bloqueo de demora si el envío sigue dentro del plazo
+    // (los canales cliente no tienen el "confirmar igual" del operador).
+    const eligibilityError = incidentRules.getClientEligibilityError(shipment, type, openIncidents);
+    // field: 'eligibility' → no es un problema de email; el chatbot NO debe mandar a
+    // "cambiá el email" sino mostrar el motivo (ej: el envío aún no está demorado).
+    if (eligibilityError) { return { ok: false, status: 400, field: 'eligibility', message: eligibilityError }; }
 
     // Validar que el email del reportante coincida con sender o recipient.
     const emailCheck = incidentEmailValidation.validateReporterEmail(shipment, reporterEmail);
     if (!emailCheck.ok) {
-        return { ok: false, status: 400, message: emailCheck.message };
+        return { ok: false, status: 400, field: 'email', message: emailCheck.message };
     }
 
     // Limpiar tokens expirados antes de insertar uno nuevo (lazy GC).
@@ -475,8 +482,9 @@ const confirmIncidentByToken = async (rawToken) => {
     }
 
     // Re-evaluamos elegibilidad: puede haber cambiado el estado del envio en este lapso.
+    // Mismas reglas que el alta (incluye bloqueo de demora dentro de plazo y duplicados).
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
-    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
+    const eligibilityError = incidentRules.getClientEligibilityError(shipment, type, openIncidents);
     if (eligibilityError) {
         await incidentPendingModel.deleteByToken(token).catch(() => {});
         return { ok: false, status: 400, message: `No se puede confirmar el reporte: ${eligibilityError}` };
@@ -664,16 +672,23 @@ const getSelfServiceForm = async (req, res) => {
         // cuándo recibiría a domicilio vs cuándo podría retirar por sucursal y decide.
         const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
         const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
+        // Recálculo ML (urgencia express): nueva fecha más pronta para el envío demorado.
+        // Si el ML no está disponible cae a una heurística rápida (no bloquea la carga).
+        const expressEta = await require('../services/deliveryEtaPredictor').predictExpressEta(shipment);
         res.render('portal/selfService', {
             shipment,
             timeWindows,
             branches,
             editable,
             saved: req.query.saved === '1',
+            accepted: req.query.accepted === '1',
             appliedCount: Number(req.query.applied) || 0,
             pendingCount: Number(req.query.pending) || 0,
             etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
             etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
+            expressEtaLabel: formatDate(expressEta.date, etaFmt),
+            expressEtaIso:   expressEta.date.toISOString().slice(0, 10),
+            expressEtaSource: expressEta.source,
         });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
@@ -696,6 +711,45 @@ const saveSelfService = async (req, res) => {
         // NFAL07: no permitir reprogramar con un link ya usado o vencido.
         if (shipmentModel.selfServiceTokenState(shipment) !== 'ok') {
             return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
+
+        // ── Demora: el destinatario ACEPTA esperar la nueva fecha (recálculo express) ──
+        // No cambia franja/modalidad, solo confirma la nueva fecha estimada. Antes este
+        // caso caía en "No se detectaron cambios" y dejaba la página colgada; ahora se
+        // persiste expectedDeliveryDate (visible en detalle de envío) y se consume el link.
+        const wantsJson = (req.get('accept') || '').includes('application/json');
+        if (req.body.action === 'accept_new_date') {
+            if (!canModifyShipment(shipment)) {
+                const msg = 'Este envío ya no admite cambios desde autogestión.';
+                return wantsJson ? res.status(409).json({ ok: false, error: msg })
+                    : res.status(409).render('error', { status: 409, reason: msg });
+            }
+            const iso = String(req.body.newExpectedDate || '').slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(new Date(iso).getTime())) {
+                const msg = 'La nueva fecha de entrega no es válida.';
+                return wantsJson ? res.status(400).json({ ok: false, error: msg })
+                    : res.status(400).render('error', { status: 400, reason: msg });
+            }
+            await Shipment.update({ expectedDeliveryDate: iso }, { where: { id: shipment.id } });
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: shipment.statusId,
+                toStatusId:   shipment.statusId,
+                comment:      `El destinatario aceptó esperar la nueva fecha estimada de entrega (${iso}) desde autogestión por demora.`,
+                userId:       null,
+                eventType:    ShipmentHistoryEvent.MODIFICATION_APPLIED,
+            }).catch(e => console.error('saveSelfService accept history:', e.message));
+            // Aviso de reprogramación al cliente (best-effort).
+            try {
+                require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, shipment.id).catch(() => {});
+            } catch { /* notif best-effort */ }
+            await shipmentModel.markSelfServiceTokenUsed(shipment.id)
+                .catch(e => console.error('markSelfServiceTokenUsed:', e.message));
+
+            if (wantsJson) {
+                return res.json({ ok: true, trackingId: shipment.trackingId, newDate: iso });
+            }
+            return res.redirect(`/portal/self-saved/${shipment.trackingId}?accepted=1`);
         }
 
         const result = await submitPortalModification({
@@ -742,7 +796,10 @@ const getSelfServiceSaved = (req, res) => {
     const { trackingId } = req.params;
     const appliedCount = Number(req.query.applied) || 0;
     const pendingCount = Number(req.query.pending) || 0;
-    res.render('portal/selfServiceSaved', { trackingId, appliedCount, pendingCount });
+    res.render('portal/selfServiceSaved', {
+        trackingId, appliedCount, pendingCount,
+        accepted: req.query.accepted === '1',
+    });
 };
 
 module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };

@@ -251,6 +251,25 @@ async function handleConfirm(runtime, createIncidentFromPortal) {
     });
 
     if (!result.ok) {
+        // Si el error NO es de email (ej: el envío todavía no está demorado según su
+        // fecha de entrega, ya hay una incidencia de ese tipo abierta, o el estado no
+        // lo permite), no tiene sentido mandar a "cambiá el email": mostramos el motivo
+        // real y ofrecemos volver al inicio. Misma validación que el alta interna.
+        if (result.field && result.field !== 'email') {
+            clearDraft(runtime);
+            return {
+                messages: [
+                    createMessage({
+                        text: 'No pude crear el reporte: ' + result.message,
+                        actions: [
+                            createAction('Empezar de nuevo', 'report-incident-start'),
+                            createAction('Volver al menú', 'show-main-menu'),
+                        ],
+                    }),
+                ],
+                effects: [],
+            };
+        }
         // El error mas comun aca es que el email no coincide con el remitente/destinatario.
         // Reintentar con los mismos datos volveria a fallar (quedaba "tildado"), asi que
         // dejamos el wizard en el paso de email y ofrecemos cambiarlo o volver al inicio.

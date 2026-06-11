@@ -20,7 +20,9 @@
             <div class="icon">✓</div>
             <h1>Envío <span class="pill"><%= trackingId %></span></h1>
             <div class="ok">
-                <% if (pendingCount > 0 && appliedCount > 0) { %>
+                <% if (typeof accepted !== 'undefined' && accepted) { %>
+                    <strong>FORMULARIO ENTREGADO.</strong> Registramos que vas a esperar la nueva fecha estimada de entrega y actualizamos tu envío.
+                <% } else if (pendingCount > 0 && appliedCount > 0) { %>
                     Algunos cambios se aplicaron de inmediato y otros quedaron pendientes de revisión operativa.
                 <% } else if (pendingCount > 0) { %>
                     Tu solicitud quedó pendiente de revisión operativa. Te notificaremos novedades.
