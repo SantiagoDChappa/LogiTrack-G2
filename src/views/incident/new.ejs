@@ -234,6 +234,32 @@
         (function () {
             const form = document.getElementById('incidentForm');
             if (!form) return;
+
+            // #3: aviso de "demora dentro de plazo" como popup (sin recargar).
+            <%
+                const _delayType = (types || []).find(t => t.code === 'DELAY');
+                let _within = false;
+                if (typeof shipment !== 'undefined' && shipment && shipment.expectedDeliveryDate) {
+                    const _exp = new Date(shipment.expectedDeliveryDate);
+                    if (!isNaN(_exp.getTime())) {
+                        const _t0 = new Date(); _t0.setHours(0, 0, 0, 0); _exp.setHours(0, 0, 0, 0);
+                        _within = _exp >= _t0;
+                    }
+                }
+            %>
+            const DELAY_TYPE_ID = '<%= _delayType ? _delayType.id : "" %>';
+            const DELAY_WITHIN_WINDOW = <%= _within ? 'true' : 'false' %>;
+            function confirmDelayWarning() {
+                const msg = 'El envío todavía está dentro del plazo estimado de entrega. ¿Confirmás abrir igual una incidencia por demora?';
+                if (window.Swal && typeof window.Swal.fire === 'function') {
+                    return window.Swal.fire({
+                        title: 'Envío dentro del plazo', text: msg, icon: 'warning',
+                        showCancelButton: true, confirmButtonText: 'Sí, crear igual', cancelButtonText: 'Cancelar'
+                    }).then(function (r) { return !!r.isConfirmed; });
+                }
+                return Promise.resolve(window.confirm(msg));
+            }
+
             const focusField = (el) => {
                 if (!el) { return; }
                 if (typeof el.scrollIntoView === 'function') {
@@ -263,6 +289,21 @@
                         subtitle: 'Falta un paso mas antes de poder crear la incidencia.',
                         intro: 'Revisa estos campos y vuelve a intentar.',
                         items: missing
+                    });
+                    return;
+                }
+                // #3: "Envío demorado" pero el envío sigue dentro del plazo → confirmar
+                // en popup (sin recargar). Si confirma, se reenvía con confirmWarning=1.
+                if (DELAY_WITHIN_WINDOW && DELAY_TYPE_ID
+                    && String(form.incidentTypeId.value) === DELAY_TYPE_ID
+                    && !form.querySelector('input[name="confirmWarning"]')) {
+                    e.preventDefault();
+                    confirmDelayWarning().then(function (ok) {
+                        if (!ok) { return; }
+                        const inp = document.createElement('input');
+                        inp.type = 'hidden'; inp.name = 'confirmWarning'; inp.value = '1';
+                        form.appendChild(inp);
+                        form.submit();
                     });
                 }
             });
