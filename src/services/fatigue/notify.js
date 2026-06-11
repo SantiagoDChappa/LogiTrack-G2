@@ -95,6 +95,12 @@ async function sendTemplated({ eventCode, branchId, defaultSubject, defaultBody,
         return 0;
     }
 
+    // Link absoluto al panel de Ojo de Patrón para los CTA (las plantillas HTML lo usan).
+    try {
+        const ph = require('../notificationPlaceholders');
+        if (!vars.panelUrl) { vars.panelUrl = `${ph.baseUrl()}/fatigue`; }
+    } catch { /* sin baseUrl: el token queda vacío */ }
+
     let subject = defaultSubject;
     let body = defaultBody;
     let format = 'text';

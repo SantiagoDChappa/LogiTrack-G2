@@ -71,6 +71,7 @@ const CATALOG = [
     { token: 'minutos',              label: 'Minutos',              group: 'Control de fatiga', description: 'Minutos sin completar el re-chequeo pedido en ruta.',      resolve: s => (notNil(s._minutos) ? String(s._minutos) : '') },
     { token: 'ventanaCantidad',      label: 'Cantidad de bloqueos', group: 'Control de fatiga', description: 'Bloqueos por fatiga en la ventana de patrón recurrente.',  resolve: s => (notNil(s._ventanaCantidad) ? String(s._ventanaCantidad) : '') },
     { token: 'ventanaDias',          label: 'Ventana (días)',       group: 'Control de fatiga', description: 'Cantidad de días de la ventana de patrón recurrente.',     resolve: s => (notNil(s._ventanaDias) ? String(s._ventanaDias) : '') },
+    { token: 'panelUrl',             label: 'Enlace al panel',      group: 'Control de fatiga', description: '🔗 Link al panel de Ojo de Patrón (/fatigue).',            resolve: s => s._panelUrl || `${baseUrl()}/fatigue` },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
