@@ -47,6 +47,11 @@ function nextCheckAt(session, cfg, derived) {
         return session.restUntil ? new Date(session.restUntil) : null;
     }
     if (derived.state === RecheckState.STOPPED && session.stoppedAt) {
+        // El re-chequeo se dispara solo si, además de estar detenido el mínimo, YA manejaste
+        // el mínimo. Estando detenido el manejo queda congelado: si todavía no llegaste al
+        // umbral de manejo, detenerte no va a disparar el re-chequeo → no hay "próxima hora".
+        const driveMet = (derived.driveMin || 0) >= cfg.recheckDriveMin;
+        if (!driveMet) { return null; }
         return new Date(new Date(session.stoppedAt).getTime() + cfg.recheckStoppedMin * MS_MIN);
     }
     return null;

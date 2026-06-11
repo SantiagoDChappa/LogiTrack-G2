@@ -1838,9 +1838,31 @@
         const FATIGUE_TZ  = '<%= typeof displayTimezone !== "undefined" && displayTimezone ? displayTimezone : "America/Argentina/Buenos_Aires" %>';
         const FATIGUE_H12 = <%= (typeof clock24h !== "undefined" && !clock24h) ? "true" : "false" %>;
         const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: FATIGUE_TZ, hour12: FATIGUE_H12 }); } catch (_) { return '--:--'; } };
+        // Muestra la hora REAL del próximo chequeo/reintento (en la zona de Ajustes) con
+        // una cuenta regresiva en vivo. Al llegar a la hora, dispara un refresh para que
+        // el re-chequeo se active automáticamente (sin esperar el siguiente poll).
+        let nextTick = null;
         const showNext = (iso, label) => {
+            if (nextTick) { clearInterval(nextTick); nextTick = null; }
             if (!iso) { nextLbl.style.display = 'none'; return; }
-            nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span>`;
+            const target = new Date(iso).getTime();
+            let firedAtZero = false;
+            const paint = () => {
+                const remMs = target - Date.now();
+                let cd;
+                if (remMs <= 0) {
+                    cd = 'ahora';
+                    if (nextTick) { clearInterval(nextTick); nextTick = null; }
+                    if (!firedAtZero) { firedAtZero = true; refresh(); } // activa el re-chequeo puntual
+                } else {
+                    const totalSec = Math.floor(remMs / 1000);
+                    const m = Math.floor(totalSec / 60); const s = totalSec % 60;
+                    cd = m > 0 ? `en ${m}m ${String(s).padStart(2, '0')}s` : `en ${s}s`;
+                }
+                nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span> <span style="opacity:.85">(${cd})</span>`;
+            };
+            paint();
+            nextTick = setInterval(paint, 1000);
             nextLbl.style.display = 'block';
         };
 
