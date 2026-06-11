@@ -32,17 +32,29 @@
         return el;
     }
 
+    // Red de seguridad: si tras mostrar el loader NO hubo navegación (la validación
+    // frenó el submit, un modal canceló la acción, un error, etc.), se auto-oculta
+    // para no quedar "Cargando…" colgado para siempre.
+    let safetyTimer = null;
+
     function show() {
         const el = ensureNode();
         el.classList.add('is-active');
         el.setAttribute('aria-hidden', 'false');
+        if (safetyTimer) { clearTimeout(safetyTimer); }
+        safetyTimer = window.setTimeout(hide, 15000);
     }
     function hide() {
+        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
         const el = document.getElementById('page-loader');
         if (!el) { return; }
         el.classList.remove('is-active');
         el.setAttribute('aria-hidden', 'true');
     }
+
+    // Expuesto para que otros scripts (ej. la validación de incidencias) puedan
+    // ocultar el loader si frenan una acción.
+    window.hidePageLoader = hide;
 
     function isInternalLink(a) {
         if (!a || !a.href) { return false; }
@@ -69,7 +81,11 @@
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) { return; }
         const a = e.target && e.target.closest ? e.target.closest('a') : null;
         if (!isInternalLink(a)) { return; }
-        show();
+        // Esperamos al final del ciclo del evento: si otro handler cancela la
+        // navegación (abre un modal, valida, etc.), no mostramos el loader.
+        window.setTimeout(function () {
+            if (!e.defaultPrevented) { show(); }
+        }, 0);
     }, true);
 
     document.addEventListener('submit', function (e) {

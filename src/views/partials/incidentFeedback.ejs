@@ -234,6 +234,9 @@
     }
 
     window.showIncidentFeedback = function (opts) {
+        // La validación frenó la acción: ocultá el loader global si quedó visible,
+        // así no queda "Cargando…" colgado detrás del aviso.
+        if (typeof window.hidePageLoader === 'function') { window.hidePageLoader(); }
         const input = Object.assign({}, opts || {});
         const tone = input.icon || 'warning';
 
