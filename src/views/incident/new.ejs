@@ -45,7 +45,44 @@
                 <% } %>
             </div>
 
+            <% if (shipment && Array.isArray(openIncidents) && openIncidents.length) { %>
+                <%
+                    const _stLabel = { OPEN: 'Abierta', IN_REVIEW: 'En revisión' };
+                %>
+                <div class="assoc-incidents" role="note">
+                    <div class="assoc-incidents__head">
+                        <span class="material-symbols-outlined">report</span>
+                        Este envío ya tiene <strong><%= openIncidents.length %></strong> incidencia<%= openIncidents.length === 1 ? '' : 's' %> abierta<%= openIncidents.length === 1 ? '' : 's' %>
+                    </div>
+                    <ul class="assoc-incidents__list">
+                        <% openIncidents.forEach(i => { %>
+                            <li>
+                                <a href="/incident/<%= i.id %>" target="_blank" rel="noopener">#<%= i.id %></a>
+                                <span class="assoc-incidents__type"><%= i.type ? i.type.description : 'Sin tipo' %></span>
+                                <span class="assoc-incidents__badge assoc-incidents__badge--<%= i.status %>"><%= _stLabel[i.status] || i.status %></span>
+                            </li>
+                        <% }) %>
+                    </ul>
+                    <small>Revisá que el tipo que vas a reportar no esté ya abierto para no duplicar.</small>
+                </div>
+            <% } %>
+
             <style>
+            .assoc-incidents {
+                margin: 0 0 1rem; padding: .85rem 1rem; border-radius: 10px;
+                background: rgba(217,119,6,.10); border: 1px solid rgba(217,119,6,.35);
+            }
+            .assoc-incidents__head { display: flex; align-items: center; gap: .4rem; font-weight: 600; color: #b45309; font-size: .92rem; }
+            .assoc-incidents__head .material-symbols-outlined { font-size: 20px; }
+            .assoc-incidents__list { list-style: none; margin: .55rem 0 .35rem; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+            .assoc-incidents__list li { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .88rem; }
+            .assoc-incidents__list a { font-weight: 700; color: var(--color-primary); text-decoration: none; }
+            .assoc-incidents__list a:hover { text-decoration: underline; }
+            .assoc-incidents__type { color: var(--color-text); }
+            .assoc-incidents__badge { font-size: .72rem; font-weight: 700; padding: .1rem .5rem; border-radius: 999px; }
+            .assoc-incidents__badge--OPEN { background: rgba(220,38,38,.15); color: #dc2626; }
+            .assoc-incidents__badge--IN_REVIEW { background: rgba(37,99,235,.15); color: var(--color-primary); }
+            .assoc-incidents small { color: var(--color-text-secondary); font-size: .8rem; }
             .ship-search-wrapper input {
                 width: 100%; padding: .65rem .85rem;
                 border: 1px solid var(--color-border); border-radius: 10px;

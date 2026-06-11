@@ -18,7 +18,7 @@ const incidentAttachmentModel = require('../models/incidentAttachment');
 const { IncidentAttachment }  = incidentAttachmentModel;
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
-    ShipmentHistoryEvent, NotificationEvent, Status
+    ShipmentHistoryEvent, NotificationEvent, Status, IncidentStatusLabel
 } = require('../constants/enums');
 
 const roleDescriptionById = Object.values(RoleType).reduce((acc, r) => {
@@ -154,27 +154,41 @@ const getCreateForm = async (req, res) => {
     // Si entramos desde un envío, pre-seleccionamos su sucursal actual (o "Sin sucursal" = 0)
     // para ahorrar clics: el picker la auto-selecciona y lista sus usuarios al cargar.
     const prefillForm = shipment
-        ? { branchId: shipment.currentBranchId != null ? String(shipment.currentBranchId) : '0' }
+        ? { branchId: (shipment.currentBranchId !== null && shipment.currentBranchId !== undefined) ? String(shipment.currentBranchId) : '0' }
         : {};
-    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: prefillForm });
+    // Incidencias ya abiertas del envío: se le muestran al operador para que sepa qué
+    // tiene asociado antes de crear otra (y no duplique un tipo ya abierto).
+    const openIncidents = shipment ? await incidentModel.findOpenByShipmentWithType(shipment.id) : [];
+    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: prefillForm, openIncidents });
 };
 
 // Datos para el modal rápido de incidencia (acción in-situ desde detalle/tabla de envíos):
 // tipos activos + staff disponible. El front filtra los usuarios por la sucursal del envío.
 const getQuickData = async (req, res) => {
-    const [types, users] = await Promise.all([
+    const shipmentId = req.query.shipmentId ? Number(req.query.shipmentId) : null;
+    const [types, users, openIncidents] = await Promise.all([
         incidentTypeModel.getActive(),
         User.findAll({
             where: { active: true, roleId: STAFF_ROLES },
             attributes: ['id', 'fullName', 'roleId', 'branchId'],
             order: [['fullName', 'ASC']]
-        })
+        }),
+        // Incidencias ya abiertas del envío (si se abrió el modal desde uno), para
+        // avisarle al operador qué tiene asociado antes de crear otra.
+        shipmentId ? incidentModel.findOpenByShipmentWithType(shipmentId) : Promise.resolve([])
     ]);
     res.json({
         types: types.map(t => ({ id: t.id, code: t.code, description: t.description })),
         users: users.map(u => ({
             id: u.id, fullName: u.fullName, roleId: u.roleId,
             roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
+        })),
+        incidents: openIncidents.map(i => ({
+            id: i.id,
+            status: i.status,
+            statusLabel: IncidentStatusLabel[i.status] || i.status,
+            typeCode: i.type ? i.type.code : null,
+            typeLabel: i.type ? i.type.description : 'Sin tipo',
         })),
     });
 };
@@ -200,11 +214,14 @@ const create = async (req, res) => {
             id: u.id, fullName: u.fullName, roleId: u.roleId,
             roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
         }));
+        const errShipment = shipmentId ? await shipmentModel.getById(Number(shipmentId)) : null;
+        const errOpenIncidents = errShipment ? await incidentModel.findOpenByShipmentWithType(errShipment.id) : [];
         return res.status(400).render('incident/new', {
-            shipment: shipmentId ? await shipmentModel.getById(Number(shipmentId)) : null,
+            shipment: errShipment,
             types, branches, users: usersPayload,
             error: errorMessage,
-            form: req.body
+            form: req.body,
+            openIncidents: errOpenIncidents
         });
     };
 
@@ -553,7 +570,6 @@ const changeStatus = async (req, res) => {
 
 // Notifica al cliente el cambio de estado de una incidencia vía el sistema de
 // plantillas editables (evento INCIDENT_STATUS_CHANGE). Fire-and-forget.
-const { IncidentStatusLabel } = require('../constants/enums');
 function notifyIncidentStatusChange(shipmentId, incidentId, toStatus, comentario) {
     if (!shipmentId) { return; }
     require('./shipment').notifyShipmentEvent(NotificationEvent.INCIDENT_STATUS_CHANGE, shipmentId, {

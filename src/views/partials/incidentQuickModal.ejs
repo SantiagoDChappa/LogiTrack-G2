@@ -18,6 +18,10 @@
                 <span class="iqm-chip iqm-chip--muted"><span class="material-symbols-outlined">store</span><span id="iqm-branchName">—</span></span>
             </div>
 
+            <%# Incidencias ya abiertas del envío: se cargan al abrir el modal para que el
+                operador sepa qué tiene asociado y no duplique un tipo. %>
+            <div class="iqm-assoc" id="iqm-assoc" hidden></div>
+
             <div class="iqm-field">
                 <label for="iqm-type">Tipo <span class="iqm-req">*</span></label>
                 <select id="iqm-type" name="incidentTypeId" required></select>
@@ -85,6 +89,14 @@
     .iqm-warning { display: flex; align-items: flex-start; gap: .5rem; font-size: .85rem; background: rgba(217,119,6,.12); border: 1px solid rgba(217,119,6,.35); color: #92400e; padding: .6rem .75rem; border-radius: 8px; }
     .iqm-warning input { margin-top: .15rem; }
     .iqm-error { font-size: .85rem; color: #dc2626; background: rgba(220,38,38,.1); border: 1px solid rgba(220,38,38,.3); padding: .6rem .75rem; border-radius: 8px; }
+    .iqm-assoc { font-size: .85rem; background: rgba(217,119,6,.1); border: 1px solid rgba(217,119,6,.35); color: #92400e; padding: .6rem .75rem; border-radius: 8px; }
+    .iqm-assoc__head { display: flex; align-items: center; gap: .35rem; font-weight: 600; }
+    .iqm-assoc__head .material-symbols-outlined { font-size: 18px; }
+    .iqm-assoc ul { list-style: none; margin: .45rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+    .iqm-assoc li { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .iqm-assoc a { font-weight: 700; color: var(--color-primary); text-decoration: none; }
+    .iqm-assoc a:hover { text-decoration: underline; }
+    .iqm-assoc__badge { font-size: .68rem; font-weight: 700; padding: .05rem .45rem; border-radius: 999px; background: rgba(220,38,38,.15); color: #dc2626; }
     .iqm-actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
     .iqm-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .6rem 1rem; background: var(--color-primary); color: #fff; border: none; border-radius: 8px; font-weight: 600; font-size: .9rem; cursor: pointer; text-decoration: none; }
     .iqm-btn:disabled { opacity: .6; cursor: default; }
@@ -111,12 +123,37 @@
     var elConfirm  = document.getElementById('iqm-confirm');
     var elSubmit   = document.getElementById('iqm-submit');
     var elFullLink = document.getElementById('iqm-fulllink');
+    var elAssoc    = document.getElementById('iqm-assoc');
 
     var cache = null;          // { types, users } cargado una sola vez
     var currentBranchKey = null; // id de sucursal seleccionada ('0' = sin sucursal)
 
     function close() { backdrop.setAttribute('hidden', ''); }
     function showError(msg) { elError.textContent = msg; elError.hidden = !msg; }
+
+    var escAssoc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); };
+
+    // Carga y muestra las incidencias ya abiertas del envío (si las hay).
+    function loadAssoc(shipmentId) {
+        elAssoc.hidden = true; elAssoc.innerHTML = '';
+        if (!shipmentId) { return; }
+        fetch('/incident/quick-data?shipmentId=' + encodeURIComponent(shipmentId), { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var list = (d && d.incidents) || [];
+                if (!list.length) { return; }
+                var items = list.map(function (i) {
+                    return '<li><a href="/incident/' + encodeURIComponent(i.id) + '" target="_blank" rel="noopener">#' + escAssoc(i.id) + '</a>'
+                        + '<span>' + escAssoc(i.typeLabel) + '</span>'
+                        + '<span class="iqm-assoc__badge">' + escAssoc(i.statusLabel) + '</span></li>';
+                }).join('');
+                elAssoc.innerHTML = '<div class="iqm-assoc__head"><span class="material-symbols-outlined">report</span>'
+                    + 'Ya tiene ' + list.length + ' incidencia' + (list.length === 1 ? '' : 's') + ' abierta' + (list.length === 1 ? '' : 's')
+                    + ' — revisá no duplicar el tipo.</div><ul>' + items + '</ul>';
+                elAssoc.hidden = false;
+            })
+            .catch(function () { /* no bloquea el alta si falla */ });
+    }
 
     function fillTypes() {
         elType.innerHTML = '';
@@ -180,6 +217,7 @@
         loadData()
             .then(function () { fillTypes(); fillAssignees(branchKey); })
             .catch(function () { showError('No se pudieron cargar los datos. Probá el formulario completo.'); });
+        loadAssoc(opts.shipmentId);
     };
 
     // Delegación: cualquier elemento con [data-incident-open] abre el modal con sus data-*.

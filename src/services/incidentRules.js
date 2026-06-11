@@ -48,6 +48,19 @@ const getEligibilityError = (shipment, type, existingOpenIncidents = []) => {
     return null;
 };
 
+// ¿El envío todavía está dentro del plazo estimado de entrega? (no figura demorado).
+// Devuelve la fecha prevista (Date, normalizada a medianoche) si aún no venció, o null.
+// Lo comparten el warning interno (confirmable) y el bloqueo de los canales cliente.
+const delayStillWithinWindow = (shipment) => {
+    if (!shipment || !shipment.expectedDeliveryDate) { return null; }
+    const expected = new Date(shipment.expectedDeliveryDate);
+    if (Number.isNaN(expected.getTime())) { return null; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expected.setHours(0, 0, 0, 0);
+    return expected >= today ? expected : null;
+};
+
 // Warnings (no bloqueantes): el operador puede igual abrir la incidencia confirmando.
 // - DELAY: envío todavía dentro del plazo estimado.
 // - VEH_OUT_OF_SERVICE: muestra estado actual del vehículo (habilitado / ya fuera) para
@@ -57,13 +70,8 @@ const getEligibilityWarning = (shipment, type, extras = {}) => {
     if (!shipment || !type) { return null; }
 
     if (type.code === 'DELAY') {
-        if (!shipment.expectedDeliveryDate) { return null; }
-        const expected = new Date(shipment.expectedDeliveryDate);
-        if (Number.isNaN(expected.getTime())) { return null; }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        expected.setHours(0, 0, 0, 0);
-        if (expected >= today) {
+        const expected = delayStillWithinWindow(shipment);
+        if (expected) {
             const fmt = expected.toLocaleDateString('es-AR');
             return `El envío todavía está dentro del plazo estimado (entrega prevista ${fmt}). ¿Confirmás abrir igual una incidencia por demora?`;
         }
@@ -88,4 +96,29 @@ const getEligibilityWarning = (shipment, type, extras = {}) => {
     return null;
 };
 
-module.exports = { INCIDENT_TYPE_BLOCKED_STATUSES, getEligibilityError, getEligibilityWarning };
+// Validación para los canales del CLIENTE (portal de incidencias + chatbot), que NO
+// tienen el paso "confirmar igual" del alta interna. Aplica las mismas reglas duras
+// que getEligibilityError (duplicado del mismo tipo + estado bloqueado) y además
+// convierte el warning de demora en un BLOQUEO: si el envío sigue dentro del plazo,
+// el cliente no puede abrir una incidencia por demora (aún no figura demorado).
+// Devuelve un mensaje (string) o null si está OK.
+const getClientEligibilityError = (shipment, type, existingOpenIncidents = []) => {
+    const hard = getEligibilityError(shipment, type, existingOpenIncidents);
+    if (hard) { return hard; }
+
+    if (type && type.code === 'DELAY') {
+        const expected = delayStillWithinWindow(shipment);
+        if (expected) {
+            const fmt = expected.toLocaleDateString('es-AR');
+            return `El envío todavía está dentro del plazo estimado de entrega (prevista para el ${fmt}), así que aún no figura como demorado y no podemos registrar una incidencia por demora. Si el problema es otro, elegí el tipo que corresponda.`;
+        }
+    }
+
+    return null;
+};
+
+module.exports = {
+    INCIDENT_TYPE_BLOCKED_STATUSES,
+    getEligibilityError, getEligibilityWarning, getClientEligibilityError,
+    delayStillWithinWindow,
+};

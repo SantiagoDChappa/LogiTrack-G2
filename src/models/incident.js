@@ -114,6 +114,18 @@ const findOpenByShipment = (shipmentId) => Incident.findAll({
     attributes: ['id', 'incidentTypeId', 'status']
 });
 
+// Incidencias abiertas de un envío con su tipo y prioridad, para mostrarle al operador
+// al crear una nueva incidencia qué tiene ya asociado/abierto (evitar duplicados).
+const findOpenByShipmentWithType = (shipmentId) => {
+    const { IncidentType } = require('./incidentType');
+    return Incident.findAll({
+        where: { shipmentId, status: ['OPEN', 'IN_REVIEW'] },
+        attributes: ['id', 'incidentTypeId', 'status', 'priority', 'createdAt'],
+        include: [{ model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'], required: false }],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
 const findByShipmentIds = (shipmentIds, { statusIn, excludeChannels, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const ids = Array.isArray(shipmentIds) ? shipmentIds.filter(Boolean) : [];
@@ -139,4 +151,4 @@ const findByShipmentIds = (shipmentIds, { statusIn, excludeChannels, limit = 200
     });
 };
 
-module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment, findByShipmentIds };
+module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment, findOpenByShipmentWithType, findByShipmentIds };
