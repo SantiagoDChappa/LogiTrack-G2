@@ -1,5 +1,6 @@
 const { body, validationResult } = require("express-validator");
 const userModel = require("../models/user");
+const branchModel = require("../models/branch");
 const { RoleType } = require("../constants/enums");
 
 
@@ -57,7 +58,8 @@ const handleValidationErrors = async (req, res, next) => {
         return res.render('user/new', {
             errors:    errorsArray,
             body:      req.body,
-            roleTypes: Object.values(RoleType)
+            roleTypes: Object.values(RoleType),
+            branches:  await branchModel.getAll(),
         });
     }
 
@@ -90,6 +92,7 @@ const handleUpdateValidationErrors = async (req, res, next) => {
             errors:    errorsArray,
             user,
             roleTypes: Object.values(RoleType),
+            branches:  await branchModel.getAll(),
             returnUrl: req.query.from || '/user',
         });
     }
