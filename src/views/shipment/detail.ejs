@@ -3,7 +3,7 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <% const _hasRoute = mapData && mapData.route && mapData.route.stops && mapData.route.stops.length > 0; %>
     <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0) || _hasRoute); %>
     <% if (_hasMap) { %>
