@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const settingModel = require('../../models/setting');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Estrategia de envío:
@@ -202,9 +203,21 @@ async function sendViaSmtp(recipients, subject, content, format) {
     }
 }
 
+// ¿Resend habilitado? Toggle configurable desde Ajustes (setting 'email_resend_enabled').
+// Default ON. Si la DB falla, no bloqueamos el envío: asumimos habilitado.
+async function isResendEnabled() {
+    try {
+        const v = await settingModel.get('email_resend_enabled');
+        return (v === null || v === undefined) ? true : (v !== '0' && v !== 'false');
+    } catch {
+        return true;
+    }
+}
+
 // Lista de proveedores disponibles, en orden de preferencia: SendGrid → Resend → SMTP.
 // Cada uno se intenta sólo si está configurado; si uno falla, se pasa al siguiente.
-function buildProviderChain() {
+// Resend además se puede apagar desde Ajustes (para enviar solo por SendGrid).
+async function buildProviderChain() {
     const chain = [];
     if (USE_SENDGRID_API) {
         chain.push({ name: 'sendgrid', send: async (r, s, c, f) => {
@@ -212,7 +225,7 @@ function buildProviderChain() {
             return ok ? { ok: true } : { ok: false, error: 'SendGrid: ver log [email] ERROR' };
         }});
     }
-    if (USE_RESEND_API) {
+    if (USE_RESEND_API && await isResendEnabled()) {
         chain.push({ name: 'resend', send: sendViaResendApi });
     }
     // SMTP/Gmail como último recurso (suele estar bloqueado en Render, pero útil en local).
@@ -242,7 +255,7 @@ async function sendEmailWithResult(to, subject, content, format = 'text') {
         return { ok: false, provider: null, attempts, error: 'sin destinatarios válidos' };
     }
 
-    const chain = buildProviderChain();
+    const chain = await buildProviderChain();
     if (chain.length === 0) {
         console.warn('[email] sin proveedor de email configurado (SendGrid/Resend/SMTP)');
         return { ok: false, provider: null, attempts, error: 'sin proveedor configurado' };
@@ -274,4 +287,12 @@ async function sendEmail(to, subject, content, format = 'text') {
     return res.ok;
 }
 
-module.exports = { sendEmail, sendEmailWithResult };
+// Estado de configuración de cada proveedor (lo lee Ajustes para mostrar contexto).
+// resend.configured = hay API key; el toggle de Ajustes decide si se usa o no.
+const providerStatus = {
+    sendgrid: USE_SENDGRID_API,
+    resend:   USE_RESEND_API,
+    smtp:     Boolean(transporter),
+};
+
+module.exports = { sendEmail, sendEmailWithResult, providerStatus };

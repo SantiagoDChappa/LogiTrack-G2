@@ -41,6 +41,7 @@ router.post('/email-snippet',                  requireAdmin, settingController.s
 router.post('/email-snippet/:id',              requireAdmin, settingController.saveEmailSnippet);
 router.post('/email-snippet/:id/delete',       requireAdmin, settingController.deleteEmailSnippet);
 router.post('/test-email-override',         requireAdmin, settingController.saveTestEmailOverride);
+router.post('/email-providers',             requireAdmin, settingController.saveEmailProviders);
 router.post('/datetime',                    requireAdmin, settingController.saveDateTimeSettings);
 // Sprint 3 - 2.5 parámetros configurables nuevos
 router.post('/failed-reason',          requireAdmin, settingController.saveFailedReason);

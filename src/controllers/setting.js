@@ -118,8 +118,12 @@ const getSettings = async (req, res) => {
             test_email_override:               settings.test_email_override               || '',
             display_timezone:                  settings.display_timezone                  || require('../utils/datetime').DEFAULT_TZ,
             clock_24h:                         settings.clock_24h !== '0',
+            // Toggle de Resend como respaldo (default ON). '0' = solo SendGrid.
+            email_resend_enabled:              settings.email_resend_enabled !== '0',
         },
         timezones: require('../utils/datetime').TIMEZONES,
+        // Estado de cada proveedor de email (configurado o no) para mostrar contexto.
+        emailProviders: require('../services/notification/emailSender').providerStatus,
     });
 };
 
@@ -443,6 +447,21 @@ const saveTestEmailOverride = async (req, res) => {
     } catch (err) {
         console.error('saveTestEmailOverride:', err.message);
         res.status(500).redirect(settingBack(req, '?error=override_save'));
+    }
+};
+
+// Proveedores de email: toggle de Resend como respaldo. Apagarlo => solo SendGrid.
+// El valor lo lee la cadena de envío en cada mail (emailSender.buildProviderChain).
+const saveEmailProviders = async (req, res) => {
+    try {
+        const enabled = req.body.email_resend_enabled === 'on' ? '1' : '0';
+        const oldValue = await settingModel.get('email_resend_enabled');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'email_resend_enabled', oldValue, enabled);
+        await settingModel.set('email_resend_enabled', enabled);
+        res.redirect(settingBack(req, '?success=email_providers'));
+    } catch (err) {
+        console.error('saveEmailProviders:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=email_providers'));
     }
 };
 
@@ -913,4 +932,5 @@ module.exports = {
     saveFatigueConsentNotifConfig,
     triggerDelayDetection,
     saveDateTimeSettings,
+    saveEmailProviders,
 };

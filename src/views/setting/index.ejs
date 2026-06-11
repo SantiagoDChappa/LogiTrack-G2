@@ -1017,6 +1017,41 @@
                 </form>
             </div>
 
+            <!-- Card: Proveedores de email (SendGrid / Resend) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">alternate_email</span>
+                    Proveedores de email
+                </h2>
+                <p class="settings-subtitle">
+                    Orden de envío: <strong>SendGrid</strong> primero y, si falla, <strong>Resend</strong> como respaldo (ambos por HTTPS, no bloqueados por Render).
+                    Podés desactivar Resend para enviar <strong>solo por SendGrid</strong>.
+                </p>
+                <p class="settings-subtitle" style="margin-top:-.25rem">
+                    Estado:
+                    SendGrid <strong style="color:<%= emailProviders.sendgrid ? '#16a34a' : '#dc2626' %>"><%= emailProviders.sendgrid ? 'configurado' : 'no configurado' %></strong>
+                    · Resend <strong style="color:<%= emailProviders.resend ? '#16a34a' : '#dc2626' %>"><%= emailProviders.resend ? 'configurado' : 'no configurado' %></strong>
+                </p>
+                <% if (!emailProviders.sendgrid) { %>
+                <p class="settings-subtitle" style="color:#b45309">
+                    ⚠ SendGrid no está configurado. Si apagás Resend, <strong>no saldrá ningún email</strong> (salvo SMTP en local).
+                </p>
+                <% } %>
+                <form method="POST" action="/setting/email-providers">
+                    <div class="field" style="margin-top:.75rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" name="email_resend_enabled" <%= params.email_resend_enabled ? 'checked' : '' %>>
+                            Usar Resend como respaldo si SendGrid falla. Sin tildar: enviar solo por SendGrid.
+                        </label>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar proveedores" aria-label="Guardar proveedores">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card: Variables de notificación (ABM) -->
             <% } %>
             <% if (activeSection === 'plantillas') { %>
