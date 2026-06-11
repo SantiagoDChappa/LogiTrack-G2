@@ -616,10 +616,17 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
             return res.status(409).json({ error: `Ya tenés otra ruta en curso (#${otherActive.id}). Finalizala antes de iniciar esta.` });
         }
     }
+    const routeStartedAt = new Date();
     await Route.update(
-        { startedAt: new Date(), statusId: RouteStatus.IN_ROUTE },
+        { startedAt: routeStartedAt, statusId: RouteStatus.IN_ROUTE },
         { where: { id: req.params.id } }
     );
+    // Ojo de Patrón: ancla el conteo de manejo al inicio real de la ruta. Así el tiempo
+    // cuenta desde que arranca (no desde que se abre el widget), persiste al navegar y
+    // solo se congela cuando el conductor marca "Estoy detenido".
+    try {
+        await fatigueRecheck.startDriving(req.params.id, routeStartedAt);
+    } catch (e) { console.warn('[fatigue] startDriving:', e.message); }
     // Sprint 3 - 2.1 / 2.3: por cada envío en la ruta emitir evento OUT_FOR_DELIVERY
     // en el timeline y disparar notificación SHIPMENT_OUT_FOR_DELIVERY.
     try {

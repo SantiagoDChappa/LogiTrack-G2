@@ -70,6 +70,26 @@ async function ensureSession(routeId, route) {
     return row;
 }
 
+// Ancla el conteo de manejo al INICIO REAL de la ruta (lo llama el endpoint de
+// inicio). Garantiza que el tiempo empiece a correr desde que arranca la ruta y no
+// desde la primera vez que se abre el widget. Si la sesión ya existía (ruta reiniciada),
+// la reancla en limpio. Mientras esté en DRIVING el conteo no frena: solo se congela
+// cuando el conductor marca "Estoy detenido" (markStopped).
+async function startDriving(routeId, startedAt = new Date()) {
+    const [row, created] = await RouteFatigueSession.findOrCreate({
+        where: { routeId },
+        defaults: { routeId, driveStartedAt: startedAt, state: RecheckState.DRIVING },
+    });
+    if (!created) {
+        await row.update({
+            driveStartedAt: startedAt, state: RecheckState.DRIVING,
+            stoppedAt: null, recheckRequestedAt: null, pausedAt: null, restUntil: null,
+            updatedAt: new Date(),
+        });
+    }
+    return row;
+}
+
 // "Estoy detenido": empieza a contar la detención (Esc.1/2).
 async function markStopped(routeId, route, cfg) {
     const s = await ensureSession(routeId, route);
@@ -148,6 +168,6 @@ async function onRecheckResult(routeId, decision, cfg) {
 
 module.exports = {
     minutesBetween, deriveState, nextCheckAt, canDiscardStop,
-    ensureSession, markStopped, resume, getStatus, guardRetry, onRecheckResult,
+    ensureSession, startDriving, markStopped, resume, getStatus, guardRetry, onRecheckResult,
     RecheckState,
 };
