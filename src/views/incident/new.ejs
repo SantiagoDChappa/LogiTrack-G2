@@ -27,6 +27,7 @@
                         <span class="material-symbols-outlined">inventory_2</span>
                         <strong><%= shipment.trackingId %></strong>
                         <% if (shipment.recipient && shipment.recipient.fullName) { %>· <%= shipment.recipient.fullName %><% } %>
+                        <% if (shipment.status && shipment.status.description) { %>· <span class="ship-chip-status">Estado: <strong><%= shipment.status.description %></strong></span><% } %>
                     </div>
                 <% } else { %>
                     <div class="ship-search-wrapper" style="position:relative">
@@ -408,7 +409,7 @@
             const s = items[idx];
             if (!s) return;
             hidden.value = s.id;
-            chip.innerHTML = `<span class="material-symbols-outlined">inventory_2</span><strong>${s.trackingId}</strong>${s.recipientName ? ' · ' + s.recipientName : ''}`;
+            chip.innerHTML = `<span class="material-symbols-outlined">inventory_2</span><strong>${s.trackingId}</strong>${s.recipientName ? ' · ' + s.recipientName : ''}${s.statusLabel ? ' · Estado: <strong>' + s.statusLabel + '</strong>' : ''}`;
             selRow.style.display = 'flex';
             input.value = '';
             input.style.display = 'none';

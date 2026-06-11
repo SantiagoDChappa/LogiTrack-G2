@@ -321,7 +321,8 @@ const findShipmentByTracking = (trackingId) => {
         where: { trackingId: t.toUpperCase() },
         include: [
             { model: Person, as: 'sender',    attributes: ['id', 'fullName', 'document', 'email'] },
-            { model: Person, as: 'recipient', attributes: ['id', 'fullName', 'document', 'email'] }
+            { model: Person, as: 'recipient', attributes: ['id', 'fullName', 'document', 'email'] },
+            { model: Status, as: 'status',    attributes: ['description'] }
         ]
     });
 };
