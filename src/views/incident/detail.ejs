@@ -202,10 +202,10 @@
                                 e.preventDefault();
                                 showIncidentFeedback({
                                     title: 'Falta asignar responsable',
+                                    subtitle: 'Necesitamos saber quién va a tomar esta incidencia.',
                                     text: 'Elegí una sucursal y un usuario antes de asignar.'
                                 });
                                 return;
-                                alert('Elegí una sucursal y un usuario antes de asignar.');
                             }
                         });
                     })();
@@ -343,10 +343,9 @@
                         master.classList.add('is-invalid');
                         showIncidentFeedback({
                             title: 'Falta comentario',
+                            subtitle: 'Toda acción sobre una incidencia necesita trazabilidad.',
                             text: 'Escribí un comentario antes de ejecutar la acción.'
                         });
-                        return;
-                        alert('Escribí un comentario antes de ejecutar la acción.');
                         return;
                     }
                     master.classList.remove('is-invalid');

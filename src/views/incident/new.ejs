@@ -234,7 +234,6 @@
         (function () {
             const form = document.getElementById('incidentForm');
             if (!form) return;
-            const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const focusField = (el) => {
                 if (!el) { return; }
                 if (typeof el.scrollIntoView === 'function') {
@@ -247,25 +246,23 @@
             };
             form.addEventListener('submit', function (e) {
                 const missing = [];
-                if (!form.shipmentId.value)       { missing.push('envío'); }
-                if (!form.incidentTypeId.value)   { missing.push('tipo'); }
-                if (!(form.description.value || '').trim()) { missing.push('descripción'); }
-                if (!form.branchId.value)         { missing.push('sucursal'); }
-                if (!form.assignedToUserId.value) { missing.push('usuario asignado'); }
+                if (!form.shipmentId.value)       { missing.push('Envío'); }
+                if (!form.incidentTypeId.value)   { missing.push('Tipo de incidencia'); }
+                if (!(form.description.value || '').trim()) { missing.push('Descripción'); }
+                if (!form.branchId.value)         { missing.push('Sucursal asignada'); }
+                if (!form.assignedToUserId.value) { missing.push('Usuario asignado'); }
                 if (missing.length) {
                     e.preventDefault();
                     if (!form.shipmentId.value) { focusField(document.getElementById('shipmentSearch') || document.getElementById('ship-selected-row')); }
-                    if (missing[0] === 'descripciÃ³n') { focusField(form.description); }
+                    else if (!form.branchId.value) { focusField(document.querySelector('#branch-picker .branch-card') || document.getElementById('branch-picker')); }
                     else if (!form.incidentTypeId.value) { focusField(form.incidentTypeId); }
                     else if (!(form.description.value || '').trim()) { focusField(form.description); }
-                    if (missing[0] === 'envÃ­o') { focusField(document.getElementById('shipmentSearch') || document.getElementById('ship-selected-row')); }
+                    else if (!form.assignedToUserId.value) { focusField(document.querySelector('#user-picker .user-card') || document.getElementById('user-picker')); }
                     showIncidentFeedback({
-                        title: 'Completá los datos obligatorios',
-                        html: ''
-                            + '<p class="incident-feedback-copy">Antes de crear la incidencia, revisá estos campos:</p>'
-                            + '<ul class="incident-feedback-list">'
-                            + missing.map(item => '<li>' + escapeHtml(item) + '</li>').join('')
-                            + '</ul>'
+                        title: 'Completa los datos obligatorios',
+                        subtitle: 'Falta un paso mas antes de poder crear la incidencia.',
+                        intro: 'Revisa estos campos y vuelve a intentar.',
+                        items: missing
                     });
                 }
             });
