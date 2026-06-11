@@ -1578,7 +1578,7 @@ ul { list-style: none; }
     color: var(--c-text); text-decoration: none; font-size: 0.88rem; font-weight: 500;
     background: var(--c-bg);
 }
-.portal-card-incident-cta-link:hover { border-color: var(--c-primary); color: var(--c-primary); }
+.portal-card-incident-cta-link:hover { border-color: var(--c-primary); color: var(--c-primary); text-decoration: none; }
 
 /* ── Incidencias del envío — card estilo "detalle de envío" (público / y autogestivo) ── */
 .portal-incidents-card {
@@ -1618,8 +1618,14 @@ ul { list-style: none; }
     box-shadow: var(--shadow);
     border-left-color: #b91c1c;
     outline: none;
+    text-decoration: none;
 }
-.portal-incident-row, .portal-incident-row * { text-decoration: none; }
+/* La regla global `a:hover { text-decoration: underline }` gana por especificidad;
+   forzamos sin subrayado en la fila y todos sus hijos, incluso en hover. */
+.portal-incident-row,
+.portal-incident-row:hover,
+.portal-incident-row *,
+.portal-incident-row:hover * { text-decoration: none !important; }
 
 .portal-incident-id   { font-weight: 700; color: var(--c-danger); font-size: .9rem; letter-spacing: .02em; }
 .portal-incident-main { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
