@@ -11,6 +11,7 @@ const swaggerUi = require('swagger-ui-express');
 const cookieParser = require('cookie-parser');
 const app     = express();
 const port    = process.env.PORT || 3000;
+const assetVersion = process.env.RENDER_GIT_COMMIT || process.env.ASSET_VERSION || String(Date.now());
 
 const sequelize = require('./src/database/connection');
 // Load models and associations
@@ -101,6 +102,7 @@ app.use((req, res, next) => {
     res.locals.fmtNumber = (n, dec = 2) => Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
     res.locals.IncidentStatusLabel = IncidentStatusLabel;
     res.locals.IncidentResolutionLabel = IncidentResolutionLabel;
+    res.locals.assetVersion = assetVersion;
     next();
 });
 
