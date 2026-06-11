@@ -460,7 +460,9 @@ const addComment = async (req, res) => {
         incidentId: id,
         eventType:  IncidentEventType.COMMENT,
         comment:    comment.trim().slice(0, 2000),
-        userId:     user.id
+        userId:     user.id,
+        // "Solo comentar" del staff = interno: no se envía ni se ve en el portal.
+        internal:   true,
     });
     res.redirect(`/incident/${id}`);
 };
@@ -556,6 +558,7 @@ function notifyIncidentStatusChange(shipmentId, incidentId, toStatus, comentario
     if (!shipmentId) { return; }
     require('./shipment').notifyShipmentEvent(NotificationEvent.INCIDENT_STATUS_CHANGE, shipmentId, {
         incidentId,
+        _incidentId: incidentId,   // habilita {{incidentUrl}} apuntando a ESTA incidencia
         incidentEstado: IncidentStatusLabel[toStatus] || toStatus,
         incidentComentario: comentario || '',
     }).catch((e) => console.error('notifyIncidentStatusChange:', e.message));

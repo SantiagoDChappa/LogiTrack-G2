@@ -164,7 +164,8 @@ const loadIncidentDetailViewModel = async (incident) => {
     ]);
 
     const history = historyRows
-        .filter((row) => CLIENT_VISIBLE_EVENTS.has(row.eventType))
+        // Tipo visible para el cliente Y que no sea un comentario interno del staff.
+        .filter((row) => CLIENT_VISIBLE_EVENTS.has(row.eventType) && !row.internal)
         .map(formatHistoryDetail);
 
     const attachments = attachmentRows.map((row) => formatAttachmentRow(row, json.id));

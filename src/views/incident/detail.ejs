@@ -219,13 +219,16 @@
                         <label for="masterComment">Comentario <span class="incident-required" aria-hidden="true">*</span></label>
                         <textarea id="masterComment" rows="3" required
                                   placeholder="Escribí un comentario. Es obligatorio para cualquier acción (cambiar estado, cerrar, reabrir o comentar)."></textarea>
-                        <small class="incident-master-comment__hint">Se usa para todas las acciones de abajo y queda registrado en el historial.</small>
+                        <small class="incident-master-comment__hint">
+                            Al <strong>cambiar de estado / cerrar / reabrir</strong>, este comentario <strong>se le envía por mail al cliente</strong> y lo ve en el portal.
+                            Con <strong>“Solo comentar (interno)”</strong> queda <strong>interno</strong>: no se envía ni lo ve el cliente.
+                        </small>
                         <% if (flags.canComment) { %>
                             <form method="POST" action="/incident/<%= incident.id %>/comment" class="incident-master-comment__form" data-needs-comment="1">
                                 <input type="hidden" name="comment" value="">
-                                <button type="submit" class="btn-only-comment">
-                                    <span class="material-symbols-outlined">comment</span>
-                                    Solo comentar
+                                <button type="submit" class="btn-only-comment" title="Queda en el historial interno; el cliente no lo ve ni le llega por mail">
+                                    <span class="material-symbols-outlined">lock</span>
+                                    Solo comentar (interno)
                                 </button>
                             </form>
                         <% } %>
@@ -480,6 +483,12 @@
                                 <span class="tl-arrow material-symbols-outlined">arrow_right_alt</span>
                                 <% if (toPretty) { %><span class="tl-val tl-val--to"><%= toPretty %></span><% } else { %><span class="tl-val tl-val--empty">—</span><% } %>
                             </div>
+                        <% } %>
+                        <% if (h.internal) { %>
+                            <span class="incident-timeline-internal" title="Comentario interno: el cliente no lo ve ni le llega por mail"
+                                  style="display:inline-flex;align-items:center;gap:.25rem;margin:.25rem 0;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;background:rgba(217,119,6,.15);color:#b45309;">
+                                <span class="material-symbols-outlined" style="font-size:14px">lock</span> Interno — no visible al cliente
+                            </span>
                         <% } %>
                         <% if (h.comment) { %>
                             <p class="incident-timeline-comment"><%= h.comment %></p>
