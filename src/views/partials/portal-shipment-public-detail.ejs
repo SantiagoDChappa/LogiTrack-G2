@@ -136,6 +136,27 @@
 
     <%- include('portal-modifications-history', { modifications: typeof modifications !== 'undefined' ? modifications : [] }) %>
 
+    <% var _incidents = (typeof incidents !== 'undefined' && incidents) ? incidents : []; %>
+    <% if (_incidents.length) { %>
+    <div class="portal-history portal-incidents">
+        <span class="portal-history-title">Incidencias de tu envío</span>
+        <ul class="portal-history-list">
+            <% _incidents.forEach(function(inc) { %>
+            <li class="portal-history-item">
+                <a href="/portal/mis-envios/incidencia/<%= inc.id %>" class="portal-incident-link"
+                   style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;width:100%;text-decoration:none;color:inherit;">
+                    <span class="portal-history-date"><%= new Date(inc.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                    <span class="portal-history-to"><%= inc.typeLabel %></span>
+                    <span class="portal-incident-state portal-incident-state--<%= inc.statusLabel === 'Cerrada' ? 'closed' : 'open' %>"><%= inc.statusLabel %></span>
+                    <% if (inc.resolutionLabel) { %><span class="portal-history-comment">Resolución: <%= inc.resolutionLabel %></span><% } %>
+                    <span class="material-symbols-outlined" style="margin-left:auto;font-size:18px;opacity:.65;" aria-hidden="true">chevron_right</span>
+                </a>
+            </li>
+            <% }); %>
+        </ul>
+    </div>
+    <% } %>
+
     <div class="portal-mis-envios-actions">
         <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(s.trackingId) %>" class="portal-card-incident-cta-link">
             <span class="material-symbols-outlined">report</span>

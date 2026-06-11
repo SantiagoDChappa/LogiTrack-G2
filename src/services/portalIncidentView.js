@@ -90,6 +90,19 @@ const formatIncidentDetail = (incident) => {
     };
 };
 
+// Incidencias (abiertas + cerradas) de UN envío, formateadas para el portal.
+// Excluye las autogeneradas por el sistema (igual que el resto del portal).
+const listIncidentsForShipment = async (shipmentId) => {
+    if (!shipmentId) { return []; }
+    const [openRows, closedRows] = await Promise.all([
+        incidentModel.findByShipmentIds([shipmentId], { statusIn: OPEN_STATUSES, excludeChannels: PORTAL_EXCLUDED_CHANNELS }),
+        incidentModel.findByShipmentIds([shipmentId], { statusIn: CLOSED_STATUSES, excludeChannels: PORTAL_EXCLUDED_CHANNELS }),
+    ]);
+    return [...openRows, ...closedRows]
+        .map(formatIncidentDetail)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+};
+
 const historyEventLabel = (eventType) => ({
     [IncidentEventType.CREATED]:        'Incidencia registrada',
     [IncidentEventType.COMMENT]:        'Comentario',
@@ -206,6 +219,7 @@ const loadOwnedIncident = async (incidentId, client) => {
 module.exports = {
     getClientShipmentIds,
     listClientIncidents,
+    listIncidentsForShipment,
     formatIncidentRow,
     formatIncidentDetail,
     loadIncidentDetailViewModel,

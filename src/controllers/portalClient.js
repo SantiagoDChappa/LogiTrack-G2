@@ -21,6 +21,7 @@ const { Branch } = require('../models/branch');
 const provinceModel = require('../models/province');
 const {
     listClientIncidents,
+    listIncidentsForShipment,
     loadIncidentDetailViewModel,
     loadOwnedIncident,
 } = require('../services/portalIncidentView');
@@ -198,6 +199,7 @@ const getShipmentDetail = async (req, res) => {
 
     const enriched = await enrichShipmentRecord(shipment);
     const modifications = formatModificationsList(await listByShipment(shipmentId));
+    const incidents = await listIncidentsForShipment(shipmentId);
 
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),
@@ -205,6 +207,7 @@ const getShipmentDetail = async (req, res) => {
         shipment: enriched,
         canSelfService: canSelfService(enriched),
         modifications,
+        incidents,
     });
 };
 
