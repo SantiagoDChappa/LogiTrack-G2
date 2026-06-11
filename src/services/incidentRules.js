@@ -106,6 +106,12 @@ const getClientEligibilityError = (shipment, type, existingOpenIncidents = []) =
     const hard = getEligibilityError(shipment, type, existingOpenIncidents);
     if (hard) { return hard; }
 
+    // El envío todavía no fue despachado (Pendiente): no se movió, no hay incidencia
+    // posible desde un canal cliente. Aplica a TODOS los tipos.
+    if (shipment && shipment.statusId === Status.PENDING.id) {
+        return 'El envío todavía está pendiente de despacho, así que aún no se puede reportar una incidencia desde este canal. Cuando esté en camino vas a poder hacerlo. Ante cualquier duda, contactá a soporte.';
+    }
+
     if (type && type.code === 'DELAY') {
         const expected = delayStillWithinWindow(shipment);
         if (expected) {
