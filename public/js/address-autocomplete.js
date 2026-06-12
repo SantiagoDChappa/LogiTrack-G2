@@ -131,7 +131,10 @@
         const parts   = r.display_name.split(',').map(s => s.trim()).filter(Boolean);
         const mainLine = parts[0] || [r.street, r.number].filter(Boolean).join(' ');
         const subLine  = parts.slice(1, 3).join(', ') || [r.city, r.province_name].filter(Boolean).join(', ');
-        showChip(mainLine, subLine);
+        const cp       = r.postal || '';
+        // El CP viene del normalizador; lo mostramos para que el usuario lo verifique
+        const subWithCp = [subLine, cp ? `CP ${cp}` : ''].filter(Boolean).join(' · ');
+        showChip(mainLine, subWithCp);
 
         // Limpia el input y cierra el dropdown
         const searchBox = el('address-search');
@@ -140,7 +143,7 @@
         hideDropdown();
 
         // Marca la validación como correcta
-        setValidationState('valid', `Dirección seleccionada: <strong>${mainLine}${subLine ? ', ' + subLine : ''}</strong>`);
+        setValidationState('valid', `Dirección seleccionada: <strong>${mainLine}${subLine ? ', ' + subLine : ''}</strong>${cp ? ` — Código postal: <strong>${cp}</strong>` : ''}`);
 
         // Dispara la predicción (cambia el valor del province hidden)
         const provinceHidden = el('province');
