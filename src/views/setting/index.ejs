@@ -1090,7 +1090,7 @@
                                 <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                             </form>
                             <form method="POST" action="/setting/notification-variable/<%= v.id %>/delete">
-                                <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                                <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar" aria-label="Eliminar"><span class="material-symbols-outlined">delete</span></button>
                             </form>
                         </div>
                     <% }) %>
@@ -1130,7 +1130,7 @@
                             </form>
                             <% if (!s.builtin) { %>
                                 <form method="POST" action="/setting/email-snippet/<%= s.id %>/delete" class="abm-snip-del">
-                                    <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                                    <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar" aria-label="Eliminar"><span class="material-symbols-outlined">delete</span></button>
                                 </form>
                             <% } %>
                         </div>
@@ -1172,9 +1172,9 @@
                             <div class="tplm-row tplm-variant-row">
                                 <span class="tplm-label">Variante</span>
                                 <select id="tpl-variant-select" class="tplm-variant-select"></select>
-                                <button type="button" class="tplm-icon-action" id="tpl-variant-new" title="Nueva variante"><span class="material-symbols-outlined">add</span></button>
-                                <button type="button" class="tplm-icon-action" id="tpl-variant-default" title="Marcar como predeterminada"><span class="material-symbols-outlined">star</span></button>
-                                <button type="button" class="tplm-icon-action tplm-icon-action--danger" id="tpl-variant-delete" title="Eliminar variante"><span class="material-symbols-outlined">delete</span></button>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-new" title="Nueva variante" aria-label="Nueva variante"><span class="material-symbols-outlined">add</span></button>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-default" title="Marcar como predeterminada" aria-label="Marcar como predeterminada"><span class="material-symbols-outlined">star</span></button>
+                                <button type="button" class="tplm-icon-action tplm-icon-action--danger" id="tpl-variant-delete" title="Eliminar variante" aria-label="Eliminar variante"><span class="material-symbols-outlined">delete</span></button>
                             </div>
 
                             <div class="tplm-row">
