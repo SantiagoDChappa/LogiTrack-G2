@@ -40,7 +40,27 @@
     cursor: pointer;
 }
 
-/* La tarjeta del formulario respira mejor y no queda pegada a la izquierda en pantallas anchas. */
+/* Estos ABM tienen un solo card; el grid de 2 columnas del alta de envío lo dejaba en la
+   mitad izquierda con medio viewport vacío. Lo pasamos a una sola columna y centramos el card. */
+.form-new form {
+    grid-template-columns: 1fr;
+}
 .form-new .usuario {
-    max-width: 880px;
+    max-width: 1000px;
+    margin-inline: auto;
+    width: 100%;
+}
+/* El título y el multiselect ocupan toda la fila; los campos se adaptan al ancho. */
+.form-new .usuario > h3 {
+    grid-column: 1 / -1;
+}
+.form-new .usuario .field:has(select[multiple]) {
+    grid-column: 1 / -1;
+}
+
+/* Responsive: en pantallas chicas los campos pasan a una sola columna. */
+@media (max-width: 640px) {
+    .form-new .usuario {
+        grid-template-columns: 1fr;
+    }
 }
