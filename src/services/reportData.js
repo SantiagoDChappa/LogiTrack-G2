@@ -200,6 +200,7 @@ const getIncidentsByPeriodData = async (query = {}, deps = { sequelize, QueryTyp
         dateTo,
         error: null,
         rows: [],
+        otherDetails: [],
         totalIncidents: 0,
         hasQuery,
         exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
@@ -210,18 +211,39 @@ const getIncidentsByPeriodData = async (query = {}, deps = { sequelize, QueryTyp
         return viewModel;
     }
 
+    // LGT-211: además del total/abiertas/resueltas, se desglosa por PROCEDENCIA
+    // (resolution): procedentes / no procedentes / aún sin clasificar, dentro de cada tipo.
     viewModel.rows = await deps.sequelize.query(
         `SELECT
             it.id            AS incident_type_id,
+            it.code          AS incident_type_code,
             it.description   AS incident_type,
             COUNT(i.id)::int AS total,
             COUNT(CASE WHEN i.status IN ('OPEN', 'IN_REVIEW') THEN 1 END)::int AS open,
-            COUNT(CASE WHEN i.status NOT IN ('OPEN', 'IN_REVIEW') THEN 1 END)::int AS resolved
+            COUNT(CASE WHEN i.status NOT IN ('OPEN', 'IN_REVIEW') THEN 1 END)::int AS resolved,
+            COUNT(CASE WHEN i.resolution = 'PROCEDENTE' THEN 1 END)::int    AS procedente,
+            COUNT(CASE WHEN i.resolution = 'NO_PROCEDENTE' THEN 1 END)::int AS no_procedente,
+            COUNT(CASE WHEN i.resolution IS NULL THEN 1 END)::int           AS sin_clasificar
          FROM logitrack.incident i
          JOIN logitrack.incident_type it ON it.id = i."incidentTypeId"
          WHERE i."createdAt"::date >= :from AND i."createdAt"::date <= :to
-         GROUP BY it.id, it.description
+         GROUP BY it.id, it.code, it.description
          ORDER BY total DESC`,
+        { type: deps.QueryTypes.SELECT, replacements: { from: dateFrom, to: dateTo } }
+    );
+
+    // LGT-211 Esc.2: el tipo "Otro" se cuenta como una categoría más (ya entra arriba) y
+    // además se puede consultar el texto libre informado en cada incidencia de ese tipo.
+    viewModel.otherDetails = await deps.sequelize.query(
+        `SELECT
+            i.id                 AS id,
+            i.description        AS description,
+            i.resolution         AS resolution,
+            i."createdAt"        AS created_at
+         FROM logitrack.incident i
+         JOIN logitrack.incident_type it ON it.id = i."incidentTypeId"
+         WHERE it.code = 'OTHER' AND i."createdAt"::date >= :from AND i."createdAt"::date <= :to
+         ORDER BY i."createdAt" DESC`,
         { type: deps.QueryTypes.SELECT, replacements: { from: dateFrom, to: dateTo } }
     );
 
