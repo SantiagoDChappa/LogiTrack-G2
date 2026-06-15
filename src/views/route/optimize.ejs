@@ -6,6 +6,15 @@
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/routes.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        /* Las tablas de envíos/transportes son anchas: que no se apretujen y scrolleen en pantallas chicas. */
+        #optimize-form .table-wrapper table { min-width: 760px; }
+        #optimize-form .table-wrapper th,
+        #optimize-form .table-wrapper td { white-space: nowrap; }
+        @media (max-width: 720px) {
+            #optimize-form .table-wrapper table { min-width: 640px; }
+        }
+    </style>
 </head>
 <body>
     <%- include('../partials/header') %>
