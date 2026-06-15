@@ -148,7 +148,7 @@
                                                 <% if (g.driverName) { %><span class="k-transport-driver"><%= g.driverName %></span><% } %>
                                             </div>
                                             <span class="k-transport-count"><%= g.shipments.length %></span>
-                                            <button class="k-transport-toggle" title="Expandir / colapsar" onclick="event.stopPropagation();this.closest('[data-transport-group]').classList.toggle('k-transport-group--collapsed')">
+                                            <button class="k-transport-toggle" title="Expandir / colapsar" onclick="event.stopPropagation();this.closest('[data-transport-group]').classList.toggle('k-transport-group--collapsed')" aria-label="Expandir / colapsar">
                                                 <span class="material-symbols-outlined">expand_more</span>
                                             </button>
                                         </div>

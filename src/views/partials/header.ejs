@@ -1,3 +1,5 @@
+<!-- LGT-217 — salto al contenido para navegación por teclado/lector de pantalla. -->
+<a href="#main-content" class="skip-to-content">Saltar al contenido</a>
 <header>
     <div class="left-header">
         <button class="nav-close-btn" id="btn-nav-close" aria-label="Cerrar menú">
@@ -114,3 +116,11 @@
     </div>
 </header>
 <div id="nav-overlay" class="nav-overlay"></div>
+<script>
+    // LGT-217 — marca el <main> como destino del salto de contenido y foco programático.
+    document.addEventListener('DOMContentLoaded', function () {
+        var m = document.querySelector('main');
+        if (m && !m.id) { m.id = 'main-content'; }
+        if (m && !m.hasAttribute('tabindex')) { m.setAttribute('tabindex', '-1'); }
+    });
+</script>
