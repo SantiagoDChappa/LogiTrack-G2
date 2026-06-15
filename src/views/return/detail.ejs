@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Devolución #<%= ret.id %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <a href="/returns" class="action-btn neutro" data-tooltip="Volver" aria-label="Volver"><span class="material-symbols-outlined">arrow_back</span></a>
+            <h1>Devolución #<%= ret.id %></h1>
+            <span class="ot-badge" style="margin-left:auto;"><%= ReturnStatusLabel[ret.status] || ret.status %></span>
+        </div>
+
+        <% if (query && query.ok) { %>
+            <div class="report-alert report-alert--ok"><span class="material-symbols-outlined">check_circle</span> Solicitud gestionada.</div>
+        <% } %>
+        <% if (query && query.error) { %>
+            <div class="report-alert report-alert--error"><span class="material-symbols-outlined">error</span> <%= query.error %></div>
+        <% } %>
+
+        <div class="report-card">
+            <h2>Detalle</h2>
+            <p><strong>Envío:</strong> <%= ret.shipment ? ret.shipment.trackingId : '—' %></p>
+            <p><strong>Motivo:</strong> <%= ReturnReasonLabel[ret.reason] || ret.reason %><% if (ret.reason === 'OTRO' && ret.reasonOther) { %> — <%= ret.reasonOther %><% } %></p>
+            <p><strong>Modalidad:</strong> <%= ret.deliveryMode === 'branch' ? ('Entrega en sucursal' + (ret.pickupBranch ? ' (' + ret.pickupBranch.name + ')' : '')) : 'Retiro a domicilio' %></p>
+            <% if (ret.observations) { %><p><strong>Observaciones:</strong> <%= ret.observations %></p><% } %>
+            <% if (ret.result) { %><p><strong>Resultado:</strong> <%= ret.result === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></p><% } %>
+            <% if (ret.rejectionReason) { %><p><strong>Motivo de rechazo:</strong> <%= ret.rejectionReason %></p><% } %>
+            <% if (ret.reviewedBy) { %><p><strong>Gestionada por:</strong> <%= ret.reviewedBy.fullName %></p><% } %>
+            <p><strong>Fecha de solicitud:</strong> <%= new Date(ret.createdAt).toLocaleString('es-AR') %></p>
+        </div>
+
+        <% if (canManage) { %>
+            <div class="report-card">
+                <h2>Aprobar</h2>
+                <form method="POST" action="/returns/<%= ret.id %>/resolve">
+                    <input type="hidden" name="decision" value="approve">
+                    <label style="display:block;margin:.4rem 0;"><input type="radio" name="result" value="REEMBOLSO" required> Reembolso (genera nota de crédito)</label>
+                    <label style="display:block;margin:.4rem 0;"><input type="radio" name="result" value="REEMPLAZO"> Reemplazo (genera envío de reposición)</label>
+                    <button type="submit" class="action-btn crear" data-tooltip="Aprobar" aria-label="Aprobar"><span class="material-symbols-outlined">check</span> Aprobar</button>
+                </form>
+            </div>
+            <div class="report-card">
+                <h2>Rechazar</h2>
+                <form method="POST" action="/returns/<%= ret.id %>/resolve">
+                    <input type="hidden" name="decision" value="reject">
+                    <textarea name="rejectionReason" rows="3" maxlength="2000" placeholder="Motivo del rechazo (obligatorio)" required style="width:100%;"></textarea>
+                    <button type="submit" class="action-btn eliminar" data-tooltip="Rechazar" aria-label="Rechazar"><span class="material-symbols-outlined">close</span> Rechazar</button>
+                </form>
+            </div>
+        <% } else { %>
+            <div class="report-alert"><span class="material-symbols-outlined">info</span> Esta solicitud ya fue gestionada.</div>
+        <% } %>
+
+        <div class="report-card">
+            <h2>Historial</h2>
+            <ul>
+                <% (ret.history || []).forEach(h => { %>
+                    <li><%= new Date(h.createdAt).toLocaleString('es-AR') %> — <strong><%= ReturnStatusLabel[h.toStatus] || h.toStatus %></strong><% if (h.comment) { %>: <%= h.comment %><% } %></li>
+                <% }) %>
+            </ul>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

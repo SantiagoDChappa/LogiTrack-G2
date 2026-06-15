@@ -46,6 +46,7 @@ const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
 const notificationRoutes = require('./src/routes/notification');
+const returnRoutes = require('./src/routes/return');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
 
@@ -144,6 +145,8 @@ app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
 app.use('/notification', requireAuth, requireSupervisor, notificationRoutes);
+// Gestión interna de devoluciones (LGT-183): Supervisor/Admin.
+app.use('/returns', requireAuth, requireSupervisor, returnRoutes);
 app.use('/fatigue',   requireAuth, fatigueRoutes);
 
 // PII (nombre/email/telefono por documento): SOLO usuarios logueados.

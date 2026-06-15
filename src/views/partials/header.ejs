@@ -24,7 +24,11 @@
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 2 || currentUser.roleId === 4) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                     <a href="/shipment/modifications"><ul><span class="material-symbols-outlined">edit_note</span>Modificaciones portal</ul></a>
-                <% } else if (currentUser.roleId === 3) { %>
+                <% } %>
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/returns"><ul><span class="material-symbols-outlined">assignment_return</span>Devoluciones</ul></a>
+                <% } %>
+                <% if (currentUser.roleId === 3) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Mis incidencias</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>

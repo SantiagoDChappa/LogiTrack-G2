@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Devoluciones - LogiTrack</title>
+    <link rel="stylesheet" href="/css/report.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Devoluciones pendientes</h1>
+        </div>
+
+        <% if (!returns || returns.length === 0) { %>
+            <div class="report-card">
+                <div class="report-empty-state">
+                    <span class="material-symbols-outlined">assignment_turned_in</span>
+                    <p>No hay solicitudes de devolución pendientes de evaluación.</p>
+                </div>
+            </div>
+        <% } else { %>
+            <div class="report-card">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Envío</th>
+                            <th>Motivo</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% returns.forEach(r => { %>
+                            <tr>
+                                <td><strong>#<%= r.id %></strong></td>
+                                <td><%= r.shipment ? r.shipment.trackingId : '—' %></td>
+                                <td><%= ReturnReasonLabel[r.reason] || r.reason %></td>
+                                <td><span class="ot-badge"><%= ReturnStatusLabel[r.status] || r.status %></span></td>
+                                <td><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></td>
+                                <td><a href="/returns/<%= r.id %>" class="action-btn neutro" data-tooltip="Ver" aria-label="Ver"><span class="material-symbols-outlined">visibility</span></a></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>
