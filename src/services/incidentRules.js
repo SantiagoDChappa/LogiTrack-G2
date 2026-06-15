@@ -1,4 +1,4 @@
-const { Status } = require('../constants/enums');
+const { Status, RoleType } = require('../constants/enums');
 
 // Matriz tipo de incidencia -> estados de envio donde NO aplica abrirla.
 // Si el statusId del shipment esta en esta lista, getEligibilityError lo bloquea.
@@ -13,6 +13,12 @@ const INCIDENT_TYPE_BLOCKED_STATUSES = Object.freeze({
     VEH_OUT_OF_SERVICE: [Status.DELIVERED.id, Status.CANCELLED.id],
     OTHER:          []
 });
+
+// LGT-220: roles que NO pueden cargar una incidencia de paquete roto desde el alta interna.
+// Habilitados: Supervisor, Administrador y el repartidor asignado al envío (el control de
+// "asignado" lo hace el controller). El cliente la carga por el portal (envío Entregado).
+// El Operador queda excluido.
+const DAMAGE_FORBIDDEN_ROLE_IDS = Object.freeze([RoleType.OPERATOR.id]);
 
 // Estados del envío en los que un CLIENTE puede abrir cada tipo de incidencia desde
 // los canales externos (portal autogestivo, chatbot, búsqueda de envío). Es la fuente
@@ -63,6 +69,17 @@ const getEligibilityError = (shipment, type, existingOpenIncidents = []) => {
         return `No se puede abrir una incidencia '${type.description}' porque el envío está en estado '${statusDescription(shipment.statusId)}'.`;
     }
 
+    return null;
+};
+
+// LGT-220: ¿el rol tiene vedado cargar paquete roto desde el alta interna? Devuelve un
+// mensaje (string) si está bloqueado, o null si puede. El controller la invoca solo cuando
+// el tipo es de daño (isDamageType). El repartidor habilitado es además el asignado al envío
+// (eso lo valida el controller); acá solo se filtra por rol.
+const getDamageRoleError = (roleId) => {
+    if (DAMAGE_FORBIDDEN_ROLE_IDS.includes(roleId)) {
+        return 'El Operador no puede registrar incidencias de paquete roto. Puede hacerlo un Supervisor, el repartidor asignado al envío o el cliente desde el portal (con el envío Entregado).';
+    }
     return null;
 };
 
@@ -154,6 +171,8 @@ const getClientEligibilityError = (shipment, type, existingOpenIncidents = []) =
 
 module.exports = {
     INCIDENT_TYPE_BLOCKED_STATUSES,
+    DAMAGE_FORBIDDEN_ROLE_IDS,
     getEligibilityError, getEligibilityWarning, getClientEligibilityError,
+    getDamageRoleError,
     delayStillWithinWindow,
 };
