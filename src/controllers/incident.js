@@ -379,6 +379,14 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
     require('../services/incidentDamageResolution').notifySenderIfDamage({ incidentId, shipment, type })
         .catch(e => console.error('[incident] notif daño cliente:', e.message));
 
+    // LGT-89: notificación interna IN-APP a los supervisores de la sucursal del ENVÍO
+    // (+ fallback a Administradores si la sucursal no tiene supervisor). Una por incidencia.
+    const openedByLabel = openedBy
+        ? (openedBy.fullName || openedBy.email || 'usuario interno')
+        : (reporterName ? `${reporterName} (portal)` : 'portal público');
+    notifyBranchSupervisors(incidentId, shipment, type, openedByLabel)
+        .catch(e => console.error('[incident] notif supervisores sucursal:', e.message));
+
     if (emails.length === 0) { return; }
 
     const reportedByLabel = openedBy
@@ -395,6 +403,42 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
         `Reportada por: ${reportedByLabel}\n\n` +
         `Acceder al detalle: /incident/${incidentId}`;
     await sendEmail(emails.join(','), subject, body);
+};
+
+// LGT-89: avisa por el centro in-app a los supervisores de la sucursal del envío.
+// Si la sucursal no tiene supervisor activo, hace fallback a los Administradores.
+// El contenido incluye tracking, tipo, quién la cargó y la fecha, con enlace al detalle.
+const notifyBranchSupervisors = async (incidentId, shipment, type, openedByLabel) => {
+    const inApp = require('../services/notification/inAppNotifier');
+    const branchId = shipment.currentBranchId || null;
+
+    let recipients = [];
+    if (branchId) {
+        recipients = await User.findAll({
+            where: { roleId: RoleType.SUPERVISOR.id, branchId, active: true },
+            attributes: ['id'],
+        });
+    }
+    if (recipients.length === 0) {
+        // Fallback: sin supervisor en la sucursal → Administradores.
+        recipients = await User.findAll({
+            where: { roleId: RoleType.ADMIN.id, active: true },
+            attributes: ['id'],
+        });
+    }
+    if (recipients.length === 0) { return; }
+
+    const track = shipment.trackingId || shipment.id;
+    const title = `Nueva incidencia #${incidentId} en envío ${track}`;
+    const body  = `Tipo: ${type.description} · Cargada por: ${openedByLabel} · ${new Date().toLocaleString('es-AR')}`;
+    await inApp.notifyMany(recipients.map(u => u.id), {
+        event:        'INCIDENT_CREATED',
+        title,
+        body,
+        resourceType: 'incident',
+        resourceId:   incidentId,
+        url:          `/incident/${incidentId}`,
+    });
 };
 
 // Notif a un usuario cuando es asignado o reasignado a una incidencia.
