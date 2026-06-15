@@ -779,6 +779,14 @@
                                             data-tooltip="Editar mail" aria-label="Editar mail">
                                             <span class="material-symbols-outlined">edit_note</span>
                                         </button>
+                                        <%# LGT-219 — canales por evento (multi-selección). %>
+                                        <% var _ch = config.channels || ['email']; %>
+                                        <div style="grid-column:1/-1;display:flex;gap:1.1rem;align-items:center;font-size:.84rem;flex-wrap:wrap;border-top:1px dashed var(--color-border,#e2e8f0);padding-top:.5rem;">
+                                            <span style="opacity:.7;">Canales:</span>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="in-app" <%= _ch.includes('in-app') ? 'checked' : '' %>> In-app</label>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="email" <%= _ch.includes('email') ? 'checked' : '' %>> Email</label>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="sms" <%= _ch.includes('sms') ? 'checked' : '' %>> SMS</label>
+                                        </div>
                                     </div>
                                 <% }) %>
                             </div>

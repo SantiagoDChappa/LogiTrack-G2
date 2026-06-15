@@ -144,8 +144,17 @@ const saveNotificationConfig = async (req, res) => {
             }
             if (mode !== 'custom') { custom = null; }
 
+            // LGT-219: canales (in-app/email/SMS). Un evento habilitado debe tener ≥1 canal (Esc.6).
+            const rawChannels = req.body[`channels_${cfg.eventCode}`];
+            const channels = NotificationConfigModel.serializeChannels(
+                Array.isArray(rawChannels) ? rawChannels : (rawChannels ? [rawChannels] : [])
+            );
+            if (enabled && !channels) {
+                return res.redirect(settingBack(req, '?error=channel_required'));
+            }
+
             await NotificationConfigModel.NotificationConfig.update(
-                { enabled, recipientMode: mode, customEmail: custom },
+                { enabled, recipientMode: mode, customEmail: custom, channels: channels || 'email' },
                 { where: { id: cfg.id } }
             );
         }
