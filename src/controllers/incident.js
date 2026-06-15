@@ -701,13 +701,33 @@ const setResolution = async (req, res) => {
                 ? `Tu reclamo por paquete dañado fue aprobado. Gestionamos tu ${choiceLabel}.`
                 : `Tu reclamo por paquete dañado fue revisado y resultó no procedente. Motivo: ${cleanComment}`;
             notifyIncidentStatusChange(incident.shipmentId, id, incident.status, decision);
-            if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice) {
-                // TODO(LGT-214/215): ejecutar la resolución aprobada (nota de crédito / envío de reposición).
-                console.warn(`[incident] paquete roto #${id} aprobado (${incident.damageChoice}) — pendiente ejecución LGT-214/215`);
+
+            if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMBOLSO') {
+                const r = await require('../services/creditNoteService')
+                    .generate({ shipmentId: incident.shipmentId, incidentId: id, userId: user.id });
+                if (r.ok && r.creditNote) {
+                    await incidentHistoryModel.create({
+                        incidentId: id,
+                        eventType:  IncidentEventType.COMMENT,
+                        comment:    `Nota de crédito ${r.creditNote.number} generada por reembolso (/credit-note/${r.creditNote.id}).`,
+                        userId:     user.id,
+                    });
+                }
+            } else if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMPLAZO') {
+                const r = await require('../services/replacementService')
+                    .generate({ originalShipmentId: incident.shipmentId });
+                if (r.ok && r.shipment) {
+                    await incidentHistoryModel.create({
+                        incidentId: id,
+                        eventType:  IncidentEventType.COMMENT,
+                        comment:    `Envío de reposición ${r.shipment.trackingId} generado por reemplazo (#${r.shipment.id}).`,
+                        userId:     user.id,
+                    });
+                }
             }
         }
     } catch (e) {
-        console.error('[incident] notif resolución daño:', e.message);
+        console.error('[incident] resolución de paquete dañado (notif/ejecución):', e.message);
     }
 
     res.redirect(`/incident/${id}`);

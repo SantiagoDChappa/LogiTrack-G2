@@ -33,6 +33,7 @@ const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
 const { ShipmentReturn, ShipmentReturnHistory } = require('./shipmentReturn');
+const { CreditNote } = require('./creditNote');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -212,6 +213,12 @@ const safeAssociate = () => {
     if (Shipment.hasMany && ShipmentReturn) {
         Shipment.hasMany(ShipmentReturn, { as: 'returns', foreignKey: 'shipmentId' });
     }
+    // LGT-214 - nota de crédito
+    if (CreditNote.belongsTo) {
+        if (Shipment) { CreditNote.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
+        if (Incident) { CreditNote.belongsTo(Incident, { as: 'incident', foreignKey: 'incidentId' }); }
+        if (User)     { CreditNote.belongsTo(User, { as: 'createdBy', foreignKey: 'createdByUserId' }); }
+    }
 };
 
 safeAssociate();
@@ -252,6 +259,7 @@ module.exports = {
     ShipmentModificationRequest,
     ShipmentReturn,
     ShipmentReturnHistory,
+    CreditNote,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,
