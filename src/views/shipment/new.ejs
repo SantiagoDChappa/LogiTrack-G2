@@ -27,8 +27,10 @@
                         <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="sender-phone">Teléfono</label>
-                        <input id="sender-phone" type="tel" name="senderPhone" maxlength="10" pattern="[0-9]*" inputmode="numeric" value="<%= body.senderPhone || '' %>" placeholder="Ej: 1123456789">
+                        <label for="sender-phone">Teléfono <span class="req">*</span></label>
+                        <input id="sender-phone" type="tel" name="senderPhone" maxlength="15" minlength="8" pattern="[0-9]{8,15}" inputmode="numeric" required value="<%= body.senderPhone || '' %>" placeholder="Ej: 1123456789">
+                        <span class="field-hint" id="sender-phone-area-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:none;"></span>
+                        <span class="field-hint" id="sender-phone-area-warn" role="alert" style="font-size:0.8rem;color:var(--color-warning,#b45309);margin-top:2px;display:none;">La característica no coincide con la zona del código postal. Podés continuar igual.</span>
                     </div>
                     <div class="field">
                         <label for="sender-email">Email</label>
@@ -50,8 +52,10 @@
                         <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="recipient-phone">Teléfono</label>
-                        <input id="recipient-phone" type="tel" name="recipientPhone" maxlength="10" pattern="[0-9]*" inputmode="numeric" value="<%= body.recipientPhone || '' %>" placeholder="Ej: 1123456789">
+                        <label for="recipient-phone">Teléfono <span class="req">*</span></label>
+                        <input id="recipient-phone" type="tel" name="recipientPhone" maxlength="15" minlength="8" pattern="[0-9]{8,15}" inputmode="numeric" required value="<%= body.recipientPhone || '' %>" placeholder="Ej: 1123456789">
+                        <span class="field-hint" id="recipient-phone-area-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:none;"></span>
+                        <span class="field-hint" id="recipient-phone-area-warn" role="alert" style="font-size:0.8rem;color:var(--color-warning,#b45309);margin-top:2px;display:none;">La característica no coincide con la zona del código postal. Podés continuar igual.</span>
                     </div>
                     <div class="field">
                         <label for="recipient-email">Email</label>
@@ -113,7 +117,6 @@
                     <input type="hidden" id="street"      name="street"     value="<%= body.street || '' %>">
                     <input type="hidden" id="number"      name="number"     value="<%= body.number || '' %>">
                     <input type="hidden" id="province"    name="province"   value="<%= body.province || '' %>">
-                    <input type="hidden" id="postal-code" name="postalCode" value="<%= body.postalCode || '' %>">
                     <input type="hidden" id="address-lat" name="addressLat" value="">
                     <input type="hidden" id="address-lng" name="addressLng" value="">
 
@@ -143,6 +146,15 @@
                     <div class="field">
                         <label for="floor-apartment">Piso y/o Depto <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
                         <input id="floor-apartment" type="text" name="floorApartment" value="<%= body.floorApartment || '' %>" placeholder="Ej: 3° B">
+                    </div>
+
+                    <!-- Código postal — autocompletado desde el normalizador, editable y cargable a mano (LGT-207 Esc.9/10/11) -->
+                    <div class="field">
+                        <label for="postal-code">Código postal <span style="font-weight:400;color:var(--color-text-secondary)">(autocompletado, editable)</span></label>
+                        <input id="postal-code" type="text" name="postalCode" maxlength="8" value="<%= body.postalCode || '' %>" placeholder="Ej: 1234 o B1234ABC" autocomplete="off">
+                        <span class="field-hint" id="postal-code-missing" role="alert" style="font-size:0.8rem;color:var(--color-warning,#b45309);margin-top:4px;display:none;">
+                            No detectamos el código postal de esta dirección. Ingresalo manualmente (no es obligatorio para continuar).
+                        </span>
                     </div>
                 </div>
 
@@ -218,6 +230,7 @@
     <script src="/js/prediction.js" defer></script>
     <script src="/js/address-validation.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
+    <script src="/js/phone-area.js" defer></script>
     <script src="/js/document-format.js" defer></script>
     <script src="/js/personaSugerencia.js" defer></script>
     <script src="/js/priorityInitial.js" defer></script>

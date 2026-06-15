@@ -21,10 +21,11 @@ const validateShipment = [
         .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
         .normalizeEmail(),
     body('senderPhone')
-        .optional({ checkFalsy: true })
-        .matches(/^\d+$/).withMessage('El teléfono del remitente solo debe contener dígitos')
+        .notEmpty().withMessage('El teléfono de contacto es obligatorio')
         .bail()
-        .isLength({ min: 8, max: 15 }).withMessage('Teléfono del remitente inválido (8-15 dígitos)'),
+        .matches(/^\d+$/).withMessage('Teléfono inválido (8-15 dígitos, solo números)')
+        .bail()
+        .isLength({ min: 8, max: 15 }).withMessage('Teléfono inválido (8-15 dígitos, solo números)'),
     body('senderDocument')
         .notEmpty().withMessage('El documento del remitente es obligatorio')
         .bail()
@@ -42,10 +43,11 @@ const validateShipment = [
         .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
         .normalizeEmail(),
     body('recipientPhone')
-        .optional({ checkFalsy: true })
-        .matches(/^\d+$/).withMessage('El teléfono del destinatario solo debe contener dígitos')
+        .notEmpty().withMessage('El teléfono de contacto es obligatorio')
         .bail()
-        .isLength({ min: 8, max: 15 }).withMessage('Teléfono del destinatario inválido (8-15 dígitos)'),
+        .matches(/^\d+$/).withMessage('Teléfono inválido (8-15 dígitos, solo números)')
+        .bail()
+        .isLength({ min: 8, max: 15 }).withMessage('Teléfono inválido (8-15 dígitos, solo números)'),
     body('recipientDocument')
         .notEmpty().withMessage('El documento del destinatario es obligatorio')
         .bail()
