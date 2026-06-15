@@ -1,6 +1,9 @@
-// ABM tables: filtro de texto + orden por columna + paginación, autocontenido.
-// Opt-in con <table data-tools="clave">. Reemplaza a table-paginate.js para esas tablas
-// (maneja él mismo la visibilidad de filas, así no compiten por row.style.display).
+// ABM tables: filtro + orden por columna + paginación, autocontenido (estilo "administrador").
+// Opt-in con <table data-tools="clave">.
+//   - Si existe <form ... data-tools-for="clave"> con inputs/selects marcados data-col="N"
+//     (índice de columna) o data-col="*" (cualquier columna), ese panel filtra client-side.
+//   - Si no hay panel, inyecta un buscador propio.
+// Maneja él mismo la visibilidad de filas (no compite con table-paginate.js).
 (function () {
     'use strict';
 
@@ -14,7 +17,7 @@
     const remember = (k, v) => { try { localStorage.setItem(KEY + k, String(v)); } catch (_) {} };
 
     const cellText = (row, idx) => (row.cells[idx] ? row.cells[idx].textContent.trim() : '');
-    const isNumeric = (s) => s !== '' && !isNaN(parseFloat(s.replace(/[^0-9.,-]/g, '').replace(/\.(?=.*\.)/g, '').replace(',', '.')));
+    const isNumeric = (s) => s !== '' && !isNaN(parseFloat(s.replace(/[^0-9.,-]/g, '').replace(',', '.')));
     const numVal = (s) => parseFloat(s.replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0;
 
     function build(table) {
@@ -26,7 +29,10 @@
             !r.classList.contains('empty-row') && !r.classList.contains('incident-empty') && r.dataset.skip !== 'true');
         if (rows.length === 0) { return; }
 
-        const headRow = table.tHead ? table.tHead.rows[0] : null;
+        const wrapper = table.closest('.table-wrapper, .shipments-wrapper') || table;
+
+        // Encabezados ordenables.
+        const headRow = table.tHead ? table.tHead.rows[table.tHead.rows.length - 1] : null;
         const sortableCols = [];
         if (headRow) {
             Array.from(headRow.cells).forEach((th, i) => {
@@ -46,22 +52,34 @@
             });
         }
 
-        // Toolbar con buscador.
-        const toolbar = document.createElement('div');
-        toolbar.className = 'tbl-tools';
-        const search = document.createElement('input');
-        search.type = 'search';
-        search.className = 'tbl-tools__search';
-        search.placeholder = 'Filtrar…';
-        search.setAttribute('aria-label', 'Filtrar tabla');
-        const count = document.createElement('span');
-        count.className = 'tbl-tools__count';
-        toolbar.append(search, count);
+        // Filtro: panel externo o buscador propio.
+        const panel = document.querySelector('[data-tools-for="' + key + '"]');
+        let filterInputs = [];
+        let search = null;
+        let countEl = null;
+        if (panel) {
+            filterInputs = Array.from(panel.querySelectorAll('[data-col]'));
+            panel.addEventListener('submit', (e) => { e.preventDefault(); applyFilter(); render(); });
+            filterInputs.forEach(inp => {
+                inp.addEventListener('input', () => { applyFilter(); render(); });
+                inp.addEventListener('change', () => { applyFilter(); render(); });
+            });
+        } else {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'tbl-tools';
+            search = document.createElement('input');
+            search.type = 'search';
+            search.className = 'tbl-tools__search';
+            search.placeholder = 'Filtrar…';
+            search.setAttribute('aria-label', 'Filtrar tabla');
+            countEl = document.createElement('span');
+            countEl.className = 'tbl-tools__count';
+            toolbar.append(search, countEl);
+            wrapper.insertAdjacentElement('beforebegin', toolbar);
+            search.addEventListener('input', () => { applyFilter(); render(); });
+        }
 
-        const wrapper = table.closest('.table-wrapper, .shipments-wrapper') || table;
-        wrapper.insertAdjacentElement('beforebegin', toolbar);
-
-        // Controles de paginación (mismas clases que table-paginate para heredar estilos).
+        // Paginación (mismas clases que table-paginate para heredar estilos).
         const pg = document.createElement('div');
         pg.className = 'tbl-paginate';
         pg.innerHTML = '<div class="tbl-paginate__left">'
@@ -78,24 +96,30 @@
         const sizeSel = pg.querySelector('.tbl-paginate__size');
         SIZES.forEach(n => { const o = document.createElement('option'); o.value = o.textContent = String(n); sizeSel.appendChild(o); });
 
-        const state = {
-            size: recall(key) || DEFAULT_SIZE,
-            page: 0,
-            sortCol: null,
-            sortDir: 1,
-            filtered: rows.slice(),
-        };
+        const state = { size: recall(key) || DEFAULT_SIZE, page: 0, sortCol: null, sortDir: 1, filtered: rows.slice() };
         sizeSel.value = String(state.size);
 
-        function applyFilter() {
+        function rowMatches(r) {
+            if (panel) {
+                return filterInputs.every(inp => {
+                    const v = (inp.value || '').trim().toLowerCase();
+                    if (!v) { return true; }
+                    const col = inp.getAttribute('data-col');
+                    const hay = col === '*' ? r.textContent.toLowerCase() : cellText(r, Number(col)).toLowerCase();
+                    return hay.includes(v);
+                });
+            }
             const q = search.value.trim().toLowerCase();
-            state.filtered = rows.filter(r => !q || r.textContent.toLowerCase().includes(q));
-            state.page = 0;
+            return !q || r.textContent.toLowerCase().includes(q);
         }
 
-        function sortBy(col) {
-            if (state.sortCol === col) { state.sortDir *= -1; }
-            else { state.sortCol = col; state.sortDir = 1; }
+        function applyFilter() {
+            state.filtered = rows.filter(rowMatches);
+            state.page = 0;
+            if (state.sortCol !== null) { sortRows(state.sortCol, false); }
+        }
+
+        function sortRows(col, render_) {
             const numeric = state.filtered.every(r => { const t = cellText(r, col); return t === '' || isNumeric(t); });
             state.filtered.sort((a, b) => {
                 const ta = cellText(a, col), tb = cellText(b, col);
@@ -108,11 +132,15 @@
                     if (ar) { ar.textContent = i === col ? (state.sortDir === 1 ? ' ▲' : ' ▼') : ''; }
                 });
             }
-            render();
+            if (render_) { render(); }
+        }
+
+        function sortBy(col) {
+            if (state.sortCol === col) { state.sortDir *= -1; } else { state.sortCol = col; state.sortDir = 1; }
+            sortRows(col, true);
         }
 
         function render() {
-            // Oculta todas las reales, muestra solo la página filtrada.
             rows.forEach(r => { r.style.display = 'none'; });
             const total = state.filtered.length;
             const pages = Math.max(1, Math.ceil(total / state.size));
@@ -122,10 +150,10 @@
             const to = Math.min(total, from + state.size);
             for (let i = from; i < to; i++) {
                 state.filtered[i].style.display = '';
-                tbody.appendChild(state.filtered[i]); // reordena el DOM según el sort
+                tbody.appendChild(state.filtered[i]);
             }
-            count.textContent = `${total} resultado${total === 1 ? '' : 's'}`;
-            pg.querySelector('.tbl-paginate__info').textContent = total ? ` ${total ? from + 1 : 0}–${to} de ${total}` : ' 0 resultados';
+            if (countEl) { countEl.textContent = `${total} resultado${total === 1 ? '' : 's'}`; }
+            pg.querySelector('.tbl-paginate__info').textContent = total ? ` ${from + 1}–${to} de ${total}` : ' 0 resultados';
             pg.querySelector('.tbl-paginate__page').textContent = `${state.page + 1} / ${pages}`;
             pg.querySelector('[data-act="first"]').disabled = state.page === 0;
             pg.querySelector('[data-act="prev"]').disabled = state.page === 0;
@@ -133,7 +161,6 @@
             pg.querySelector('[data-act="last"]').disabled = state.page >= pages - 1;
         }
 
-        search.addEventListener('input', () => { applyFilter(); render(); });
         sizeSel.addEventListener('change', () => { state.size = Number(sizeSel.value) || DEFAULT_SIZE; remember(key, state.size); state.page = 0; render(); });
         pg.addEventListener('click', (e) => {
             const act = e.target.closest('[data-act]');

@@ -20,6 +20,30 @@
         </div>
 
         <div class="shipments-wrapper">
+            <form class="search-form" data-tools-for="zones" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-zone-name">Nombre</label>
+                        <input type="text" id="f-zone-name" class="search-input" data-col="0" placeholder="Ej: CABA - Belgrano">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-zone-prov">Provincia</label>
+                        <input type="text" id="f-zone-prov" class="search-input" data-col="1" placeholder="Ej: 24">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-zone-state">Estado</label>
+                        <select id="f-zone-state" class="search-input" data-col="4">
+                            <option value="">Todas</option>
+                            <option value="Habilitada">Habilitada</option>
+                            <option value="Deshabilitada">Deshabilitada</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
             <div class="table-wrapper">
                 <table data-tools="zones">
                     <thead>

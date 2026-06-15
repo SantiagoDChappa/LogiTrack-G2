@@ -20,6 +20,34 @@
         </div>
 
         <div class="shipments-wrapper">
+            <form class="search-form" data-tools-for="transports" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-tr-name">Nombre</label>
+                        <input type="text" id="f-tr-name" class="search-input" data-col="0" placeholder="Ej: Camión 1">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-tr-plate">Patente</label>
+                        <input type="text" id="f-tr-plate" class="search-input" data-col="1" placeholder="Ej: AB123CD">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-tr-driver">Conductor</label>
+                        <input type="text" id="f-tr-driver" class="search-input" data-col="6" placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-tr-state">Estado</label>
+                        <select id="f-tr-state" class="search-input" data-col="8">
+                            <option value="">Todos</option>
+                            <option value="Habilitado">Habilitado</option>
+                            <option value="Deshabilitado">Deshabilitado</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
             <div class="table-wrapper">
                 <table data-tools="transports">
                     <thead>
