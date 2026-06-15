@@ -30,6 +30,14 @@ const STAFF_ROLES = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMI
 const isStaff      = (u) => STAFF_ROLES.includes(u?.roleId);
 const isDelivery   = (u) => u?.roleId === RoleType.DELIVERY.id;
 const isSupOrAdmin = (u) => u?.roleId === RoleType.SUPERVISOR.id || u?.roleId === RoleType.ADMIN.id;
+const isOperator   = (u) => u?.roleId === RoleType.OPERATOR.id;
+
+const { isDamageType } = require('../services/incidentDamageResolution');
+
+// LGT-220: el Operador no puede cargar incidencias de paquete roto, así que esos tipos
+// ni se le ofrecen en los selectores (defensa en UI; el backend igual lo rechaza).
+const visibleTypesFor = (types, user) =>
+    isOperator(user) ? types.filter(t => !isDamageType(t)) : types;
 
 const incidentVisibleTo = (incident, user) => {
     if (!incident) { return false; }
@@ -159,12 +167,13 @@ const getCreateForm = async (req, res) => {
     // Incidencias ya abiertas del envío: se le muestran al operador para que sepa qué
     // tiene asociado antes de crear otra (y no duplique un tipo ya abierto).
     const openIncidents = shipment ? await incidentModel.findOpenByShipmentWithType(shipment.id) : [];
-    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: prefillForm, openIncidents });
+    res.render('incident/new', { shipment, types: visibleTypesFor(types, user), branches, users: usersPayload, error: null, form: prefillForm, openIncidents });
 };
 
 // Datos para el modal rápido de incidencia (acción in-situ desde detalle/tabla de envíos):
 // tipos activos + staff disponible. El front filtra los usuarios por la sucursal del envío.
 const getQuickData = async (req, res) => {
+    const user = res.locals.currentUser;
     const shipmentId = req.query.shipmentId ? Number(req.query.shipmentId) : null;
     const [types, users, openIncidents] = await Promise.all([
         incidentTypeModel.getActive(),
@@ -178,7 +187,7 @@ const getQuickData = async (req, res) => {
         shipmentId ? incidentModel.findOpenByShipmentWithType(shipmentId) : Promise.resolve([])
     ]);
     res.json({
-        types: types.map(t => ({ id: t.id, code: t.code, description: t.description })),
+        types: visibleTypesFor(types, user).map(t => ({ id: t.id, code: t.code, description: t.description })),
         users: users.map(u => ({
             id: u.id, fullName: u.fullName, roleId: u.roleId,
             roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
@@ -271,6 +280,16 @@ const create = async (req, res) => {
         return wantsJson
             ? res.status(400).json({ error: 'Tipo de incidencia inválido' })
             : res.status(400).render('error', { message: 'Tipo de incidencia inválido' });
+    }
+
+    // LGT-220: paquete roto solo lo cargan Supervisor/Admin, el repartidor asignado
+    // (ya validado arriba) o el cliente por el portal. El Operador queda excluido en el
+    // backend, además de no vérsele el tipo en la UI (defensa doble).
+    if (isDamageType(type)) {
+        const roleError = incidentRules.getDamageRoleError(user.roleId);
+        if (roleError) {
+            return wantsJson ? res.status(403).json({ error: roleError }) : renderFormError(roleError);
+        }
     }
 
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
