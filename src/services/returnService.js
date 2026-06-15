@@ -86,6 +86,35 @@ const validateForm = (body) => {
     return { reason, deliveryMode: m.deliveryMode, pickupBranchId: m.pickupBranchId };
 };
 
+// LGT-218/219 — al registrarse una devolución, avisa por el centro in-app a los
+// supervisores de la sucursal del envío (fallback a Administradores), igual que LGT-89
+// para incidencias. Best-effort: no rompe el alta si la notificación falla.
+const notifyReturnCreated = async (shipment, returnId) => {
+    const inApp = require('./notification/inAppNotifier');
+    const { User } = require('../models/user');
+    const { RoleType } = require('../constants/enums');
+    const branchId = shipment.currentBranchId || null;
+
+    let recipients = [];
+    if (branchId) {
+        recipients = await User.findAll({ where: { roleId: RoleType.SUPERVISOR.id, branchId, active: true }, attributes: ['id'] });
+    }
+    if (recipients.length === 0) {
+        recipients = await User.findAll({ where: { roleId: RoleType.ADMIN.id, active: true }, attributes: ['id'] });
+    }
+    if (recipients.length === 0) { return; }
+
+    const track = shipment.trackingId || shipment.id;
+    await inApp.notifyMany(recipients.map(u => u.id), {
+        event:        'RETURN_CREATED',
+        title:        `Nueva devolución #${returnId} · envío ${track}`,
+        body:         `Pendiente de revisión · ${new Date().toLocaleString('es-AR')}`,
+        resourceType: 'return',
+        resourceId:   returnId,
+        url:          `/returns/${returnId}`,
+    });
+};
+
 const createReturn = async ({ shipment, client, body }) => {
     const elig = await checkEligibility(shipment);
     if (!elig.ok) { return { ok: false, status: 400, message: elig.error }; }
@@ -118,6 +147,9 @@ const createReturn = async ({ shipment, client, body }) => {
 
         return r;
     });
+
+    // Aviso interno in-app (best-effort, fire-and-forget).
+    notifyReturnCreated(shipment, created.id).catch((e) => console.error('[returnService] notif devolución:', e.message));
 
     return { ok: true, returnId: created.id };
 };
