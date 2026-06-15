@@ -14,13 +14,6 @@ const INCIDENT_TYPE_BLOCKED_STATUSES = Object.freeze({
     OTHER:          []
 });
 
-// LGT-220: allowlist dura de estados por tipo, para TODOS los canales (interno + cliente).
-// Si el tipo figura acá y el envío NO está en uno de esos estados, getEligibilityError
-// lo bloquea. Paquete roto solo se constata al recibir → únicamente envío Entregado.
-const INCIDENT_TYPE_REQUIRED_STATUSES = Object.freeze({
-    PACKAGE_BROKEN: [Status.DELIVERED.id],
-});
-
 // LGT-220: roles que NO pueden cargar una incidencia de paquete roto desde el alta interna.
 // Habilitados: Supervisor, Administrador y el repartidor asignado al envío (el control de
 // "asignado" lo hace el controller). El cliente la carga por el portal (envío Entregado).
@@ -73,15 +66,6 @@ const getEligibilityError = (shipment, type, existingOpenIncidents = []) => {
 
     const blocked = INCIDENT_TYPE_BLOCKED_STATUSES[type.code];
     if (blocked && blocked.includes(shipment.statusId)) {
-        return `No se puede abrir una incidencia '${type.description}' porque el envío está en estado '${statusDescription(shipment.statusId)}'.`;
-    }
-
-    // LGT-220: allowlist dura por estado (aplica a todos los canales, incluido el alta interna).
-    const required = INCIDENT_TYPE_REQUIRED_STATUSES[type.code];
-    if (required && !required.includes(shipment.statusId)) {
-        if (type.code === 'PACKAGE_BROKEN') {
-            return 'Solo podés reportar un paquete roto cuando el envío figura como Entregado.';
-        }
         return `No se puede abrir una incidencia '${type.description}' porque el envío está en estado '${statusDescription(shipment.statusId)}'.`;
     }
 
@@ -187,7 +171,6 @@ const getClientEligibilityError = (shipment, type, existingOpenIncidents = []) =
 
 module.exports = {
     INCIDENT_TYPE_BLOCKED_STATUSES,
-    INCIDENT_TYPE_REQUIRED_STATUSES,
     DAMAGE_FORBIDDEN_ROLE_IDS,
     getEligibilityError, getEligibilityWarning, getClientEligibilityError,
     getDamageRoleError,

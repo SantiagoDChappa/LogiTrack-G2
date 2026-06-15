@@ -2,26 +2,30 @@ const incidentRules = require('../../src/services/incidentRules');
 const { Status, RoleType } = require('../../src/constants/enums');
 
 const brokenType = { id: 1, code: 'PACKAGE_BROKEN', description: 'Paquete roto' };
-const delayType  = { id: 2, code: 'DELAY', description: 'Demora' };
 
-describe('LGT-220 — estado: paquete roto solo con envío Entregado (todos los canales)', () => {
-    test('PACKAGE_BROKEN en estado distinto de Entregado → bloquea con mensaje claro', () => {
+describe('LGT-220 — estado paquete roto: interno siempre permite, cliente solo Entregado', () => {
+    test('alta interna (getEligibilityError): PACKAGE_BROKEN En Tránsito → permite (null)', () => {
         const msg = incidentRules.getEligibilityError({ statusId: Status.IN_TRANSIT.id }, brokenType, []);
-        expect(msg).toBe('Solo podés reportar un paquete roto cuando el envío figura como Entregado.');
+        expect(msg).toBeNull();
     });
 
-    test('PACKAGE_BROKEN con envío Entregado → permite (null)', () => {
+    test('alta interna: PACKAGE_BROKEN Entregado → permite (null)', () => {
         const msg = incidentRules.getEligibilityError({ statusId: Status.DELIVERED.id }, brokenType, []);
         expect(msg).toBeNull();
     });
 
-    test('PACKAGE_BROKEN en Pendiente → sigue bloqueado (regla previa)', () => {
-        const msg = incidentRules.getEligibilityError({ statusId: Status.PENDING.id }, brokenType, []);
-        expect(msg).toBeTruthy();
+    test('alta interna: PACKAGE_BROKEN Pendiente/Cancelado → sigue bloqueado (regla previa)', () => {
+        expect(incidentRules.getEligibilityError({ statusId: Status.PENDING.id }, brokenType, [])).toBeTruthy();
+        expect(incidentRules.getEligibilityError({ statusId: Status.CANCELLED.id }, brokenType, [])).toBeTruthy();
     });
 
-    test('tipo sin allowlist (DELAY) no se ve afectado por la regla de estado requerido', () => {
-        const msg = incidentRules.getEligibilityError({ statusId: Status.AT_BRANCH.id }, delayType, []);
+    test('canal cliente (getClientEligibilityError): PACKAGE_BROKEN En Tránsito → bloquea (solo Entregado)', () => {
+        const msg = incidentRules.getClientEligibilityError({ statusId: Status.IN_TRANSIT.id }, brokenType, []);
+        expect(msg).toMatch(/Entregado/i);
+    });
+
+    test('canal cliente: PACKAGE_BROKEN Entregado → permite (null)', () => {
+        const msg = incidentRules.getClientEligibilityError({ statusId: Status.DELIVERED.id }, brokenType, []);
         expect(msg).toBeNull();
     });
 });
