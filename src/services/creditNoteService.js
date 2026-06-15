@@ -40,5 +40,6 @@ const generate = async ({ shipmentId, incidentId = null, returnId = null, userId
 const getById = (id) => CreditNote.findByPk(id);
 const getByShipment = (shipmentId) =>
     CreditNote.findAll({ where: { shipmentId }, order: [['createdAt', 'DESC']] });
+const getByReturn = (returnId) => CreditNote.findOne({ where: { returnId } });
 
-module.exports = { generate, getById, getByShipment, buildNumber };
+module.exports = { generate, getById, getByShipment, getByReturn, buildNumber };

@@ -12,7 +12,7 @@ const {
     getSurveyList, getSurveyForm, postSurvey, getPublicSurveyForm, postPublicSurvey,
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
-const { getReturnForm, postReturn, listReturns, returnDetail } = require('../controllers/portalReturn');
+const { getReturnForm, postReturn, listReturns, returnDetail, postEditModality } = require('../controllers/portalReturn');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
 
@@ -70,6 +70,8 @@ router.post('/portal/mis-envios/envio/:id/devolucion', requirePortalClient, post
 // LGT-186 — seguimiento de devoluciones del cliente.
 router.get('/portal/mis-envios/devoluciones',     requirePortalClient, listReturns);
 router.get('/portal/mis-envios/devolucion/:id',   requirePortalClient, returnDetail);
+// LGT-184 Esc.7/8 — editar modalidad mientras la devolución no fue tomada operativamente.
+router.post('/portal/mis-envios/devolucion/:id/modalidad', requirePortalClient, postEditModality);
 router.get('/portal/mis-envios/incidencias',        requirePortalClient, getIncidentList);
 router.get('/portal/mis-envios/incidencia/:id',     requirePortalClient, getIncidentDetail);
 router.post('/portal/mis-envios/incidencia/:id/responder', requirePortalClient, portalEvidenceUpload, postIncidentResponse);

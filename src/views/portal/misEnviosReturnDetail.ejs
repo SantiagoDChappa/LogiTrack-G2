@@ -39,8 +39,57 @@
                 <% } %>
                 <% if (ret.result) { %>
                     <p><strong>Resultado:</strong> <%= ret.result === 'REEMBOLSO' ? 'Reembolso (nota de crédito)' : 'Reemplazo (envío de reposición)' %></p>
+                    <% if (ret.result === 'REEMBOLSO' && creditNote) { %>
+                        <p><strong>Nota de crédito:</strong> <%= creditNote.number %> · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></p>
+                    <% } %>
+                    <% if (ret.result === 'REEMPLAZO' && replacement) { %>
+                        <p><strong>Envío de reposición:</strong>
+                            <a href="/portal/mis-envios/envio/<%= replacement.id %>"><%= replacement.trackingId %></a>
+                        </p>
+                    <% } %>
                 <% } %>
             </div>
+
+            <% if (typeof query !== 'undefined' && query.modalidadOk) { %>
+                <div class="portal-manage-card" style="border-left:4px solid #2e7d32;"><p style="margin:0;">Modalidad actualizada.</p></div>
+            <% } %>
+            <% if (typeof query !== 'undefined' && query.modalidadError) { %>
+                <div class="portal-manage-card" style="border-left:4px solid #c62828;"><p style="margin:0;"><%= query.modalidadError %></p></div>
+            <% } %>
+
+            <% if (canEditModality) { %>
+            <div class="portal-manage-card">
+                <h2>Cambiar modalidad</h2>
+                <form method="POST" action="/portal/mis-envios/devolucion/<%= ret.id %>/modalidad">
+                    <% const _mode = ret.deliveryMode || 'home'; %>
+                    <label class="portal-manage-radio">
+                        <input type="radio" name="deliveryMode" value="home" <%= _mode === 'home' ? 'checked' : '' %>>
+                        Retiro a domicilio
+                    </label>
+                    <div class="portal-manage-hint" id="returnHomeInfo" style="<%= _mode === 'home' ? '' : 'display:none;' %>">
+                        Pasamos a retirar por:
+                        <strong><%= [shipment.address && shipment.address.street, shipment.address && shipment.address.number].filter(Boolean).join(' ') || 'el domicilio del envío' %></strong><% if (shipment.address && shipment.address.postalCode) { %> (CP <%= shipment.address.postalCode %>)<% } %>.
+                    </div>
+                    <label class="portal-manage-radio">
+                        <input type="radio" name="deliveryMode" value="branch" <%= _mode === 'branch' ? 'checked' : '' %>>
+                        Entrega en sucursal
+                    </label>
+                    <div class="portal-search-field" id="returnBranchWrap" style="<%= _mode === 'branch' ? '' : 'display:none;' %>">
+                        <label class="portal-search-label" for="pickupBranchId">Sucursal</label>
+                        <select name="pickupBranchId" id="pickupBranchId" class="portal-search-input-field">
+                            <option value="">— seleccionar —</option>
+                            <% branches.forEach(function(b) { %>
+                            <option value="<%= b.id %>" <%= String(ret.pickupBranchId) === String(b.id) ? 'selected' : '' %>><%= b.name %><%= b.address ? ' — ' + b.address : '' %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <button type="submit" class="portal-search-panel-btn" style="margin-top:.75rem;">
+                        <span class="material-symbols-outlined">edit</span>
+                        Guardar modalidad
+                    </button>
+                </form>
+            </div>
+            <% } %>
 
             <div class="portal-manage-card">
                 <h2>Seguimiento</h2>
@@ -61,5 +110,22 @@
         </div>
     </section>
     <script src="/js/theme.js" defer></script>
+    <script>
+        (function () {
+            // Modalidad: muestra domicilio (home) o selector de sucursal (branch).
+            var homeInfo = document.getElementById('returnHomeInfo');
+            var branchWrap = document.getElementById('returnBranchWrap');
+            var branchSel = document.getElementById('pickupBranchId');
+            if (!branchWrap) { return; }
+            document.querySelectorAll('input[name="deliveryMode"]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    var branch = document.querySelector('input[name="deliveryMode"]:checked').value === 'branch';
+                    branchWrap.style.display = branch ? '' : 'none';
+                    if (homeInfo) { homeInfo.style.display = branch ? 'none' : ''; }
+                    if (branch) { branchSel.setAttribute('required', 'required'); } else { branchSel.removeAttribute('required'); }
+                });
+            });
+        })();
+    </script>
 </body>
 </html>
