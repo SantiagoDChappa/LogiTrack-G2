@@ -32,6 +32,7 @@ const { IncidentTask }         = require('./incidentTask');
 const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
+const { CreditNote } = require('./creditNote');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -196,6 +197,13 @@ const safeAssociate = () => {
         if (User)   { IncidentAttachment.belongsTo(User,   { as: 'uploadedByUser',   foreignKey: 'uploadedByUserId' }); }
         if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
     }
+
+    // LGT-214 - nota de crédito
+    if (CreditNote.belongsTo) {
+        if (Shipment) { CreditNote.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
+        if (Incident) { CreditNote.belongsTo(Incident, { as: 'incident', foreignKey: 'incidentId' }); }
+        if (User)     { CreditNote.belongsTo(User, { as: 'createdBy', foreignKey: 'createdByUserId' }); }
+    }
 };
 
 safeAssociate();
@@ -234,6 +242,7 @@ module.exports = {
     IncidentAttachment,
     IncidentPendingConfirmation,
     ShipmentModificationRequest,
+    CreditNote,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,

@@ -223,40 +223,10 @@ const getDetail = async (req, res) => {
         return { delivered: true, expected, actual, daysLate, penaltyPct: Math.min(50, daysLate * 5), onTime: daysLate === 0 };
     })();
 
-    // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
-    const costClient = await (async () => {
-        const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
-        const w = Number(shipment.weightKg || 0);
-        const v = Number(shipment.volumeM3 || 0);
-
-        if (!shipment.zone) {
-            return costoBase > 0 ? {
-                costoBase,
-                zoneBase: 0,
-                wSurcharge: 0,
-                vSurcharge: 0,
-                subtotal: costoBase,
-                penalty: 0,
-                final: costoBase
-            } : null;
-        }
-
-        const zone = shipment.zone;
-        const zoneBase = Number(zone.baseCost || 0);
-        const wSurcharge = Number(zone.surchargePerKg || 0) * w;
-        const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
-        const subtotal = costoBase + zoneBase + wSurcharge + vSurcharge;
-        const penalty = sla?.penaltyPct ? subtotal * (sla.penaltyPct / 100) : 0;
-        return {
-            costoBase,
-            zoneBase,
-            wSurcharge,
-            vSurcharge,
-            subtotal,
-            penalty: Number(penalty.toFixed(2)),
-            final: Number((subtotal - penalty).toFixed(2))
-        };
-    })();
+    // Desglose costo cliente (zona base + recargo peso/vol). Centralizado en shipmentCostService
+    // para reutilizarlo en la nota de crédito (LGT-214).
+    const costClient = await require('../services/shipmentCostService')
+        .computeCost(shipment, { penaltyPct: sla?.penaltyPct || 0 });
 
 
     const incidentsForShipment = await require('../models/incident').list({ shipmentId: id, limit: 50 });

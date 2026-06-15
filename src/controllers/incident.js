@@ -667,6 +667,30 @@ const setResolution = async (req, res) => {
             transaction: t
         });
     });
+
+    // LGT-214: al aprobar (PROCEDENTE) una incidencia de paquete dañado con elección
+    // REEMBOLSO, se genera la nota de crédito por el total del envío (idempotente).
+    if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMBOLSO') {
+        try {
+            const { isDamageType } = require('../services/incidentDamageResolution');
+            const type = await incidentTypeModel.getById(incident.incidentTypeId);
+            if (isDamageType(type)) {
+                const r = await require('../services/creditNoteService')
+                    .generate({ shipmentId: incident.shipmentId, incidentId: id, userId: user.id });
+                if (r.ok && r.creditNote) {
+                    await incidentHistoryModel.create({
+                        incidentId: id,
+                        eventType:  IncidentEventType.COMMENT,
+                        comment:    `Nota de crédito ${r.creditNote.number} generada por reembolso (/credit-note/${r.creditNote.id}).`,
+                        userId:     user.id,
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('[incident] generación nota de crédito:', e.message);
+        }
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
