@@ -200,7 +200,6 @@ const safeAssociate = () => {
         if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
     }
 
-<<<<<<< HEAD
     // LGT-182/183/186 - devoluciones
     if (ShipmentReturn.belongsTo) {
         if (Shipment) { ShipmentReturn.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
