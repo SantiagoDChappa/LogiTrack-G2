@@ -13,15 +13,15 @@
         <div class="page-header">
             <h1>Zonas</h1>
             <div class="page-header__actions">
-                <a href="/zone/new" class="btn-primary">
-                    <span class="material-symbols-outlined">add</span>Nueva
+                <a href="/zone/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva zona" aria-label="Nueva zona">
+                    <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
         </div>
 
         <div class="shipments-wrapper">
             <div class="table-wrapper">
-                <table data-paginate="zones">
+                <table data-tools="zones">
                     <thead>
                         <tr>
                             <th>Nombre</th>
@@ -70,5 +70,6 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js" defer></script>
 </body>
 </html>

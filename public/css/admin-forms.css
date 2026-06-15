@@ -1,0 +1,46 @@
+/* ABM Zonas / Transportes — selects, multiselect y layout legibles en ambos temas. */
+
+/* Inputs y selects toman los colores del tema (el multiselect nativo se veía blanco en dark). */
+.form-new .search-input,
+.form-new select.search-input,
+.form-new select[multiple] {
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+}
+.form-new .search-input:focus,
+.form-new select.search-input:focus,
+.form-new select[multiple]:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    outline: none;
+}
+
+/* Multiselect de zonas: alto cómodo y opciones legibles. */
+.form-new select[multiple] {
+    min-height: 150px;
+    padding: 0.3rem;
+}
+.form-new select[multiple] option {
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    color: var(--color-text);
+}
+.form-new select[multiple] option:checked {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* Checkbox "Habilitado/Habilitada" prolijo y alineado. */
+.form-new input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+/* La tarjeta del formulario respira mejor y no queda pegada a la izquierda en pantallas anchas. */
+.form-new .usuario {
+    max-width: 880px;
+}
