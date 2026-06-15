@@ -32,6 +32,7 @@ const { IncidentTask }         = require('./incidentTask');
 const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
+const { NotificationInApp }   = require('./notificationInApp');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -196,6 +197,12 @@ const safeAssociate = () => {
         if (User)   { IncidentAttachment.belongsTo(User,   { as: 'uploadedByUser',   foreignKey: 'uploadedByUserId' }); }
         if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
     }
+
+    // LGT-218 - notificaciones in-app por usuario
+    if (NotificationInApp.belongsTo && User) {
+        NotificationInApp.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+        User.hasMany(NotificationInApp, { as: 'notifications', foreignKey: 'userId' });
+    }
 };
 
 safeAssociate();
@@ -234,6 +241,7 @@ module.exports = {
     IncidentAttachment,
     IncidentPendingConfirmation,
     ShipmentModificationRequest,
+    NotificationInApp,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,
