@@ -1177,12 +1177,33 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
         }
         const fill = (s) => placeholders.render(s, vars);
 
-        await queueEmail({
-            recipient: recipients.join(','),
-            subject:   fill(template.subject),
-            body:      fill(template.body),
-            format:    template.format || 'text',
-        });
+        // LGT-219: el evento se envía por los canales configurados (multi-selección).
+        // Default 'email' preserva el comportamiento previo. In-app no aplica a eventos de
+        // envío (el destinatario es el cliente, un Person, no un usuario del sistema); ese
+        // canal lo consumen los eventos internos (ver LGT-89).
+        const channels = String(cfg.channels || 'email').split(',').map(s => s.trim()).filter(Boolean);
+        const wantEmail = channels.length === 0 || channels.includes('email');
+        const wantSms   = channels.includes('sms');
+
+        if (wantEmail) {
+            await queueEmail({
+                recipient: recipients.join(','),
+                subject:   fill(template.subject),
+                body:      fill(template.body),
+                format:    template.format || 'text',
+            });
+        }
+
+        if (wantSms) {
+            // Esc.3/4: SMS real por Twilio al teléfono del destinatario según el modo;
+            // si no tiene teléfono o no hay credenciales, se omite (los demás canales igual van).
+            const { sendSms } = require('../services/notification/smsSender');
+            const phones = [];
+            if ((mode === 'recipient' || mode === 'both') && shipment.recipient?.phone) { phones.push(shipment.recipient.phone); }
+            if ((mode === 'sender'    || mode === 'both') && shipment.sender?.phone)    { phones.push(shipment.sender.phone);    }
+            const smsText = fill(template.subject);
+            phones.forEach((ph) => { sendSms(ph, smsText).catch((e) => console.error('[sms] notify:', e.message)); });
+        }
     } catch (err) {
         console.error('notifyShipmentEvent error:', err.message);
     }

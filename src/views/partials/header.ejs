@@ -97,7 +97,7 @@
             <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %>">
             <span><%= nombreEmpresa %></span>
         </a>
-        <i><span class="material-symbols-outlined">notifications</span></i>
+        <%- include('notificationBell') %>
         <div class="user">
             <div class="user-avatar"><%= currentUser.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
             <span class="user-name"><%= currentUser.fullName %></span>

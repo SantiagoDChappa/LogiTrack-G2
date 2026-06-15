@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Notificaciones - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Notificaciones</h1>
+            <% if (unread > 0) { %>
+                <form method="POST" action="/notifications/read-all" style="margin-left:auto;">
+                    <button type="submit" class="action-btn neutro" data-tooltip="Marcar todas como leídas" aria-label="Marcar todas como leídas">
+                        <span class="material-symbols-outlined">mark_chat_read</span> Marcar todas como leídas
+                    </button>
+                </form>
+            <% } %>
+        </div>
+
+        <% if (!items || items.length === 0) { %>
+            <div class="notif-empty">
+                <span class="material-symbols-outlined">notifications_off</span>
+                <p>No tenés notificaciones</p>
+            </div>
+        <% } else { %>
+            <ul class="notif-list">
+                <% items.forEach(n => {
+                    const isUnread = !n.readAt;
+                    const href = n.url && String(n.url).startsWith('/') ? `/notifications/${n.id}/go` : `/notifications/${n.id}/go`;
+                    const f = n.createdAt ? new Date(n.createdAt).toLocaleString('es-AR') : '';
+                %>
+                    <li class="notif-item <%= isUnread ? 'notif-item--unread' : '' %>">
+                        <a href="<%= href %>" class="notif-link">
+                            <span class="notif-dot" aria-hidden="true"></span>
+                            <span class="notif-main">
+                                <span class="notif-title"><%= n.title %></span>
+                                <% if (n.body) { %><span class="notif-body"><%= n.body %></span><% } %>
+                                <span class="notif-date"><%= f %></span>
+                            </span>
+                            <span class="material-symbols-outlined notif-chevron">chevron_right</span>
+                        </a>
+                    </li>
+                <% }) %>
+            </ul>
+        <% } %>
+    </main>
+
+    <style>
+        .page-header { display: flex; align-items: center; gap: 1rem; }
+        .notif-empty { text-align: center; color: var(--color-text-secondary); padding: 3rem 1rem; }
+        .notif-empty .material-symbols-outlined { font-size: 48px; opacity: .5; }
+        .notif-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; max-width: 760px; }
+        .notif-item { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); }
+        .notif-item--unread { border-color: rgba(37,99,235,.4); background: rgba(37,99,235,.06); }
+        .notif-link { display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; text-decoration: none; color: var(--color-text); }
+        .notif-dot { width: 9px; height: 9px; border-radius: 50%; background: transparent; flex: 0 0 auto; }
+        .notif-item--unread .notif-dot { background: var(--color-primary); }
+        .notif-main { display: flex; flex-direction: column; gap: .15rem; flex: 1; min-width: 0; }
+        .notif-title { font-weight: 600; }
+        .notif-body { font-size: .88rem; color: var(--color-text-secondary); }
+        .notif-date { font-size: .75rem; color: var(--color-text-secondary); }
+        .notif-chevron { color: var(--color-text-secondary); }
+    </style>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

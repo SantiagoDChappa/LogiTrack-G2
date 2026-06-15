@@ -1,0 +1,92 @@
+<%# LGT-218 — campana de notificaciones in-app con badge de no leídas y dropdown. %>
+<div class="notif-bell" id="notif-bell">
+    <button type="button" class="notif-bell__btn" id="notif-bell-btn" aria-label="Notificaciones" aria-haspopup="true" aria-expanded="false">
+        <span class="material-symbols-outlined">notifications</span>
+        <span class="notif-bell__badge" id="notif-bell-badge" hidden>0</span>
+    </button>
+    <div class="notif-bell__panel" id="notif-bell-panel" hidden>
+        <div class="notif-bell__head">
+            <strong>Notificaciones</strong>
+            <button type="button" class="notif-bell__readall" id="notif-bell-readall">Marcar todas como leídas</button>
+        </div>
+        <ul class="notif-bell__list" id="notif-bell-list"></ul>
+        <a href="/notifications" class="notif-bell__all">Ver todas</a>
+    </div>
+</div>
+
+<style>
+    .notif-bell { position: relative; display: inline-flex; }
+    .notif-bell__btn { position: relative; background: none; border: none; cursor: pointer; color: inherit; display: inline-flex; padding: .25rem; }
+    .notif-bell__btn .material-symbols-outlined { font-size: 26px; }
+    .notif-bell__badge { position: absolute; top: -2px; right: -2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #dc2626; color: #fff; font-size: .68rem; font-weight: 700; line-height: 17px; text-align: center; }
+    .notif-bell__panel { position: absolute; top: calc(100% + 8px); right: 0; width: 340px; max-width: 92vw; background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: 0 18px 48px rgba(15,23,42,.3); z-index: 1200; overflow: hidden; }
+    .notif-bell__panel[hidden] { display: none; }
+    .notif-bell__head { display: flex; align-items: center; justify-content: space-between; padding: .7rem .9rem; border-bottom: 1px solid var(--color-border); }
+    .notif-bell__readall { background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: .78rem; }
+    .notif-bell__list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+    .notif-bell__list li a { display: block; padding: .6rem .9rem; border-bottom: 1px solid var(--color-border); text-decoration: none; color: var(--color-text); }
+    .notif-bell__list li a:hover { background: rgba(37,99,235,.07); }
+    .notif-bell__list li.unread a { background: rgba(37,99,235,.06); font-weight: 600; }
+    .notif-bell__t { display: block; font-size: .86rem; }
+    .notif-bell__d { display: block; font-size: .72rem; color: var(--color-text-secondary); font-weight: 400; }
+    .notif-bell__empty { padding: 1rem .9rem; color: var(--color-text-secondary); font-size: .85rem; text-align: center; }
+    .notif-bell__all { display: block; text-align: center; padding: .6rem; font-size: .82rem; color: var(--color-primary); text-decoration: none; border-top: 1px solid var(--color-border); }
+</style>
+
+<script>
+(function () {
+    var bell   = document.getElementById('notif-bell');
+    if (!bell) { return; }
+    var btn    = document.getElementById('notif-bell-btn');
+    var panel  = document.getElementById('notif-bell-panel');
+    var badge  = document.getElementById('notif-bell-badge');
+    var list   = document.getElementById('notif-bell-list');
+    var readAll = document.getElementById('notif-bell-readall');
+
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); };
+
+    function setBadge(n) {
+        if (n > 0) { badge.textContent = n > 99 ? '99+' : String(n); badge.hidden = false; }
+        else { badge.hidden = true; }
+    }
+
+    function render(data) {
+        setBadge(data.unread || 0);
+        var items = data.items || [];
+        if (!items.length) { list.innerHTML = '<li class="notif-bell__empty">No tenés notificaciones</li>'; return; }
+        list.innerHTML = items.map(function (n) {
+            var d = n.createdAt ? new Date(n.createdAt).toLocaleString('es-AR') : '';
+            return '<li class="' + (n.read ? '' : 'unread') + '"><a href="/notifications/' + n.id + '/go">'
+                 + '<span class="notif-bell__t">' + esc(n.title) + '</span>'
+                 + '<span class="notif-bell__d">' + esc(d) + '</span></a></li>';
+        }).join('');
+    }
+
+    function load() {
+        fetch('/notifications/data', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : { unread: 0, items: [] }; })
+            .then(render)
+            .catch(function () { /* silencioso */ });
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = panel.hidden;
+        panel.hidden = !open;
+        btn.setAttribute('aria-expanded', String(open));
+        if (open) { load(); }
+    });
+    document.addEventListener('click', function (e) {
+        if (!bell.contains(e.target)) { panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+    });
+    readAll.addEventListener('click', function () {
+        fetch('/notifications/read-all', { method: 'POST', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function () { load(); })
+            .catch(function () {});
+    });
+
+    load();
+    setInterval(load, 45000);
+})();
+</script>

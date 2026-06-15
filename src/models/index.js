@@ -34,6 +34,7 @@ const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation')
 const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
 const { ShipmentReturn, ShipmentReturnHistory } = require('./shipmentReturn');
 const { CreditNote } = require('./creditNote');
+const { NotificationInApp }   = require('./notificationInApp');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -199,6 +200,7 @@ const safeAssociate = () => {
         if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
     }
 
+<<<<<<< HEAD
     // LGT-182/183/186 - devoluciones
     if (ShipmentReturn.belongsTo) {
         if (Shipment) { ShipmentReturn.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
@@ -218,6 +220,11 @@ const safeAssociate = () => {
         if (Shipment) { CreditNote.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
         if (Incident) { CreditNote.belongsTo(Incident, { as: 'incident', foreignKey: 'incidentId' }); }
         if (User)     { CreditNote.belongsTo(User, { as: 'createdBy', foreignKey: 'createdByUserId' }); }
+    }
+    // LGT-218 - notificaciones in-app por usuario
+    if (NotificationInApp.belongsTo && User) {
+        NotificationInApp.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+        User.hasMany(NotificationInApp, { as: 'notifications', foreignKey: 'userId' });
     }
 };
 
@@ -260,6 +267,7 @@ module.exports = {
     ShipmentReturn,
     ShipmentReturnHistory,
     CreditNote,
+    NotificationInApp,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,
