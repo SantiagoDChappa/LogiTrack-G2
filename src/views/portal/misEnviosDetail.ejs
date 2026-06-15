@@ -31,6 +31,42 @@
             </div>
 
             <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
+
+            <%# LGT-182 — Devoluciones del envío %>
+            <% const _returns = typeof returns !== 'undefined' ? returns : []; %>
+            <div class="portal-mis-envios-card" style="margin-top:1rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                    <h2 style="margin:0;">Devoluciones</h2>
+                    <% if (typeof canRequestReturn !== 'undefined' && canRequestReturn) { %>
+                        <a href="/portal/mis-envios/envio/<%= shipment.id %>/devolucion" class="portal-search-panel-btn" style="width:auto;">
+                            <span class="material-symbols-outlined">assignment_return</span>
+                            Solicitar devolución
+                        </a>
+                    <% } %>
+                </div>
+
+                <% if (typeof returnError !== 'undefined' && returnError) { %>
+                    <div class="portal-mis-envios-alert portal-mis-envios-alert-error" style="margin-top:.75rem;">
+                        <span class="material-symbols-outlined">error</span>
+                        <%= returnError %>
+                    </div>
+                <% } %>
+
+                <% if (_returns.length === 0) { %>
+                    <p class="portal-manage-hint" style="margin-top:.5rem;">Este envío no tiene devoluciones registradas.</p>
+                <% } else { %>
+                    <ul style="list-style:none;margin:.75rem 0 0;padding:0;display:flex;flex-direction:column;gap:.5rem;">
+                        <% _returns.forEach(function(r) { %>
+                            <li style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.6rem .8rem;">
+                                <strong>#<%= r.id %></strong>
+                                <span><%= r.reasonLabel %></span>
+                                <span class="portal-badge"><%= r.statusLabel %></span>
+                                <span style="opacity:.7;font-size:.8rem;margin-left:auto;"><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></span>
+                            </li>
+                        <% }); %>
+                    </ul>
+                <% } %>
+            </div>
         </div>
     </section>
 

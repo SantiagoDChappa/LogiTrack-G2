@@ -12,6 +12,7 @@ const {
     getSurveyList, getSurveyForm, postSurvey, getPublicSurveyForm, postPublicSurvey,
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
+const { getReturnForm, postReturn } = require('../controllers/portalReturn');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
 
@@ -63,6 +64,9 @@ router.get('/portal/mis-envios/lista',        requirePortalClient, getShipmentLi
 router.get('/portal/mis-envios/envio/:id',    requirePortalClient, getShipmentDetail);
 router.get('/portal/mis-envios/envio/:id/gestion', requirePortalClient, getManageForm);
 router.post('/portal/mis-envios/envio/:id/gestion', requirePortalClient, postManageForm);
+// LGT-182 — solicitud de devolución de un envío elegible.
+router.get('/portal/mis-envios/envio/:id/devolucion',  requirePortalClient, getReturnForm);
+router.post('/portal/mis-envios/envio/:id/devolucion', requirePortalClient, postReturn);
 router.get('/portal/mis-envios/incidencias',        requirePortalClient, getIncidentList);
 router.get('/portal/mis-envios/incidencia/:id',     requirePortalClient, getIncidentDetail);
 router.post('/portal/mis-envios/incidencia/:id/responder', requirePortalClient, portalEvidenceUpload, postIncidentResponse);

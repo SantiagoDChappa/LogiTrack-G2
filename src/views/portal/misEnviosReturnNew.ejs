@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitar devolución <%= shipment.trackingId %> - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/envio/<%= shipment.id %>" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al detalle
+                </a>
+            </div>
+
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Solicitud de devolución</span>
+                <h1><%= shipment.trackingId %></h1>
+                <p class="portal-mis-envios-lead">Podés devolver envíos entregados dentro de los <%= windowDays %> días. Contanos el motivo para iniciar la gestión.</p>
+            </div>
+
+            <% if (error) { %>
+            <div class="portal-mis-envios-alert portal-mis-envios-alert-error">
+                <span class="material-symbols-outlined">error</span>
+                <%= error %>
+            </div>
+            <% } %>
+
+            <form method="POST" action="/portal/mis-envios/envio/<%= shipment.id %>/devolucion" class="portal-mis-envios-form portal-manage-form">
+                <div class="portal-manage-card">
+                    <h2>Motivo</h2>
+                    <div class="portal-search-field">
+                        <label class="portal-search-label" for="reason">¿Por qué querés devolverlo?</label>
+                        <select name="reason" id="reason" class="portal-search-input-field" required>
+                            <option value="">— elegí un motivo —</option>
+                            <% reasons.forEach(function(r) { %>
+                            <option value="<%= r.code %>" <%= form.reason === r.code ? 'selected' : '' %>><%= r.label %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                    <div class="portal-search-field" id="reasonOtherWrap" style="<%= form.reason === 'OTRO' ? '' : 'display:none;' %>">
+                        <label class="portal-search-label" for="reasonOther">Detallá el motivo</label>
+                        <textarea name="reasonOther" id="reasonOther" class="portal-search-input-field" maxlength="2000" rows="2"><%= form.reasonOther || '' %></textarea>
+                    </div>
+                </div>
+
+                <div class="portal-manage-card">
+                    <h2>Observaciones <span style="font-weight:400;opacity:.7;">(opcional)</span></h2>
+                    <div class="portal-search-field">
+                        <textarea name="observations" class="portal-search-input-field" maxlength="2000" rows="3" placeholder="Cualquier dato que nos sirva para gestionar la devolución."><%= form.observations || '' %></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="portal-search-panel-btn">
+                    <span class="material-symbols-outlined">assignment_return</span>
+                    Registrar solicitud
+                </button>
+            </form>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+    <script>
+        (function () {
+            var sel = document.getElementById('reason');
+            var wrap = document.getElementById('reasonOther');
+            var wrapBox = document.getElementById('reasonOtherWrap');
+            if (!sel) { return; }
+            sel.addEventListener('change', function () {
+                var other = sel.value === 'OTRO';
+                wrapBox.style.display = other ? '' : 'none';
+                if (other) { wrap.setAttribute('required', 'required'); } else { wrap.removeAttribute('required'); }
+            });
+        })();
+    </script>
+</body>
+</html>

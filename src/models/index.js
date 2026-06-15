@@ -32,6 +32,7 @@ const { IncidentTask }         = require('./incidentTask');
 const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
+const { ShipmentReturn, ShipmentReturnHistory } = require('./shipmentReturn');
 // Sprint 3 - nuevos modelos parametrizables
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
@@ -196,6 +197,21 @@ const safeAssociate = () => {
         if (User)   { IncidentAttachment.belongsTo(User,   { as: 'uploadedByUser',   foreignKey: 'uploadedByUserId' }); }
         if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
     }
+
+    // LGT-182/183/186 - devoluciones
+    if (ShipmentReturn.belongsTo) {
+        if (Shipment) { ShipmentReturn.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
+        if (Branch)   { ShipmentReturn.belongsTo(Branch,   { as: 'pickupBranch', foreignKey: 'pickupBranchId' }); }
+        if (User)     { ShipmentReturn.belongsTo(User,     { as: 'reviewedBy', foreignKey: 'reviewedByUserId' }); }
+    }
+    if (ShipmentReturn.hasMany && ShipmentReturnHistory) {
+        ShipmentReturn.hasMany(ShipmentReturnHistory, { as: 'history', foreignKey: 'returnId' });
+        ShipmentReturnHistory.belongsTo(ShipmentReturn, { as: 'return', foreignKey: 'returnId' });
+        if (User) { ShipmentReturnHistory.belongsTo(User, { as: 'byUser', foreignKey: 'byUserId' }); }
+    }
+    if (Shipment.hasMany && ShipmentReturn) {
+        Shipment.hasMany(ShipmentReturn, { as: 'returns', foreignKey: 'shipmentId' });
+    }
 };
 
 safeAssociate();
@@ -234,6 +250,8 @@ module.exports = {
     IncidentAttachment,
     IncidentPendingConfirmation,
     ShipmentModificationRequest,
+    ShipmentReturn,
+    ShipmentReturnHistory,
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,

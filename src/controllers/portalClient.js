@@ -2,7 +2,6 @@ const settingModel = require('../models/setting');
 const shipmentModel = require('../models/shipment');
 const {
     COOKIE_NAME,
-    parseDocument,
     assertClientOwnsShipment,
     requestAccess,
     confirmAccess,
@@ -201,6 +200,20 @@ const getShipmentDetail = async (req, res) => {
     const modifications = formatModificationsList(await listByShipment(shipmentId));
     const incidents = await listIncidentsForShipment(shipmentId);
 
+    // LGT-182 — devoluciones vinculadas + posibilidad de solicitar una nueva.
+    const returnService = require('../services/returnService');
+    const { ReturnStatusLabel, ReturnReasonLabel, Status } = require('../constants/enums');
+    const returnRows = await returnService.listByShipment(shipmentId);
+    const returns = returnRows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        statusLabel: ReturnStatusLabel[r.status] || r.status,
+        reasonLabel: ReturnReasonLabel[r.reason] || r.reason,
+        createdAt: r.createdAt,
+    }));
+    const hasOpenReturn = await returnService.findOpenByShipment(shipmentId);
+    const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasOpenReturn;
+
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
@@ -208,6 +221,9 @@ const getShipmentDetail = async (req, res) => {
         canSelfService: canSelfService(enriched),
         modifications,
         incidents,
+        returns,
+        canRequestReturn,
+        returnError: req.query.returnError ? String(req.query.returnError) : null,
     });
 };
 
