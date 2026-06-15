@@ -691,6 +691,29 @@ const setResolution = async (req, res) => {
         }
     }
 
+    // LGT-215: al aprobar (PROCEDENTE) una incidencia de paquete dañado con elección
+    // REEMPLAZO, se genera el envío de reposición (sin cargo, enlazado al original).
+    if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMPLAZO') {
+        try {
+            const { isDamageType } = require('../services/incidentDamageResolution');
+            const type = await incidentTypeModel.getById(incident.incidentTypeId);
+            if (isDamageType(type)) {
+                const r = await require('../services/replacementService')
+                    .generate({ originalShipmentId: incident.shipmentId });
+                if (r.ok && r.shipment) {
+                    await incidentHistoryModel.create({
+                        incidentId: id,
+                        eventType:  IncidentEventType.COMMENT,
+                        comment:    `Envío de reposición ${r.shipment.trackingId} generado por reemplazo (#${r.shipment.id}).`,
+                        userId:     user.id,
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('[incident] generación envío de reposición:', e.message);
+        }
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
