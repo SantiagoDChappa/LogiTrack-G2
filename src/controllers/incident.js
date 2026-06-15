@@ -686,6 +686,30 @@ const setResolution = async (req, res) => {
             transaction: t
         });
     });
+
+    // LGT-213: en una incidencia de paquete dañado, el supervisor aprueba/rechaza la
+    // resolución elegida por el cliente. Le informamos la decisión (Esc.3) y, si es
+    // PROCEDENTE, queda el punto de integración para EJECUTAR la resolución elegida:
+    // reembolso → nota de crédito (LGT-214), reemplazo → envío de reposición (LGT-215).
+    try {
+        const { isDamageType } = require('../services/incidentDamageResolution');
+        const type = await incidentTypeModel.getById(incident.incidentTypeId);
+        if (isDamageType(type)) {
+            const choiceLabel = incident.damageChoice === 'REEMBOLSO' ? 'reembolso'
+                : incident.damageChoice === 'REEMPLAZO' ? 'reemplazo' : 'solicitud';
+            const decision = resolution === IncidentResolution.PROCEDENTE
+                ? `Tu reclamo por paquete dañado fue aprobado. Gestionamos tu ${choiceLabel}.`
+                : `Tu reclamo por paquete dañado fue revisado y resultó no procedente. Motivo: ${cleanComment}`;
+            notifyIncidentStatusChange(incident.shipmentId, id, incident.status, decision);
+            if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice) {
+                // TODO(LGT-214/215): ejecutar la resolución aprobada (nota de crédito / envío de reposición).
+                console.warn(`[incident] paquete roto #${id} aprobado (${incident.damageChoice}) — pendiente ejecución LGT-214/215`);
+            }
+        }
+    } catch (e) {
+        console.error('[incident] notif resolución daño:', e.message);
+    }
+
     res.redirect(`/incident/${id}`);
 };
 
