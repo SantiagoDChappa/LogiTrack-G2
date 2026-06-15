@@ -71,6 +71,11 @@ describe('validateForm', () => {
     test('modalidad sucursal sin sucursal → error', () => {
         expect(svc.validateForm({ reason: 'DEFECTUOSO', deliveryMode: 'branch' }).error).toMatch(/sucursal/i);
     });
+    test('modalidad sucursal con sucursal → ok', () => {
+        const v = svc.validateForm({ reason: 'DEFECTUOSO', deliveryMode: 'branch', pickupBranchId: '3' });
+        expect(v.error).toBeUndefined();
+        expect(v).toMatchObject({ deliveryMode: 'branch', pickupBranchId: 3 });
+    });
 });
 
 describe('createReturn', () => {
