@@ -336,7 +336,7 @@ const getIncidentDetail = async (req, res) => {
         incident: await loadIncidentDetailViewModel(incident),
         damage: { isDamage, choice: incident.damageChoice || null, options: damageSvc.CHOICES, closed: !!incident.closedAt },
         flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.'
-            : (req.query.choice ? 'Registramos tu elección. El operador la verá y actuará en consecuencia.' : null),
+            : (req.query.choice ? 'Registramos tu elección. Queda pendiente de aprobación del supervisor; cuando la apruebe, la ejecutamos.' : null),
         error: req.query.error ? String(req.query.error) : null,
     });
 };
