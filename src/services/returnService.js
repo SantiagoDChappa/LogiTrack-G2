@@ -4,13 +4,15 @@ const sequelize = require('../database/connection');
 const settingModel = require('../models/setting');
 const { ShipmentReturn, ShipmentReturnHistory } = require('../models/shipmentReturn');
 const { ShipmentHistory } = require('../models/shipmentHistory');
-const { Status, ReturnStatus, ReturnReason } = require('../constants/enums');
+const { Status, ReturnStatus, ReturnReason, ReturnResult } = require('../constants/enums');
 
 const DEFAULT_WINDOW_DAYS = 30;
 const OPEN_STATUSES = [
     ReturnStatus.SOLICITADA, ReturnStatus.EN_REVISION,
     ReturnStatus.APROBADA, ReturnStatus.EN_PROCESO,
 ];
+// Estados sobre los que el Supervisor todavía puede resolver (aprobar/rechazar).
+const PENDING_STATUSES = [ReturnStatus.SOLICITADA, ReturnStatus.EN_REVISION];
 const VALID_MODES = ['home', 'branch'];
 
 // Ventana de devolución parametrizable por el Administrador (Ajustes). Default 30 días.
@@ -113,8 +115,83 @@ const createReturn = async ({ shipment, client, body }) => {
     return { ok: true, returnId: created.id };
 };
 
+// ── Gestión interna (LGT-183) ────────────────────────────────────────────────
+
+// Bandeja: devoluciones pendientes de evaluación (Solicitada / En revisión).
+const listPending = () => {
+    const { Shipment } = require('../models/shipment');
+    return ShipmentReturn.findAll({
+        where: { status: { [Op.in]: PENDING_STATUSES } },
+        include: [{ model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'] }],
+        order: [['createdAt', 'ASC']],
+    });
+};
+
+const getByIdFull = (id) => {
+    const { Shipment } = require('../models/shipment');
+    const { User } = require('../models/user');
+    const { Branch } = require('../models/branch');
+    return ShipmentReturn.findByPk(id, {
+        include: [
+            { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId', 'recipientId'] },
+            { model: Branch, as: 'pickupBranch', attributes: ['id', 'name'], required: false },
+            { model: User, as: 'reviewedBy', attributes: ['id', 'fullName'], required: false },
+            { model: ShipmentReturnHistory, as: 'history', required: false },
+        ],
+        order: [[{ model: ShipmentReturnHistory, as: 'history' }, 'createdAt', 'ASC']],
+    });
+};
+
+// Aprueba o rechaza una solicitud. No permite re-resolver (Esc.7).
+// approve: define el resultado (reembolso/reemplazo) y la devolución pasa a En proceso (Esc.3).
+//          La EJECUCIÓN real (nota de crédito LGT-214 / envío de reposición LGT-215) queda como
+//          punto de integración: acá se registra el resultado y la transición.
+// reject:  requiere motivo y pasa a Rechazada (Esc.4).
+const resolveReturn = async ({ returnId, userId, decision, result, rejectionReason }) => {
+    const r = await ShipmentReturn.findByPk(returnId);
+    if (!r) { return { ok: false, status: 404, message: 'Devolución no encontrada.' }; }
+    if (!PENDING_STATUSES.includes(r.status)) {
+        return { ok: false, status: 400, message: 'Esta solicitud ya fue gestionada.' };
+    }
+
+    if (decision === 'approve') {
+        const res = String(result || '').toUpperCase();
+        if (![ReturnResult.REEMBOLSO, ReturnResult.REEMPLAZO].includes(res)) {
+            return { ok: false, status: 400, message: 'Elegí un resultado: reembolso o reemplazo.' };
+        }
+        const from = r.status;
+        await sequelize.transaction(async (t) => {
+            await r.update({ status: ReturnStatus.EN_PROCESO, result: res, reviewedByUserId: userId, updatedAt: new Date() }, { transaction: t });
+            await ShipmentReturnHistory.create({
+                returnId: r.id, fromStatus: from, toStatus: ReturnStatus.EN_PROCESO,
+                comment: `Aprobada — resultado ${res === ReturnResult.REEMBOLSO ? 'Reembolso' : 'Reemplazo'}. Pasa a En proceso.`,
+                byUserId: userId, byClient: false, createdAt: new Date(),
+            }, { transaction: t });
+        });
+        return { ok: true, status: ReturnStatus.EN_PROCESO, result: res };
+    }
+
+    if (decision === 'reject') {
+        const reason = String(rejectionReason || '').trim();
+        if (!reason) { return { ok: false, status: 400, message: 'Ingresá un motivo de rechazo.' }; }
+        const from = r.status;
+        await sequelize.transaction(async (t) => {
+            await r.update({ status: ReturnStatus.RECHAZADA, rejectionReason: reason.slice(0, 2000), reviewedByUserId: userId, updatedAt: new Date() }, { transaction: t });
+            await ShipmentReturnHistory.create({
+                returnId: r.id, fromStatus: from, toStatus: ReturnStatus.RECHAZADA,
+                comment: `Rechazada: ${reason.slice(0, 500)}`,
+                byUserId: userId, byClient: false, createdAt: new Date(),
+            }, { transaction: t });
+        });
+        return { ok: true, status: ReturnStatus.RECHAZADA };
+    }
+
+    return { ok: false, status: 400, message: 'Decisión inválida.' };
+};
+
 module.exports = {
-    DEFAULT_WINDOW_DAYS, OPEN_STATUSES, VALID_MODES,
+    DEFAULT_WINDOW_DAYS, OPEN_STATUSES, PENDING_STATUSES, VALID_MODES,
     getWindowDays, getDeliveredAt, findOpenByShipment, listByShipment,
     checkEligibility, validateForm, createReturn,
+    listPending, getByIdFull, resolveReturn,
 };
