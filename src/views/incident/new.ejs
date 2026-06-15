@@ -244,6 +244,18 @@
                 </select>
             </div>
 
+            <!-- LGT-210 — nivel de demora (solo visible cuando el tipo es Demora) -->
+            <div class="form-group" data-col="6" id="delay-level-group" style="display:none;">
+                <label for="delayLevel">Nivel de demora <span class="req">*</span></label>
+                <select id="delayLevel" name="delayLevel">
+                    <option value="">Seleccione el nivel...</option>
+                    <option value="DEMORADA"     <%= form.delayLevel === 'DEMORADA' ? 'selected' : '' %>>Demorada</option>
+                    <option value="MUY_DEMORADA" <%= form.delayLevel === 'MUY_DEMORADA' ? 'selected' : '' %>>Muy demorada</option>
+                    <option value="REPROGRAMAR"  <%= form.delayLevel === 'REPROGRAMAR' ? 'selected' : '' %>>Se debe reprogramar</option>
+                </select>
+                <span class="field-hint" style="font-size:.8rem;color:var(--color-text-secondary);display:block;margin-top:4px;">"Se debe reprogramar" deja el envío pendiente de nueva fecha; los demás mantienen la fecha comprometida.</span>
+            </div>
+
             <div class="form-group">
                 <label for="description">Descripción</label>
                 <textarea id="description" name="description" rows="6" maxlength="2000" required><%= form.description || '' %></textarea>
@@ -287,6 +299,20 @@
             %>
             const DELAY_TYPE_ID = '<%= _delayType ? _delayType.id : "" %>';
             const DELAY_WITHIN_WINDOW = <%= _within ? 'true' : 'false' %>;
+
+            // LGT-210 — muestra el nivel de demora solo cuando el tipo es Demora.
+            const delayGroup  = document.getElementById('delay-level-group');
+            const delaySelect = document.getElementById('delayLevel');
+            function isDelaySelected() {
+                return DELAY_TYPE_ID && String(form.incidentTypeId.value) === DELAY_TYPE_ID;
+            }
+            function toggleDelayLevel() {
+                const on = isDelaySelected();
+                if (delayGroup)  { delayGroup.style.display = on ? '' : 'none'; }
+                if (delaySelect) { delaySelect.required = on; if (!on) { delaySelect.value = ''; } }
+            }
+            form.incidentTypeId.addEventListener('change', toggleDelayLevel);
+            toggleDelayLevel();
             function confirmDelayWarning() {
                 const msg = 'El envío todavía está dentro del plazo estimado de entrega. ¿Confirmás abrir igual una incidencia por demora?';
                 if (window.Swal && typeof window.Swal.fire === 'function') {
@@ -313,6 +339,7 @@
                 if (!form.shipmentId.value)       { missing.push('Envío'); }
                 if (!form.incidentTypeId.value)   { missing.push('Tipo de incidencia'); }
                 if (!(form.description.value || '').trim()) { missing.push('Descripción'); }
+                if (isDelaySelected() && delaySelect && !delaySelect.value) { missing.push('Nivel de demora'); }
                 if (!form.branchId.value)         { missing.push('Sucursal asignada'); }
                 if (!form.assignedToUserId.value) { missing.push('Usuario asignado'); }
                 if (missing.length) {

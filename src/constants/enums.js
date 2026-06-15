@@ -51,6 +51,19 @@ const IncidentResolution = Object.freeze({
     NO_PROCEDENTE: 'NO_PROCEDENTE',
 });
 
+// LGT-210 — nivel de demora que clasifica el repartidor al informarla.
+const IncidentDelayLevel = Object.freeze({
+    DEMORADA:     'DEMORADA',
+    MUY_DEMORADA: 'MUY_DEMORADA',
+    REPROGRAMAR:  'REPROGRAMAR',
+});
+
+const IncidentDelayLevelLabel = Object.freeze({
+    DEMORADA:     'Demorada',
+    MUY_DEMORADA: 'Muy demorada',
+    REPROGRAMAR:  'Se debe reprogramar',
+});
+
 const IncidentResolutionLabel = Object.freeze({
     PROCEDENTE:    'Procedente',
     NO_PROCEDENTE: 'No procedente',
@@ -138,6 +151,7 @@ const ShipmentHistoryEvent = Object.freeze({
     RETURNED_TO_BRANCH:      'RETURNED_TO_BRANCH',
     ROUTE_ASSIGNED:          'ROUTE_ASSIGNED',
     INCIDENT_OPENED:         'INCIDENT_OPENED',
+    DELAY_PROPAGATED:        'DELAY_PROPAGATED',
     MODIFICATION_APPLIED:    'MODIFICATION_APPLIED',
     MODIFICATION_REQUESTED:  'MODIFICATION_REQUESTED',
     MODIFICATION_REJECTED:   'MODIFICATION_REJECTED',
@@ -237,6 +251,7 @@ const EmailQueueStatus = {
 module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
     IncidentStatus, IncidentStatusLabel, IncidentResolution, IncidentResolutionLabel,
+    IncidentDelayLevel, IncidentDelayLevelLabel,
     IncidentChannel, IncidentEventType, IncidentPriority,
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,

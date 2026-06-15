@@ -46,6 +46,10 @@ const Shipment = sequelize.define('shipment', {
     portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
     // Sprint 4 - Notificación de demora (LGT-160)
     delayNotifiedAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'delayNotifiedAt' },
+    // LGT-210/209 - reprogramación y trazabilidad de demora propagada en cascada.
+    pendingReschedule:    { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'pending_reschedule' },
+    rescheduleDate:       { type: DataTypes.DATEONLY,       allowNull: true,  field: 'reschedule_date' },
+    delayOriginIncidentId:{ type: DataTypes.INTEGER,        allowNull: true,  field: 'delay_origin_incident_id' },
     // LGT-215 - envío de reposición: apunta al envío original que reemplaza.
     replacementOfShipmentId: { type: DataTypes.INTEGER,    allowNull: true,  field: 'replacement_of_shipment_id' },
 },

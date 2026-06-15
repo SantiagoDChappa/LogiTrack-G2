@@ -18,7 +18,7 @@ const incidentAttachmentModel = require('../models/incidentAttachment');
 const { IncidentAttachment }  = incidentAttachmentModel;
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
-    ShipmentHistoryEvent, NotificationEvent, Status, IncidentStatusLabel
+    ShipmentHistoryEvent, NotificationEvent, Status, IncidentStatusLabel, IncidentDelayLevel
 } = require('../constants/enums');
 
 const roleDescriptionById = Object.values(RoleType).reduce((acc, r) => {
@@ -292,6 +292,17 @@ const create = async (req, res) => {
         }
     }
 
+    // LGT-210 — al informar una demora, el repartidor clasifica el nivel (obligatorio para DELAY).
+    const isDelayType = type.code === 'DELAY';
+    let delayLevel = null;
+    if (isDelayType) {
+        delayLevel = String(req.body.delayLevel || '').toUpperCase();
+        if (!Object.values(IncidentDelayLevel).includes(delayLevel)) {
+            const msg = 'Elegí el nivel de demora: Demorada, Muy demorada o Se debe reprogramar.';
+            return wantsJson ? res.status(400).json({ error: msg }) : renderFormError(msg);
+        }
+    }
+
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
     const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
     if (eligibilityError) {
@@ -319,7 +330,8 @@ const create = async (req, res) => {
             description:      description.trim().slice(0, 2000),
             openedChannel:    IncidentChannel.INTERNAL,
             openedByUserId:   user.id,
-            assignedToUserId: assignee.id
+            assignedToUserId: assignee.id,
+            delayLevel:       isDelayType ? delayLevel : null
         }, { transaction: t });
 
         await incidentHistoryModel.create({
@@ -357,6 +369,39 @@ const create = async (req, res) => {
 
     notifyIncidentCreated(incident.id, shipment, type, { assignee, openedBy: user })
         .catch(e => console.error('[incident] notif:', e.message));
+
+    // LGT-210 — efecto del nivel de demora; LGT-209 — propagación en cascada a la ruta.
+    if (isDelayType) {
+        try {
+            const { Shipment } = require('../models/shipment');
+            if (delayLevel === IncidentDelayLevel.REPROGRAMAR) {
+                // Esc.2 — marca el envío pendiente de reprogramación y habilita el flujo de nueva fecha.
+                await Shipment.update({ pendingReschedule: true }, { where: { id: shipment.id } });
+                await shipmentHistoryModel.create({
+                    shipmentId:   shipment.id,
+                    fromStatusId: shipment.statusId,
+                    toStatusId:   shipment.statusId,
+                    eventType:    ShipmentHistoryEvent.RESCHEDULED,
+                    comment:      `Demora nivel "Se debe reprogramar" (incidencia #${incident.id}). Pendiente de nueva fecha de entrega.`,
+                    userId:       user.id,
+                });
+            } else {
+                // Esc.3 — demorada / muy demorada: mantiene la fecha comprometida, puede entregarse fuera de plazo el mismo día.
+                await shipmentHistoryModel.create({
+                    shipmentId:   shipment.id,
+                    fromStatusId: shipment.statusId,
+                    toStatusId:   shipment.statusId,
+                    eventType:    ShipmentHistoryEvent.INCIDENT_OPENED,
+                    comment:      `Demora nivel "${delayLevel === IncidentDelayLevel.MUY_DEMORADA ? 'Muy demorada' : 'Demorada'}" (incidencia #${incident.id}). La entrega puede producirse fuera del plazo previsto, dentro del mismo día.`,
+                    userId:       user.id,
+                });
+            }
+            // LGT-209 — propaga a los envíos pendientes posteriores de la misma ruta.
+            await require('../services/delayPropagation').propagate({ shipment, originIncidentId: incident.id, userId: user.id });
+        } catch (e) {
+            console.error('[incident] post-proceso de demora (210/209):', e.message);
+        }
+    }
 
     if (wantsJson) {
         return res.json({ ok: true, incidentId: incident.id, trackingId: shipment.trackingId });
