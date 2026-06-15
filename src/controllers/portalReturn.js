@@ -3,7 +3,7 @@ const shipmentModel = require('../models/shipment');
 const settingModel = require('../models/setting');
 const { assertClientOwnsShipment } = require('../services/portalClientAccess');
 const returnService = require('../services/returnService');
-const { ReturnReason, ReturnReasonLabel } = require('../constants/enums');
+const { ReturnReason, ReturnReasonLabel, ReturnStatusLabel } = require('../constants/enums');
 
 const getSupportInfo = async () => {
     const [nombreEmpresa, telefonoSoporte, emailSoporte] = await Promise.all([
@@ -78,4 +78,44 @@ const postReturn = async (req, res) => {
     });
 };
 
-module.exports = { getReturnForm, postReturn };
+// LGT-186 — seguimiento: listado de devoluciones del cliente (identidad validada).
+const listReturns = async (req, res) => {
+    const { document, email } = res.locals.portalClient;
+    const shipments = await shipmentModel.findByClientIdentity({ document, email });
+    const ids = shipments.map((s) => s.id);
+    const rows = await returnService.listForShipmentIds(ids);
+    const returns = rows.map((r) => ({
+        id: r.id,
+        trackingId: r.shipment ? r.shipment.trackingId : '—',
+        status: r.status,
+        statusLabel: ReturnStatusLabel[r.status] || r.status,
+        reasonLabel: ReturnReasonLabel[r.reason] || r.reason,
+        createdAt: r.createdAt,
+    }));
+    res.render('portal/misEnviosReturnsList', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        returns,
+    });
+};
+
+// LGT-186 — detalle + historial cronológico de una devolución propia.
+const returnDetail = async (req, res) => {
+    const id = Number(req.params.id);
+    const ret = await returnService.findByIdWithHistory(id);
+    if (!ret) { return notFound(res); }
+
+    // Aislamiento: la devolución debe ser de un envío de la identidad validada.
+    const shipment = await loadOwned(req, res, ret.shipmentId);
+    if (!shipment) { return notFound(res); }
+
+    res.render('portal/misEnviosReturnDetail', {
+        support: await getSupportInfo(),
+        client: res.locals.portalClient,
+        ret,
+        ReturnStatusLabel,
+        ReturnReasonLabel,
+    });
+};
+
+module.exports = { getReturnForm, postReturn, listReturns, returnDetail };

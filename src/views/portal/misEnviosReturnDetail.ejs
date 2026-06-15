@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devolución #<%= ret.id %> - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/devoluciones" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver a mis devoluciones
+                </a>
+            </div>
+
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Devolución</span>
+                <h1>#<%= ret.id %> · <%= ret.shipment ? ret.shipment.trackingId : '' %></h1>
+                <p class="portal-mis-envios-lead">Estado actual: <strong><%= ReturnStatusLabel[ret.status] || ret.status %></strong></p>
+            </div>
+
+            <div class="portal-manage-card">
+                <h2>Detalle</h2>
+                <p><strong>Motivo:</strong> <%= ReturnReasonLabel[ret.reason] || ret.reason %><% if (ret.reason === 'OTRO' && ret.reasonOther) { %> — <%= ret.reasonOther %><% } %></p>
+                <p><strong>Modalidad:</strong> <%= ret.deliveryMode === 'branch' ? 'Entrega en sucursal' : 'Retiro a domicilio' %></p>
+                <% if (ret.observations) { %><p><strong>Observaciones:</strong> <%= ret.observations %></p><% } %>
+                <p><strong>Fecha de solicitud:</strong> <%= new Date(ret.createdAt).toLocaleString('es-AR') %></p>
+                <% if (ret.status === 'RECHAZADA' && ret.rejectionReason) { %>
+                    <p><strong>Motivo del rechazo:</strong> <%= ret.rejectionReason %></p>
+                <% } %>
+                <% if (ret.result) { %>
+                    <p><strong>Resultado:</strong> <%= ret.result === 'REEMBOLSO' ? 'Reembolso (nota de crédito)' : 'Reemplazo (envío de reposición)' %></p>
+                <% } %>
+            </div>
+
+            <div class="portal-manage-card">
+                <h2>Seguimiento</h2>
+                <% if (!ret.history || ret.history.length === 0) { %>
+                    <p class="portal-manage-hint">Sin actualizaciones todavía.</p>
+                <% } else { %>
+                    <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem;">
+                        <% ret.history.forEach(function(h) { %>
+                            <li>
+                                <strong><%= ReturnStatusLabel[h.toStatus] || h.toStatus %></strong>
+                                <span style="opacity:.7;font-size:.8rem;"> · <%= new Date(h.createdAt).toLocaleString('es-AR') %></span>
+                                <% if (h.comment) { %><div style="font-size:.88rem;opacity:.85;"><%= h.comment %></div><% } %>
+                            </li>
+                        <% }); %>
+                    </ul>
+                <% } %>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

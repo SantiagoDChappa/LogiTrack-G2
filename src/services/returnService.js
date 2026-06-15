@@ -113,8 +113,34 @@ const createReturn = async ({ shipment, client, body }) => {
     return { ok: true, returnId: created.id };
 };
 
+// ── Seguimiento del cliente (LGT-186) ────────────────────────────────────────
+
+// Todas las devoluciones de un conjunto de envíos (los del cliente con identidad validada).
+const listForShipmentIds = (shipmentIds) => {
+    const { Shipment } = require('../models/shipment');
+    const ids = (shipmentIds || []).filter(Boolean);
+    return ShipmentReturn.findAll({
+        where: { shipmentId: { [Op.in]: ids.length ? ids : [-1] } },
+        include: [{ model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'] }],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+// Detalle con historial cronológico (para el seguimiento del cliente).
+const findByIdWithHistory = (id) => {
+    const { Shipment } = require('../models/shipment');
+    return ShipmentReturn.findByPk(id, {
+        include: [
+            { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'] },
+            { model: ShipmentReturnHistory, as: 'history', required: false },
+        ],
+        order: [[{ model: ShipmentReturnHistory, as: 'history' }, 'createdAt', 'ASC']],
+    });
+};
+
 module.exports = {
     DEFAULT_WINDOW_DAYS, OPEN_STATUSES, VALID_MODES,
     getWindowDays, getDeliveredAt, findOpenByShipment, listByShipment,
     checkEligibility, validateForm, createReturn,
+    listForShipmentIds, findByIdWithHistory,
 };
