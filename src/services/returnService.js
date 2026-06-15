@@ -142,6 +142,31 @@ const getByIdFull = (id) => {
     });
 };
 
+// ── Seguimiento del cliente (LGT-186) ────────────────────────────────────────
+
+// Todas las devoluciones de un conjunto de envíos (los del cliente con identidad validada).
+const listForShipmentIds = (shipmentIds) => {
+    const { Shipment } = require('../models/shipment');
+    const ids = (shipmentIds || []).filter(Boolean);
+    return ShipmentReturn.findAll({
+        where: { shipmentId: { [Op.in]: ids.length ? ids : [-1] } },
+        include: [{ model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'] }],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+// Detalle con historial cronológico (para el seguimiento del cliente).
+const findByIdWithHistory = (id) => {
+    const { Shipment } = require('../models/shipment');
+    return ShipmentReturn.findByPk(id, {
+        include: [
+            { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'] },
+            { model: ShipmentReturnHistory, as: 'history', required: false },
+        ],
+        order: [[{ model: ShipmentReturnHistory, as: 'history' }, 'createdAt', 'ASC']],
+    });
+};
+
 // Aprueba o rechaza una solicitud. No permite re-resolver (Esc.7).
 // approve: define el resultado (reembolso/reemplazo) y la devolución pasa a En proceso (Esc.3).
 //          La EJECUCIÓN real (nota de crédito LGT-214 / envío de reposición LGT-215) queda como
@@ -194,4 +219,5 @@ module.exports = {
     getWindowDays, getDeliveredAt, findOpenByShipment, listByShipment,
     checkEligibility, validateForm, createReturn,
     listPending, getByIdFull, resolveReturn,
+    listForShipmentIds, findByIdWithHistory,
 };
