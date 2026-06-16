@@ -166,6 +166,31 @@ const listPending = () => {
     });
 };
 
+// Bandeja filtrable: admite status, reason, trackingId y id numérico.
+const listFiltered = (filters = {}) => {
+    const { Shipment } = require('../models/shipment');
+    const where = {};
+
+    if (filters.status)                              { where.status = filters.status; }
+    if (filters.reason)                              { where.reason = filters.reason; }
+    if (filters.id && !isNaN(Number(filters.id)))   { where.id     = Number(filters.id); }
+
+    const byTracking  = filters.trackingId ? filters.trackingId.trim() : '';
+    const shipmentWhere = byTracking ? { trackingId: { [Op.iLike]: `%${byTracking}%` } } : {};
+
+    return ShipmentReturn.findAll({
+        where,
+        include: [{
+            model: Shipment,
+            as: 'shipment',
+            attributes: ['id', 'trackingId'],
+            ...(byTracking ? { where: shipmentWhere } : {}),
+            required: !!byTracking,
+        }],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
 const getByIdFull = (id) => {
     const { Shipment } = require('../models/shipment');
     const { User } = require('../models/user');
@@ -320,6 +345,6 @@ module.exports = {
     DEFAULT_WINDOW_DAYS, OPEN_STATUSES, PENDING_STATUSES, VALID_MODES,
     getWindowDays, getDeliveredAt, findOpenByShipment, listByShipment,
     checkEligibility, validateModality, validateForm, createReturn,
-    listPending, getByIdFull, resolveReturn,
+    listPending, listFiltered, getByIdFull, resolveReturn,
     listForShipmentIds, findByIdWithHistory, updateModality,
 };

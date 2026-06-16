@@ -3,50 +3,88 @@
 <head>
     <%- include('../partials/head') %>
     <title>Devoluciones - LogiTrack</title>
-    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
 </head>
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
         <div class="page-header">
-            <h1>Devoluciones pendientes</h1>
+            <h1>Devoluciones</h1>
         </div>
 
-        <% if (!returns || returns.length === 0) { %>
-            <div class="report-card">
-                <div class="report-empty-state">
-                    <span class="material-symbols-outlined">assignment_turned_in</span>
-                    <p>No hay solicitudes de devolución pendientes de evaluación.</p>
-                </div>
+        <form method="GET" action="/returns" class="incident-filters">
+            <div class="incident-filter">
+                <label for="status">
+                    <span class="material-symbols-outlined incident-filter-icon">flag</span> Estado
+                </label>
+                <select id="status" name="status">
+                    <option value="">Todos</option>
+                    <% Object.entries(ReturnStatusLabel).forEach(([key, label]) => { %>
+                        <option value="<%= key %>" <%= filters.status === key ? 'selected' : '' %>><%= label %></option>
+                    <% }) %>
+                </select>
             </div>
-        <% } else { %>
-            <div class="report-card">
-                <table class="report-table">
-                    <thead>
+            <div class="incident-filter">
+                <label for="reason">
+                    <span class="material-symbols-outlined incident-filter-icon">help_outline</span> Motivo
+                </label>
+                <select id="reason" name="reason">
+                    <option value="">Todos</option>
+                    <% Object.entries(ReturnReasonLabel).forEach(([key, label]) => { %>
+                        <option value="<%= key %>" <%= filters.reason === key ? 'selected' : '' %>><%= label %></option>
+                    <% }) %>
+                </select>
+            </div>
+            <div class="incident-filter">
+                <label for="trackingId">
+                    <span class="material-symbols-outlined incident-filter-icon">local_shipping</span> Envío
+                </label>
+                <input type="text" id="trackingId" name="trackingId" placeholder="Ej: ENV-1145" value="<%= filters.trackingId || '' %>">
+            </div>
+            <div class="incident-filter">
+                <label for="id">
+                    <span class="material-symbols-outlined incident-filter-icon">tag</span> ID devolución
+                </label>
+                <input type="text" id="id" name="id" placeholder="Ej: 3" value="<%= filters.id || '' %>">
+            </div>
+            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Filtrar" aria-label="Filtrar">
+                <span class="material-symbols-outlined">filter_alt</span>
+            </button>
+            <a href="/returns" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                <span class="material-symbols-outlined">refresh</span>
+            </a>
+        </form>
+
+        <div class="incident-table-wrapper">
+            <table class="incident-table" data-paginate="returns">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Envío</th>
+                        <th>Motivo</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!returns || returns.length === 0) { %>
+                        <tr><td colspan="6" class="incident-empty">No hay devoluciones para mostrar.</td></tr>
+                    <% } %>
+                    <% (returns || []).forEach(r => { %>
                         <tr>
-                            <th>#</th>
-                            <th>Envío</th>
-                            <th>Motivo</th>
-                            <th>Estado</th>
-                            <th>Fecha</th>
-                            <th></th>
+                            <td><strong>#<%= r.id %></strong></td>
+                            <td><%= r.shipment ? r.shipment.trackingId : '—' %></td>
+                            <td><%= ReturnReasonLabel[r.reason] || r.reason %></td>
+                            <td><span class="incident-badge incident-badge--<%= r.status.toLowerCase() %>"><%= ReturnStatusLabel[r.status] || r.status %></span></td>
+                            <td><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+                            <td><a href="/returns/<%= r.id %>" class="action-btn detalle" data-tooltip="Ver detalle" aria-label="Ver detalle"><span class="material-symbols-outlined">visibility</span></a></td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <% returns.forEach(r => { %>
-                            <tr>
-                                <td><strong>#<%= r.id %></strong></td>
-                                <td><%= r.shipment ? r.shipment.trackingId : '—' %></td>
-                                <td><%= ReturnReasonLabel[r.reason] || r.reason %></td>
-                                <td><span class="ot-badge"><%= ReturnStatusLabel[r.status] || r.status %></span></td>
-                                <td><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></td>
-                                <td><a href="/returns/<%= r.id %>" class="action-btn neutro" data-tooltip="Ver" aria-label="Ver"><span class="material-symbols-outlined">visibility</span></a></td>
-                            </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
-        <% } %>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
     </main>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>

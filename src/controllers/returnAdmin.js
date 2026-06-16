@@ -1,13 +1,22 @@
 // LGT-183 — gestión interna de devoluciones (bandeja del Supervisor: aprobar / rechazar).
 const returnService = require('../services/returnService');
-const { ReturnStatusLabel, ReturnReasonLabel, ReturnResult } = require('../constants/enums');
+const { ReturnStatusLabel, ReturnReasonLabel, ReturnResult, ReturnStatus, ReturnReason } = require('../constants/enums');
 
 const list = async (req, res) => {
-    const pending = await returnService.listPending();
+    const filters = {
+        status:     req.query.status     || '',
+        reason:     req.query.reason     || '',
+        trackingId: req.query.trackingId || '',
+        id:         req.query.id         || '',
+    };
+    const returns = await returnService.listFiltered(filters);
     res.render('return/list', {
-        returns: pending,
+        returns,
+        filters,
         ReturnStatusLabel,
         ReturnReasonLabel,
+        ReturnStatus,
+        ReturnReason,
         query: req.query,
     });
 };
