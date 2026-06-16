@@ -301,6 +301,51 @@
             font-weight: var(--font-weight-semibold);
             cursor: pointer;
         }
+
+        .pod-body form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-5);
+        }
+
+        .pod-section-secret {
+            background: var(--color-primary-light, #eff6ff);
+            border: 1.5px solid var(--color-primary);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+        }
+
+        .pod-section-secret .pod-section-title {
+            border-bottom-color: rgba(37, 99, 235, 0.2);
+            color: var(--color-primary);
+        }
+
+        .pod-section-secret .pod-section-title .material-symbols-outlined {
+            color: var(--color-primary);
+        }
+
+        .secret-code-input {
+            text-transform: uppercase;
+            letter-spacing: .3em;
+            font-weight: 700;
+            font-size: 1.25rem;
+            text-align: center;
+            width: 100%;
+            padding: .85rem var(--space-3);
+            border: 2px solid var(--color-primary);
+            border-radius: var(--radius-md);
+            background: var(--color-surface);
+            color: var(--color-text);
+            box-sizing: border-box;
+        }
+
+        .secret-code-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
     </style>
     <link rel="stylesheet" href="/css/delivery.css">
 </head>
@@ -406,19 +451,16 @@
                 <input type="hidden" name="signatureBase64" id="signatureBase64">
             </div>
 
-            <% if (typeof secretRequired !== 'undefined' && secretRequired) { %>
-                <div class="pod-section">
-                    <div class="pod-section-title">
-                        <span class="material-symbols-outlined">key</span>
-                        Código clave de entrega
-                    </div>
-                    <p style="font-size:.85rem;color:#64748b;margin:0 0 .5rem">Pedíle al destinatario el código que recibió por mail (6 caracteres).</p>
-                    <input type="text" name="deliverySecretCode" maxlength="10" required
-                        placeholder="Ej: H7P3KQ"
-                        style="text-transform:uppercase;letter-spacing:.3em;font-weight:700;font-size:1.1rem;text-align:center;width:100%;padding:.7rem;border:1.5px solid #2563eb;border-radius:10px"
-                        oninput="this.value=this.value.toUpperCase()">
+            <div class="pod-section-secret" id="secretSection">
+                <div class="pod-section-title">
+                    <span class="material-symbols-outlined">key</span>
+                    Código clave de entrega
                 </div>
-            <% } %>
+                <p style="font-size:.85rem;color:var(--color-text-secondary);margin:0">Pedíle al destinatario el código de 6 caracteres que recibió por mail.</p>
+                <input type="text" id="deliverySecretCode" name="deliverySecretCode"
+                    class="secret-code-input" maxlength="10" placeholder="Ej: H7P3KQ"
+                    oninput="this.value=this.value.toUpperCase()">
+            </div>
 
             <button type="submit" class="submit-btn">
                 <span class="material-symbols-outlined">check_circle</span>
@@ -430,6 +472,8 @@
 </div>
 
 <script>
+    const secretRequired = <%= (typeof secretRequired !== 'undefined' && secretRequired) ? 'true' : 'false' %>;
+
     // GPS
     let gpsOk = false;
     if (navigator.geolocation) {
@@ -570,6 +614,10 @@
         if (!gpsOk) missing.push('Ubicación GPS');
         if (!photo) missing.push('Foto del paquete');
         if (!signatureDrawn) missing.push('Firma del receptor');
+        if (secretRequired) {
+            const code = (document.getElementById('deliverySecretCode')?.value || '').trim();
+            if (!code) missing.push('Código clave de entrega');
+        }
 
         if (missing.length || invalid.length) {
             const parts = [];
