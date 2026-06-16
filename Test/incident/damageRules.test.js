@@ -14,9 +14,9 @@ describe('LGT-220 — estado paquete roto: interno siempre permite, cliente solo
         expect(msg).toBeNull();
     });
 
-    test('alta interna: PACKAGE_BROKEN Pendiente/Cancelado → sigue bloqueado (regla previa)', () => {
-        expect(incidentRules.getEligibilityError({ statusId: Status.PENDING.id }, brokenType, [])).toBeTruthy();
-        expect(incidentRules.getEligibilityError({ statusId: Status.CANCELLED.id }, brokenType, [])).toBeTruthy();
+    test('alta interna: PACKAGE_BROKEN en cualquier estado (incl. Pendiente/Cancelado) → permite (interno sin restricción de estado)', () => {
+        expect(incidentRules.getEligibilityError({ statusId: Status.PENDING.id }, brokenType, [])).toBeNull();
+        expect(incidentRules.getEligibilityError({ statusId: Status.CANCELLED.id }, brokenType, [])).toBeNull();
     });
 
     test('canal cliente (getClientEligibilityError): PACKAGE_BROKEN En Tránsito → bloquea (solo Entregado)', () => {

@@ -4,7 +4,11 @@ const { Status, RoleType } = require('../constants/enums');
 // Si el statusId del shipment esta en esta lista, getEligibilityError lo bloquea.
 // OTHER es catch-all: nunca bloqueado por estado.
 const INCIDENT_TYPE_BLOCKED_STATUSES = Object.freeze({
-    PACKAGE_BROKEN: [Status.PENDING.id, Status.CANCELLED.id],
+    // Paquete roto/dañado: desde el ALTA INTERNA (operación) no se restringe por estado del
+    // envío — el staff puede registrar el daño cuando lo constata, en cualquier estado.
+    // La exigencia de "envío Entregado" aplica SOLO a los canales externos (portal/chatbot),
+    // que pasan por getClientEligibilityError + CLIENT_ALLOWED_STATUSES.PACKAGE_BROKEN.
+    PACKAGE_BROKEN: [],
     DELAY:          [Status.DELIVERED.id, Status.CANCELLED.id, Status.PACKAGE_FAILED.id],
     MISSING_ITEM:   [Status.PENDING.id, Status.IN_TRANSIT.id, Status.CANCELLED.id],
     WRONG_ADDRESS:  [Status.DELIVERED.id, Status.CANCELLED.id, Status.PACKAGE_FAILED.id],
