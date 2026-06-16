@@ -211,8 +211,8 @@ const getShipmentDetail = async (req, res) => {
         reasonLabel: ReturnReasonLabel[r.reason] || r.reason,
         createdAt: r.createdAt,
     }));
-    const hasAnyReturn = await returnService.findAnyByShipment(shipmentId);
-    const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasAnyReturn;
+    const hasOpenReturn = await returnService.findOpenByShipment(shipmentId);
+    const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasOpenReturn;
 
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),

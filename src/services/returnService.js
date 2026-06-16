@@ -33,13 +33,10 @@ const getDeliveredAt = async (shipmentId) => {
 const findOpenByShipment = (shipmentId) =>
     ShipmentReturn.findOne({ where: { shipmentId, status: { [Op.in]: OPEN_STATUSES } } });
 
-const findAnyByShipment = (shipmentId) =>
-    ShipmentReturn.findOne({ where: { shipmentId }, order: [['createdAt', 'DESC']] });
-
 const listByShipment = (shipmentId) =>
     ShipmentReturn.findAll({ where: { shipmentId }, order: [['createdAt', 'DESC']] });
 
-// Elegibilidad: envío Entregado + dentro de la ventana + sin devolución previa (abierta o terminal).
+// Elegibilidad: envío Entregado + dentro de la ventana + sin devolución abierta.
 const checkEligibility = async (shipment) => {
     const windowDays = await getWindowDays();
     const windowMsg = `Solo podés devolver envíos entregados dentro de los ${windowDays} días.`;
@@ -55,14 +52,9 @@ const checkEligibility = async (shipment) => {
             return { ok: false, error: windowMsg, windowDays, deliveredAt };
         }
     }
-    const existing = await findAnyByShipment(shipment.id);
-    if (existing) {
-        const msg = existing.status === ReturnStatus.RECHAZADA
-            ? 'La devolución de este envío fue rechazada. Contactá a soporte si querés apelar.'
-            : existing.status === ReturnStatus.FINALIZADA
-                ? 'La devolución de este envío ya fue finalizada.'
-                : 'Ya hay una devolución en curso para este envío.';
-        return { ok: false, error: msg, windowDays, deliveredAt, existing };
+    const open = await findOpenByShipment(shipment.id);
+    if (open) {
+        return { ok: false, error: 'Ya hay una devolución en curso para este envío.', windowDays, deliveredAt, existing: open };
     }
     return { ok: true, windowDays, deliveredAt };
 };
@@ -351,7 +343,7 @@ const updateModality = async ({ returnId, body }) => {
 
 module.exports = {
     DEFAULT_WINDOW_DAYS, OPEN_STATUSES, PENDING_STATUSES, VALID_MODES,
-    getWindowDays, getDeliveredAt, findOpenByShipment, findAnyByShipment, listByShipment,
+    getWindowDays, getDeliveredAt, findOpenByShipment, listByShipment,
     checkEligibility, validateModality, validateForm, createReturn,
     listPending, listFiltered, getByIdFull, resolveReturn,
     listForShipmentIds, findByIdWithHistory, updateModality,
