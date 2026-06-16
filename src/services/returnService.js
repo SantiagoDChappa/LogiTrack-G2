@@ -7,11 +7,9 @@ const { ShipmentHistory } = require('../models/shipmentHistory');
 const { Status, ReturnStatus, ReturnReason, ReturnResult } = require('../constants/enums');
 
 const DEFAULT_WINDOW_DAYS = 30;
-const OPEN_STATUSES = [
-    ReturnStatus.SOLICITADA, ReturnStatus.EN_REVISION,
-    ReturnStatus.APROBADA, ReturnStatus.EN_PROCESO,
-];
-// Estados sobre los que el Supervisor todavía puede resolver (aprobar/rechazar).
+// Flujo: SOLICITADA → (tomar) EN_REVISION → (aprobar) FINALIZADA | (rechazar) RECHAZADA
+const OPEN_STATUSES = [ReturnStatus.SOLICITADA, ReturnStatus.EN_REVISION];
+// El cliente puede cambiar la modalidad mientras esté en estos estados.
 const PENDING_STATUSES = [ReturnStatus.SOLICITADA, ReturnStatus.EN_REVISION];
 const VALID_MODES = ['home', 'branch'];
 
@@ -149,7 +147,7 @@ const notifyClientReturnResolved = async (r) => {
     if (!email) { return; }
     const name  = shipment.recipient?.fullName || 'cliente';
     const track = shipment.trackingId || `#${r.shipmentId}`;
-    const approved = r.status === ReturnStatus.EN_PROCESO;
+    const approved = r.status === ReturnStatus.APROBADA;
     const badgeColor = approved ? '#16a34a' : '#dc2626';
     const badgeText  = approved ? 'Aprobada' : 'Rechazada';
     const msg = approved
@@ -295,7 +293,7 @@ const executeReturnResolution = async (r, userId) => {
                 .generate({ shipmentId: r.shipmentId, returnId: r.id, userId });
             if (cn.ok && cn.creditNote) {
                 await ShipmentReturnHistory.create({
-                    returnId: r.id, fromStatus: ReturnStatus.EN_PROCESO, toStatus: ReturnStatus.EN_PROCESO,
+                    returnId: r.id, fromStatus: ReturnStatus.APROBADA, toStatus: ReturnStatus.APROBADA,
                     comment: `Nota de crédito ${cn.creditNote.number} generada por reembolso (/credit-note/${cn.creditNote.id}).`,
                     byUserId: userId, byClient: false, createdAt: new Date(),
                 });
@@ -306,7 +304,7 @@ const executeReturnResolution = async (r, userId) => {
                 .generate({ originalShipmentId: r.shipmentId });
             if (rep.ok && rep.shipment) {
                 await ShipmentReturnHistory.create({
-                    returnId: r.id, fromStatus: ReturnStatus.EN_PROCESO, toStatus: ReturnStatus.EN_PROCESO,
+                    returnId: r.id, fromStatus: ReturnStatus.APROBADA, toStatus: ReturnStatus.APROBADA,
                     comment: `Envío de reposición ${rep.shipment.trackingId} generado por reemplazo (#${rep.shipment.id}).`,
                     byUserId: userId, byClient: false, createdAt: new Date(),
                 });
@@ -319,16 +317,14 @@ const executeReturnResolution = async (r, userId) => {
     return null;
 };
 
-// Aprueba o rechaza una solicitud. No permite re-resolver (Esc.7).
-// approve: define el resultado (reembolso/reemplazo), la devolución pasa a En proceso (Esc.3)
-//          y se EJECUTA la resolución: reembolso → nota de crédito (LGT-214),
-//          reemplazo → envío de reposición (LGT-215).
-// reject:  requiere motivo y pasa a Rechazada (Esc.4).
+// Aprueba o rechaza una solicitud tomada (EN_REVISION). No permite re-resolver.
+// approve: define resultado (reembolso/reemplazo) → FINALIZADA + NC o reposición auto-generados.
+// reject:  requiere motivo → RECHAZADA.
 const resolveReturn = async ({ returnId, userId, decision, result, rejectionReason }) => {
     const r = await ShipmentReturn.findByPk(returnId);
     if (!r) { return { ok: false, status: 404, message: 'Devolución no encontrada.' }; }
-    if (!PENDING_STATUSES.includes(r.status)) {
-        return { ok: false, status: 400, message: 'Esta solicitud ya fue gestionada.' };
+    if (r.status !== ReturnStatus.EN_REVISION) {
+        return { ok: false, status: 400, message: r.status === ReturnStatus.SOLICITADA ? 'Primero tomá la devolución para revisión.' : 'Esta solicitud ya fue gestionada.' };
     }
 
     if (decision === 'approve') {
@@ -336,19 +332,18 @@ const resolveReturn = async ({ returnId, userId, decision, result, rejectionReas
         if (![ReturnResult.REEMBOLSO, ReturnResult.REEMPLAZO].includes(res)) {
             return { ok: false, status: 400, message: 'Elegí un resultado: reembolso o reemplazo.' };
         }
-        const from = r.status;
         await sequelize.transaction(async (t) => {
-            await r.update({ status: ReturnStatus.EN_PROCESO, result: res, reviewedByUserId: userId, updatedAt: new Date() }, { transaction: t });
+            await r.update({ status: ReturnStatus.APROBADA, result: res, reviewedByUserId: userId, updatedAt: new Date() }, { transaction: t });
             await ShipmentReturnHistory.create({
-                returnId: r.id, fromStatus: from, toStatus: ReturnStatus.EN_PROCESO,
-                comment: `Aprobada — resultado ${res === ReturnResult.REEMBOLSO ? 'Reembolso' : 'Reemplazo'}. Pasa a En proceso.`,
+                returnId: r.id, fromStatus: ReturnStatus.EN_REVISION, toStatus: ReturnStatus.APROBADA,
+                comment: `Aprobada — resultado ${res === ReturnResult.REEMBOLSO ? 'Reembolso' : 'Reemplazo'}.`,
                 byUserId: userId, byClient: false, createdAt: new Date(),
             }, { transaction: t });
         });
         // LGT-214/215: ejecutar la resolución aprobada (idempotente, deja traza en el historial).
         const execution = await executeReturnResolution(r, userId);
         notifyClientReturnResolved(r).catch(e => console.error('[returnService] email resolución:', e.message));
-        return { ok: true, status: ReturnStatus.EN_PROCESO, result: res, execution };
+        return { ok: true, status: ReturnStatus.APROBADA, result: res, execution };
     }
 
     if (decision === 'reject') {
@@ -368,6 +363,24 @@ const resolveReturn = async ({ returnId, userId, decision, result, rejectionReas
     }
 
     return { ok: false, status: 400, message: 'Decisión inválida.' };
+};
+
+// Supervisor toma la devolución para revisión: SOLICITADA → EN_REVISION.
+const takeReturn = async ({ returnId, userId }) => {
+    const r = await ShipmentReturn.findByPk(returnId);
+    if (!r) { return { ok: false, status: 404, message: 'Devolución no encontrada.' }; }
+    if (r.status !== ReturnStatus.SOLICITADA) {
+        return { ok: false, status: 400, message: 'Solo se pueden tomar devoluciones en estado Solicitada.' };
+    }
+    await sequelize.transaction(async (t) => {
+        await r.update({ status: ReturnStatus.EN_REVISION, reviewedByUserId: userId, updatedAt: new Date() }, { transaction: t });
+        await ShipmentReturnHistory.create({
+            returnId: r.id, fromStatus: ReturnStatus.SOLICITADA, toStatus: ReturnStatus.EN_REVISION,
+            comment: 'Devolución tomada para revisión.',
+            byUserId: userId, byClient: false, createdAt: new Date(),
+        }, { transaction: t });
+    });
+    return { ok: true };
 };
 
 // LGT-184 Esc.7/8 — el cliente cambia la modalidad mientras la devolución no fue tomada
@@ -401,6 +414,6 @@ module.exports = {
     DEFAULT_WINDOW_DAYS, OPEN_STATUSES, PENDING_STATUSES, VALID_MODES,
     getWindowDays, getDeliveredAt, findOpenByShipment, findAnyByShipment, listByShipment,
     checkEligibility, validateModality, validateForm, createReturn,
-    listPending, listFiltered, getByIdFull, resolveReturn,
+    listPending, listFiltered, getByIdFull, takeReturn, resolveReturn,
     listForShipmentIds, findByIdWithHistory, updateModality,
 };

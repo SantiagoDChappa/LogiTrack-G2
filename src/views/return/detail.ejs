@@ -88,7 +88,16 @@
             <div class="incident-detail-card incident-actions-card">
                 <h2>Gestión</h2>
                 <div class="incident-actions-inner">
-                <% if (canManage) { %>
+                <% if (canTake) { %>
+                    <p style="font-size:.9rem;color:var(--c-text-2);margin-bottom:1rem;">Tomá la devolución para revisión antes de resolverla.</p>
+                    <form method="POST" action="/returns/<%= ret.id %>/take" id="form-take">
+                        <button type="submit"
+                                class="action-btn action-btn--lg crear"
+                                style="width:100%;justify-content:center;padding:.65rem 1rem;gap:.5rem;">
+                            <span class="material-symbols-outlined">assignment_ind</span> Tomar para revisión
+                        </button>
+                    </form>
+                <% } else if (canManage) { %>
 
                     <div class="return-action-tabs" role="tablist">
                         <button type="button"
@@ -151,7 +160,7 @@
                         <span class="material-symbols-outlined" style="font-size:1.2rem;">info</span>
                         Esta solicitud ya fue gestionada.
                     </div>
-                <% } %>
+                <% } /* canTake / canManage */ %>
                 </div>
             </div>
 
@@ -196,6 +205,27 @@
     <script src="/js/ui.js" defer></script>
     <script>
     (function () {
+        /* ── Confirmar "Tomar para revisión" ── */
+        var formTake = document.getElementById('form-take');
+        if (formTake) {
+            formTake.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var self = this;
+                var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+                Swal.fire({
+                    icon: 'question',
+                    title: '¿Tomar esta devolución?',
+                    text: 'Pasará a En revisión y podrás aprobarla o rechazarla.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, tomar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#2563eb',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#f1f5f9' : '#1e293b',
+                }).then(function (r) { if (r.isConfirmed) self.submit(); });
+            });
+        }
+
         var tabs      = document.querySelectorAll('.return-action-tab');
         var panels    = {
             approve: document.getElementById('panel-approve'),

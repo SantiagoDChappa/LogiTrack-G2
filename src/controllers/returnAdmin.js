@@ -1,4 +1,4 @@
-// LGT-183 — gestión interna de devoluciones (bandeja del Supervisor: aprobar / rechazar).
+// LGT-183 — gestión interna de devoluciones (bandeja del Supervisor).
 const returnService = require('../services/returnService');
 const { ReturnStatusLabel, ReturnReasonLabel, ReturnResult, ReturnStatus, ReturnReason } = require('../constants/enums');
 
@@ -11,12 +11,8 @@ const list = async (req, res) => {
     };
     const returns = await returnService.listFiltered(filters);
     res.render('return/list', {
-        returns,
-        filters,
-        ReturnStatusLabel,
-        ReturnReasonLabel,
-        ReturnStatus,
-        ReturnReason,
+        returns, filters,
+        ReturnStatusLabel, ReturnReasonLabel, ReturnStatus, ReturnReason,
         query: req.query,
     });
 };
@@ -41,11 +37,21 @@ const detail = async (req, res) => {
         ReturnStatusLabel,
         ReturnReasonLabel,
         ReturnResult,
-        canManage: returnService.PENDING_STATUSES.includes(ret.status),
+        canTake:   ret.status === ReturnStatus.SOLICITADA,
+        canManage: ret.status === ReturnStatus.EN_REVISION,
         creditNote,
         replacement,
         query: req.query,
     });
+};
+
+const take = async (req, res) => {
+    const id = Number(req.params.id);
+    const result = await returnService.takeReturn({ returnId: id, userId: res.locals.currentUser?.id });
+    if (!result.ok) {
+        return res.redirect(`/returns/${id}?error=${encodeURIComponent(result.message)}`);
+    }
+    res.redirect(`/returns/${id}`);
 };
 
 const resolve = async (req, res) => {
@@ -63,4 +69,4 @@ const resolve = async (req, res) => {
     res.redirect(`/returns/${id}?ok=1`);
 };
 
-module.exports = { list, detail, resolve };
+module.exports = { list, detail, take, resolve };

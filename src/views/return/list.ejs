@@ -5,6 +5,7 @@
     <title>Devoluciones - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/incidents.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 </head>
 <body>
     <%- include('../partials/header') %>
@@ -79,7 +80,14 @@
                             <td><%= ReturnReasonLabel[r.reason] || r.reason %></td>
                             <td><span class="incident-badge incident-badge--<%= r.status.toLowerCase() %>"><%= ReturnStatusLabel[r.status] || r.status %></span></td>
                             <td><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
-                            <td><a href="/returns/<%= r.id %>" class="action-btn detalle" data-tooltip="Ver detalle" aria-label="Ver detalle"><span class="material-symbols-outlined">visibility</span></a></td>
+                            <td style="display:flex;gap:.4rem;align-items:center;">
+                                <a href="/returns/<%= r.id %>" class="action-btn detalle" data-tooltip="Ver detalle" aria-label="Ver detalle"><span class="material-symbols-outlined">visibility</span></a>
+                                <% if (r.status === ReturnStatus.SOLICITADA) { %>
+                                <form method="POST" action="/returns/<%= r.id %>/take" class="form-take-inline">
+                                    <button type="submit" class="action-btn crear" data-tooltip="Tomar para revisión" aria-label="Tomar para revisión"><span class="material-symbols-outlined">assignment_ind</span></button>
+                                </form>
+                                <% } %>
+                            </td>
                         </tr>
                     <% }) %>
                 </tbody>
@@ -88,5 +96,21 @@
     </main>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+    document.querySelectorAll('.form-take-inline').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var self = this;
+            var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'question', title: '¿Tomar esta devolución?',
+                text: 'Pasará a En revisión y podrás resolverla desde el detalle.',
+                showCancelButton: true, confirmButtonText: 'Sí, tomar', cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff', color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(function (r) { if (r.isConfirmed) self.submit(); });
+        });
+    });
+    </script>
 </body>
 </html>
