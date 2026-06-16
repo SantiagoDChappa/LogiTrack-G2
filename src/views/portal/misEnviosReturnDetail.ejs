@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Devolución #<%= ret.id %> - Mis envíos</title>
+    <title>Devolución #<%= ret.id %> - <%= support.nombre %></title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -25,36 +25,46 @@
             <div class="portal-mis-envios-header">
                 <span class="portal-incident-eyebrow">Devolución</span>
                 <h1>#<%= ret.id %> · <%= ret.shipment ? ret.shipment.trackingId : '' %></h1>
-                <p class="portal-mis-envios-lead">Estado actual: <strong><%= ReturnStatusLabel[ret.status] || ret.status %></strong></p>
+                <p class="portal-mis-envios-lead"><span class="portal-badge <%= ret.status.toLowerCase() %>"><%= ReturnStatusLabel[ret.status] || ret.status %></span></p>
             </div>
 
             <div class="portal-manage-card">
                 <h2>Detalle</h2>
-                <p><strong>Motivo:</strong> <%= ReturnReasonLabel[ret.reason] || ret.reason %><% if (ret.reason === 'OTRO' && ret.reasonOther) { %> — <%= ret.reasonOther %><% } %></p>
-                <p><strong>Modalidad:</strong> <%= ret.deliveryMode === 'branch' ? 'Entrega en sucursal' : 'Retiro a domicilio' %></p>
-                <% if (ret.observations) { %><p><strong>Observaciones:</strong> <%= ret.observations %></p><% } %>
-                <p><strong>Fecha de solicitud:</strong> <%= new Date(ret.createdAt).toLocaleString('es-AR') %></p>
-                <% if (ret.status === 'RECHAZADA' && ret.rejectionReason) { %>
-                    <p><strong>Motivo del rechazo:</strong> <%= ret.rejectionReason %></p>
-                <% } %>
-                <% if (ret.result) { %>
-                    <p><strong>Resultado:</strong> <%= ret.result === 'REEMBOLSO' ? 'Reembolso (nota de crédito)' : 'Reemplazo (envío de reposición)' %></p>
+                <dl class="portal-kv">
+                    <dt>Motivo</dt>
+                    <dd><%= ReturnReasonLabel[ret.reason] || ret.reason %><% if (ret.reason === 'OTRO' && ret.reasonOther) { %> — <%= ret.reasonOther %><% } %></dd>
+                    <dt>Modalidad</dt>
+                    <dd><%= ret.deliveryMode === 'branch' ? 'Entrega en sucursal' : 'Retiro a domicilio' %></dd>
+                    <% if (ret.observations) { %>
+                    <dt>Observaciones</dt>
+                    <dd><%= ret.observations %></dd>
+                    <% } %>
+                    <dt>Solicitud</dt>
+                    <dd><%= new Date(ret.createdAt).toLocaleString('es-AR') %></dd>
+                    <% if (ret.status === 'RECHAZADA' && ret.rejectionReason) { %>
+                    <dt>Motivo de rechazo</dt>
+                    <dd><%= ret.rejectionReason %></dd>
+                    <% } %>
+                    <% if (ret.result) { %>
+                    <dt>Resultado</dt>
+                    <dd><%= ret.result === 'REEMBOLSO' ? 'Reembolso (nota de crédito)' : 'Reemplazo (envío de reposición)' %></dd>
                     <% if (ret.result === 'REEMBOLSO' && creditNote) { %>
-                        <p><strong>Nota de crédito:</strong> <%= creditNote.number %> · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></p>
+                    <dt>Nota de crédito</dt>
+                    <dd><%= creditNote.number %> · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></dd>
                     <% } %>
                     <% if (ret.result === 'REEMPLAZO' && replacement) { %>
-                        <p><strong>Envío de reposición:</strong>
-                            <a href="/portal/mis-envios/envio/<%= replacement.id %>"><%= replacement.trackingId %></a>
-                        </p>
+                    <dt>Envío de reposición</dt>
+                    <dd><a href="/portal/mis-envios/envio/<%= replacement.id %>"><%= replacement.trackingId %></a></dd>
                     <% } %>
-                <% } %>
+                    <% } %>
+                </dl>
             </div>
 
             <% if (typeof query !== 'undefined' && query.modalidadOk) { %>
-                <div class="portal-manage-card" style="border-left:4px solid #2e7d32;"><p style="margin:0;">Modalidad actualizada.</p></div>
+                <div class="portal-manage-card" style="border-left:4px solid var(--c-success);"><p style="margin:0;">Modalidad actualizada.</p></div>
             <% } %>
             <% if (typeof query !== 'undefined' && query.modalidadError) { %>
-                <div class="portal-manage-card" style="border-left:4px solid #c62828;"><p style="margin:0;"><%= query.modalidadError %></p></div>
+                <div class="portal-manage-card" style="border-left:4px solid var(--c-danger);"><p style="margin:0;"><%= query.modalidadError %></p></div>
             <% } %>
 
             <% if (canEditModality) { %>
@@ -96,12 +106,13 @@
                 <% if (!ret.history || ret.history.length === 0) { %>
                     <p class="portal-manage-hint">Sin actualizaciones todavía.</p>
                 <% } else { %>
-                    <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem;">
+                    <ul class="portal-vlog">
                         <% ret.history.forEach(function(h) { %>
-                            <li>
-                                <strong><%= ReturnStatusLabel[h.toStatus] || h.toStatus %></strong>
-                                <span style="opacity:.7;font-size:.8rem;"> · <%= new Date(h.createdAt).toLocaleString('es-AR') %></span>
-                                <% if (h.comment) { %><div style="font-size:.88rem;opacity:.85;"><%= h.comment %></div><% } %>
+                            <li class="portal-vlog-item">
+                                <span class="portal-vlog-dot"></span>
+                                <div class="portal-vlog-title"><%= ReturnStatusLabel[h.toStatus] || h.toStatus %></div>
+                                <div class="portal-vlog-date"><%= new Date(h.createdAt).toLocaleString('es-AR') %></div>
+                                <% if (h.comment) { %><div class="portal-vlog-comment"><%= h.comment %></div><% } %>
                             </li>
                         <% }); %>
                     </ul>

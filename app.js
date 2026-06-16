@@ -106,6 +106,7 @@ app.use((req, res, next) => {
     res.locals.IncidentStatusLabel = IncidentStatusLabel;
     res.locals.IncidentResolutionLabel = IncidentResolutionLabel;
     res.locals.assetVersion = assetVersion;
+    res.locals.currentPath = req.path;
     next();
 });
 
