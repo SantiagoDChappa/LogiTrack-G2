@@ -27,12 +27,8 @@
                         <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="sender-phone-local">Teléfono <span class="req">*</span></label>
-                        <div class="phone-group">
-                            <select id="sender-phone-area" class="phone-area" aria-label="Característica (código de área) del remitente"></select>
-                            <input id="sender-phone-local" class="phone-local" type="tel" inputmode="numeric" autocomplete="off" placeholder="5456 5446">
-                            <label class="phone-mobile" title="Celular (antepone el 9)"><input type="checkbox" id="sender-phone-mobile" checked> Cel</label>
-                        </div>
+                        <label for="sender-phone-display">Teléfono <span class="req">*</span></label>
+                        <input id="sender-phone-display" class="phone-display" type="tel" inputmode="numeric" autocomplete="off" placeholder="Ej: 11 5456 5446 o 9 11 2384 2323">
                         <input type="hidden" name="senderPhone" id="sender-phone" value="<%= body.senderPhone || '' %>">
                         <span class="field-hint phone-preview" id="sender-phone-preview"></span>
                     </div>
@@ -56,12 +52,8 @@
                         <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="recipient-phone-local">Teléfono <span class="req">*</span></label>
-                        <div class="phone-group">
-                            <select id="recipient-phone-area" class="phone-area" aria-label="Característica (código de área) del destinatario"></select>
-                            <input id="recipient-phone-local" class="phone-local" type="tel" inputmode="numeric" autocomplete="off" placeholder="5456 5446">
-                            <label class="phone-mobile" title="Celular (antepone el 9)"><input type="checkbox" id="recipient-phone-mobile" checked> Cel</label>
-                        </div>
+                        <label for="recipient-phone-display">Teléfono <span class="req">*</span></label>
+                        <input id="recipient-phone-display" class="phone-display" type="tel" inputmode="numeric" autocomplete="off" placeholder="Ej: 11 5456 5446 o 9 11 2384 2323">
                         <input type="hidden" name="recipientPhone" id="recipient-phone" value="<%= body.recipientPhone || '' %>">
                         <span class="field-hint phone-preview" id="recipient-phone-preview"></span>
                     </div>

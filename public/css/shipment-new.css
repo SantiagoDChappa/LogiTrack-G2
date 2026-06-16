@@ -482,35 +482,24 @@ html[data-theme="dark"] {
     .btn-edit-persona { justify-self: stretch; }
 }
 
-/* LGT-207 — teléfono: característica (select) + número formateado + check celular */
-.phone-group { display: flex; gap: .5rem; align-items: center; }
-.phone-group .phone-area,
-.phone-group .phone-local {
-    padding: .55rem .7rem;
+/* LGT-207 — teléfono en un solo input que se autoformatea mientras se escribe. */
+.phone-display {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .65rem .85rem;
     background: var(--color-bg);
     border: 1.5px solid var(--color-border);
     border-radius: var(--radius-md, 8px);
     color: var(--color-text);
-    font-size: .92rem;
+    font-size: 1.05rem;
+    letter-spacing: .08em;
+    font-variant-numeric: tabular-nums;
     outline: none;
     transition: border-color .15s, box-shadow .15s;
 }
-.phone-group .phone-area { flex: 0 0 auto; min-width: 140px; cursor: pointer; }
-.phone-group .phone-local { flex: 1 1 auto; min-width: 0; letter-spacing: .06em; }
-.phone-group .phone-area:focus,
-.phone-group .phone-local:focus {
+.phone-display::placeholder { letter-spacing: normal; font-size: .92rem; color: var(--color-text-muted); }
+.phone-display:focus {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
 }
-.phone-group .phone-mobile {
-    flex: 0 0 auto;
-    display: inline-flex; align-items: center; gap: .35rem;
-    font-size: .82rem; color: var(--color-text-secondary);
-    white-space: nowrap; cursor: pointer; user-select: none;
-}
-.phone-group .phone-mobile input { width: 16px; height: 16px; accent-color: var(--color-primary); cursor: pointer; }
 .phone-preview { font-size: .8rem; color: var(--color-text-secondary); margin-top: 4px; display: block; }
-@media (max-width: 560px) {
-    .phone-group { flex-wrap: wrap; }
-    .phone-group .phone-area, .phone-group .phone-local { flex-basis: 100%; width: 100%; }
-}
