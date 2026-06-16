@@ -166,4 +166,30 @@ const postEditModality = async (req, res) => {
     return res.redirect(`/portal/mis-envios/devolucion/${id}?${flag}`);
 };
 
-module.exports = { getReturnForm, postReturn, listReturns, returnDetail, postEditModality };
+// LGT-214 — comprobante de nota de crédito accesible desde el portal del cliente.
+// Aislamiento: verifica que la NC pertenezca a un envío propio de la identidad validada.
+const returnCreditNote = async (req, res) => {
+    const cnService = require('../services/creditNoteService');
+    const costSvc   = require('../services/shipmentCostService');
+    const settingModel = require('../models/setting');
+
+    const cn = await cnService.getById(Number(req.params.id));
+    if (!cn) { return notFound(res); }
+
+    // Aislamiento: el envío asociado a la NC debe pertenecer al cliente autenticado.
+    const shipment = await loadOwned(req, res, cn.shipmentId);
+    if (!shipment) { return notFound(res); }
+
+    const breakdown = await costSvc.computeCost(shipment);
+    const empresa   = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
+
+    res.render('portal/misEnviosReturnCreditNote', {
+        support: await getSupportInfo(),
+        cn,
+        shipment: shipment.toJSON ? shipment.toJSON() : shipment,
+        breakdown,
+        empresa,
+    });
+};
+
+module.exports = { getReturnForm, postReturn, listReturns, returnDetail, postEditModality, returnCreditNote };

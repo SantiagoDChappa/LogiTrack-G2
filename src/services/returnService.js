@@ -95,21 +95,20 @@ const validateForm = (body) => {
 };
 
 // LGT-218/219 — al registrarse una devolución, avisa por el centro in-app a los
-// supervisores de la sucursal del envío (fallback a Administradores), igual que LGT-89
-// para incidencias. Best-effort: no rompe el alta si la notificación falla.
+// supervisores de la sucursal del envío Y a todos los administradores.
+// Best-effort: no rompe el alta si la notificación falla.
 const notifyReturnCreated = async (shipment, returnId) => {
     const inApp = require('./notification/inAppNotifier');
     const { User } = require('../models/user');
     const { RoleType } = require('../constants/enums');
     const branchId = shipment.currentBranchId || null;
 
-    let recipients = [];
-    if (branchId) {
-        recipients = await User.findAll({ where: { roleId: RoleType.SUPERVISOR.id, branchId, active: true }, attributes: ['id'] });
-    }
-    if (recipients.length === 0) {
-        recipients = await User.findAll({ where: { roleId: RoleType.ADMIN.id, active: true }, attributes: ['id'] });
-    }
+    // Siempre avisa a todos los admins + supervisores de la sucursal del envío.
+    const where = branchId
+        ? { active: true, [Op.or]: [{ roleId: RoleType.ADMIN.id }, { roleId: RoleType.SUPERVISOR.id, branchId }] }
+        : { active: true, roleId: RoleType.ADMIN.id };
+
+    const recipients = await User.findAll({ where, attributes: ['id'] });
     if (recipients.length === 0) { return; }
 
     const track = shipment.trackingId || shipment.id;
@@ -121,6 +120,52 @@ const notifyReturnCreated = async (shipment, returnId) => {
         resourceId:   returnId,
         url:          `/returns/${returnId}`,
     });
+};
+
+// Email de confirmación al cliente del portal cuando crea la solicitud.
+const notifyClientReturnCreated = async (shipment, returnId) => {
+    const { sendEmail } = require('./notification/emailSender');
+    const email = shipment.recipient?.email;
+    if (!email) { return; }
+    const name  = shipment.recipient?.fullName || 'cliente';
+    const track = shipment.trackingId || `#${shipment.id}`;
+    const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
+        <h2 style="color:#2563eb;margin-bottom:4px">LogiTrack</h2>
+        <p style="color:#64748b;margin-top:0">Sistema de gestión de envíos</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
+        <p style="font-size:15px;color:#1e293b">Hola <strong>${name}</strong>,</p>
+        <p style="font-size:15px;color:#1e293b">Recibimos tu solicitud de devolución <strong>#${returnId}</strong> para el envío <strong>${track}</strong>. Nuestro equipo la revisará a la brevedad y te avisaremos cuando haya novedades.</p>
+        <p style="font-size:13px;color:#64748b;margin-top:20px">Si tenés alguna consulta, contactá con tu sucursal de LogiTrack.</p>
+    </div>`;
+    await sendEmail(email, `Solicitud de devolución #${returnId} recibida — LogiTrack`, html, 'html');
+};
+
+// Email al cliente cuando su devolución es aprobada o rechazada.
+const notifyClientReturnResolved = async (r) => {
+    const { sendEmail } = require('./notification/emailSender');
+    const shipmentModel = require('../models/shipment');
+    const shipment = await shipmentModel.getById(r.shipmentId);
+    const email = shipment?.recipient?.email;
+    if (!email) { return; }
+    const name  = shipment.recipient?.fullName || 'cliente';
+    const track = shipment.trackingId || `#${r.shipmentId}`;
+    const approved = r.status === ReturnStatus.EN_PROCESO;
+    const badgeColor = approved ? '#16a34a' : '#dc2626';
+    const badgeText  = approved ? 'Aprobada' : 'Rechazada';
+    const msg = approved
+        ? 'Tu solicitud fue <strong>aprobada</strong>. Nos contactaremos para coordinar los próximos pasos.'
+        : 'Tu solicitud fue <strong>rechazada</strong>. Podés comunicarte con tu sucursal de LogiTrack para más información.';
+    const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
+        <h2 style="color:#2563eb;margin-bottom:4px">LogiTrack</h2>
+        <p style="color:#64748b;margin-top:0">Sistema de gestión de envíos</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
+        <p style="font-size:15px;color:#1e293b">Hola <strong>${name}</strong>,</p>
+        <p style="font-size:15px;color:#1e293b">Novedades sobre tu devolución <strong>#${r.id}</strong> · envío <strong>${track}</strong>:</p>
+        <div style="background:${badgeColor};color:#fff;border-radius:6px;padding:12px 20px;display:inline-block;font-size:16px;font-weight:600;margin:8px 0">${badgeText}</div>
+        <p style="font-size:15px;color:#1e293b">${msg}</p>
+        <p style="font-size:13px;color:#64748b;margin-top:20px">Si tenés alguna consulta, contactá con tu sucursal de LogiTrack.</p>
+    </div>`;
+    await sendEmail(email, `Devolución #${r.id} ${badgeText.toLowerCase()} · envío ${track} — LogiTrack`, html, 'html');
 };
 
 const createReturn = async ({ shipment, client, body }) => {
@@ -156,7 +201,8 @@ const createReturn = async ({ shipment, client, body }) => {
         return r;
     });
 
-    // Aviso interno in-app (best-effort, fire-and-forget).
+    // Email al cliente del portal + aviso in-app interno (best-effort, fire-and-forget).
+    notifyClientReturnCreated(shipment, created.id).catch(e => console.error('[returnService] email creación:', e.message));
     notifyReturnCreated(shipment, created.id).catch((e) => console.error('[returnService] notif devolución:', e.message));
 
     return { ok: true, returnId: created.id };
@@ -301,6 +347,7 @@ const resolveReturn = async ({ returnId, userId, decision, result, rejectionReas
         });
         // LGT-214/215: ejecutar la resolución aprobada (idempotente, deja traza en el historial).
         const execution = await executeReturnResolution(r, userId);
+        notifyClientReturnResolved(r).catch(e => console.error('[returnService] email resolución:', e.message));
         return { ok: true, status: ReturnStatus.EN_PROCESO, result: res, execution };
     }
 
@@ -316,6 +363,7 @@ const resolveReturn = async ({ returnId, userId, decision, result, rejectionReas
                 byUserId: userId, byClient: false, createdAt: new Date(),
             }, { transaction: t });
         });
+        notifyClientReturnResolved(r).catch(e => console.error('[returnService] email resolución:', e.message));
         return { ok: true, status: ReturnStatus.RECHAZADA };
     }
 

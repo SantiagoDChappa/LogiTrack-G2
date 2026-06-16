@@ -602,6 +602,36 @@
             </div>
             <!-- ══════════ FIN BOTTOM GRID ══════════ -->
 
+            <%# LGT-215 — relación con envío de reposición (en ambas direcciones) %>
+            <% if ((typeof replacementShipment !== 'undefined' && replacementShipment) || (typeof originalShipment !== 'undefined' && originalShipment)) { %>
+            <div class="update-card" style="margin-top:1.5rem;">
+                <h3><span class="material-symbols-outlined" style="color:var(--color-warning,#d97706);">swap_horiz</span> Reposición vinculada</h3>
+                <% if (typeof replacementShipment !== 'undefined' && replacementShipment) { %>
+                <div style="display:flex;align-items:center;gap:.75rem;margin-top:.75rem;padding:.6rem .8rem;background:var(--color-surface-alt,#f8fafc);border-radius:8px;border:1px solid var(--color-border);">
+                    <span class="material-symbols-outlined" style="color:var(--color-warning,#d97706);font-size:1.2rem;">redo</span>
+                    <div>
+                        <div style="font-size:.78rem;opacity:.6;text-transform:uppercase;margin-bottom:.1rem;">Envío de reposición generado</div>
+                        <a href="/shipment/detail/<%= replacementShipment.id %>" style="font-weight:600;color:var(--color-primary);">
+                            <%= replacementShipment.trackingId %>
+                        </a>
+                        <span style="font-size:.82rem;margin-left:.5rem;opacity:.7;">· Sin cargo al cliente</span>
+                    </div>
+                </div>
+                <% } %>
+                <% if (typeof originalShipment !== 'undefined' && originalShipment) { %>
+                <div style="display:flex;align-items:center;gap:.75rem;margin-top:.75rem;padding:.6rem .8rem;background:var(--color-surface-alt,#f8fafc);border-radius:8px;border:1px solid var(--color-border);">
+                    <span class="material-symbols-outlined" style="color:var(--color-primary);font-size:1.2rem;">undo</span>
+                    <div>
+                        <div style="font-size:.78rem;opacity:.6;text-transform:uppercase;margin-bottom:.1rem;">Reposición del envío original</div>
+                        <a href="/shipment/detail/<%= originalShipment.id %>" style="font-weight:600;color:var(--color-primary);">
+                            <%= originalShipment.trackingId %>
+                        </a>
+                    </div>
+                </div>
+                <% } %>
+            </div>
+            <% } %>
+
             <% if (typeof modifications !== 'undefined' && modifications && modifications.length) { %>
             <div class="update-card" style="margin-top:1.5rem;">
                 <h3><span class="material-symbols-outlined">edit_note</span> Modificaciones desde portal</h3>

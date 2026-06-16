@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nota de crédito <%= cn.number %> - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <style>
+        .cn-card { background: var(--c-surface, #fff); border: 1px solid var(--c-border, #e2e8f0); border-radius: 12px; padding: 1.5rem; max-width: 680px; margin: 0 auto; }
+        .cn-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; border-bottom: 1px solid var(--c-border, #e2e8f0); padding-bottom: 1rem; margin-bottom: 1.25rem; }
+        .cn-badge { border: 2px solid var(--c-text, #0f172a); border-radius: 6px; padding: .1rem .55rem; font-weight: 700; font-size: 1rem; display: inline-block; }
+        .cn-kv { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+        .cn-kv-item label { font-size: .72rem; text-transform: uppercase; opacity: .6; display: block; margin-bottom: .15rem; }
+        .cn-table { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 1rem; }
+        .cn-table th, .cn-table td { padding: .5rem .6rem; border-bottom: 1px solid var(--c-border, #e2e8f0); }
+        .cn-table th { text-align: left; font-size: .78rem; opacity: .6; text-transform: uppercase; }
+        .cn-table td:last-child, .cn-table th:last-child { text-align: right; }
+        .cn-table tfoot td { border-top: 2px solid var(--c-border, #e2e8f0); border-bottom: none; }
+        .cn-footer { display: flex; justify-content: space-between; font-size: .78rem; opacity: .65; border-top: 1px dashed var(--c-border, #e2e8f0); padding-top: .75rem; margin-top: .5rem; }
+        .print-btn { background: none; border: 1px solid var(--c-border, #e2e8f0); border-radius: 8px; padding: .4rem .9rem; cursor: pointer; display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; color: var(--c-text, #0f172a); }
+        @media print { .portal-nav, .portal-mis-envios-back, .print-btn { display: none !important; } }
+    </style>
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top" style="justify-content:space-between;align-items:center;">
+                <a href="javascript:history.back()" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver
+                </a>
+                <button onclick="window.print()" class="print-btn">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem;">print</span>
+                    Imprimir
+                </button>
+            </div>
+
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Nota de crédito</span>
+                <h1><%= cn.number %></h1>
+            </div>
+
+            <div class="cn-card">
+                <%
+                    const total    = Number(cn.amount || 0);
+                    const subtotal = Number((total / 1.21).toFixed(2));
+                    const iva      = Number((total - subtotal).toFixed(2));
+                    const fmt = (n) => '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+                    const recipient = shipment && shipment.recipient ? shipment.recipient : null;
+                    const addr      = shipment && shipment.address  ? shipment.address  : null;
+                %>
+
+                <div class="cn-header">
+                    <div>
+                        <strong style="font-size:1.05rem;"><%= empresa %> S.A.</strong><br>
+                        <span style="font-size:.82rem;opacity:.7;">CUIT 30-71234567-9 · Resp. Inscripto</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="cn-badge">NC</span>
+                        <div style="font-weight:700;margin-top:.4rem;"><%= cn.number %></div>
+                        <div style="font-size:.82rem;opacity:.7;">Fecha: <%= new Date(cn.createdAt).toLocaleDateString('es-AR') %></div>
+                    </div>
+                </div>
+
+                <div class="cn-kv">
+                    <div class="cn-kv-item">
+                        <label>Cliente</label>
+                        <strong><%= recipient ? (recipient.fullName || '—') : '—' %></strong>
+                        <% if (recipient && recipient.document) { %><br><span style="font-size:.85rem;">DNI <%= recipient.document %></span><% } %>
+                        <% if (addr) { %><br><span style="font-size:.85rem;"><%= [addr.street, addr.number].filter(Boolean).join(' ') %><% if (addr.postalCode) { %> · CP <%= addr.postalCode %><% } %></span><% } %>
+                    </div>
+                    <div class="cn-kv-item">
+                        <label>Envío</label>
+                        <strong><%= shipment ? shipment.trackingId : '—' %></strong>
+                        <% if (cn.returnId) { %><br><span style="font-size:.85rem;">Devolución #<%= cn.returnId %></span><% } %>
+                    </div>
+                </div>
+
+                <table class="cn-table">
+                    <thead>
+                        <tr><th>Concepto</th><th>Importe</th></tr>
+                    </thead>
+                    <tbody>
+                        <% if (breakdown) { %>
+                            <% if (breakdown.costoBase)  { %><tr><td>Servicio de envío (base)</td><td><%= fmt(breakdown.costoBase) %></td></tr><% } %>
+                            <% if (breakdown.zoneBase)   { %><tr><td>Costo por zona</td><td><%= fmt(breakdown.zoneBase) %></td></tr><% } %>
+                            <% if (breakdown.wSurcharge) { %><tr><td>Adicional por peso</td><td><%= fmt(breakdown.wSurcharge) %></td></tr><% } %>
+                            <% if (breakdown.vSurcharge) { %><tr><td>Adicional por volumen</td><td><%= fmt(breakdown.vSurcharge) %></td></tr><% } %>
+                        <% } else { %>
+                            <tr><td>Servicio de envío</td><td><%= fmt(subtotal) %></td></tr>
+                        <% } %>
+                    </tbody>
+                    <tfoot>
+                        <tr><td>Subtotal</td><td><%= fmt(subtotal) %></td></tr>
+                        <tr><td>IVA 21%</td><td><%= fmt(iva) %></td></tr>
+                        <tr><td><strong>Total</strong></td><td><strong><%= fmt(total) %></strong></td></tr>
+                    </tfoot>
+                </table>
+
+                <div class="cn-footer">
+                    <span>Comprobante asociado al envío <%= shipment ? shipment.trackingId : '' %></span>
+                    <span>Generado por <%= empresa %></span>
+                </div>
+            </div>
+
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

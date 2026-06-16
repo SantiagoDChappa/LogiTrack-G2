@@ -50,7 +50,12 @@
                     <dd><%= ret.result === 'REEMBOLSO' ? 'Reembolso (nota de crédito)' : 'Reemplazo (envío de reposición)' %></dd>
                     <% if (ret.result === 'REEMBOLSO' && creditNote) { %>
                     <dt>Nota de crédito</dt>
-                    <dd><%= creditNote.number %> · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></dd>
+                    <dd>
+                        <a href="/portal/mis-envios/nota-credito/<%= creditNote.id %>" style="color:var(--c-primary);">
+                            <%= creditNote.number %>
+                        </a>
+                        · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+                    </dd>
                     <% } %>
                     <% if (ret.result === 'REEMPLAZO' && replacement) { %>
                     <dt>Envío de reposición</dt>

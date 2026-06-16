@@ -21,7 +21,11 @@ const generate = async ({ shipmentId, incidentId = null, returnId = null, userId
     const shipment = await shipmentModel.getById(shipmentId);
     if (!shipment) { return { ok: false, message: 'Envío no encontrado' }; }
 
-    const amount = await costSvc.computeTotal(shipment);
+    // Usa el costo persistido al crear el envío (LGT-214 precondición).
+    // Fallback a computeTotal para envíos anteriores sin costTotal.
+    const amount = shipment.costTotal != null
+        ? Number(shipment.costTotal)
+        : await costSvc.computeTotal(shipment);
     try {
         const created = await CreditNote.create({
             number: 'TMP', shipmentId, incidentId, returnId,
