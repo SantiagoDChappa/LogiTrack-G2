@@ -7,6 +7,7 @@ const userModel            = require("../models/user");
 const settingModel         = require("../models/setting");
 const { RoleType }         = require("../constants/enums");
 const { PROVINCES }        = require("../utils/provinces");
+const { parseArPhone }     = require("../utils/phone");
 
 const validateShipment = [
     body('senderName')
@@ -23,9 +24,14 @@ const validateShipment = [
     body('senderPhone')
         .notEmpty().withMessage('El teléfono de contacto es obligatorio')
         .bail()
-        .matches(/^\d+$/).withMessage('Teléfono inválido (8-15 dígitos, solo números)')
+        .matches(/^\d+$/).withMessage('Teléfono inválido (solo números)')
         .bail()
-        .isLength({ min: 8, max: 15 }).withMessage('Teléfono inválido (8-15 dígitos, solo números)'),
+        .custom((v) => {
+            const r = parseArPhone(v);
+            if (r.ok) { return true; }
+            if (r.reason === 'area') { throw new Error('La característica (código de área) del remitente no es válida'); }
+            throw new Error('Teléfono del remitente inválido: deben ser 10 dígitos (o 11 con el 9 de celular)');
+        }),
     body('senderDocument')
         .notEmpty().withMessage('El documento del remitente es obligatorio')
         .bail()
@@ -45,9 +51,14 @@ const validateShipment = [
     body('recipientPhone')
         .notEmpty().withMessage('El teléfono de contacto es obligatorio')
         .bail()
-        .matches(/^\d+$/).withMessage('Teléfono inválido (8-15 dígitos, solo números)')
+        .matches(/^\d+$/).withMessage('Teléfono inválido (solo números)')
         .bail()
-        .isLength({ min: 8, max: 15 }).withMessage('Teléfono inválido (8-15 dígitos, solo números)'),
+        .custom((v) => {
+            const r = parseArPhone(v);
+            if (r.ok) { return true; }
+            if (r.reason === 'area') { throw new Error('La característica (código de área) del destinatario no es válida'); }
+            throw new Error('Teléfono del destinatario inválido: deben ser 10 dígitos (o 11 con el 9 de celular)');
+        }),
     body('recipientDocument')
         .notEmpty().withMessage('El documento del destinatario es obligatorio')
         .bail()
