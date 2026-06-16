@@ -57,6 +57,8 @@
 
 .table-wrapper {
   background: transparent;
+  overflow-x: auto;            /* tablas anchas (ej. optimizar ruteo) scrollean en vez de apretarse */
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-wrapper table {

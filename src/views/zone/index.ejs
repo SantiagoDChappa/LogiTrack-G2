@@ -13,15 +13,39 @@
         <div class="page-header">
             <h1>Zonas</h1>
             <div class="page-header__actions">
-                <a href="/zone/new" class="btn-primary">
-                    <span class="material-symbols-outlined">add</span>Nueva
+                <a href="/zone/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva zona" aria-label="Nueva zona">
+                    <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
         </div>
 
         <div class="shipments-wrapper">
+            <form class="search-form" data-tools-for="zones" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-zone-name">Nombre</label>
+                        <input type="text" id="f-zone-name" class="search-input" data-col="0" placeholder="Ej: CABA - Belgrano">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-zone-prov">Provincia</label>
+                        <input type="text" id="f-zone-prov" class="search-input" data-col="1" placeholder="Ej: 24">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-zone-state">Estado</label>
+                        <select id="f-zone-state" class="search-input" data-col="4">
+                            <option value="">Todas</option>
+                            <option value="Habilitada">Habilitada</option>
+                            <option value="Deshabilitada">Deshabilitada</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
             <div class="table-wrapper">
-                <table data-paginate="zones">
+                <table data-tools="zones">
                     <thead>
                         <tr>
                             <th>Nombre</th>
@@ -70,5 +94,6 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

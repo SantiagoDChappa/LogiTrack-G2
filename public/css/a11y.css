@@ -1,0 +1,59 @@
+/* LGT-217 — Accesibilidad global: foco visible, lector de pantalla y salto de contenido.
+   Cargado en todas las pantallas (head partial + portal). */
+
+/* Esc.3 — foco visible y consistente para navegación por teclado.
+   :focus-visible solo marca el foco cuando viene del teclado (no del mouse). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible {
+    outline: 3px solid var(--color-primary, #2563eb);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Fallback para navegadores sin :focus-visible. */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline-color: var(--color-primary, #2563eb);
+}
+
+/* Esc.1 — texto solo para lectores de pantalla (etiquetas accesibles sin afectar el diseño). */
+.sr-only {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Esc.3 — salto al contenido principal: oculto hasta recibir foco con Tab. */
+.skip-to-content {
+    position: absolute;
+    left: -999px;
+    top: 0;
+    z-index: 2000;
+    background: var(--color-primary, #2563eb);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    border-radius: 0 0 6px 0;
+    text-decoration: none;
+    font-weight: 600;
+}
+.skip-to-content:focus {
+    left: 0;
+}
+
+/* Esc.2 — los mensajes de estado/alerta no deben quedar ocultos al lector aunque estén vacíos. */
+[role="alert"][hidden],
+[aria-live][hidden] {
+    display: none;
+}

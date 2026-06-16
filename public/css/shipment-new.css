@@ -481,3 +481,25 @@ html[data-theme="dark"] {
     .form-actions .btn-secondary { width: 100%; justify-content: center; }
     .btn-edit-persona { justify-self: stretch; }
 }
+
+/* LGT-207 — teléfono en un solo input que se autoformatea mientras se escribe. */
+.phone-display {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .65rem .85rem;
+    background: var(--color-bg);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    color: var(--color-text);
+    font-size: 1.05rem;
+    letter-spacing: .08em;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+.phone-display::placeholder { letter-spacing: normal; font-size: .92rem; color: var(--color-text-muted); }
+.phone-display:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+.phone-preview { font-size: .8rem; color: var(--color-text-secondary); margin-top: 4px; display: block; }

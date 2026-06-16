@@ -1,7 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/connection');
-const { NotificationEvent } = require('../constants/enums');
-const { NotificationEvent: NotificationEventsModel } = require('../models/notificationEvents')
+const { NotificationEvent: NotificationEventsModel } = require('../models/notificationEvents');
 
 const NotificationConfig = sequelize.define('notificationConfig', {
     id: {
@@ -28,10 +27,25 @@ const NotificationConfig = sequelize.define('notificationConfig', {
         allowNull: true,
         field: 'custom_email',
     },
+    // LGT-219: canales activos del evento, CSV de 'in-app','email','sms'. Default 'email'.
+    channels: {
+        type: DataTypes.STRING(60),
+        allowNull: false,
+        defaultValue: 'email',
+    },
 },
     {
         tableName: 'notification_config',
     });
+
+// LGT-219 — helpers de canales.
+const VALID_CHANNELS = ['in-app', 'email', 'sms'];
+const parseChannels = (raw) => String(raw || '')
+    .split(',').map(s => s.trim()).filter(c => VALID_CHANNELS.includes(c));
+const serializeChannels = (arr) => {
+    const clean = (Array.isArray(arr) ? arr : []).filter(c => VALID_CHANNELS.includes(c));
+    return Array.from(new Set(clean)).join(',');
+};
 
 NotificationConfig.belongsTo(NotificationEventsModel, {
     foreignKey: 'eventCode',
@@ -46,7 +60,7 @@ const isNotificationEnabled = async (eventCode) => {
 
 const getAllConfigs = async () => {
     const config = await NotificationConfig.findAll({
-        attributes: ['id', 'eventCode', 'enabled', 'recipientMode', 'customEmail'],
+        attributes: ['id', 'eventCode', 'enabled', 'recipientMode', 'customEmail', 'channels'],
         include: [{
             model: NotificationEventsModel,
             as: 'eventDetails',
@@ -63,6 +77,7 @@ const getAllConfigs = async () => {
         enabled: item.enabled,
         recipientMode: item.recipientMode || 'recipient',
         customEmail: item.customEmail || '',
+        channels: parseChannels(item.channels).length ? parseChannels(item.channels) : ['email'],
     }));
 };
 
@@ -70,4 +85,7 @@ const getConfigByEvent = async (eventCode) => {
     return NotificationConfig.findOne({ where: { eventCode } });
 };
 
-module.exports = { NotificationConfig, isNotificationEnabled, getAllConfigs, getConfigByEvent };
+module.exports = {
+    NotificationConfig, isNotificationEnabled, getAllConfigs, getConfigByEvent,
+    VALID_CHANNELS, parseChannels, serializeChannels,
+};

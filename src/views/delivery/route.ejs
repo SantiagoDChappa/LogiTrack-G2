@@ -571,26 +571,26 @@
                 <a class="btn-back" href="/delivery" title="Volver a Mi Ruteo">
                     <span class="material-symbols-outlined">arrow_back</span>
                 </a>
-                <button class="btn-menu" id="btn-route-menu" title="Menú">
+                <button class="btn-menu" id="btn-route-menu" title="Menú" aria-label="Menú">
                     <span class="material-symbols-outlined">menu</span>
                 </button>
             </div>
             <div class="map-actions">
                 <% if (!readOnly) { %>
-                    <button class="btn-panic"    id="btn-panic"    title="Pánico: enviar ubicación a despacho">
+                    <button class="btn-panic"    id="btn-panic"    title="Pánico: enviar ubicación a despacho" aria-label="Pánico: enviar ubicación a despacho">
                         <span class="material-symbols-outlined">sos</span>
                     </button>
-                    <button class="btn-incident" id="btn-incident" title="Reportar incidente vehicular / accidente">
+                    <button class="btn-incident" id="btn-incident" title="Reportar incidente vehicular / accidente" aria-label="Reportar incidente vehicular / accidente">
                         <span class="material-symbols-outlined">report</span>
                     </button>
-                    <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)">
+                    <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)" aria-label="Pausar ruta (almuerzo / combustible)">
                         <span class="material-symbols-outlined">pause_circle</span>
                     </button>
                 <% } %>
-                <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps">
+                <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">
                     <span class="material-symbols-outlined">map</span>
                 </button>
-                <button class="btn-recenter" id="btn-recenter" title="Centrar en mi posición">
+                <button class="btn-recenter" id="btn-recenter" title="Centrar en mi posición" aria-label="Centrar en mi posición">
                     <span class="material-symbols-outlined">my_location</span>
                 </button>
                 <% if (readOnly) { %>

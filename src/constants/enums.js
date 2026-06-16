@@ -51,6 +51,19 @@ const IncidentResolution = Object.freeze({
     NO_PROCEDENTE: 'NO_PROCEDENTE',
 });
 
+// LGT-210 — nivel de demora que clasifica el repartidor al informarla.
+const IncidentDelayLevel = Object.freeze({
+    DEMORADA:     'DEMORADA',
+    MUY_DEMORADA: 'MUY_DEMORADA',
+    REPROGRAMAR:  'REPROGRAMAR',
+});
+
+const IncidentDelayLevelLabel = Object.freeze({
+    DEMORADA:     'Demorada',
+    MUY_DEMORADA: 'Muy demorada',
+    REPROGRAMAR:  'Se debe reprogramar',
+});
+
 const IncidentResolutionLabel = Object.freeze({
     PROCEDENTE:    'Procedente',
     NO_PROCEDENTE: 'No procedente',
@@ -138,6 +151,7 @@ const ShipmentHistoryEvent = Object.freeze({
     RETURNED_TO_BRANCH:      'RETURNED_TO_BRANCH',
     ROUTE_ASSIGNED:          'ROUTE_ASSIGNED',
     INCIDENT_OPENED:         'INCIDENT_OPENED',
+    DELAY_PROPAGATED:        'DELAY_PROPAGATED',
     MODIFICATION_APPLIED:    'MODIFICATION_APPLIED',
     MODIFICATION_REQUESTED:  'MODIFICATION_REQUESTED',
     MODIFICATION_REJECTED:   'MODIFICATION_REJECTED',
@@ -172,6 +186,48 @@ const RouteFailureReason = Object.freeze({
     OTHER:               'OTHER',
 });
 
+// LGT-182/183/184/186 — Devoluciones.
+const ReturnStatus = Object.freeze({
+    SOLICITADA:  'SOLICITADA',
+    EN_REVISION: 'EN_REVISION',
+    APROBADA:    'APROBADA',
+    RECHAZADA:   'RECHAZADA',
+    EN_PROCESO:  'EN_PROCESO',
+    FINALIZADA:  'FINALIZADA',
+});
+
+const ReturnStatusLabel = Object.freeze({
+    SOLICITADA:  'Solicitada',
+    EN_REVISION: 'En revisión',
+    APROBADA:    'Aprobada',
+    RECHAZADA:   'Rechazada',
+    EN_PROCESO:  'En proceso',
+    FINALIZADA:  'Finalizada',
+});
+
+const ReturnReason = Object.freeze({
+    DEFECTUOSO:      'DEFECTUOSO',
+    INCORRECTO:      'INCORRECTO',
+    DANADO:          'DANADO',
+    ARREPENTIMIENTO: 'ARREPENTIMIENTO',
+    OTRO:            'OTRO',
+});
+
+const ReturnReasonLabel = Object.freeze({
+    DEFECTUOSO:      'Producto defectuoso',
+    INCORRECTO:      'Producto incorrecto o equivocado',
+    DANADO:          'Llegó dañado',
+    ARREPENTIMIENTO: 'Arrepentimiento (ya no lo quiero)',
+    OTRO:            'Otro',
+});
+
+// Resultado que define el Supervisor al aprobar (LGT-183/213). Comparte vocabulario con
+// incident.damageChoice (REEMBOLSO/REEMPLAZO).
+const ReturnResult = Object.freeze({
+    REEMBOLSO: 'REEMBOLSO',
+    REEMPLAZO: 'REEMPLAZO',
+});
+
 const mapperShipmentStatusToEvent = {
     [Status.PENDING.id]:        NotificationEvent.SHIPMENT_PENDING,
     [Status.IN_TRANSIT.id]:     NotificationEvent.SHIPMENT_IN_TRANSIT,
@@ -195,8 +251,10 @@ const EmailQueueStatus = {
 module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
     IncidentStatus, IncidentStatusLabel, IncidentResolution, IncidentResolutionLabel,
+    IncidentDelayLevel, IncidentDelayLevelLabel,
     IncidentChannel, IncidentEventType, IncidentPriority,
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,
     ModificationRequestStatus, ModificationChangeType, ModificationChannel,
+    ReturnStatus, ReturnStatusLabel, ReturnReason, ReturnReasonLabel, ReturnResult,
 };

@@ -331,6 +331,11 @@ header {
   margin-left: auto;
 }
 
+/* LGT-218: la campana abre el grupo derecho (campana + perfil) y lo empuja al extremo. */
+.top-header .notif-bell {
+  margin-left: auto;
+}
+
 .top-header form input[type="text"] {
   width: 100%;
   padding: clamp(0.4rem, 0.6vw, 0.65rem) clamp(0.85rem, 1.2vw, 1.2rem);

@@ -18,7 +18,7 @@ const incidentAttachmentModel = require('../models/incidentAttachment');
 const { IncidentAttachment }  = incidentAttachmentModel;
 const {
     RoleType, IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType,
-    ShipmentHistoryEvent, NotificationEvent, Status, IncidentStatusLabel
+    ShipmentHistoryEvent, NotificationEvent, Status, IncidentStatusLabel, IncidentDelayLevel
 } = require('../constants/enums');
 
 const roleDescriptionById = Object.values(RoleType).reduce((acc, r) => {
@@ -30,6 +30,14 @@ const STAFF_ROLES = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMI
 const isStaff      = (u) => STAFF_ROLES.includes(u?.roleId);
 const isDelivery   = (u) => u?.roleId === RoleType.DELIVERY.id;
 const isSupOrAdmin = (u) => u?.roleId === RoleType.SUPERVISOR.id || u?.roleId === RoleType.ADMIN.id;
+const isOperator   = (u) => u?.roleId === RoleType.OPERATOR.id;
+
+const { isDamageType } = require('../services/incidentDamageResolution');
+
+// LGT-220: el Operador no puede cargar incidencias de paquete roto, así que esos tipos
+// ni se le ofrecen en los selectores (defensa en UI; el backend igual lo rechaza).
+const visibleTypesFor = (types, user) =>
+    isOperator(user) ? types.filter(t => !isDamageType(t)) : types;
 
 const incidentVisibleTo = (incident, user) => {
     if (!incident) { return false; }
@@ -159,12 +167,13 @@ const getCreateForm = async (req, res) => {
     // Incidencias ya abiertas del envío: se le muestran al operador para que sepa qué
     // tiene asociado antes de crear otra (y no duplique un tipo ya abierto).
     const openIncidents = shipment ? await incidentModel.findOpenByShipmentWithType(shipment.id) : [];
-    res.render('incident/new', { shipment, types, branches, users: usersPayload, error: null, form: prefillForm, openIncidents });
+    res.render('incident/new', { shipment, types: visibleTypesFor(types, user), branches, users: usersPayload, error: null, form: prefillForm, openIncidents });
 };
 
 // Datos para el modal rápido de incidencia (acción in-situ desde detalle/tabla de envíos):
 // tipos activos + staff disponible. El front filtra los usuarios por la sucursal del envío.
 const getQuickData = async (req, res) => {
+    const user = res.locals.currentUser;
     const shipmentId = req.query.shipmentId ? Number(req.query.shipmentId) : null;
     const [types, users, openIncidents] = await Promise.all([
         incidentTypeModel.getActive(),
@@ -178,7 +187,7 @@ const getQuickData = async (req, res) => {
         shipmentId ? incidentModel.findOpenByShipmentWithType(shipmentId) : Promise.resolve([])
     ]);
     res.json({
-        types: types.map(t => ({ id: t.id, code: t.code, description: t.description })),
+        types: visibleTypesFor(types, user).map(t => ({ id: t.id, code: t.code, description: t.description })),
         users: users.map(u => ({
             id: u.id, fullName: u.fullName, roleId: u.roleId,
             roleDescription: roleDescriptionById[u.roleId] || '', branchId: u.branchId
@@ -273,6 +282,27 @@ const create = async (req, res) => {
             : res.status(400).render('error', { message: 'Tipo de incidencia inválido' });
     }
 
+    // LGT-220: paquete roto solo lo cargan Supervisor/Admin, el repartidor asignado
+    // (ya validado arriba) o el cliente por el portal. El Operador queda excluido en el
+    // backend, además de no vérsele el tipo en la UI (defensa doble).
+    if (isDamageType(type)) {
+        const roleError = incidentRules.getDamageRoleError(user.roleId);
+        if (roleError) {
+            return wantsJson ? res.status(403).json({ error: roleError }) : renderFormError(roleError);
+        }
+    }
+
+    // LGT-210 — al informar una demora, el repartidor clasifica el nivel (obligatorio para DELAY).
+    const isDelayType = type.code === 'DELAY';
+    let delayLevel = null;
+    if (isDelayType) {
+        delayLevel = String(req.body.delayLevel || '').toUpperCase();
+        if (!Object.values(IncidentDelayLevel).includes(delayLevel)) {
+            const msg = 'Elegí el nivel de demora: Demorada, Muy demorada o Se debe reprogramar.';
+            return wantsJson ? res.status(400).json({ error: msg }) : renderFormError(msg);
+        }
+    }
+
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
     const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
     if (eligibilityError) {
@@ -300,7 +330,8 @@ const create = async (req, res) => {
             description:      description.trim().slice(0, 2000),
             openedChannel:    IncidentChannel.INTERNAL,
             openedByUserId:   user.id,
-            assignedToUserId: assignee.id
+            assignedToUserId: assignee.id,
+            delayLevel:       isDelayType ? delayLevel : null
         }, { transaction: t });
 
         await incidentHistoryModel.create({
@@ -338,6 +369,45 @@ const create = async (req, res) => {
 
     notifyIncidentCreated(incident.id, shipment, type, { assignee, openedBy: user })
         .catch(e => console.error('[incident] notif:', e.message));
+
+    // Aviso in-app al usuario asignado en el alta (salvo que sea quien la está creando).
+    if (assignee && assignee.id !== user.id) {
+        notifyIncidentAssigned(incident.id, shipment, type, assignee, user)
+            .catch(e => console.error('[incident] notif asignado (alta):', e.message));
+    }
+
+    // LGT-210 — efecto del nivel de demora; LGT-209 — propagación en cascada a la ruta.
+    if (isDelayType) {
+        try {
+            const { Shipment } = require('../models/shipment');
+            if (delayLevel === IncidentDelayLevel.REPROGRAMAR) {
+                // Esc.2 — marca el envío pendiente de reprogramación y habilita el flujo de nueva fecha.
+                await Shipment.update({ pendingReschedule: true }, { where: { id: shipment.id } });
+                await shipmentHistoryModel.create({
+                    shipmentId:   shipment.id,
+                    fromStatusId: shipment.statusId,
+                    toStatusId:   shipment.statusId,
+                    eventType:    ShipmentHistoryEvent.RESCHEDULED,
+                    comment:      `Demora nivel "Se debe reprogramar" (incidencia #${incident.id}). Pendiente de nueva fecha de entrega.`,
+                    userId:       user.id,
+                });
+            } else {
+                // Esc.3 — demorada / muy demorada: mantiene la fecha comprometida, puede entregarse fuera de plazo el mismo día.
+                await shipmentHistoryModel.create({
+                    shipmentId:   shipment.id,
+                    fromStatusId: shipment.statusId,
+                    toStatusId:   shipment.statusId,
+                    eventType:    ShipmentHistoryEvent.INCIDENT_OPENED,
+                    comment:      `Demora nivel "${delayLevel === IncidentDelayLevel.MUY_DEMORADA ? 'Muy demorada' : 'Demorada'}" (incidencia #${incident.id}). La entrega puede producirse fuera del plazo previsto, dentro del mismo día.`,
+                    userId:       user.id,
+                });
+            }
+            // LGT-209 — propaga a los envíos pendientes posteriores de la misma ruta.
+            await require('../services/delayPropagation').propagate({ shipment, originIncidentId: incident.id, userId: user.id });
+        } catch (e) {
+            console.error('[incident] post-proceso de demora (210/209):', e.message);
+        }
+    }
 
     if (wantsJson) {
         return res.json({ ok: true, incidentId: incident.id, trackingId: shipment.trackingId });
@@ -379,6 +449,14 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
     require('../services/incidentDamageResolution').notifySenderIfDamage({ incidentId, shipment, type })
         .catch(e => console.error('[incident] notif daño cliente:', e.message));
 
+    // LGT-89: notificación interna IN-APP a los supervisores de la sucursal del ENVÍO
+    // (+ fallback a Administradores si la sucursal no tiene supervisor). Una por incidencia.
+    const openedByLabel = openedBy
+        ? (openedBy.fullName || openedBy.email || 'usuario interno')
+        : (reporterName ? `${reporterName} (portal)` : 'portal público');
+    notifyBranchSupervisors(incidentId, shipment, type, openedByLabel)
+        .catch(e => console.error('[incident] notif supervisores sucursal:', e.message));
+
     if (emails.length === 0) { return; }
 
     const reportedByLabel = openedBy
@@ -397,14 +475,63 @@ const notifyIncidentCreated = async (incidentId, shipment, type, ctx = {}) => {
     await sendEmail(emails.join(','), subject, body);
 };
 
+// LGT-89: avisa por el centro in-app a los supervisores de la sucursal del envío.
+// Si la sucursal no tiene supervisor activo, hace fallback a los Administradores.
+// El contenido incluye tracking, tipo, quién la cargó y la fecha, con enlace al detalle.
+const notifyBranchSupervisors = async (incidentId, shipment, type, openedByLabel) => {
+    const inApp = require('../services/notification/inAppNotifier');
+    const branchId = shipment.currentBranchId || null;
+
+    let recipients = [];
+    if (branchId) {
+        recipients = await User.findAll({
+            where: { roleId: RoleType.SUPERVISOR.id, branchId, active: true },
+            attributes: ['id'],
+        });
+    }
+    if (recipients.length === 0) {
+        // Fallback: sin supervisor en la sucursal → Administradores.
+        recipients = await User.findAll({
+            where: { roleId: RoleType.ADMIN.id, active: true },
+            attributes: ['id'],
+        });
+    }
+    if (recipients.length === 0) { return; }
+
+    const track = shipment.trackingId || shipment.id;
+    const title = `Nueva incidencia #${incidentId} en envío ${track}`;
+    const body  = `Tipo: ${type.description} · Cargada por: ${openedByLabel} · ${new Date().toLocaleString('es-AR')}`;
+    await inApp.notifyMany(recipients.map(u => u.id), {
+        event:        'INCIDENT_CREATED',
+        title,
+        body,
+        resourceType: 'incident',
+        resourceId:   incidentId,
+        url:          `/incident/${incidentId}`,
+    });
+};
+
 // Notif a un usuario cuando es asignado o reasignado a una incidencia.
 // Se manda SIEMPRE (sin pasar por la config), porque es la accion intencional
 // del admin/supervisor al asignar. Si el target no tiene email, skip silencioso.
 const notifyIncidentAssigned = async (incidentId, shipment, type, targetUser, assignedBy) => {
-    if (!targetUser || !targetUser.email) { return; }
+    if (!targetUser) { return; }
     const assignedByLabel = assignedBy
         ? (assignedBy.fullName || assignedBy.email || 'un admin')
         : 'un admin';
+
+    // Aviso in-app SIEMPRE y SOLO al usuario asignado (no depende de que tenga email).
+    require('../services/notification/inAppNotifier').notify({
+        userId:       targetUser.id,
+        event:        'INCIDENT_ASSIGNED',
+        title:        `Te asignaron la incidencia #${incidentId}`,
+        body:         `Envío ${shipment.trackingId || shipment.id} · ${type.description} · asignada por ${assignedByLabel}`,
+        resourceType: 'incident',
+        resourceId:   incidentId,
+        url:          `/incident/${incidentId}`,
+    }).catch(e => console.error('[incident] in-app asignación:', e.message));
+
+    if (!targetUser.email) { return; }
     const subject = `[LogiTrack] Te asignaron la incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
     const body =
         `${targetUser.fullName || ''},\n\n` +
@@ -667,6 +794,50 @@ const setResolution = async (req, res) => {
             transaction: t
         });
     });
+
+    // LGT-213: en una incidencia de paquete dañado, el supervisor aprueba/rechaza la
+    // resolución elegida por el cliente. Le informamos la decisión (Esc.3) y, si es
+    // PROCEDENTE, queda el punto de integración para EJECUTAR la resolución elegida:
+    // reembolso → nota de crédito (LGT-214), reemplazo → envío de reposición (LGT-215).
+    try {
+        const { isDamageType } = require('../services/incidentDamageResolution');
+        const type = await incidentTypeModel.getById(incident.incidentTypeId);
+        if (isDamageType(type)) {
+            const choiceLabel = incident.damageChoice === 'REEMBOLSO' ? 'reembolso'
+                : incident.damageChoice === 'REEMPLAZO' ? 'reemplazo' : 'solicitud';
+            const decision = resolution === IncidentResolution.PROCEDENTE
+                ? `Tu reclamo por paquete dañado fue aprobado. Gestionamos tu ${choiceLabel}.`
+                : `Tu reclamo por paquete dañado fue revisado y resultó no procedente. Motivo: ${cleanComment}`;
+            notifyIncidentStatusChange(incident.shipmentId, id, incident.status, decision);
+
+            if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMBOLSO') {
+                const r = await require('../services/creditNoteService')
+                    .generate({ shipmentId: incident.shipmentId, incidentId: id, userId: user.id });
+                if (r.ok && r.creditNote) {
+                    await incidentHistoryModel.create({
+                        incidentId: id,
+                        eventType:  IncidentEventType.COMMENT,
+                        comment:    `Nota de crédito ${r.creditNote.number} generada por reembolso (/credit-note/${r.creditNote.id}).`,
+                        userId:     user.id,
+                    });
+                }
+            } else if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMPLAZO') {
+                const r = await require('../services/replacementService')
+                    .generate({ originalShipmentId: incident.shipmentId });
+                if (r.ok && r.shipment) {
+                    await incidentHistoryModel.create({
+                        incidentId: id,
+                        eventType:  IncidentEventType.COMMENT,
+                        comment:    `Envío de reposición ${r.shipment.trackingId} generado por reemplazo (#${r.shipment.id}).`,
+                        userId:     user.id,
+                    });
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[incident] resolución de paquete dañado (notif/ejecución):', e.message);
+    }
+
     res.redirect(`/incident/${id}`);
 };
 

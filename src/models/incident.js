@@ -18,6 +18,8 @@ const Incident = sequelize.define('incident', {
     assignedToUserId: { type: DataTypes.INTEGER,     allowNull: true },
     closedByUserId:   { type: DataTypes.INTEGER,     allowNull: true },
     closedAt:         { type: DataTypes.DATE,        allowNull: true },
+    // LGT-210 — nivel de demora que clasifica el repartidor (DEMORADA | MUY_DEMORADA | REPROGRAMAR).
+    delayLevel:       { type: DataTypes.STRING(20),  allowNull: true, field: 'delay_level' },
     // LGT-204 — elección del remitente ante paquete dañado.
     damageChoice:     { type: DataTypes.STRING(12),  allowNull: true, field: 'damage_choice' }, // REEMBOLSO | REEMPLAZO
     damageChoiceAt:   { type: DataTypes.DATE,        allowNull: true, field: 'damage_choice_at' },
