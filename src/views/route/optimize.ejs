@@ -6,6 +6,42 @@
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/routes.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Diálogos lindos para el flujo de ruteo (con fallback a los nativos).
+        window.rtTheme = function () { return (localStorage.getItem('theme') || 'light') === 'dark'; };
+        window.rtConfirm = function (opts) {
+            opts = opts || {};
+            var dark = window.rtTheme();
+            if (window.Swal) {
+                return Swal.fire({
+                    title: opts.title || '¿Confirmás?',
+                    html: opts.html || opts.text || '',
+                    icon: opts.icon || 'question',
+                    showCancelButton: true,
+                    confirmButtonText: opts.confirmText || 'Aceptar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: dark ? '#3b82f6' : '#2563eb',
+                    cancelButtonColor: dark ? '#475569' : '#6b7280',
+                    background: dark ? '#1e293b' : '#ffffff',
+                    color: dark ? '#f1f5f9' : '#1e293b',
+                }).then(function (r) { return !!r.isConfirmed; });
+            }
+            return Promise.resolve(window.confirm(opts.text || opts.title || ''));
+        };
+        window.rtAlert = function (msg, icon) {
+            var dark = window.rtTheme();
+            if (window.Swal) {
+                return Swal.fire({
+                    html: msg, icon: icon || 'info', confirmButtonText: 'Aceptar',
+                    confirmButtonColor: dark ? '#3b82f6' : '#2563eb',
+                    background: dark ? '#1e293b' : '#ffffff', color: dark ? '#f1f5f9' : '#1e293b',
+                });
+            }
+            window.alert(typeof msg === 'string' ? msg.replace(/<[^>]+>/g, '') : msg);
+            return Promise.resolve();
+        };
+    </script>
     <style>
         /* Las tablas de envíos/transportes son anchas: que no se apretujen y scrolleen en pantallas chicas. */
         #optimize-form .table-wrapper table { min-width: 760px; }
@@ -242,14 +278,14 @@
         const fd = new FormData(e.target);
         const shipmentIds = fd.getAll('shipmentIds');
         if (shipmentIds.length === 0) {
-            alert('Seleccioná al menos un envío.');
+            window.rtAlert('Seleccioná al menos un envío.', 'warning');
             return;
         }
         const body = { shipmentIds, branchId: window.CURRENT_BRANCH_ID };
         if (manualTxMode) {
             const selectedTx = fd.getAll('transportIds').map(Number);
             if (selectedTx.length === 0) {
-                alert('Modo manual activo: tildá al menos un transporte.');
+                window.rtAlert('Modo manual activo: tildá al menos un transporte.', 'warning');
                 return;
             }
             body.excludeTransportIds = allTxIds.filter(id => !selectedTx.includes(id));
@@ -260,7 +296,7 @@
             body: JSON.stringify(body),
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Error'); return; }
+        if (!res.ok) { window.rtAlert(data.error || 'Error', 'error'); return; }
         window.renderRoutePreview(data, { shipmentIds: shipmentIds.map(Number) });
         setTimeout(() => {
             document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

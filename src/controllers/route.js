@@ -140,8 +140,9 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
     if (!transport) { throw new Error('Transporte no encontrado'); }
     if (!transport.driverUserId) { throw new Error('El transporte no tiene conductor asignado. Asigná un conductor antes de confirmar la ruta.'); }
 
-    // Un repartidor sólo puede tener UNA ruta activa (PLANNED o IN_ROUTE) a la vez,
-    // sin importar cuántos transports tenga asignados. Bloquea si ya tiene otra ruta abierta.
+    // El repartidor puede tener varias rutas PLANIFICADAS en cola, pero solo UNA EN CURSO.
+    // Si ya está manejando una (IN_ROUTE), no se le puede asignar otra hasta que la termine;
+    // si solo tiene planificadas, la nueva se encola.
     const { Transport } = require('../models/transport');
     const driverTransports = await Transport.findAll({
         where: { driverUserId: transport.driverUserId },
@@ -150,18 +151,17 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
     });
     const driverTransportIds = driverTransports.map(dt => dt.id);
     if (driverTransportIds.length > 0) {
-        const existingActive = await Route.findOne({
+        const inRoute = await Route.findOne({
             where: {
                 transportId: { [Op.in]: driverTransportIds },
-                statusId:    { [Op.in]: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
+                statusId:    RouteStatus.IN_ROUTE,
             },
-            attributes: ['id', 'statusId'],
+            attributes: ['id'],
             transaction: t,
         });
-        if (existingActive) {
-            const lbl = existingActive.statusId === RouteStatus.IN_ROUTE ? 'En curso' : 'Planificada';
+        if (inRoute) {
             const driverName = transport.driver?.fullName || `#${transport.driverUserId}`;
-            throw new Error(`El repartidor ${driverName} ya tiene una ruta activa (#${existingActive.id} · ${lbl}). Sólo se permite una ruta activa por repartidor.`);
+            throw new Error(`El repartidor ${driverName} ya está en curso con la ruta #${inRoute.id}. No se le puede asignar otra hasta que la termine (las rutas planificadas sí se pueden encolar).`);
         }
     }
 
@@ -476,6 +476,20 @@ const dispatchRoute = async (req, res) => {
             && route.transport?.driverUserId
             && route.transport.driverUserId !== currentUser.id) {
             return res.status(403).render('route/scan', { route, error: 'Esta ruta no está asignada a vos.', success: null, summary: null });
+        }
+
+        // Cola: solo se puede tener UNA ruta En Curso a la vez. Si el repartidor ya tiene otra
+        // en curso, no puede arrancar esta hasta terminarla (las demás quedan planificadas).
+        if (route.statusId === RouteStatus.PLANNED && route.transport?.driverUserId) {
+            const { Transport } = require('../models/transport');
+            const driverTx = await Transport.findAll({ where: { driverUserId: route.transport.driverUserId }, attributes: ['id'] });
+            const otherInRoute = await Route.findOne({
+                where: { transportId: { [Op.in]: driverTx.map(tx => tx.id) }, statusId: RouteStatus.IN_ROUTE, id: { [Op.ne]: routeId } },
+                attributes: ['id'],
+            });
+            if (otherInRoute) {
+                return res.status(409).render('route/scan', { route, error: `Ya tenés la ruta #${otherInRoute.id} en curso. Terminala antes de empezar esta.`, success: null, summary: null });
+            }
         }
 
         const coords = await resolveUserBranchCoords(currentUser.id);

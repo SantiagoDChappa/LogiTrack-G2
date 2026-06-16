@@ -94,7 +94,8 @@ const getActiveByDriver = (driverUserId) => {
         include: [
             { model: Transport, as: 'transport', where: { driverUserId }, required: true },
         ],
-        order: [['createdAt', 'DESC']],
+        // Cola: la EN CURSO tiene prioridad; entre planificadas, la más vieja primero (FIFO).
+        order: [['statusId', 'DESC'], ['createdAt', 'ASC']],
     });
 };
 
