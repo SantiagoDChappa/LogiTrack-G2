@@ -230,7 +230,21 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
             });
         }
     }
-    return route.id;
+    return { id: route.id, driverId, transportName, stops: shipmentIds.length };
+};
+
+// Aviso in-app SOLO al repartidor al que se le asignó la ruta (best-effort, post-commit).
+const notifyDriverRouteAssigned = ({ driverId, id, transportName, stops }) => {
+    if (!driverId) { return; }
+    require('../services/notification/inAppNotifier').notify({
+        userId:       driverId,
+        event:        'ROUTE_ASSIGNED',
+        title:        `Te asignaron la ruta #${id}`,
+        body:         `${transportName || 'Transporte'} · ${stops || 0} entrega${stops === 1 ? '' : 's'}`,
+        resourceType: 'route',
+        resourceId:   id,
+        url:          `/route/${id}`,
+    }).catch(e => console.error('[route] in-app asignación repartidor:', e.message));
 };
 
 const confirmOne = async (req, res) => {
@@ -259,8 +273,9 @@ const confirmOne = async (req, res) => {
         }
 
         const actor = res.locals.currentUser || {};
-        const routeId = await sequelize.transaction(t => persistProposal({ p: proposal, branchId, actor, t }));
-        res.json({ ok: true, routeId });
+        const result = await sequelize.transaction(t => persistProposal({ p: proposal, branchId, actor, t }));
+        res.json({ ok: true, routeId: result.id });
+        notifyDriverRouteAssigned(result);
     } catch (e) {
         console.error('confirmOne err', e);
         res.status(500).json({ error: e.message });
@@ -276,16 +291,17 @@ const confirm = async (req, res) => {
         return res.status(400).json({ error: 'No hay propuestas para confirmar' });
     }
 
-    const createdRoutes = [];
+    const results = [];
     const actor = res.locals.currentUser || {};
     try {
         await sequelize.transaction(async (t) => {
             for (const p of proposals) {
-                const id = await persistProposal({ p, branchId, actor, t });
-                createdRoutes.push(id);
+                const r = await persistProposal({ p, branchId, actor, t });
+                results.push(r);
             }
         });
-        res.json({ ok: true, routeIds: createdRoutes });
+        res.json({ ok: true, routeIds: results.map(r => r.id) });
+        results.forEach(notifyDriverRouteAssigned);
     } catch (e) {
         res.status(400).json({ error: e.message });
     }

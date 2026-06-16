@@ -370,6 +370,12 @@ const create = async (req, res) => {
     notifyIncidentCreated(incident.id, shipment, type, { assignee, openedBy: user })
         .catch(e => console.error('[incident] notif:', e.message));
 
+    // Aviso in-app al usuario asignado en el alta (salvo que sea quien la está creando).
+    if (assignee && assignee.id !== user.id) {
+        notifyIncidentAssigned(incident.id, shipment, type, assignee, user)
+            .catch(e => console.error('[incident] notif asignado (alta):', e.message));
+    }
+
     // LGT-210 — efecto del nivel de demora; LGT-209 — propagación en cascada a la ruta.
     if (isDelayType) {
         try {
@@ -509,10 +515,23 @@ const notifyBranchSupervisors = async (incidentId, shipment, type, openedByLabel
 // Se manda SIEMPRE (sin pasar por la config), porque es la accion intencional
 // del admin/supervisor al asignar. Si el target no tiene email, skip silencioso.
 const notifyIncidentAssigned = async (incidentId, shipment, type, targetUser, assignedBy) => {
-    if (!targetUser || !targetUser.email) { return; }
+    if (!targetUser) { return; }
     const assignedByLabel = assignedBy
         ? (assignedBy.fullName || assignedBy.email || 'un admin')
         : 'un admin';
+
+    // Aviso in-app SIEMPRE y SOLO al usuario asignado (no depende de que tenga email).
+    require('../services/notification/inAppNotifier').notify({
+        userId:       targetUser.id,
+        event:        'INCIDENT_ASSIGNED',
+        title:        `Te asignaron la incidencia #${incidentId}`,
+        body:         `Envío ${shipment.trackingId || shipment.id} · ${type.description} · asignada por ${assignedByLabel}`,
+        resourceType: 'incident',
+        resourceId:   incidentId,
+        url:          `/incident/${incidentId}`,
+    }).catch(e => console.error('[incident] in-app asignación:', e.message));
+
+    if (!targetUser.email) { return; }
     const subject = `[LogiTrack] Te asignaron la incidencia #${incidentId} en envío ${shipment.trackingId || shipment.id}`;
     const body =
         `${targetUser.fullName || ''},\n\n` +
