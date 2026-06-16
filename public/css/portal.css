@@ -1661,9 +1661,16 @@ ul { list-style: none; }
     border-radius: 999px; text-transform: uppercase;
     border: 1px solid transparent; white-space: nowrap;
 }
-.portal-incident-badge--open      { background: var(--badge-transit-bg);   color: var(--badge-transit-text); }
-.portal-incident-badge--in_review { background: var(--badge-delayed-bg);   color: var(--badge-delayed-text); }
-.portal-incident-badge--closed    { background: var(--badge-delivered-bg); color: var(--badge-delivered-text); }
+.portal-incident-badge--open        { background: var(--badge-transit-bg);    color: var(--badge-transit-text); }
+.portal-incident-badge--in_review   { background: var(--badge-delayed-bg);    color: var(--badge-delayed-text); }
+.portal-incident-badge--closed      { background: var(--badge-delivered-bg);  color: var(--badge-delivered-text); }
+/* Estados de devolución */
+.portal-incident-badge--solicitada  { background: var(--badge-pending-bg);    color: var(--badge-pending-text); }
+.portal-incident-badge--en_revision { background: var(--badge-delayed-bg);    color: var(--badge-delayed-text); }
+.portal-incident-badge--aprobada    { background: #dcfce7;                    color: #15803d; }
+.portal-incident-badge--rechazada   { background: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text); }
+.portal-incident-badge--en_proceso  { background: var(--badge-assigned-bg);   color: var(--badge-assigned-text); }
+.portal-incident-badge--finalizada  { background: var(--badge-delivered-bg);  color: var(--badge-delivered-text); }
 
 .portal-incidents-empty {
     display: flex; flex-direction: column; align-items: center; justify-content: center;

@@ -33,17 +33,20 @@
             <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
 
             <%# LGT-182 — Devoluciones del envío %>
-            <% const _returns = typeof returns !== 'undefined' ? returns : []; %>
-            <div class="portal-mis-envios-card" style="margin-top:1rem;">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-                    <h2 style="margin:0;">Devoluciones</h2>
+            <% var _returns = typeof returns !== 'undefined' ? returns : []; %>
+            <div class="portal-incidents-card" style="margin-top:1rem;">
+                <h3 class="portal-incidents-card__title" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                    <span style="display:inline-flex;align-items:center;gap:.45rem;">
+                        <span class="material-symbols-outlined" style="color:var(--c-primary);">assignment_return</span>
+                        Devoluciones<% if (_returns.length) { %> <span class="portal-incidents-card__count">(<%= _returns.length %>)</span><% } %>
+                    </span>
                     <% if (typeof canRequestReturn !== 'undefined' && canRequestReturn) { %>
-                        <a href="/portal/mis-envios/envio/<%= shipment.id %>/devolucion" class="portal-search-panel-btn" style="width:auto;">
-                            <span class="material-symbols-outlined">assignment_return</span>
+                        <a href="/portal/mis-envios/envio/<%= shipment.id %>/devolucion" class="portal-card-incident-cta-link">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem;">assignment_return</span>
                             Solicitar devolución
                         </a>
                     <% } %>
-                </div>
+                </h3>
 
                 <% if (typeof returnError !== 'undefined' && returnError) { %>
                     <div class="portal-mis-envios-alert portal-mis-envios-alert-error" style="margin-top:.75rem;">
@@ -53,18 +56,24 @@
                 <% } %>
 
                 <% if (_returns.length === 0) { %>
-                    <p class="portal-manage-hint" style="margin-top:.5rem;">Este envío no tiene devoluciones registradas.</p>
+                    <div class="portal-incidents-empty">
+                        <span class="material-symbols-outlined">assignment_return</span>
+                        <p>Este envío no tiene devoluciones registradas.</p>
+                    </div>
                 <% } else { %>
-                    <ul style="list-style:none;margin:.75rem 0 0;padding:0;display:flex;flex-direction:column;gap:.5rem;">
+                    <div class="portal-incidents-list">
                         <% _returns.forEach(function(r) { %>
-                            <li style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.6rem .8rem;">
-                                <strong>#<%= r.id %></strong>
-                                <span><%= r.reasonLabel %></span>
-                                <span class="portal-badge"><%= r.statusLabel %></span>
-                                <span style="opacity:.7;font-size:.8rem;margin-left:auto;"><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></span>
-                            </li>
+                            <a href="/portal/mis-envios/devolucion/<%= r.id %>" class="portal-incident-row">
+                                <span class="portal-incident-id">#<%= r.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= r.reasonLabel %></span>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= r.status.toLowerCase() %>"><%= r.statusLabel %></span>
+                                <span class="portal-incident-date"><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                                <span class="material-symbols-outlined portal-incident-arrow" aria-hidden="true">chevron_right</span>
+                            </a>
                         <% }); %>
-                    </ul>
+                    </div>
                 <% } %>
             </div>
         </div>

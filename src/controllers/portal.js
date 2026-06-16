@@ -228,6 +228,7 @@ const getPortal = async (req, res) => {
         for (const s of shipmentsWithHistory) {
             s.incidents = await buildPublicIncidents(s.id);
             s.recovery  = await buildRecovery(s.id);
+            s.returns   = await buildPublicReturns(s.id);
         }
 
         return res.render('portal', {
@@ -310,6 +311,22 @@ const buildRecovery = async (shipmentId) => {
             suggestedDateLabel:   j.suggestedDate   ? formatDate(j.suggestedDate)   : null,
             rescheduledDateLabel: j.rescheduledDate ? formatDate(j.rescheduledDate) : null,
             status:               j.status || null,
+        };
+    });
+};
+
+const buildPublicReturns = async (shipmentId) => {
+    const returnService = require('../services/returnService');
+    const { ReturnStatusLabel, ReturnReasonLabel } = require('../constants/enums');
+    const rows = await returnService.listByShipment(shipmentId);
+    return rows.map(r => {
+        const j = r.toJSON ? r.toJSON() : r;
+        return {
+            id:          j.id,
+            status:      j.status,
+            statusLabel: ReturnStatusLabel[j.status] || j.status,
+            reasonLabel: ReturnReasonLabel[j.reason]  || j.reason,
+            createdAt:   j.createdAt,
         };
     });
 };
