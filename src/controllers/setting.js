@@ -101,6 +101,7 @@ const getSettings = async (req, res) => {
             reschedule_max_per_envio: settings.reschedule_max_per_envio || '3',
             max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
             dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
+            return_window_days:       settings.return_window_days       || '30',
             notificaciones_activas:   settings.notificaciones_activas   || 'true',
             horario_entrega_inicio:   settings.horario_entrega_inicio   || '08:00',
             horario_entrega_fin:      settings.horario_entrega_fin      || '20:00',
@@ -725,6 +726,7 @@ const saveParams = async (req, res) => {
             // Sprint 3 - 2.5 reglas de reprogramación
             'reschedule_default_days',
             'reschedule_max_per_envio',
+            'return_window_days',
         ];
 
         // Validaciones
@@ -736,6 +738,11 @@ const saveParams = async (req, res) => {
         const diasExpiracion = parseInt(req.body.dias_expiracion_envio);
         if (isNaN(diasExpiracion) || diasExpiracion < 1 || diasExpiracion > 365) {
             return res.redirect(settingBack(req, '?error=dias_expiracion'));
+        }
+
+        const returnWindow = parseInt(req.body.return_window_days);
+        if (isNaN(returnWindow) || returnWindow < 1 || returnWindow > 365) {
+            return res.redirect(settingBack(req, '?error=return_window_days'));
         }
         const pesoMax = parseFloat(req.body.peso_maximo_envio);
         if (isNaN(pesoMax) || pesoMax < 1 || pesoMax > 999) {
