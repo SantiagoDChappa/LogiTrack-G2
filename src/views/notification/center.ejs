@@ -42,7 +42,7 @@
                     %>
                         <li class="notif-item <%= isUnread ? 'notif-item--unread' : '' %>">
                             <a href="<%= href %>" class="notif-link">
-                                <span class="notif-icon" aria-hidden="true"><span class="material-symbols-outlined"><%= icon %></span></span>
+                                <span class="notif-icon notif-icon--<%= n.resourceType || 'default' %>" aria-hidden="true"><span class="material-symbols-outlined"><%= icon %></span></span>
                                 <span class="notif-main">
                                     <span class="notif-title"><%= n.title %></span>
                                     <% if (n.body) { %><span class="notif-body"><%= n.body %></span><% } %>
@@ -69,10 +69,27 @@
         .notif-item { border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-sm); transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
         .notif-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-md, 0 6px 18px rgba(15,23,42,.12)); border-color: var(--color-primary); }
         .notif-item--unread { border-left: 3px solid var(--color-primary); background: linear-gradient(0deg, rgba(37,99,235,.05), rgba(37,99,235,.05)), var(--color-surface); }
-        .notif-link { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.1rem; text-decoration: none; color: var(--color-text); }
-        .notif-icon { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; background: rgba(37,99,235,.1); color: var(--color-primary); }
+        /* Los links de notificación nunca van subrayados ni en azul (heredan el color del texto). */
+        .notif-item .notif-link,
+        .notif-item .notif-link:hover,
+        .notif-item .notif-link:focus,
+        .notif-item .notif-link:visited { text-decoration: none; color: var(--color-text); }
+        .notif-item .notif-link * { text-decoration: none; }
+        .notif-link { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.1rem; }
+        /* Foco accesible pero prolijo: anillo interno, no un recuadro suelto. */
+        .notif-link:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-primary); border-radius: 12px; }
+        .notif-icon { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; background: rgba(37,99,235,.12); color: var(--color-primary); }
         .notif-icon .material-symbols-outlined { font-size: 22px; }
+        /* Un poco de color por tipo de notificación. */
+        .notif-icon--incident { background: rgba(220,38,38,.14); color: #dc2626; }
+        .notif-icon--return   { background: rgba(124,58,237,.14); color: #7c3aed; }
+        .notif-icon--route    { background: rgba(22,163,74,.14); color: #16a34a; }
+        .notif-icon--shipment { background: rgba(217,119,6,.14); color: #d97706; }
         .notif-item--unread .notif-icon { background: var(--color-primary); color: #fff; }
+        .notif-item--unread .notif-icon--incident { background: #dc2626; }
+        .notif-item--unread .notif-icon--return { background: #7c3aed; }
+        .notif-item--unread .notif-icon--route { background: #16a34a; }
+        .notif-item--unread .notif-icon--shipment { background: #d97706; }
         .notif-main { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 0; }
         .notif-title { font-weight: 600; font-size: .98rem; line-height: 1.3; }
         .notif-body { font-size: .88rem; color: var(--color-text-secondary); line-height: 1.4; }
