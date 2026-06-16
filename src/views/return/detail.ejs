@@ -58,7 +58,18 @@
 
                     <% if (ret.result) { %>
                     <dt>Resultado</dt>
-                    <dd><strong><%= ret.result === 'REEMBOLSO' ? 'Reembolso (nota de crédito)' : 'Reemplazo (envío de reposición)' %></strong></dd>
+                    <dd><strong><%= ret.result === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong></dd>
+                    <% if (ret.result === 'REEMBOLSO' && typeof creditNote !== 'undefined' && creditNote) { %>
+                    <dt>Nota de crédito</dt>
+                    <dd>
+                        <a href="/credit-note/<%= creditNote.id %>"><%= creditNote.number %></a>
+                        · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+                    </dd>
+                    <% } %>
+                    <% if (ret.result === 'REEMPLAZO' && typeof replacement !== 'undefined' && replacement) { %>
+                    <dt>Envío de reposición</dt>
+                    <dd><a href="/shipment/detail/<%= replacement.id %>"><%= replacement.trackingId %></a></dd>
+                    <% } %>
                     <% } %>
 
                     <% if (ret.rejectionReason) { %>

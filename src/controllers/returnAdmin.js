@@ -27,12 +27,23 @@ const detail = async (req, res) => {
     if (!ret) {
         return res.status(404).render('error', { message: 'Devolución no encontrada' });
     }
+
+    let creditNote = null;
+    let replacement = null;
+    if (ret.result === ReturnResult.REEMBOLSO) {
+        creditNote = await require('../services/creditNoteService').getByReturn(ret.id);
+    } else if (ret.result === ReturnResult.REEMPLAZO) {
+        replacement = await require('../services/replacementService').findExistingByOrigin(ret.shipmentId);
+    }
+
     res.render('return/detail', {
         ret,
         ReturnStatusLabel,
         ReturnReasonLabel,
         ReturnResult,
         canManage: returnService.PENDING_STATUSES.includes(ret.status),
+        creditNote,
+        replacement,
         query: req.query,
     });
 };
