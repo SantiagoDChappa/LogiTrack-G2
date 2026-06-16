@@ -47,7 +47,7 @@
                             <% }); %>
                         </select>
                     </div>
-                    <div class="portal-search-field" id="reasonOtherWrap" style="<%= form.reason === 'OTRO' ? '' : 'display:none;' %>">
+                    <div class="portal-search-field" id="reasonOtherWrap" style="margin-top:1rem;<%= form.reason === 'OTRO' ? '' : 'display:none;' %>">
                         <label class="portal-search-label" for="reasonOther">Detallá el motivo</label>
                         <textarea name="reasonOther" id="reasonOther" class="portal-search-input-field" maxlength="2000" rows="2"><%= form.reasonOther || '' %></textarea>
                     </div>

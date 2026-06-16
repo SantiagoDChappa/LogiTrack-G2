@@ -15,7 +15,12 @@ const getSupportInfo = async () => {
         settingModel.get('telefono_soporte'),
         settingModel.get('email_soporte'),
     ]);
-    return { nombreEmpresa: nombreEmpresa || 'LogiTrack', telefonoSoporte, emailSoporte };
+    return {
+        nombre:   nombreEmpresa  || 'LogiTrack',
+        telefono: telefonoSoporte || '0800-555-5678',
+        email:    emailSoporte    || 'soporte@logitrack.com',
+        hours:    'Lunes a viernes, 9 a 18 hs',
+    };
 };
 
 const REASON_OPTIONS = Object.values(ReturnReason).map((code) => ({ code, label: ReturnReasonLabel[code] }));
