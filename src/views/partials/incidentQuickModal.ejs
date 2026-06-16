@@ -87,6 +87,8 @@
     .iqm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 480px) { .iqm-row { grid-template-columns: 1fr; } }
     .iqm-warning { display: flex; align-items: flex-start; gap: .5rem; font-size: .85rem; background: rgba(217,119,6,.12); border: 1px solid rgba(217,119,6,.35); color: #92400e; padding: .6rem .75rem; border-radius: 8px; }
+    /* El checkbox de "confirmar igual" solo se ve cuando hay un warning soft del backend. */
+    .iqm-warning[hidden] { display: none; }
     .iqm-warning input { margin-top: .15rem; }
     .iqm-error { font-size: .85rem; color: #dc2626; background: rgba(220,38,38,.1); border: 1px solid rgba(220,38,38,.3); padding: .6rem .75rem; border-radius: 8px; }
     .iqm-assoc { font-size: .85rem; background: rgba(217,119,6,.1); border: 1px solid rgba(217,119,6,.35); color: #92400e; padding: .6rem .75rem; border-radius: 8px; }
