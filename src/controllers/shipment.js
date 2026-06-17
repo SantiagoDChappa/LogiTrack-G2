@@ -253,6 +253,15 @@ const getDetail = async (req, res) => {
         require('../services/invoiceService').getByShipment(id),
     ]);
 
+    // Alta interna de devolución: visible a staff cuando el envío es elegible
+    // (entregado + dentro de ventana + sin devolución previa). El form vuelve a validar igual.
+    const STAFF_ROLE_IDS = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id];
+    let canCreateReturn = false;
+    if (viewer && STAFF_ROLE_IDS.includes(viewer.roleId)) {
+        const elig = await require('../services/returnIncidentService').checkEligibility(shipment).catch(() => ({ ok: false }));
+        canCreateReturn = !!elig.ok;
+    }
+
     res.render('shipment/detail', {
         shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
@@ -262,6 +271,8 @@ const getDetail = async (req, res) => {
         originalShipment,
         isAdmin: isAdminUser(viewer),
         currentBranch,
+        canCreateReturn,
+        returnError: req.query.returnError || null,
     });
 };
 

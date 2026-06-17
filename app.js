@@ -151,8 +151,9 @@ app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
 app.use('/notification', requireAuth, requireSupervisor, notificationRoutes);
-// Gestión interna de devoluciones (LGT-183): Supervisor/Admin.
-app.use('/returns', requireAuth, requireSupervisor, returnRoutes);
+// Devoluciones como incidencias (tipo RETURN): el RBAC fino lo aplica cada ruta
+// (alta interna = staff; tomar/resolver = supervisor/admin).
+app.use('/returns', requireAuth, returnRoutes);
 // Comprobante de nota de crédito (LGT-214): usuarios logueados.
 app.use('/credit-note', requireAuth, creditNoteRoutes);
 // Comprobante de factura del envío: usuarios logueados.
