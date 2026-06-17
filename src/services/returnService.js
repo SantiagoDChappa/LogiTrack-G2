@@ -120,12 +120,18 @@ const notifyReturnCreated = async (shipment, returnId) => {
     });
 };
 
-// Email de confirmación al cliente del portal cuando crea la solicitud.
+// Email de confirmación al REMITENTE (quien contrata y paga el envío) cuando se
+// crea la solicitud de devolución. El reembolso se dirige al remitente.
 const notifyClientReturnCreated = async (shipment, returnId) => {
     const { sendEmail } = require('./notification/emailSender');
-    const email = shipment.recipient?.email;
+    let sender = shipment.sender;
+    if (!sender) {
+        const full = await require('../models/shipment').getById(shipment.id);
+        sender = full?.sender;
+    }
+    const email = sender?.email;
     if (!email) { return; }
-    const name  = shipment.recipient?.fullName || 'cliente';
+    const name  = sender?.fullName || 'cliente';
     const track = shipment.trackingId || `#${shipment.id}`;
     const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
         <h2 style="color:#2563eb;margin-bottom:4px">LogiTrack</h2>
@@ -138,14 +144,14 @@ const notifyClientReturnCreated = async (shipment, returnId) => {
     await sendEmail(email, `Solicitud de devolución #${returnId} recibida — LogiTrack`, html, 'html');
 };
 
-// Email al cliente cuando su devolución es aprobada o rechazada.
+// Email al REMITENTE cuando su devolución es aprobada o rechazada (el reembolso va al remitente).
 const notifyClientReturnResolved = async (r) => {
     const { sendEmail } = require('./notification/emailSender');
     const shipmentModel = require('../models/shipment');
     const shipment = await shipmentModel.getById(r.shipmentId);
-    const email = shipment?.recipient?.email;
+    const email = shipment?.sender?.email;
     if (!email) { return; }
-    const name  = shipment.recipient?.fullName || 'cliente';
+    const name  = shipment.sender?.fullName || 'cliente';
     const track = shipment.trackingId || `#${r.shipmentId}`;
     const approved = r.status === ReturnStatus.APROBADA;
     const badgeColor = approved ? '#16a34a' : '#dc2626';
