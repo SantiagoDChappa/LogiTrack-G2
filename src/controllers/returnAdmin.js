@@ -24,11 +24,13 @@ const detail = async (req, res) => {
         return res.status(404).render('error', { message: 'Devolución no encontrada' });
     }
 
+    // Se eliminó el reemplazo: la única resolución es el reembolso (nota de crédito).
     let creditNote = null;
     let replacement = null;
     if (ret.result === ReturnResult.REEMBOLSO) {
         creditNote = await require('../services/creditNoteService').getByReturn(ret.id);
     } else if (ret.result === ReturnResult.REEMPLAZO) {
+        // Compatibilidad con devoluciones históricas resueltas con reemplazo.
         replacement = await require('../services/replacementService').findExistingByOrigin(ret.shipmentId);
     }
 

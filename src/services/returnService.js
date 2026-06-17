@@ -283,9 +283,8 @@ const findByIdWithHistory = (id) => {
     });
 };
 
-// Ejecuta la resolución aprobada con los mecanismos compartidos (idempotentes):
-// reembolso → nota de crédito (LGT-214), reemplazo → envío de reposición (LGT-215).
-// Best-effort fuera de la transacción de estado; deja traza en el historial de la devolución.
+// Ejecuta la resolución aprobada: única salida = reembolso → nota de crédito (LGT-214).
+// Se eliminó el reemplazo (envío de reposición). Idempotente; deja traza en el historial.
 const executeReturnResolution = async (r, userId) => {
     try {
         if (r.result === ReturnResult.REEMBOLSO) {
@@ -299,17 +298,6 @@ const executeReturnResolution = async (r, userId) => {
                 });
                 return { kind: 'creditNote', creditNote: cn.creditNote };
             }
-        } else if (r.result === ReturnResult.REEMPLAZO) {
-            const rep = await require('./replacementService')
-                .generate({ originalShipmentId: r.shipmentId });
-            if (rep.ok && rep.shipment) {
-                await ShipmentReturnHistory.create({
-                    returnId: r.id, fromStatus: ReturnStatus.APROBADA, toStatus: ReturnStatus.APROBADA,
-                    comment: `Envío de reposición ${rep.shipment.trackingId} generado por reemplazo (#${rep.shipment.id}).`,
-                    byUserId: userId, byClient: false, createdAt: new Date(),
-                });
-                return { kind: 'replacement', shipment: rep.shipment };
-            }
         }
     } catch (e) {
         console.error('[returnService] ejecución de resolución:', e.message);
@@ -318,9 +306,9 @@ const executeReturnResolution = async (r, userId) => {
 };
 
 // Aprueba o rechaza una solicitud tomada (EN_REVISION). No permite re-resolver.
-// approve: define resultado (reembolso/reemplazo) → FINALIZADA + NC o reposición auto-generados.
+// approve: única resolución posible = reembolso → nota de crédito auto-generada.
 // reject:  requiere motivo → RECHAZADA.
-const resolveReturn = async ({ returnId, userId, decision, result, rejectionReason }) => {
+const resolveReturn = async ({ returnId, userId, decision, rejectionReason }) => {
     const r = await ShipmentReturn.findByPk(returnId);
     if (!r) { return { ok: false, status: 404, message: 'Devolución no encontrada.' }; }
     if (r.status !== ReturnStatus.EN_REVISION) {
@@ -328,15 +316,14 @@ const resolveReturn = async ({ returnId, userId, decision, result, rejectionReas
     }
 
     if (decision === 'approve') {
-        const res = String(result || '').toUpperCase();
-        if (![ReturnResult.REEMBOLSO, ReturnResult.REEMPLAZO].includes(res)) {
-            return { ok: false, status: 400, message: 'Elegí un resultado: reembolso o reemplazo.' };
-        }
+        // Única resolución posible: reembolso (se eliminó el reemplazo). Se ignora
+        // cualquier 'result' recibido para no permitir reemplazo desde el cliente.
+        const res = ReturnResult.REEMBOLSO;
         await sequelize.transaction(async (t) => {
             await r.update({ status: ReturnStatus.APROBADA, result: res, reviewedByUserId: userId, updatedAt: new Date() }, { transaction: t });
             await ShipmentReturnHistory.create({
                 returnId: r.id, fromStatus: ReturnStatus.EN_REVISION, toStatus: ReturnStatus.APROBADA,
-                comment: `Aprobada — resultado ${res === ReturnResult.REEMBOLSO ? 'Reembolso' : 'Reemplazo'}.`,
+                comment: 'Aprobada — resultado Reembolso.',
                 byUserId: userId, byClient: false, createdAt: new Date(),
             }, { transaction: t });
         });

@@ -117,19 +117,13 @@
                     <div id="panel-approve" role="tabpanel">
                         <form method="POST" action="/returns/<%= ret.id %>/resolve" class="return-approve-form">
                             <input type="hidden" name="decision" value="approve">
-                            <label class="return-radio-label">
-                                <input type="radio" name="result" value="REEMBOLSO" required>
-                                <span>Reembolso <small>(nota de crédito)</small></span>
-                            </label>
-                            <label class="return-radio-label">
-                                <input type="radio" name="result" value="REEMPLAZO">
-                                <span>Reemplazo <small>(envío de reposición)</small></span>
-                            </label>
+                            <p class="return-radio-label" style="margin:0 0 .5rem">
+                                Al aprobar se generará un <strong>reembolso</strong> <small>(nota de crédito al remitente)</small>.
+                            </p>
                             <div class="return-form-footer">
                                 <button type="submit" id="btn-approve"
                                         class="action-btn action-btn--lg crear"
-                                        style="width:auto;height:auto;padding:.55rem 1rem;gap:.4rem;"
-                                        disabled>
+                                        style="width:auto;height:auto;padding:.55rem 1rem;gap:.4rem;">
                                     <span class="material-symbols-outlined">check</span> Aprobar
                                 </button>
                             </div>
