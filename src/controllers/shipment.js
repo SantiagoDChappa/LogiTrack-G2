@@ -230,7 +230,7 @@ const getDetail = async (req, res) => {
 
 
     const replacementSvc = require('../services/replacementService');
-    const [incidentsForShipment, replacementShipment, originalShipment] = await Promise.all([
+    const [incidentsForShipment, replacementShipment, originalShipment, invoice] = await Promise.all([
         require('../models/incident').list({ shipmentId: id, limit: 50 }),
         // Este envío generó un reemplazo (es el original).
         replacementSvc.findExistingByOrigin(id),
@@ -238,10 +238,12 @@ const getDetail = async (req, res) => {
         shipment.replacementOfShipmentId
             ? shipmentModel.getById(shipment.replacementOfShipmentId)
             : Promise.resolve(null),
+        // Factura del envío (comprobante al remitente).
+        require('../services/invoiceService').getByShipment(id),
     ]);
 
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
@@ -480,6 +482,17 @@ const createShipment = async (req, res) => {
         if (costTotal > 0) {
             await shipmentModel.Shipment.update({ costTotal }, { where: { id: freshShipment.id } });
             freshShipment.costTotal = costTotal;
+        }
+
+        // Factura del envío (comprobante al remitente) con el desglose de costo.
+        // Best-effort: un fallo de facturación no debe tumbar el alta del envío.
+        try {
+            await require('../services/invoiceService').generate({
+                shipmentId: freshShipment.id,
+                userId: res.locals.currentUser?.id || null,
+            });
+        } catch (e) {
+            console.error('[createShipment] factura:', e.message);
         }
 
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);

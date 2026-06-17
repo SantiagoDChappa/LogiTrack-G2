@@ -321,6 +321,13 @@
                             <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Total a cobrar</span><span><%= fmtMoney(costClient.final) %></span></div>
                         </div>
                     <% } %>
+
+                    <% if (typeof invoice !== 'undefined' && invoice) { %>
+                        <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
+                            <span class="material-symbols-outlined">receipt_long</span>
+                            Ver factura <%= invoice.number %>
+                        </a>
+                    <% } %>
                 </div>
 
                 <!-- ── Trayecto del envío (mapa) ── -->
