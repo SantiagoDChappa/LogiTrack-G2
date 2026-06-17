@@ -200,18 +200,18 @@ const getShipmentDetail = async (req, res) => {
     const modifications = formatModificationsList(await listByShipment(shipmentId));
     const incidents = await listIncidentsForShipment(shipmentId);
 
-    // LGT-182 — devoluciones vinculadas + posibilidad de solicitar una nueva.
-    const returnService = require('../services/returnService');
-    const { ReturnStatusLabel, ReturnReasonLabel, Status } = require('../constants/enums');
-    const returnRows = await returnService.listByShipment(shipmentId);
+    // LGT-182 — devoluciones vinculadas (incidencias RETURN) + posibilidad de solicitar una nueva.
+    const returnIncidentService = require('../services/returnIncidentService');
+    const { ReturnReasonLabel, Status } = require('../constants/enums');
+    const returnRows = await returnIncidentService.listByShipment(shipmentId);
     const returns = returnRows.map((r) => ({
         id: r.id,
         status: r.status,
-        statusLabel: ReturnStatusLabel[r.status] || r.status,
-        reasonLabel: ReturnReasonLabel[r.reason] || r.reason,
+        statusLabel: returnIncidentService.portalStatusLabel(r),
+        reasonLabel: ReturnReasonLabel[r.returnReason] || r.returnReason || 'Devolución',
         createdAt: r.createdAt,
     }));
-    const hasAnyReturn = await returnService.findAnyByShipment(shipmentId);
+    const hasAnyReturn = await returnIncidentService.findAnyByShipment(shipmentId);
     const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasAnyReturn;
 
     res.render('portal/misEnviosDetail', {

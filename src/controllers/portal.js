@@ -316,16 +316,16 @@ const buildRecovery = async (shipmentId) => {
 };
 
 const buildPublicReturns = async (shipmentId) => {
-    const returnService = require('../services/returnService');
-    const { ReturnStatusLabel, ReturnReasonLabel } = require('../constants/enums');
-    const rows = await returnService.listByShipment(shipmentId);
+    const returnIncidentService = require('../services/returnIncidentService');
+    const { ReturnReasonLabel } = require('../constants/enums');
+    const rows = await returnIncidentService.listByShipment(shipmentId);
     return rows.map(r => {
         const j = r.toJSON ? r.toJSON() : r;
         return {
             id:          j.id,
             status:      j.status,
-            statusLabel: ReturnStatusLabel[j.status] || j.status,
-            reasonLabel: ReturnReasonLabel[j.reason]  || j.reason,
+            statusLabel: returnIncidentService.portalStatusLabel(j),
+            reasonLabel: ReturnReasonLabel[j.returnReason]  || j.returnReason || 'Devolución',
             createdAt:   j.createdAt,
         };
     });

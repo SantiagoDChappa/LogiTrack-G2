@@ -323,9 +323,50 @@ const resolveReturn = async ({ incidentId, userId, decision, rejectionReason }) 
     return { ok: false, status: 400, message: 'Decisión inválida.' };
 };
 
+// ── Consulta (portal / listados) ──────────────────────────────────────────────
+
+// Devoluciones (incidencias RETURN) de un envío, más nuevas primero.
+const listByShipment = async (shipmentId) => {
+    const typeId = await getReturnTypeId();
+    if (!typeId) { return []; }
+    return Incident.findAll({
+        where: { shipmentId, incidentTypeId: typeId },
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+// Devoluciones de un conjunto de envíos (para el listado del cliente), con su envío.
+const listForShipmentIds = async (shipmentIds) => {
+    const ids = (Array.isArray(shipmentIds) ? shipmentIds : []).filter(Boolean);
+    if (!ids.length) { return []; }
+    const typeId = await getReturnTypeId();
+    if (!typeId) { return []; }
+    const { Shipment } = require('../models/shipment');
+    return Incident.findAll({
+        where: { shipmentId: { [Op.in]: ids }, incidentTypeId: typeId },
+        include: [{ model: Shipment, as: 'shipment', attributes: ['id', 'trackingId'] }],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+// Etiqueta amigable del estado de la devolución para el cliente (deriva del estado +
+// resolución de la incidencia).
+const portalStatusLabel = (inc) => {
+    if (!inc) { return '—'; }
+    if (inc.status === IncidentStatus.OPEN)      { return 'Solicitada'; }
+    if (inc.status === IncidentStatus.IN_REVIEW) { return 'En revisión'; }
+    if (inc.status === IncidentStatus.CLOSED) {
+        if (inc.resolution === IncidentResolution.PROCEDENTE)    { return 'Aprobada (reembolso)'; }
+        if (inc.resolution === IncidentResolution.NO_PROCEDENTE) { return 'Rechazada'; }
+        return 'Cerrada';
+    }
+    return inc.status;
+};
+
 module.exports = {
     RETURN_CODE, OPEN_STATUSES, DEFAULT_WINDOW_DAYS,
     getWindowDays, getReturnTypeId, getDeliveredAt,
     findAnyByShipment, findOpenByShipment, checkEligibility, validateForm,
     createReturn, takeReturn, resolveReturn,
+    listByShipment, listForShipmentIds, portalStatusLabel,
 };
