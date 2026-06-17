@@ -25,6 +25,17 @@ const computeDefaultExpectedDeliveryDate = (shipmentTypeId) => {
     d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
 };
+
+// La fecha estimada de entrega debe ser posterior a hoy: no se admite una fecha
+// anterior ni igual al día de hoy. Si no viene (se calculará por default), es válida.
+const isValidFutureDeliveryDate = (val) => {
+    if (!val) { return true; }
+    const d = new Date(`${val}T00:00:00`);
+    if (Number.isNaN(d.getTime())) { return false; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d.getTime() > today.getTime();
+};
 const { validationResult } = require('express-validator');
 const csvImport = require('../services/csvImport');
 const csvExport = require('../services/csvExport');
@@ -287,6 +298,9 @@ const createShipment = async (req, res) => {
 
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+        if (!isValidFutureDeliveryDate(body.expectedDeliveryDate)) {
+            throw new Error('La fecha estimada de entrega debe ser posterior a hoy.');
+        }
 
         let pickupBranch = null;
         if (isPickup) {
