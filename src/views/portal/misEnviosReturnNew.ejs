@@ -54,33 +54,6 @@
                 </div>
 
                 <div class="portal-manage-card">
-                    <h2>Modalidad de la devolución</h2>
-                    <% const _mode = form.deliveryMode || 'home'; %>
-                    <label class="portal-manage-radio">
-                        <input type="radio" name="deliveryMode" value="home" <%= _mode === 'home' ? 'checked' : '' %>>
-                        Retiro a domicilio
-                    </label>
-                    <div class="portal-manage-hint" id="returnHomeInfo" style="<%= _mode === 'home' ? '' : 'display:none;' %>">
-                        Pasamos a retirar por:
-                        <strong><%= [shipment.address && shipment.address.street, shipment.address && shipment.address.number].filter(Boolean).join(' ') || 'el domicilio del envío' %></strong>
-                        <% if (shipment.address && shipment.address.postalCode) { %> (CP <%= shipment.address.postalCode %>)<% } %>.
-                    </div>
-                    <label class="portal-manage-radio">
-                        <input type="radio" name="deliveryMode" value="branch" <%= _mode === 'branch' ? 'checked' : '' %>>
-                        Entrega en sucursal
-                    </label>
-                    <div class="portal-search-field" id="returnBranchWrap" style="<%= _mode === 'branch' ? '' : 'display:none;' %>">
-                        <label class="portal-search-label" for="pickupBranchId">Sucursal</label>
-                        <select name="pickupBranchId" id="pickupBranchId" class="portal-search-input-field">
-                            <option value="">— seleccionar —</option>
-                            <% branches.forEach(function(b) { %>
-                            <option value="<%= b.id %>" <%= String(form.pickupBranchId) === String(b.id) ? 'selected' : '' %>><%= b.name %><%= b.address ? ' — ' + b.address : '' %></option>
-                            <% }); %>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="portal-manage-card">
                     <h2>Observaciones <span style="font-weight:400;opacity:.7;">(opcional)</span></h2>
                     <div class="portal-search-field">
                         <textarea name="observations" class="portal-search-input-field" maxlength="2000" rows="3" placeholder="Cualquier dato que nos sirva para gestionar la devolución."><%= form.observations || '' %></textarea>
@@ -105,19 +78,6 @@
                 var other = sel.value === 'OTRO';
                 wrapBox.style.display = other ? '' : 'none';
                 if (other) { wrap.setAttribute('required', 'required'); } else { wrap.removeAttribute('required'); }
-            });
-
-            // Modalidad: muestra domicilio (home) o selector de sucursal (branch).
-            var homeInfo = document.getElementById('returnHomeInfo');
-            var branchWrap = document.getElementById('returnBranchWrap');
-            var branchSel = document.getElementById('pickupBranchId');
-            document.querySelectorAll('input[name="deliveryMode"]').forEach(function (radio) {
-                radio.addEventListener('change', function () {
-                    var branch = document.querySelector('input[name="deliveryMode"]:checked').value === 'branch';
-                    branchWrap.style.display = branch ? '' : 'none';
-                    homeInfo.style.display = branch ? 'none' : '';
-                    if (branch) { branchSel.setAttribute('required', 'required'); } else { branchSel.removeAttribute('required'); }
-                });
             });
         })();
     </script>
