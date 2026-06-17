@@ -18,6 +18,7 @@ const User = sequelize.define('user', {
     driverAvailable:  { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'driver_available' },
     driverUnavailableReason: { type: DataTypes.STRING(120), allowNull: true, field: 'driver_unavailable_reason' },
     driverUnavailableUntil:  { type: DataTypes.DATEONLY,    allowNull: true, field: 'driver_unavailable_until' },
+    onboarded: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
 }, { tableName: 'user', timestamps: false });
 
 // Limite defensivo para que la UI de admin no se rompa con miles de usuarios.

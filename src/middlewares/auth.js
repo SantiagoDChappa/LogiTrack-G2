@@ -8,17 +8,18 @@ const requireAuth = async (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // Refrescar branchId desde DB si en el token vino null (asignacion posterior al login)
-        if (decoded?.id && !decoded.branchId) {
+        // Refrescar desde DB: onboarded (no está en el JWT) y branchId (puede asignarse post-login)
+        if (decoded?.id) {
             try {
                 const userModel = require('../models/user');
                 const fresh = await userModel.getById(decoded.id);
-                if (fresh?.branchId) {
-                    decoded.branchId = fresh.branchId;
-                    const branchModel = require('../models/branch');
-                    const b = await branchModel.getById(fresh.branchId);
-                    if (b) {
-                        decoded.branch = { id: b.id, latitude: b.latitude, longitude: b.longitude };
+                if (fresh) {
+                    decoded.onboarded = fresh.onboarded;
+                    if (!decoded.branchId && fresh.branchId) {
+                        decoded.branchId = fresh.branchId;
+                        const branchModel = require('../models/branch');
+                        const b = await branchModel.getById(fresh.branchId);
+                        if (b) decoded.branch = { id: b.id, latitude: b.latitude, longitude: b.longitude };
                     }
                 }
             } catch { /* ignore */ }
