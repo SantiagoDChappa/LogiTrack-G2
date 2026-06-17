@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solicitar devolución <%= shipment.trackingId %> - Mis envíos</title>
+    <title>Solicitar devolución <%= shipment.trackingId %> - <%= support.nombre %></title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -47,7 +47,7 @@
                             <% }); %>
                         </select>
                     </div>
-                    <div class="portal-search-field" id="reasonOtherWrap" style="<%= form.reason === 'OTRO' ? '' : 'display:none;' %>">
+                    <div class="portal-search-field" id="reasonOtherWrap" style="margin-top:1rem;<%= form.reason === 'OTRO' ? '' : 'display:none;' %>">
                         <label class="portal-search-label" for="reasonOther">Detallá el motivo</label>
                         <textarea name="reasonOther" id="reasonOther" class="portal-search-input-field" maxlength="2000" rows="2"><%= form.reasonOther || '' %></textarea>
                     </div>

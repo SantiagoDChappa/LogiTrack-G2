@@ -229,13 +229,24 @@ const getDetail = async (req, res) => {
         .computeCost(shipment, { penaltyPct: sla?.penaltyPct || 0 });
 
 
-    const incidentsForShipment = await require('../models/incident').list({ shipmentId: id, limit: 50 });
+    const replacementSvc = require('../services/replacementService');
+    const [incidentsForShipment, replacementShipment, originalShipment] = await Promise.all([
+        require('../models/incident').list({ shipmentId: id, limit: 50 }),
+        // Este envío generó un reemplazo (es el original).
+        replacementSvc.findExistingByOrigin(id),
+        // Este envío ES un reemplazo (busca el original al que apunta).
+        shipment.replacementOfShipmentId
+            ? shipmentModel.getById(shipment.replacementOfShipmentId)
+            : Promise.resolve(null),
+    ]);
 
     res.render('shipment/detail', {
         shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
+        replacementShipment,
+        originalShipment,
         isAdmin: isAdminUser(viewer),
         currentBranch,
     });
@@ -462,6 +473,15 @@ const createShipment = async (req, res) => {
         });
 
         const freshShipment = await shipmentModel.getById(shipment.id);
+
+        // LGT-214 precondición: persistir costo al momento de creación.
+        const costSvc = require('../services/shipmentCostService');
+        const costTotal = await costSvc.computeTotal(freshShipment);
+        if (costTotal > 0) {
+            await shipmentModel.Shipment.update({ costTotal }, { where: { id: freshShipment.id } });
+            freshShipment.costTotal = costTotal;
+        }
+
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
 
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);

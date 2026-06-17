@@ -3,6 +3,8 @@
 <head>
     <%- include('../partials/head') %>
     <title>Nota de crédito <%= cn.number %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/report.css?v=<%= assetVersion %>">
 </head>
 <body>
     <%- include('../partials/header') %>
@@ -15,12 +17,19 @@
             const addr = shipment && shipment.address ? shipment.address : null;
         %>
         <div class="page-header">
-            <a href="javascript:history.back()" class="action-btn neutro" data-tooltip="Volver" aria-label="Volver"><span class="material-symbols-outlined">arrow_back</span></a>
             <h1>Nota de crédito</h1>
-            <button onclick="window.print()" class="action-btn neutro" data-tooltip="Imprimir" aria-label="Imprimir" style="margin-left:auto;"><span class="material-symbols-outlined">print</span></button>
+            <div class="page-header__actions">
+                <a href="javascript:history.back()" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <button onclick="window.print()" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Imprimir" aria-label="Imprimir">
+                    <span class="material-symbols-outlined">print</span>
+                </button>
+            </div>
         </div>
 
-        <div class="credit-note" style="max-width:780px;border:1px solid var(--color-border,#e2e8f0);border-radius:12px;padding:1.5rem;background:var(--color-surface,#fff);">
+        <div style="padding: 0 clamp(1.25rem, 2.5vw, 2rem) 2rem;">
+        <div class="credit-note" style="max-width:780px;border:1px solid var(--color-border,#e2e8f0);border-radius:12px;padding:1.5rem 2rem;background:var(--color-surface,#fff);">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;border-bottom:1px solid var(--color-border,#e2e8f0);padding-bottom:1rem;">
                 <div>
                     <h2 style="margin:0;"><%= empresa %> S.A.</h2>
@@ -76,6 +85,7 @@
                 <span>Comprobante asociado al envío <%= shipment ? shipment.trackingId : '' %><% if (cn.incidentId) { %> · incidencia #<%= cn.incidentId %><% } %><% if (cn.returnId) { %> · devolución #<%= cn.returnId %><% } %></span>
                 <span>Documento generado por <%= empresa %></span>
             </div>
+        </div>
         </div>
     </main>
     <script src="/js/theme.js" defer></script>

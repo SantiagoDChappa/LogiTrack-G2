@@ -52,6 +52,8 @@ const Shipment = sequelize.define('shipment', {
     delayOriginIncidentId:{ type: DataTypes.INTEGER,        allowNull: true,  field: 'delay_origin_incident_id' },
     // LGT-215 - envío de reposición: apunta al envío original que reemplaza.
     replacementOfShipmentId: { type: DataTypes.INTEGER,    allowNull: true,  field: 'replacement_of_shipment_id' },
+    // LGT-214 precondición: costo total persistido al crear el envío (para nota de crédito).
+    costTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
 },
 { timestamps: true, tableName: 'shipment' });
 

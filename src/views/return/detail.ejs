@@ -3,69 +3,290 @@
 <head>
     <%- include('../partials/head') %>
     <title>Devolución #<%= ret.id %> - LogiTrack</title>
-    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/incidents.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
 </head>
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
         <div class="page-header">
-            <a href="/returns" class="action-btn neutro" data-tooltip="Volver" aria-label="Volver"><span class="material-symbols-outlined">arrow_back</span></a>
             <h1>Devolución #<%= ret.id %></h1>
-            <span class="ot-badge" style="margin-left:auto;"><%= ReturnStatusLabel[ret.status] || ret.status %></span>
+            <div class="page-header__actions">
+                <a href="/returns" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+            </div>
         </div>
 
         <% if (query && query.ok) { %>
-            <div class="report-alert report-alert--ok"><span class="material-symbols-outlined">check_circle</span> Solicitud gestionada.</div>
+            <div class="alert alert-success"><span class="material-symbols-outlined">check_circle</span> Solicitud gestionada correctamente.</div>
         <% } %>
         <% if (query && query.error) { %>
-            <div class="report-alert report-alert--error"><span class="material-symbols-outlined">error</span> <%= query.error %></div>
+            <div class="alert alert-error"><span class="material-symbols-outlined">error</span> <%= query.error %></div>
         <% } %>
 
-        <div class="report-card">
-            <h2>Detalle</h2>
-            <p><strong>Envío:</strong> <%= ret.shipment ? ret.shipment.trackingId : '—' %></p>
-            <p><strong>Motivo:</strong> <%= ReturnReasonLabel[ret.reason] || ret.reason %><% if (ret.reason === 'OTRO' && ret.reasonOther) { %> — <%= ret.reasonOther %><% } %></p>
-            <p><strong>Modalidad:</strong> <%= ret.deliveryMode === 'branch' ? ('Entrega en sucursal' + (ret.pickupBranch ? ' (' + ret.pickupBranch.name + ')' : '')) : 'Retiro a domicilio' %></p>
-            <% if (ret.observations) { %><p><strong>Observaciones:</strong> <%= ret.observations %></p><% } %>
-            <% if (ret.result) { %><p><strong>Resultado:</strong> <%= ret.result === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></p><% } %>
-            <% if (ret.rejectionReason) { %><p><strong>Motivo de rechazo:</strong> <%= ret.rejectionReason %></p><% } %>
-            <% if (ret.reviewedBy) { %><p><strong>Gestionada por:</strong> <%= ret.reviewedBy.fullName %></p><% } %>
-            <p><strong>Fecha de solicitud:</strong> <%= new Date(ret.createdAt).toLocaleString('es-AR') %></p>
+        <div class="incident-detail-grid">
+
+            <%# ── Card izquierda: datos de la devolución ── %>
+            <div class="incident-detail-card">
+                <h2>Detalle</h2>
+                <dl class="incident-detail-list">
+                    <dt>Estado</dt>
+                    <dd><span class="incident-badge incident-badge--<%= ret.status.toLowerCase() %>"><%= ReturnStatusLabel[ret.status] || ret.status %></span></dd>
+
+                    <dt>Envío</dt>
+                    <dd>
+                        <% if (ret.shipment) { %>
+                            <a href="/shipment/detail/<%= ret.shipment.id %>"><%= ret.shipment.trackingId %></a>
+                        <% } else { %>—<% } %>
+                    </dd>
+
+                    <dt>Motivo</dt>
+                    <dd><%= ReturnReasonLabel[ret.reason] || ret.reason %><% if (ret.reason === 'OTRO' && ret.reasonOther) { %> — <%= ret.reasonOther %><% } %></dd>
+
+                    <dt>Modalidad</dt>
+                    <dd><%= ret.deliveryMode === 'branch' ? ('Entrega en sucursal' + (ret.pickupBranch ? ' — ' + ret.pickupBranch.name : '')) : 'Retiro a domicilio' %></dd>
+
+                    <% if (ret.observations) { %>
+                    <dt>Observaciones</dt>
+                    <dd><%= ret.observations %></dd>
+                    <% } %>
+
+                    <dt>Solicitud</dt>
+                    <dd><%= new Date(ret.createdAt).toLocaleString('es-AR') %></dd>
+
+                    <% if (ret.result) { %>
+                    <dt>Resultado</dt>
+                    <dd><strong><%= ret.result === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong></dd>
+                    <% if (ret.result === 'REEMBOLSO' && typeof creditNote !== 'undefined' && creditNote) { %>
+                    <dt>Nota de crédito</dt>
+                    <dd>
+                        <a href="/credit-note/<%= creditNote.id %>"><%= creditNote.number %></a>
+                        · $<%= Number(creditNote.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+                    </dd>
+                    <% } %>
+                    <% if (ret.result === 'REEMPLAZO' && typeof replacement !== 'undefined' && replacement) { %>
+                    <dt>Envío de reposición</dt>
+                    <dd><a href="/shipment/detail/<%= replacement.id %>"><%= replacement.trackingId %></a></dd>
+                    <% } %>
+                    <% } %>
+
+                    <% if (ret.rejectionReason) { %>
+                    <dt>Motivo de rechazo</dt>
+                    <dd><%= ret.rejectionReason %></dd>
+                    <% } %>
+
+                    <% if (ret.reviewedBy) { %>
+                    <dt>Gestionada por</dt>
+                    <dd><%= ret.reviewedBy.fullName %></dd>
+                    <% } %>
+                </dl>
+            </div>
+
+            <%# ── Card derecha: acciones o estado ya gestionado ── %>
+            <div class="incident-detail-card incident-actions-card">
+                <h2>Gestión</h2>
+                <div class="incident-actions-inner">
+                <% if (canTake) { %>
+                    <p style="font-size:.9rem;color:var(--c-text-2);margin-bottom:1rem;">Tomá la devolución para revisión antes de resolverla.</p>
+                    <form method="POST" action="/returns/<%= ret.id %>/take" id="form-take">
+                        <button type="submit"
+                                class="action-btn action-btn--lg crear"
+                                style="width:100%;justify-content:center;padding:.65rem 1rem;gap:.5rem;">
+                            <span class="material-symbols-outlined">assignment_ind</span> Tomar para revisión
+                        </button>
+                    </form>
+                <% } else if (canManage) { %>
+
+                    <div class="return-action-tabs" role="tablist">
+                        <button type="button"
+                                class="return-action-tab action-btn action-btn--lg crear"
+                                data-tab="approve" role="tab" aria-selected="true" aria-controls="panel-approve"
+                                style="width:auto;height:auto;padding:.55rem 1.1rem;gap:.4rem;flex:1;justify-content:center;">
+                            <span class="material-symbols-outlined">check_circle</span> Aprobar
+                        </button>
+                        <button type="button"
+                                class="return-action-tab action-btn action-btn--lg neutro"
+                                data-tab="reject" role="tab" aria-selected="false" aria-controls="panel-reject"
+                                style="width:auto;height:auto;padding:.55rem 1.1rem;gap:.4rem;flex:1;justify-content:center;">
+                            <span class="material-symbols-outlined">cancel</span> Rechazar
+                        </button>
+                    </div>
+
+                    <div id="panel-approve" role="tabpanel">
+                        <form method="POST" action="/returns/<%= ret.id %>/resolve" class="return-approve-form">
+                            <input type="hidden" name="decision" value="approve">
+                            <label class="return-radio-label">
+                                <input type="radio" name="result" value="REEMBOLSO" required>
+                                <span>Reembolso <small>(nota de crédito)</small></span>
+                            </label>
+                            <label class="return-radio-label">
+                                <input type="radio" name="result" value="REEMPLAZO">
+                                <span>Reemplazo <small>(envío de reposición)</small></span>
+                            </label>
+                            <div class="return-form-footer">
+                                <button type="submit" id="btn-approve"
+                                        class="action-btn action-btn--lg crear"
+                                        style="width:auto;height:auto;padding:.55rem 1rem;gap:.4rem;"
+                                        disabled>
+                                    <span class="material-symbols-outlined">check</span> Aprobar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="panel-reject" hidden role="tabpanel">
+                        <form method="POST" action="/returns/<%= ret.id %>/resolve" class="return-reject-form">
+                            <input type="hidden" name="decision" value="reject">
+                            <label class="return-reject-label">
+                                Motivo del rechazo <span class="incident-required">*</span>
+                            </label>
+                            <textarea name="rejectionReason" rows="3" maxlength="2000"
+                                      placeholder="Ingresá el motivo" required
+                                      class="return-reject-textarea"></textarea>
+                            <div class="return-form-footer">
+                                <button type="submit"
+                                        class="action-btn action-btn--lg eliminar"
+                                        style="width:auto;height:auto;padding:.55rem 1rem;gap:.4rem;">
+                                    <span class="material-symbols-outlined">close</span> Rechazar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                <% } else { %>
+                    <div style="display:flex;align-items:center;gap:.5rem;color:var(--c-text-2);font-size:.92rem;padding:.5rem 0;">
+                        <span class="material-symbols-outlined" style="font-size:1.2rem;">info</span>
+                        Esta solicitud ya fue gestionada.
+                    </div>
+                <% } /* canTake / canManage */ %>
+                </div>
+            </div>
+
         </div>
 
-        <% if (canManage) { %>
-            <div class="report-card">
-                <h2>Aprobar</h2>
-                <form method="POST" action="/returns/<%= ret.id %>/resolve">
-                    <input type="hidden" name="decision" value="approve">
-                    <label style="display:block;margin:.4rem 0;"><input type="radio" name="result" value="REEMBOLSO" required> Reembolso (genera nota de crédito)</label>
-                    <label style="display:block;margin:.4rem 0;"><input type="radio" name="result" value="REEMPLAZO"> Reemplazo (genera envío de reposición)</label>
-                    <button type="submit" class="action-btn crear" data-tooltip="Aprobar" aria-label="Aprobar"><span class="material-symbols-outlined">check</span> Aprobar</button>
-                </form>
-            </div>
-            <div class="report-card">
-                <h2>Rechazar</h2>
-                <form method="POST" action="/returns/<%= ret.id %>/resolve">
-                    <input type="hidden" name="decision" value="reject">
-                    <textarea name="rejectionReason" rows="3" maxlength="2000" placeholder="Motivo del rechazo (obligatorio)" required style="width:100%;"></textarea>
-                    <button type="submit" class="action-btn eliminar" data-tooltip="Rechazar" aria-label="Rechazar"><span class="material-symbols-outlined">close</span> Rechazar</button>
-                </form>
-            </div>
-        <% } else { %>
-            <div class="report-alert"><span class="material-symbols-outlined">info</span> Esta solicitud ya fue gestionada.</div>
-        <% } %>
-
-        <div class="report-card">
+        <%# ── Historial cronológico ── %>
+        <section class="incident-detail-card" style="margin-top:1.25rem;">
             <h2>Historial</h2>
-            <ul>
-                <% (ret.history || []).forEach(h => { %>
-                    <li><%= new Date(h.createdAt).toLocaleString('es-AR') %> — <strong><%= ReturnStatusLabel[h.toStatus] || h.toStatus %></strong><% if (h.comment) { %>: <%= h.comment %><% } %></li>
-                <% }) %>
-            </ul>
-        </div>
+            <% if (!ret.history || ret.history.length === 0) { %>
+                <p style="color:var(--inc-muted);font-size:.9rem;">Sin actualizaciones todavía.</p>
+            <% } else { %>
+                <%
+                var tlClass = {
+                    SOLICITADA:  'status_change',
+                    EN_REVISION: 'priority_change',
+                    APROBADA:    'closed',
+                    RECHAZADA:   'escalated',
+                    EN_PROCESO:  'assigned',
+                    FINALIZADA:  'auto_closed'
+                };
+                %>
+                <ul class="incident-timeline">
+                    <% (ret.history || []).forEach(function(h) {
+                        var cls = tlClass[h.toStatus] || 'status_change';
+                    %>
+                    <li class="incident-timeline-item incident-timeline-item--<%= cls %>">
+                        <div class="incident-timeline-header">
+                            <span class="incident-badge incident-badge--<%= h.toStatus.toLowerCase() %>"><%= ReturnStatusLabel[h.toStatus] || h.toStatus %></span>
+                            <span class="incident-timeline-meta"><%= new Date(h.createdAt).toLocaleString('es-AR') %></span>
+                        </div>
+                        <% if (h.comment) { %>
+                        <p class="incident-timeline-comment"><%= h.comment %></p>
+                        <% } %>
+                    </li>
+                    <% }) %>
+                </ul>
+            <% } %>
+        </section>
+
     </main>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+    (function () {
+        /* ── Confirmar "Tomar para revisión" ── */
+        var formTake = document.getElementById('form-take');
+        if (formTake) {
+            formTake.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var self = this;
+                var isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+                Swal.fire({
+                    icon: 'question',
+                    title: '¿Tomar esta devolución?',
+                    text: 'Pasará a En revisión y podrás aprobarla o rechazarla.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, tomar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#2563eb',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color: isDark ? '#f1f5f9' : '#1e293b',
+                }).then(function (r) { if (r.isConfirmed) self.submit(); });
+            });
+        }
+
+        var tabs      = document.querySelectorAll('.return-action-tab');
+        var panels    = {
+            approve: document.getElementById('panel-approve'),
+            reject:  document.getElementById('panel-reject')
+        };
+        var btnApprove = document.getElementById('btn-approve');
+        var radios     = document.querySelectorAll('input[name="result"]');
+
+        /* ── Tabs ── */
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                var target = this.dataset.tab;
+                tabs.forEach(function (t) {
+                    t.setAttribute('aria-selected', 'false');
+                    t.classList.remove('crear', 'eliminar');
+                    t.classList.add('neutro');
+                });
+                this.setAttribute('aria-selected', 'true');
+                this.classList.remove('neutro');
+                this.classList.add(target === 'approve' ? 'crear' : 'eliminar');
+                Object.keys(panels).forEach(function (key) {
+                    if (panels[key]) panels[key].hidden = (key !== target);
+                });
+            });
+        });
+
+        /* ── Habilitar botón Aprobar solo si hay radio seleccionado ── */
+        if (btnApprove && radios.length) {
+            radios.forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    btnApprove.disabled = !document.querySelector('input[name="result"]:checked');
+                });
+            });
+        }
+
+        /* ── Confirmación con SweetAlert ── */
+        document.querySelectorAll('#panel-approve form, #panel-reject form').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var self     = this;
+                var decision = self.querySelector('input[name="decision"]').value;
+                var isDark   = (localStorage.getItem('theme') ?? 'light') === 'dark';
+                var isApprove = decision === 'approve';
+                Swal.fire({
+                    icon:              isApprove ? 'question' : 'warning',
+                    title:             isApprove ? '¿Aprobar devolución?' : '¿Rechazar devolución?',
+                    text:              isApprove
+                                           ? 'Se procesará la devolución según el resultado seleccionado.'
+                                           : 'Esta acción no se puede deshacer.',
+                    showCancelButton:  true,
+                    confirmButtonText: isApprove ? 'Sí, aprobar' : 'Sí, rechazar',
+                    cancelButtonText:  'Cancelar',
+                    confirmButtonColor: isApprove ? '#16a34a' : '#dc2626',
+                    background:        isDark ? '#1e293b' : '#ffffff',
+                    color:             isDark ? '#f1f5f9' : '#1e293b',
+                }).then(function (result) {
+                    if (result.isConfirmed) self.submit();
+                });
+            });
+        });
+    })();
+    </script>
 </body>
 </html>

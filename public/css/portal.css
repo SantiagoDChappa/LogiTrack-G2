@@ -448,6 +448,14 @@ ul { list-style: none; }
 .portal-badge.paquete_fallido { background: var(--badge-package-failed-bg); color: var(--badge-package-failed-text); }
 .portal-badge.intento_fallido { background: var(--badge-failed-attempt-bg); color: var(--badge-failed-attempt-text); }
 
+/* Estados de devolución */
+.portal-badge.solicitada  { background: var(--badge-pending-bg);    color: var(--badge-pending-text); }
+.portal-badge.en_revision { background: var(--badge-transit-bg);    color: var(--badge-transit-text); }
+.portal-badge.aprobada    { background: #dcfce7;                    color: #15803d; }
+.portal-badge.rechazada   { background: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text); }
+.portal-badge.en_proceso  { background: var(--badge-assigned-bg);   color: var(--badge-assigned-text); }
+.portal-badge.finalizada  { background: var(--badge-delivered-bg);  color: var(--badge-delivered-text); }
+
 /* ─── TIMELINE ─── */
 .portal-timeline {
     display: flex;
@@ -1422,7 +1430,9 @@ ul { list-style: none; }
     text-decoration: none;
     transition: background .18s, border-color .18s, color .18s;
 }
-.portal-nav-link:hover { background: var(--c-bg); color: var(--c-text); border-color: var(--c-text-2); text-decoration: none; }
+.portal-nav-link:hover  { background: var(--c-bg); color: var(--c-text); border-color: var(--c-text-2); text-decoration: none; }
+.portal-nav-link.active { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+.portal-nav-link.active:hover { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
 .portal-nav-link .material-symbols-outlined { font-size: 1rem; }
 
 .portal-mis-envios-section {
@@ -1441,6 +1451,16 @@ ul { list-style: none; }
 }
 .portal-mis-envios-list-wrapper,
 .portal-mis-envios-detail-wrapper { max-width: 960px; }
+.portal-incident-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--c-primary);
+}
 .portal-mis-envios-header h1,
 .portal-mis-envios-list-header h1 { font-size: 1.75rem; margin: 0.35rem 0 0.75rem; color: var(--c-text); }
 .portal-mis-envios-lead { color: var(--c-text-2); line-height: 1.55; margin-bottom: 1.5rem; }
@@ -1641,9 +1661,16 @@ ul { list-style: none; }
     border-radius: 999px; text-transform: uppercase;
     border: 1px solid transparent; white-space: nowrap;
 }
-.portal-incident-badge--open      { background: var(--badge-transit-bg);   color: var(--badge-transit-text); }
-.portal-incident-badge--in_review { background: var(--badge-delayed-bg);   color: var(--badge-delayed-text); }
-.portal-incident-badge--closed    { background: var(--badge-delivered-bg); color: var(--badge-delivered-text); }
+.portal-incident-badge--open        { background: var(--badge-transit-bg);    color: var(--badge-transit-text); }
+.portal-incident-badge--in_review   { background: var(--badge-delayed-bg);    color: var(--badge-delayed-text); }
+.portal-incident-badge--closed      { background: var(--badge-delivered-bg);  color: var(--badge-delivered-text); }
+/* Estados de devolución */
+.portal-incident-badge--solicitada  { background: var(--badge-pending-bg);    color: var(--badge-pending-text); }
+.portal-incident-badge--en_revision { background: var(--badge-delayed-bg);    color: var(--badge-delayed-text); }
+.portal-incident-badge--aprobada    { background: #dcfce7;                    color: #15803d; }
+.portal-incident-badge--rechazada   { background: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text); }
+.portal-incident-badge--en_proceso  { background: var(--badge-assigned-bg);   color: var(--badge-assigned-text); }
+.portal-incident-badge--finalizada  { background: var(--badge-delivered-bg);  color: var(--badge-delivered-text); }
 
 .portal-incidents-empty {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -1670,6 +1697,21 @@ ul { list-style: none; }
 .portal-manage-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .portal-manage-radio { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; font-size: 0.92rem; }
 .portal-manage-hint { font-size: 0.85rem; color: var(--c-text-2); margin: 0 0 0.75rem; }
+
+/* Key-value grid para detalles de devolución */
+.portal-kv { display: grid; grid-template-columns: 9rem 1fr; gap: .3rem .75rem; margin: 0; }
+.portal-kv dt { color: var(--c-text-3); font-size: .8rem; font-weight: 500; padding-top: .1rem; }
+.portal-kv dd { margin: 0; font-size: .9rem; }
+
+/* Timeline vertical para historial de eventos */
+.portal-vlog { list-style: none; margin: 0; padding: 0; position: relative; }
+.portal-vlog::before { content: ''; position: absolute; left: .5rem; top: .6rem; bottom: .6rem; width: 2px; background: var(--c-border); border-radius: 2px; }
+.portal-vlog-item { position: relative; padding: .1rem 0 .85rem 2.25rem; }
+.portal-vlog-item:last-child { padding-bottom: 0; }
+.portal-vlog-dot { position: absolute; left: 0; top: .3rem; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--c-primary); border: 2px solid var(--c-surface, #fff); box-shadow: 0 0 0 2px var(--c-primary); }
+.portal-vlog-title { font-weight: 600; font-size: .9rem; }
+.portal-vlog-date { font-size: .75rem; color: var(--c-text-3); margin-top: .1rem; }
+.portal-vlog-comment { font-size: .85rem; color: var(--c-text-2); margin-top: .25rem; font-style: italic; }
 
 .portal-modifications-history .portal-mis-envios-table-wrap { margin-top: 0; }
 .portal-modifications-table th:first-child,

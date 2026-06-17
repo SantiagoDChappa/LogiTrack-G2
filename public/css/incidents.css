@@ -191,6 +191,14 @@ html[data-theme="dark"] {
 .incident-badge--in_review { background: #fef3c7; color: #92400e; border-color: rgba(146, 64, 14, .15); }
 .incident-badge--closed    { background: #d1fae5; color: #065f46; border-color: rgba(6, 95, 70, .15); }
 
+/* Estados de devolución */
+.incident-badge--solicitada  { background: #dbeafe; color: #1e40af; border-color: rgba(30,64,175,.15); }
+.incident-badge--en_revision { background: #fef3c7; color: #92400e; border-color: rgba(146,64,14,.15); }
+.incident-badge--aprobada    { background: #dcfce7; color: #15803d; border-color: rgba(21,128,61,.15); }
+.incident-badge--rechazada   { background: #fee2e2; color: #991b1b; border-color: rgba(153,27,27,.15); }
+.incident-badge--en_proceso  { background: #e0e7ff; color: #3730a3; border-color: rgba(55,48,163,.15); }
+.incident-badge--finalizada  { background: #d1fae5; color: #065f46; border-color: rgba(6,95,70,.15); }
+
 .incident-priority {
     display: inline-flex;
     align-items: center;
@@ -2071,4 +2079,166 @@ html[data-theme="dark"] .btn-status--closed:hover:not(:disabled) {
     .incident-status-actions__label { margin: 0 0 .25rem; }
     .incident-status-form { flex-wrap: wrap; }
     .btn-status, .incident-close-action-inline { width: 100%; max-width: none; justify-content: center; }
+}
+
+/* ============================================================
+   Return: approve form con radio buttons
+   ============================================================ */
+.return-approve-form {
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    padding: .8rem 1rem;
+    background: var(--inc-surface-alt);
+    border: 1px solid var(--inc-border-soft);
+    border-radius: var(--inc-radius-md);
+    margin-bottom: .25rem;
+}
+.return-approve-form .return-radio-label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: .55rem;
+    cursor: pointer;
+    font-size: .9rem;
+    font-weight: 500;
+    color: var(--inc-text);
+    text-transform: none;
+    letter-spacing: 0;
+}
+.return-approve-form .return-radio-label input[type=radio] {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--inc-blue);
+}
+.return-approve-form .return-radio-label small {
+    font-weight: 400;
+    opacity: .6;
+    font-size: .8rem;
+}
+.return-form-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: .2rem;
+}
+
+/* ============================================================
+   Return detail — segmented action tabs (aprobar / rechazar)
+   ============================================================ */
+.return-action-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+    margin-bottom: .85rem;
+    padding: .35rem;
+    background: var(--inc-surface-alt);
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-md);
+}
+
+.return-action-tab {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .6rem .75rem;
+    border: 1.5px solid var(--inc-border);
+    border-radius: calc(var(--inc-radius-md) - 4px);
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: var(--inc-text);
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.return-action-tab .material-symbols-outlined { font-size: 1.1rem; }
+
+.return-action-tab--approve:not(.is-active) {
+    color: var(--inc-green);
+    border-color: rgba(22, 163, 74, .4);
+}
+.return-action-tab--approve:not(.is-active):hover {
+    background: rgba(22, 163, 74, .1);
+}
+
+.return-action-tab--reject:not(.is-active) {
+    color: var(--inc-red);
+    border-color: rgba(220, 38, 38, .4);
+}
+.return-action-tab--reject:not(.is-active):hover {
+    background: rgba(220, 38, 38, .1);
+}
+
+.return-action-tab--approve.is-active {
+    background: var(--inc-green);
+    color: #fff;
+    border-color: var(--inc-green);
+}
+
+.return-action-tab--reject.is-active {
+    background: var(--inc-red);
+    color: #fff;
+    border-color: var(--inc-red);
+}
+
+/* Approve panel — green left accent */
+#panel-approve .return-approve-form {
+    border-left: 3px solid rgba(22, 163, 74, .5);
+    border-radius: 0 var(--inc-radius-md) var(--inc-radius-md) 0;
+}
+
+/* Reject panel form */
+.return-reject-form {
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
+    padding: .8rem 1rem;
+    background: var(--inc-surface-alt);
+    border: 1px solid var(--inc-border-soft);
+    border-left: 3px solid rgba(220, 38, 38, .5);
+    border-radius: 0 var(--inc-radius-md) var(--inc-radius-md) 0;
+}
+
+.return-reject-label {
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--inc-muted);
+}
+
+.return-reject-textarea {
+    padding: .5rem .7rem;
+    border: 1px solid var(--inc-border);
+    border-radius: var(--inc-radius-sm);
+    background: var(--inc-surface);
+    color: var(--inc-text);
+    font: inherit;
+    font-size: .88rem;
+    resize: vertical;
+    min-height: 5rem;
+    box-sizing: border-box;
+    width: 100%;
+    line-height: 1.5;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.return-reject-textarea:focus {
+    outline: none;
+    border-color: var(--inc-blue);
+    box-shadow: var(--inc-ring);
+}
+
+#btn-approve:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    filter: none !important;
+    transform: none !important;
+    box-shadow: none !important;
 }

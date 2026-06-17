@@ -303,6 +303,29 @@
                         <% } %>
                     </div>
 
+                    <!-- Devoluciones del envío -->
+                    <% var _rets = (s.returns && s.returns.length) ? s.returns : []; %>
+                    <% if (_rets.length) { %>
+                    <div class="portal-incidents-card" style="margin-top:.75rem;">
+                        <h3 class="portal-incidents-card__title">
+                            <span class="material-symbols-outlined" style="color:var(--c-primary);">assignment_return</span>
+                            Devoluciones <span class="portal-incidents-card__count">(<%= _rets.length %>)</span>
+                        </h3>
+                        <div class="portal-incidents-list">
+                            <% _rets.forEach(function(r) { %>
+                            <div class="portal-incident-row" style="cursor:default;">
+                                <span class="portal-incident-id">#<%= r.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= r.reasonLabel %></span>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= r.status.toLowerCase() %>"><%= r.statusLabel %></span>
+                                <span class="portal-incident-date"><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                            </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                    <% } %>
+
                     <!-- US-C02: seguimiento de recuperación / reprogramación -->
                     <% if (s.recovery && s.recovery.length > 0) { %>
                     <div class="portal-history portal-recovery">

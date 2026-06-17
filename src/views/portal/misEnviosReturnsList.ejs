@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis devoluciones - Mis envíos</title>
+    <title>Mis devoluciones - <%= support.nombre %></title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
@@ -14,38 +14,60 @@
     <%- include('../partials/portal-nav', { support }) %>
 
     <section class="portal-mis-envios-section">
-        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
-            <div class="portal-mis-envios-detail-top">
-                <a href="/portal/mis-envios/lista" class="portal-mis-envios-back">
-                    <span class="material-symbols-outlined">arrow_back</span>
-                    Volver al listado
-                </a>
-            </div>
-
-            <div class="portal-mis-envios-header">
-                <span class="portal-incident-eyebrow">Mis devoluciones</span>
-                <h1>Devoluciones</h1>
+        <div class="portal-mis-envios-wrapper portal-mis-envios-list-wrapper">
+            <div class="portal-mis-envios-list-header">
+                <div>
+                    <span class="portal-incident-eyebrow">Tus devoluciones</span>
+                    <h1>Mis devoluciones</h1>
+                    <p class="portal-mis-envios-lead">Consultá las devoluciones solicitadas y su estado de gestión.</p>
+                </div>
+                <form method="POST" action="/portal/mis-envios/salir">
+                    <button type="submit" class="portal-mis-envios-logout">
+                        <span class="material-symbols-outlined">logout</span>
+                        Cerrar sesión
+                    </button>
+                </form>
             </div>
 
             <% if (!returns || returns.length === 0) { %>
-                <div class="portal-mis-envios-alert">
-                    <span class="material-symbols-outlined">inbox</span>
-                    No tenés devoluciones registradas.
-                </div>
+            <div class="portal-empty">
+                <span class="material-symbols-outlined portal-empty-icon">assignment_return</span>
+                <h2>No tenés devoluciones registradas</h2>
+                <p>No hay devoluciones asociadas a tus envíos en este momento.</p>
+                <a href="/portal/mis-envios/lista" class="btn-primary">Ver mis envíos</a>
+            </div>
             <% } else { %>
-                <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.6rem;">
-                    <% returns.forEach(function(r) { %>
-                        <li>
-                            <a href="/portal/mis-envios/devolucion/<%= r.id %>" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.75rem 1rem;text-decoration:none;color:inherit;">
-                                <strong>#<%= r.id %></strong>
-                                <span><%= r.trackingId %></span>
-                                <span style="opacity:.8;"><%= r.reasonLabel %></span>
-                                <span class="portal-badge"><%= r.statusLabel %></span>
-                                <span style="margin-left:auto;opacity:.7;font-size:.8rem;"><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></span>
-                            </a>
-                        </li>
-                    <% }); %>
-                </ul>
+            <div class="portal-mis-envios-table-wrap">
+                <table class="portal-mis-envios-table">
+                    <thead>
+                        <tr>
+                            <th># Devolución</th>
+                            <th>Envío</th>
+                            <th>Motivo</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% returns.forEach(function(r) { %>
+                        <tr>
+                            <td><strong>#<%= r.id %></strong></td>
+                            <td><%= r.trackingId %></td>
+                            <td><%= r.reasonLabel %></td>
+                            <td><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+                            <td><span class="portal-badge <%= r.status.toLowerCase() %>"><%= r.statusLabel %></span></td>
+                            <td>
+                                <a href="/portal/mis-envios/devolucion/<%= r.id %>" class="portal-mis-envios-link">
+                                    Ver detalle
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
             <% } %>
         </div>
     </section>
