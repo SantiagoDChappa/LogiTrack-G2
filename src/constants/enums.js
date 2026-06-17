@@ -186,25 +186,8 @@ const RouteFailureReason = Object.freeze({
     OTHER:               'OTHER',
 });
 
-// LGT-182/183/184/186 — Devoluciones.
-const ReturnStatus = Object.freeze({
-    SOLICITADA:  'SOLICITADA',
-    EN_REVISION: 'EN_REVISION',
-    APROBADA:    'APROBADA',
-    RECHAZADA:   'RECHAZADA',
-    EN_PROCESO:  'EN_PROCESO',
-    FINALIZADA:  'FINALIZADA',
-});
-
-const ReturnStatusLabel = Object.freeze({
-    SOLICITADA:  'Solicitada',
-    EN_REVISION: 'En revisión',
-    APROBADA:    'Aprobada',
-    RECHAZADA:   'Rechazada',
-    EN_PROCESO:  'En proceso',
-    FINALIZADA:  'Finalizada',
-});
-
+// LGT-182/183/184/186 — Devoluciones. Ahora son incidencias de tipo RETURN; se conserva
+// solo el motivo estructurado (el estado/resolución los maneja la incidencia).
 const ReturnReason = Object.freeze({
     DEFECTUOSO:      'DEFECTUOSO',
     INCORRECTO:      'INCORRECTO',
@@ -219,13 +202,6 @@ const ReturnReasonLabel = Object.freeze({
     DANADO:          'Llegó dañado',
     ARREPENTIMIENTO: 'Arrepentimiento (ya no lo quiero)',
     OTRO:            'Otro',
-});
-
-// Resultado que define el Supervisor al aprobar (LGT-183/213). Comparte vocabulario con
-// incident.damageChoice (REEMBOLSO/REEMPLAZO).
-const ReturnResult = Object.freeze({
-    REEMBOLSO: 'REEMBOLSO',
-    REEMPLAZO: 'REEMPLAZO',
 });
 
 const mapperShipmentStatusToEvent = {
@@ -256,5 +232,5 @@ module.exports = {
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,
     ModificationRequestStatus, ModificationChangeType, ModificationChannel,
-    ReturnStatus, ReturnStatusLabel, ReturnReason, ReturnReasonLabel, ReturnResult,
+    ReturnReason, ReturnReasonLabel,
 };
