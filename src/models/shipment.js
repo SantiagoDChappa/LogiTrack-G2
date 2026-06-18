@@ -54,6 +54,8 @@ const Shipment = sequelize.define('shipment', {
     replacementOfShipmentId: { type: DataTypes.INTEGER,    allowNull: true,  field: 'replacement_of_shipment_id' },
     // LGT-214 precondición: costo total persistido al crear el envío (para nota de crédito).
     costTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    // Sprint 5 — dashboard analítico: transporte que realizó el envío (para métricas por camioneta).
+    transportId: { type: DataTypes.INTEGER, allowNull: true },
 },
 { timestamps: true, tableName: 'shipment' });
 

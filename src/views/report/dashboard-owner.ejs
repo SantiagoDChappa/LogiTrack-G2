@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Dashboard Estratégico</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <style>
+        .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.4rem 1.6rem; }
+        .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
+        .dash-kpi__value { font-size:2.4rem; font-weight:700; line-height:1; }
+        .dash-kpi__sub { font-size:.82rem; color:var(--color-text-muted); margin-top:.3rem; }
+        .dash-kpi__value--warn { color:#e07b00; }
+        .dash-kpi__value--ok { color:var(--color-success,#2e7d32); }
+        .dash-kpi__value--danger { color:var(--color-danger,#c62828); }
+        .owner-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+        @media (max-width:900px) { .owner-grid { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Dashboard Estratégico — Visión del negocio</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/dashboard/owner" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/dashboard/owner" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+
+            <!-- KPIs estratégicos -->
+            <div class="dash-kpi-grid">
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Entregas completadas</div>
+                    <div class="dash-kpi__value"><%= kpis.total || 0 %></div>
+                    <div class="dash-kpi__sub">Con predicción registrada</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">OTIF (entregas a tiempo)</div>
+                    <div class="dash-kpi__value <%= (kpis.otif_pct||0) >= 85 ? 'dash-kpi__value--ok' : (kpis.otif_pct||0) >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
+                    </div>
+                    <div class="dash-kpi__sub">Meta recomendada: ≥ 85%</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Desvío promedio</div>
+                    <div class="dash-kpi__value <%= (kpis.avg_delta||0) <= 0.3 ? 'dash-kpi__value--ok' : (kpis.avg_delta||0) <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.avg_delta !== null ? ((kpis.avg_delta > 0 ? '+' : '') + kpis.avg_delta + 'd') : '—' %>
+                    </div>
+                    <div class="dash-kpi__sub">Real − Estimado</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Precisión del modelo</div>
+                    <div class="dash-kpi__value <%= (kpis.model_accuracy_pct||0) >= 75 ? 'dash-kpi__value--ok' : (kpis.model_accuracy_pct||0) >= 55 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.model_accuracy_pct !== null ? kpis.model_accuracy_pct + '%' : '—' %>
+                    </div>
+                    <div class="dash-kpi__sub">Delta dentro de ±1 día</div>
+                </div>
+            </div>
+
+            <!-- Evolución mensual -->
+            <div class="report-card">
+                <h2>Evolución mensual — OTIF y desvío</h2>
+                <% if (monthlyEvolution.length === 0) { %>
+                    <div class="report-empty-state">
+                        <span class="material-symbols-outlined">show_chart</span>
+                        <p>Sin datos de predicción completados en el período seleccionado.</p>
+                    </div>
+                <% } else { %>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Mes</th>
+                            <th class="text-right">Entregas</th>
+                            <th class="text-right">OTIF</th>
+                            <th class="text-right">Delta prom.</th>
+                            <th class="text-right">Precisión modelo</th>
+                            <th>Tendencia OTIF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% monthlyEvolution.forEach((m, idx) => { %>
+                        <%
+                            const delta = m.avg_delta || 0;
+                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                            const prev = idx > 0 ? monthlyEvolution[idx-1] : null;
+                            const trend = prev === null ? '—'
+                                : (m.otif_pct || 0) > (prev.otif_pct || 0) ? '↑'
+                                : (m.otif_pct || 0) < (prev.otif_pct || 0) ? '↓' : '→';
+                            const trendClass = trend === '↑' ? 'ot-badge--green' : trend === '↓' ? 'ot-badge--red' : '';
+                        %>
+                        <tr>
+                            <td><%= m.month %></td>
+                            <td class="text-right"><%= m.total %></td>
+                            <td class="text-right">
+                                <div class="dp-pct-cell">
+                                    <div class="dp-pct-bar-track">
+                                        <div class="dp-pct-bar-fill <%= (m.otif_pct||0) >= 85 ? 'fill--green' : (m.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
+                                             style="width:<%= m.otif_pct || 0 %>%"></div>
+                                    </div>
+                                    <span class="dp-pct-label"><%= m.otif_pct || 0 %>%</span>
+                                </div>
+                            </td>
+                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
+                            <td class="text-right"><%= m.model_accuracy_pct || 0 %>%</td>
+                            <td><% if (trend !== '—') { %><span class="ot-badge <%= trendClass %>"><%= trend %></span><% } else { %><span class="dp-na">—</span><% } %></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <% } %>
+            </div>
+
+            <!-- Top zonas y choferes críticos -->
+            <div class="owner-grid">
+                <div class="report-card">
+                    <h2>Zonas críticas (mayor desvío)</h2>
+                    <% if (topCriticalZones.length === 0) { %>
+                        <div class="report-empty-state"><span class="material-symbols-outlined">map</span><p>Sin datos.</p></div>
+                    <% } else { %>
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Zona</th>
+                                <th class="text-right">Entregas</th>
+                                <th class="text-right">Delta</th>
+                                <th class="text-right">OTIF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% topCriticalZones.forEach(z => { %>
+                            <%
+                                const d = z.avg_delta || 0;
+                                const dClass = d <= 0.2 ? 'ot-badge--green' : d <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                            %>
+                            <tr>
+                                <td><%= z.zone_name || '—' %></td>
+                                <td class="text-right"><%= z.total %></td>
+                                <td class="text-right"><span class="ot-badge <%= dClass %>"><%= d > 0 ? '+' : '' %><%= d %>d</span></td>
+                                <td class="text-right"><%= z.otif_pct || 0 %>%</td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    <% } %>
+                </div>
+
+                <div class="report-card">
+                    <h2>Repartidores críticos (mayor desvío)</h2>
+                    <% if (topCriticalDrivers.length === 0) { %>
+                        <div class="report-empty-state"><span class="material-symbols-outlined">person_off</span><p>Sin datos.</p></div>
+                    <% } else { %>
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Repartidor</th>
+                                <th class="text-right">Entregas</th>
+                                <th class="text-right">Delta</th>
+                                <th class="text-right">OTIF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% topCriticalDrivers.forEach(d => { %>
+                            <%
+                                const delta = d.avg_delta || 0;
+                                const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                            %>
+                            <tr>
+                                <td>
+                                    <div class="dp-driver-cell">
+                                        <div class="dp-avatar"><%= (d.driver_name || '?').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
+                                        <%= d.driver_name || '—' %>
+                                    </div>
+                                </td>
+                                <td class="text-right"><%= d.total %></td>
+                                <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
+                                <td class="text-right"><%= d.otif_pct || 0 %>%</td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    <% } %>
+                </div>
+            </div>
+
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value, to = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                if (!this.querySelector('.report-alert')) {
+                    const a = document.createElement('div');
+                    a.className = 'report-alert report-alert--error';
+                    a.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', a);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
