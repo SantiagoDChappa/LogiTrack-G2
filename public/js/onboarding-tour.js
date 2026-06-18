@@ -1,20 +1,101 @@
 (function () {
     'use strict';
 
-    if (!window.__LGT || window.__LGT.onboarded) return;
+    var MIN_TOUR_STEPS = 2;
+    var TOUR_REDIRECT_KEY = 'lgt_tour_redirected';
+    var START_DELAY_MS = 450;
+    var MOBILE_BP = '(max-width: 1024px)';
+
+    function asRole(roleId) {
+        return Number(roleId);
+    }
+
+    function getTourHome(roleId) {
+        return asRole(roleId) === 3 ? '/delivery' : '/home';
+    }
+
+    function isNavStep(element) {
+        if (!element) return false;
+        return element.indexOf('.nav') === 0 || element.indexOf('#nav-group-') === 0;
+    }
+
+    function openMobileNav() {
+        if (!window.matchMedia(MOBILE_BP).matches) return;
+        var leftHeader = document.querySelector('.left-header');
+        var navOverlay = document.getElementById('nav-overlay');
+        if (leftHeader) leftHeader.classList.add('open');
+        if (navOverlay) navOverlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeMobileNav() {
+        if (!window.matchMedia(MOBILE_BP).matches) return;
+        var leftHeader = document.querySelector('.left-header');
+        var navOverlay = document.getElementById('nav-overlay');
+        if (leftHeader) leftHeader.classList.remove('open');
+        if (navOverlay) navOverlay.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    function withNavHooks(step) {
+        if (!isNavStep(step.element)) return step;
+        var originalHighlight = step.onHighlightStarted;
+        var originalDeselected = step.onDeselected;
+        return Object.assign({}, step, {
+            onHighlightStarted: function (element, stepObj, opts) {
+                openMobileNav();
+                if (typeof originalHighlight === 'function') {
+                    originalHighlight(element, stepObj, opts);
+                }
+            },
+            onDeselected: function (element, stepObj, opts) {
+                closeMobileNav();
+                if (typeof originalDeselected === 'function') {
+                    originalDeselected(element, stepObj, opts);
+                }
+            },
+        });
+    }
+
+    function filterSteps(steps) {
+        return steps.filter(function (step) {
+            if (!step.element) return true;
+            return document.querySelector(step.element) !== null;
+        });
+    }
+
+    // ── Pasos compartidos ──────────────────────────────────────────────────────
+
+    function welcomeStep(description) {
+        return {
+            element: '.logo',
+            popover: {
+                title: '¡Bienvenido/a a LogiTrack!',
+                description: description,
+                side: 'right',
+                align: 'start',
+            },
+        };
+    }
+
+    function searchStep(isDelivery) {
+        return {
+            element: '#univ-search',
+            popover: {
+                title: 'Búsqueda rápida',
+                description: isDelivery
+                    ? 'Buscá envíos, incidencias o tus rutas asignadas escribiendo al menos 2 caracteres.'
+                    : 'Buscá envíos e incidencias al instante escribiendo al menos 2 caracteres.',
+                side: 'bottom',
+            },
+        };
+    }
 
     // ── Pasos por rol ──────────────────────────────────────────────────────────
 
     var STEPS_SUPERVISOR_ADMIN = [
-        {
-            element: '.logo',
-            popover: {
-                title: '¡Bienvenido/a a LogiTrack!',
-                description: 'Este es el panel de control de tu operación logística. Te mostramos en unos pasos qué podés hacer desde acá.',
-                side: 'right',
-                align: 'start',
-            },
-        },
+        welcomeStep('Este es el panel de control de tu operación logística. Te mostramos en unos pasos qué podés hacer desde acá.'),
+        searchStep(false),
         {
             element: '.stats-grid',
             popover: {
@@ -70,15 +151,8 @@
     ];
 
     var STEPS_OPERATOR = [
-        {
-            element: '.logo',
-            popover: {
-                title: '¡Bienvenido/a a LogiTrack!',
-                description: 'Desde acá podés gestionar envíos, incidencias y solicitudes del portal de clientes.',
-                side: 'right',
-                align: 'start',
-            },
-        },
+        welcomeStep('Desde acá podés gestionar envíos, incidencias y solicitudes del portal de clientes.'),
+        searchStep(false),
         {
             element: '.stats-grid',
             popover: {
@@ -114,78 +188,98 @@
         },
     ];
 
-    var STEPS_DELIVERY = [
-        {
-            element: '.logo',
-            popover: {
-                title: '¡Bienvenido/a a LogiTrack!',
-                description: 'Acá vas a encontrar todo lo que necesitás para gestionar tus entregas del día.',
-                side: 'right',
-                align: 'start',
-            },
-        },
-        {
-            element: '.active-hero',
-            popover: {
-                title: 'Tu ruta activa',
-                description: 'Esta tarjeta muestra tu ruta en curso: progreso de entregas, dirección siguiente y estado general.',
-                side: 'bottom',
-                align: 'start',
-            },
-        },
-        {
-            element: '.route-card',
-            popover: {
-                title: 'Rutas asignadas',
-                description: 'Tus próximas rutas aparecen acá. Hacé click en cualquiera para ver el detalle.',
-                side: 'top',
-                align: 'start',
-            },
-        },
-        {
+    function buildDeliverySteps() {
+        var steps = [
+            welcomeStep('Acá vas a encontrar todo lo que necesitás para gestionar tus entregas del día.'),
+            searchStep(true),
+        ];
+
+        if (document.querySelector('.active-hero')) {
+            steps.push({
+                element: '.active-hero',
+                popover: {
+                    title: 'Tu ruta activa',
+                    description: 'Esta tarjeta muestra tu ruta en curso: progreso de entregas, dirección siguiente y estado general.',
+                    side: 'bottom',
+                    align: 'start',
+                },
+            });
+        } else if (document.querySelector('.empty-routes')) {
+            steps.push({
+                element: '.empty-routes',
+                popover: {
+                    title: 'Sin ruta asignada',
+                    description: 'Todavía no tenés una ruta activa. Cuando un operador te asigne una, aparecerá acá para que puedas iniciarla.',
+                    side: 'bottom',
+                    align: 'start',
+                },
+            });
+        }
+
+        if (document.querySelector('.route-card')) {
+            steps.push({
+                element: '.route-card',
+                popover: {
+                    title: 'Rutas asignadas',
+                    description: 'Tus próximas rutas aparecen acá. Hacé click en cualquiera para ver el detalle.',
+                    side: 'top',
+                    align: 'start',
+                },
+            });
+        }
+
+        steps.push({
             element: '.nav a[href="/incident"]',
             popover: {
                 title: 'Mis incidencias',
                 description: 'Si encontrás un problema durante la entrega (daño, dirección incorrecta, etc.) podés reportarlo desde acá.',
                 side: 'right',
             },
-        },
-    ];
+        });
 
-    // ── Selección de pasos según rol ───────────────────────────────────────────
+        return steps;
+    }
 
     function getSteps(roleId) {
-        if (roleId === 4) return STEPS_SUPERVISOR_ADMIN.concat(STEPS_ADMIN_EXTRA);
-        if (roleId === 1) return STEPS_SUPERVISOR_ADMIN;
-        if (roleId === 2) return STEPS_OPERATOR;
-        if (roleId === 3) return STEPS_DELIVERY;
+        var role = asRole(roleId);
+        if (role === 4) return STEPS_SUPERVISOR_ADMIN.concat(STEPS_ADMIN_EXTRA);
+        if (role === 1) return STEPS_SUPERVISOR_ADMIN;
+        if (role === 2) return STEPS_OPERATOR;
+        if (role === 3) return buildDeliverySteps();
         return [];
     }
 
-    function filterSteps(steps) {
-        return steps.filter(function (step) {
-            if (!step.element) return true;
-            return document.querySelector(step.element) !== null;
-        });
+    function clearTourRedirectFlag() {
+        try { sessionStorage.removeItem(TOUR_REDIRECT_KEY); } catch (_) { /* ignore */ }
     }
 
-    // ── Marca el tour como completado en el servidor ───────────────────────────
-
     function markComplete() {
+        clearTourRedirectFlag();
         fetch('/api/onboarding/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         }).catch(function () {});
     }
 
-    // ── Iniciar tour ───────────────────────────────────────────────────────────
+    function ensureTourLanding(roleId) {
+        var home = getTourHome(roleId);
+        if (window.location.pathname === home) return true;
+        if (sessionStorage.getItem(TOUR_REDIRECT_KEY)) return true;
+        try { sessionStorage.setItem(TOUR_REDIRECT_KEY, '1'); } catch (_) { /* ignore */ }
+        window.location.replace(home);
+        return false;
+    }
 
     function startTour() {
-        var steps = filterSteps(getSteps(window.__LGT.roleId));
-        if (steps.length === 0) {
-            markComplete();
-            return;
-        }
+        if (!window.__LGT || window.__LGT.onboarded) return;
+
+        var roleId = asRole(window.__LGT.roleId);
+        if (!ensureTourLanding(roleId)) return;
+
+        var steps = filterSteps(getSteps(roleId).map(withNavHooks));
+        if (steps.length < MIN_TOUR_STEPS) return;
+
+        var tourStarted = false;
 
         var driverObj = window.driver.js.driver({
             showProgress: true,
@@ -197,7 +291,6 @@
             prevBtnText: '← Anterior',
             doneBtnText: '¡Listo!',
             onPopoverRender: function (popover) {
-                // Inyectar botón "Saltar tour" a la izquierda de los botones de navegación
                 if (popover.footer.querySelector('.lgt-tour-skip')) return;
                 var skipBtn = document.createElement('button');
                 skipBtn.textContent = 'Saltar tour';
@@ -214,18 +307,44 @@
                 }
             },
             onDestroyStarted: function () {
-                markComplete();
+                if (tourStarted) markComplete();
+                closeMobileNav();
                 driverObj.destroy();
             },
             steps: steps,
         });
 
+        tourStarted = true;
         driverObj.drive();
     }
 
+    function scheduleTour() {
+        setTimeout(startTour, START_DELAY_MS);
+    }
+
+    // Botón "Ver tour de nuevo" del header
+    var replayBtn = document.getElementById('btn-replay-tour');
+    if (replayBtn) {
+        replayBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var roleId = window.__LGT ? asRole(window.__LGT.roleId) : 1;
+            fetch('/api/onboarding/replay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            })
+                .then(function () {
+                    clearTourRedirectFlag();
+                    window.location.href = getTourHome(roleId);
+                })
+                .catch(function () {});
+        });
+    }
+
+    if (!window.__LGT || window.__LGT.onboarded) return;
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startTour);
+        document.addEventListener('DOMContentLoaded', scheduleTour);
     } else {
-        startTour();
+        scheduleTour();
     }
 })();

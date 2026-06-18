@@ -12,4 +12,16 @@ const complete = async (req, res) => {
     }
 };
 
-module.exports = { complete };
+const replay = async (req, res) => {
+    try {
+        const userId = res.locals.currentUser?.id;
+        if (!userId) return res.status(401).json({ error: 'No autenticado' });
+        await User.update({ onboarded: false }, { where: { id: userId } });
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('[onboarding] error al reiniciar tour:', err.message);
+        return res.status(500).json({ error: 'Error interno' });
+    }
+};
+
+module.exports = { complete, replay };
