@@ -108,6 +108,40 @@
         .pagination       { display: flex; align-items: center; justify-content: center; gap: .5rem;
                             padding: 1rem 0 .2rem; }
         .pagination-info  { font-size: .8rem; color: var(--color-text-secondary); margin-right: auto; }
+
+        /* Avatar */
+        .u-avatar         { width: 30px; height: 30px; border-radius: 50%; display: inline-flex;
+                            align-items: center; justify-content: center; font-size: .68rem;
+                            font-weight: 700; color: #fff; flex-shrink: 0; }
+        .user-cell        { display: flex; align-items: center; gap: .55rem; }
+        .user-cell-info   { display: flex; flex-direction: column; }
+        .user-cell-sub    { font-size: .73rem; color: var(--color-text-secondary); }
+
+        /* Security alert */
+        .security-alert   { display: flex; align-items: center; gap: .75rem; padding: .9rem 1.3rem;
+                            background: #fff3cd; border: 1px solid #f6c200; border-radius: 12px;
+                            margin-bottom: 1.5rem; }
+        .security-alert span.material-symbols-outlined { color: #92600a; font-size: 1.3rem; flex-shrink: 0; }
+        .security-alert strong { color: #92600a; font-size: .88rem; }
+        .security-alert p { color: #7a5000; font-size: .8rem; margin: 0; }
+
+        /* Activity chart */
+        .chart-outer      { padding: .25rem 0 0; }
+        .chart-grid       { display: flex; align-items: flex-end; gap: .6rem; height: 120px;
+                            border-bottom: 1.5px solid var(--color-border); padding-bottom: 0; position: relative; }
+        .chart-bar-col    { flex: 1; display: flex; flex-direction: column; align-items: center;
+                            justify-content: flex-end; position: relative; }
+        .chart-bar        { width: 100%; border-radius: 7px 7px 0 0;
+                            background: linear-gradient(to top, var(--color-primary), #93c5fd);
+                            transition: opacity .15s; cursor: default; }
+        .chart-bar:hover  { opacity: .75; }
+        .chart-bar.empty  { background: var(--color-border); border-radius: 4px; opacity: .45; height: 4px !important; }
+        .chart-count      { position: absolute; top: -1.4rem; font-size: .72rem; font-weight: 700;
+                            color: var(--color-primary); white-space: nowrap; }
+        .chart-count.zero { color: var(--color-border); font-weight: 400; }
+        .chart-days       { display: flex; gap: .6rem; margin-top: .55rem; }
+        .chart-day        { flex: 1; text-align: center; font-size: .7rem; color: var(--color-text-secondary); }
+        .chart-day.today  { font-weight: 700; color: var(--color-primary); }
     </style>
 </head>
 <body>
@@ -130,7 +164,35 @@
             const _today = new Date().toLocaleDateString('es-AR');
             const _loginsHoy = sessionCount || 0;
             const _lastEvent = (loginLogs || [])[0];
+
+            const _AVATAR_COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#ef4444','#84cc16'];
+            const _avatarColor = (name) => {
+                let h = 0;
+                for (let i = 0; i < (name||'').length; i++) { h = name.charCodeAt(i) + ((h << 5) - h); }
+                return _AVATAR_COLORS[Math.abs(h) % _AVATAR_COLORS.length];
+            };
+            const _initials = (name) => {
+                if (!name) return '?';
+                const p = name.trim().split(' ');
+                return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase();
+            };
+            const _maxActivity = Math.max(1, ...(activity||[]).map(a => a.total));
         %>
+
+        <!-- Alerta de seguridad -->
+        <% if (failedAccounts && failedAccounts.length > 0) { %>
+        <div class="security-alert">
+            <span class="material-symbols-outlined">gpp_bad</span>
+            <div>
+                <strong>Alerta de seguridad — intentos de acceso repetidos en las últimas 24 h</strong>
+                <p>
+                    <% failedAccounts.forEach((a, i) => { %>
+                    <strong><%= a.email %></strong>: <%= a.attempts %> intentos fallidos<% if (i < failedAccounts.length - 1) { %> &nbsp;·&nbsp; <% } %>
+                    <% }) %>
+                </p>
+            </div>
+        </div>
+        <% } %>
 
         <!-- Stats -->
         <div class="audit-stats">
@@ -158,6 +220,48 @@
             </div>
         </div>
 
+        <!-- Gráfico de actividad -->
+        <div class="audit-card" style="margin-bottom:1.5rem">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">bar_chart</span>
+                <h2>Actividad de los últimos 7 días</h2>
+                <span class="badge-count">logins por día</span>
+            </div>
+            <div class="audit-card-body">
+                <%
+                    const _weekTotal = (activity||[]).reduce((s, a) => s + a.total, 0);
+                    const _weekMax   = (activity||[]).reduce((m, a) => a.total > m.total ? a : m, { total: 0, label: '—' });
+                %>
+                <div style="display:flex;gap:2rem;margin-bottom:1rem">
+                    <div>
+                        <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-secondary)">Total semana</div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--color-primary)"><%= _weekTotal %></div>
+                    </div>
+                    <div>
+                        <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-secondary)">Día más activo</div>
+                        <div style="font-size:1.1rem;font-weight:700"><%= _weekMax.total > 0 ? _weekMax.label + ' (' + _weekMax.total + ')' : '—' %></div>
+                    </div>
+                </div>
+                <div class="chart-outer">
+                    <div class="chart-grid">
+                        <% (activity||[]).forEach((a, i) => { %>
+                        <div class="chart-bar-col">
+                            <span class="chart-count <%= a.total === 0 ? 'zero' : '' %>"><%= a.total > 0 ? a.total : '' %></span>
+                            <div class="chart-bar <%= a.total === 0 ? 'empty' : '' %>"
+                                 style="height:<%= a.total > 0 ? Math.max(8, Math.round((a.total / _maxActivity) * 110)) : 4 %>px"
+                                 title="<%= a.label %>: <%= a.total %> logins"></div>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <div class="chart-days">
+                        <% (activity||[]).forEach((a, i) => { %>
+                        <span class="chart-day <%= i === 6 ? 'today' : '' %>"><%= a.label %></span>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Usuarios activos -->
         <div class="audit-card">
             <div class="audit-card-head">
@@ -180,10 +284,20 @@
                         <tbody>
                             <% activeUsers.forEach(l => { %>
                             <tr>
-                                <td><span class="active-dot"></span><strong><%= l.user?.fullName || '—' %></strong></td>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= _avatarColor(l.user?.fullName) %>"><%= _initials(l.user?.fullName) %></span>
+                                        <div class="user-cell-info">
+                                            <span style="display:inline-flex;align-items:center;gap:.4rem">
+                                                <strong><%= l.user?.fullName || '—' %></strong>
+                                                <span class="active-dot" style="margin:0"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
                                 <td><span class="badge-role"><%= roleLabels[l.user?.roleId] || '—' %></span></td>
                                 <td style="color:var(--color-text-secondary)"><%= l.user?.email || '—' %></td>
-                                <td><%= new Date(l.createdAt).toLocaleString('es-AR') %></td>
+                                <td><span data-ts="<%= new Date(l.createdAt).toISOString() %>"><%= new Date(l.createdAt).toLocaleString('es-AR') %></span></td>
                                 <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= l.ip || '—' %></code></td>
                             </tr>
                             <% }) %>
@@ -256,12 +370,19 @@
                         <tbody>
                             <% loginLogs.forEach(log => { %>
                             <tr>
-                                <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)">
+                                    <span data-ts="<%= new Date(log.createdAt).toISOString() %>" title="<%= new Date(log.createdAt).toLocaleString('es-AR') %>"><%= new Date(log.createdAt).toLocaleString('es-AR') %></span>
+                                </td>
                                 <td>
-                                    <strong><%= log.user?.fullName || log.email || '—' %></strong>
-                                    <% if (log.action === 'LOGIN_FAILED' && !log.user && log.email) { %>
-                                    <div style="font-size:.75rem;color:var(--color-text-secondary)"><%= log.email %></div>
-                                    <% } %>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= _avatarColor(log.user?.fullName || log.email) %>"><%= _initials(log.user?.fullName || log.email) %></span>
+                                        <div class="user-cell-info">
+                                            <strong><%= log.user?.fullName || log.email || '—' %></strong>
+                                            <% if (log.action === 'LOGIN_FAILED' && !log.user && log.email) { %>
+                                            <span class="user-cell-sub"><%= log.email %></span>
+                                            <% } %>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     <% if (log.user?.roleId) { %>
@@ -286,7 +407,31 @@
                                     <% } %>
                                 </td>
                                 <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.ip || '—' %></code></td>
-                                <td class="ua-cell" title="<%= log.userAgent || '' %>"><%= log.userAgent ? log.userAgent.slice(0, 55) + (log.userAgent.length > 55 ? '…' : '') : '—' %></td>
+                                <td title="<%= log.userAgent || '' %>">
+                                    <%
+                                        const _ua = log.userAgent || '';
+                                        let _browser = '—', _os = '';
+                                        if (_ua.includes('Edg/'))           { _browser = 'Edge'; }
+                                        else if (_ua.includes('OPR/') || _ua.includes('Opera')) { _browser = 'Opera'; }
+                                        else if (_ua.includes('Chrome/'))   { _browser = 'Chrome'; }
+                                        else if (_ua.includes('Firefox/'))  { _browser = 'Firefox'; }
+                                        else if (_ua.includes('Safari/') && !_ua.includes('Chrome')) { _browser = 'Safari'; }
+                                        else if (_ua.includes('MSIE') || _ua.includes('Trident')) { _browser = 'IE'; }
+                                        if (_ua.includes('Android'))        { _os = 'Android'; }
+                                        else if (_ua.includes('iPhone') || _ua.includes('iPad')) { _os = 'iOS'; }
+                                        else if (_ua.includes('Windows NT')) { _os = 'Windows'; }
+                                        else if (_ua.includes('Mac OS X'))  { _os = 'Mac'; }
+                                        else if (_ua.includes('Linux'))     { _os = 'Linux'; }
+                                    %>
+                                    <% if (!_ua) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else { %>
+                                    <span style="font-size:.8rem;display:inline-flex;align-items:center;gap:.3rem">
+                                        <span class="material-symbols-outlined" style="font-size:.95rem;color:var(--color-text-secondary)"><%= (_os === 'iOS' || _os === 'Android') ? 'smartphone' : 'computer' %></span>
+                                        <span><%= _browser %><% if (_os) { %> &middot; <span style="color:var(--color-text-secondary)"><%= _os %></span><% } %></span>
+                                    </span>
+                                    <% } %>
+                                </td>
                             </tr>
                             <% }) %>
                         </tbody>
@@ -393,8 +538,15 @@
                                 try { _detail = log.detail ? JSON.parse(log.detail) : {}; } catch(e) { _detail = {}; }
                             %>
                             <tr>
-                                <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
-                                <td><strong><%= log.user?.fullName || '—' %></strong></td>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)">
+                                    <span data-ts="<%= new Date(log.createdAt).toISOString() %>" title="<%= new Date(log.createdAt).toLocaleString('es-AR') %>"><%= new Date(log.createdAt).toLocaleString('es-AR') %></span>
+                                </td>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= _avatarColor(log.user?.fullName) %>"><%= _initials(log.user?.fullName) %></span>
+                                        <strong><%= log.user?.fullName || '—' %></strong>
+                                    </div>
+                                </td>
                                 <td>
                                     <% if (log.user?.roleId) { %>
                                     <span class="badge-role"><%= roleLabels[log.user.roleId] || '—' %></span>
@@ -412,10 +564,27 @@
                                     <span style="font-size:.8rem;color:var(--color-text-secondary)"><%= _entityLabel(log.entity) %></span>
                                     <% if (log.entityId) { %><code style="font-size:.78rem;background:var(--color-bg);padding:.1rem .35rem;border-radius:5px;margin-left:.25rem">#<%= log.entityId %></code><% } %>
                                 </td>
-                                <td style="font-size:.8rem;color:var(--color-text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= JSON.stringify(_detail) %>">
-                                    <% const _keys = Object.keys(_detail); %>
-                                    <% if (_keys.length === 0) { %>—<% } else { %>
-                                    <%= _keys.slice(0,2).map(k => `${k}: ${_detail[k]}`).join(' · ') %><% if (_keys.length > 2) { %> …<% } %>
+                                <td style="font-size:.8rem;max-width:220px;">
+                                    <%
+                                        const _ROLE_NAMES = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' };
+                                        const _RES_LABELS = { PROCEDENTE: 'Procedente', NO_PROCEDENTE: 'No procedente' };
+                                        let _parts = [];
+                                        if (log.entity === 'USER') {
+                                            if (_detail.fullName) { _parts.push(_detail.fullName); }
+                                            if (_detail.email)    { _parts.push(_detail.email); }
+                                            if (_detail.roleId)   { _parts.push(_ROLE_NAMES[_detail.roleId] || 'Rol ' + _detail.roleId); }
+                                        } else if (log.entity === 'SHIPMENT') {
+                                            if (_detail.trackingId) { _parts.push('Tracking: ' + _detail.trackingId); }
+                                        } else if (log.entity === 'INCIDENT') {
+                                            if (_detail.type)       { _parts.push('Tipo: ' + _detail.type); }
+                                            if (_detail.shipmentId) { _parts.push('Envío #' + _detail.shipmentId); }
+                                            if (_detail.resolution) { _parts.push(_RES_LABELS[_detail.resolution] || _detail.resolution); }
+                                        }
+                                    %>
+                                    <% if (_parts.length === 0) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text)" title="<%= _parts.join(' · ') %>"><%= _parts.join(' · ') %></span>
                                     <% } %>
                                 </td>
                                 <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.ip || '—' %></code></td>
@@ -447,33 +616,115 @@
             <div class="audit-card-head">
                 <span class="material-symbols-outlined">history</span>
                 <h2>Cambios de configuración</h2>
-                <span class="badge-count"><%= settingLogs.length %> registros</span>
+                <span class="badge-count"><%= settingCount %> registros</span>
             </div>
             <div class="audit-card-body">
-                <% if (settingLogs.length === 0) { %>
+                <% if (!settingLogs || settingLogs.length === 0) { %>
                 <div class="empty-state">
                     <span class="material-symbols-outlined">tune</span>
                     No hay cambios de configuración registrados.
                 </div>
                 <% } else { %>
+                <%
+                    const _SETTING_LABELS = {
+                        nombre_empresa:            'Nombre de la empresa',
+                        logo_empresa:              'Logo de la empresa',
+                        email_auto_send_enabled:   'Envío automático de emails',
+                        email_resend_enabled:      'Reenvío de emails habilitado',
+                        delay_reminder_days:       'Días para recordatorio de demora',
+                        delay_threshold_pct:       'Umbral de demora (%)',
+                        consent_rejection_limit:   'Límite de rechazo de consentimiento',
+                        notify_recipient:          'Notificar al destinatario',
+                        notify_sender:             'Notificar al remitente',
+                        notify_on_incident:        'Notificar en incidencias',
+                    };
+                    const _settingLabel = (key) => {
+                        if (_SETTING_LABELS[key]) { return _SETTING_LABELS[key]; }
+                        const m = key.match(/^status_color_(\d+)$/);
+                        if (m) { return 'Color de estado ' + m[1]; }
+                        return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    };
+                    const _isColor = (v) => v && /^#[0-9a-fA-F]{3,6}$/.test(v.trim());
+                    const _isImage = (v) => v && /\.(png|jpg|jpeg|gif|webp|svg)/i.test(v);
+                    const _isBool  = (v) => v === '0' || v === '1' || v === 'true' || v === 'false';
+                    const _renderVal = (v) => {
+                        if (!v) { return null; }
+                        if (_isColor(v))  { return 'color:' + v.trim(); }
+                        if (_isImage(v))  { return 'image'; }
+                        if (_isBool(v))   { return (v === '1' || v === 'true') ? 'bool:si' : 'bool:no'; }
+                        return 'text:' + v;
+                    };
+                %>
                 <div class="audit-table-wrap">
                     <table class="audit-table">
                         <thead>
-                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Parámetro</th><th>Valor anterior</th><th>Valor nuevo</th></tr>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Parámetro</th><th>Antes</th><th>Ahora</th></tr>
                         </thead>
                         <tbody>
-                            <% settingLogs.forEach(log => { %>
+                            <% settingLogs.forEach(log => {
+                                const _oldR = _renderVal(log.oldValue);
+                                const _newR = _renderVal(log.newValue);
+                            %>
                             <tr>
                                 <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
                                 <td><strong><%= log.user ? log.user.fullName : 'Sistema' %></strong></td>
-                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.key %></code></td>
-                                <td style="color:var(--color-text-secondary)"><%= log.oldValue || '—' %></td>
-                                <td><strong style="color:var(--color-text)"><%= log.newValue || '—' %></strong></td>
+                                <td>
+                                    <span style="font-size:.82rem;font-weight:500"><%= _settingLabel(log.key) %></span>
+                                    <div style="font-size:.7rem;color:var(--color-text-secondary);margin-top:.1rem"><code style="background:var(--color-bg);padding:.05rem .3rem;border-radius:4px"><%= log.key %></code></div>
+                                </td>
+                                <td>
+                                    <% if (!_oldR) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else if (_oldR.startsWith('color:')) { %>
+                                    <span style="display:inline-flex;align-items:center;gap:.4rem">
+                                        <span style="width:14px;height:14px;border-radius:4px;background:<%= _oldR.slice(6) %>;border:1px solid var(--color-border);display:inline-block"></span>
+                                        <span style="color:var(--color-text-secondary);font-size:.8rem"><%= _oldR.slice(6) %></span>
+                                    </span>
+                                    <% } else if (_oldR === 'image') { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">imagen anterior</span>
+                                    <% } else if (_oldR === 'bool:si') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-success-bg);color:var(--color-success)">Sí</span>
+                                    <% } else if (_oldR === 'bool:no') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-danger-bg);color:var(--color-danger)">No</span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.85rem"><%= _oldR.slice(5) %></span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (!_newR) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else if (_newR.startsWith('color:')) { %>
+                                    <span style="display:inline-flex;align-items:center;gap:.4rem">
+                                        <span style="width:14px;height:14px;border-radius:4px;background:<%= _newR.slice(6) %>;border:1px solid var(--color-border);display:inline-block"></span>
+                                        <strong style="font-size:.8rem"><%= _newR.slice(6) %></strong>
+                                    </span>
+                                    <% } else if (_newR === 'image') { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">imagen nueva</span>
+                                    <% } else if (_newR === 'bool:si') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-success-bg);color:var(--color-success)">Sí</span>
+                                    <% } else if (_newR === 'bool:no') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-danger-bg);color:var(--color-danger)">No</span>
+                                    <% } else { %>
+                                    <strong style="font-size:.85rem"><%= _newR.slice(5) %></strong>
+                                    <% } %>
+                                </td>
                             </tr>
                             <% }) %>
                         </tbody>
                     </table>
                 </div>
+                <!-- Paginación configuración -->
+                <% if (settingPages > 1) { %>
+                <div class="pagination">
+                    <span class="pagination-info">Página <%= settingPage %> de <%= settingPages %> (<%= settingCount %> registros)</span>
+                    <a href="/auditoria?settingPage=<%= settingPage - 1 %>" class="btn-filter" <%- settingPage <= 1 ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        <span class="material-symbols-outlined">chevron_left</span> Anterior
+                    </a>
+                    <a href="/auditoria?settingPage=<%= settingPage + 1 %>" class="btn-filter" <%- settingPage >= settingPages ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        Siguiente <span class="material-symbols-outlined">chevron_right</span>
+                    </a>
+                </div>
+                <% } %>
                 <% } %>
             </div>
         </div>
@@ -482,5 +733,21 @@
     </main>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const now = new Date();
+            document.querySelectorAll('[data-ts]').forEach(el => {
+                const ts = new Date(el.dataset.ts);
+                const diff = Math.floor((now - ts) / 1000);
+                let rel;
+                if (diff < 60)           { rel = 'hace un momento'; }
+                else if (diff < 3600)    { rel = 'hace ' + Math.floor(diff / 60) + ' min'; }
+                else if (diff < 86400)   { rel = 'hace ' + Math.floor(diff / 3600) + ' h'; }
+                else if (diff < 604800)  { rel = 'hace ' + Math.floor(diff / 86400) + ' días'; }
+                else                     { return; }
+                el.textContent = rel;
+            });
+        });
+    </script>
 </body>
 </html>

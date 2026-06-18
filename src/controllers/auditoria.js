@@ -9,6 +9,7 @@ const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r
 const getAuditoria = async (req, res) => {
     const sessionPage = Math.max(1, parseInt(req.query.sessionPage) || 1);
     const actionPage  = Math.max(1, parseInt(req.query.actionPage)  || 1);
+    const settingPage = Math.max(1, parseInt(req.query.settingPage) || 1);
 
     const sessionFilters = {
         userId: req.query.userId || undefined,
@@ -16,7 +17,7 @@ const getAuditoria = async (req, res) => {
         from:   req.query.from   || undefined,
         to:     req.query.to     || undefined,
         page:   sessionPage,
-        limit:  50,
+        limit:  15,
     };
 
     const actionFilters = {
@@ -25,16 +26,31 @@ const getAuditoria = async (req, res) => {
         from:   req.query.from    || undefined,
         to:     req.query.to      || undefined,
         page:   actionPage,
-        limit:  50,
+        limit:  15,
     };
 
-    const [sessionResult, actionResult, settingLogs, activeUsers, users] = await Promise.all([
+    const [sessionResult, actionResult, settingResult, activeUsers, users, failedCount, activityRows] = await Promise.all([
         loginLogModel.getAll(sessionFilters).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
         actionLogModel.getAll(actionFilters).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
-        settingLogModel.getAll().catch(() => []),
+        settingLogModel.getAll({ page: settingPage, limit: 15 }).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
         loginLogModel.getActiveUsers().catch(() => []),
         userModel.getAll().catch(() => []),
+        loginLogModel.getFailedByAccount({ hours: 24, minAttempts: 3 }).catch(() => []),
+        loginLogModel.getActivityByDay({ days: 7 }).catch(() => []),
     ]);
+
+    const activityMap = {};
+    for (const row of activityRows) { activityMap[String(row.day).slice(0, 10)] = row.total; }
+    const activity = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        activity.push({
+            label: d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' }),
+            total: activityMap[key] || 0,
+        });
+    }
 
     res.render('auditoria/index', {
         loginLogs:    sessionResult.rows,
@@ -47,11 +63,16 @@ const getAuditoria = async (req, res) => {
         actionPage:   actionResult.page,
         actionPages:  actionResult.pages,
 
-        settingLogs,
+        settingLogs:   settingResult.rows,
+        settingCount:  settingResult.count,
+        settingPage:   settingResult.page,
+        settingPages:  settingResult.pages,
         activeUsers,
         users,
         auditFilters: { ...sessionFilters, aUserId: actionFilters.userId, entity: actionFilters.entity },
         roleLabels: ROLE_LABELS,
+        failedAccounts: failedCount,
+        activity,
     });
 };
 
@@ -66,7 +87,7 @@ const exportCsv = async (req, res) => {
         };
         const [sessionResult, settingLogs, actionResult] = await Promise.all([
             loginLogModel.getAll(filters).catch(() => ({ rows: [] })),
-            settingLogModel.getAll().catch(() => []),
+            settingLogModel.getAll({ page: 1, limit: 5000 }).catch(() => ({ rows: [] })),
             actionLogModel.getAll({ limit: 5000 }).catch(() => ({ rows: [] })),
         ]);
 
@@ -74,7 +95,7 @@ const exportCsv = async (req, res) => {
         for (const l of sessionResult.rows) {
             rows.push(['Sesión', new Date(l.createdAt).toLocaleString('es-AR'), l.user?.fullName || l.email || 'Desconocido', l.action, '', l.ip || '', l.userAgent || '']);
         }
-        for (const l of settingLogs) {
+        for (const l of settingLogs.rows) {
             rows.push(['Configuración', new Date(l.changedAt).toLocaleString('es-AR'), l.user?.fullName || 'Sistema', l.key, `${l.oldValue || ''} → ${l.newValue || ''}`, '', '']);
         }
         for (const l of actionResult.rows) {

@@ -72,4 +72,31 @@ const getActiveUsers = async () => {
     return Object.values(latest).filter(l => l.action === 'LOGIN');
 };
 
-module.exports = { LoginLog, record, getAll, getActiveUsers };
+const getFailedByAccount = async ({ hours = 24, minAttempts = 3 } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const rows = await sequelize.query(
+        `SELECT COALESCE(email, 'desconocido') AS email, COUNT(*)::int AS attempts
+         FROM logitrack.login_log
+         WHERE action = 'LOGIN_FAILED' AND created_at >= :since
+         GROUP BY email
+         HAVING COUNT(*) >= :min
+         ORDER BY attempts DESC`,
+        { type: QueryTypes.SELECT, replacements: { since, min: minAttempts } }
+    );
+    return rows;
+};
+
+const getActivityByDay = async ({ days = 7 } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    return await sequelize.query(
+        `SELECT DATE(created_at AT TIME ZONE 'America/Argentina/Buenos_Aires') AS day, COUNT(*)::int AS total
+         FROM logitrack.login_log
+         WHERE action = 'LOGIN' AND created_at >= :since
+         GROUP BY day ORDER BY day`,
+        { type: QueryTypes.SELECT, replacements: { since } }
+    );
+};
+
+module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay };
