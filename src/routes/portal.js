@@ -8,7 +8,7 @@ const {
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
     getShipmentList, getShipmentDetail, getManageForm, postManageForm,
-    getIncidentList, getIncidentDetail, postIncidentResponse, postDamageChoice, getIncidentAttachment,
+    getIncidentList, getIncidentDetail, postIncidentResponse, postDamageChoice, postDamageDecline, getIncidentAttachment,
     getSurveyList, getSurveyForm, postSurvey, getPublicSurveyForm, postPublicSurvey,
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
@@ -78,6 +78,7 @@ router.get('/portal/mis-envios/incidencias',        requirePortalClient, getInci
 router.get('/portal/mis-envios/incidencia/:id',     requirePortalClient, getIncidentDetail);
 router.post('/portal/mis-envios/incidencia/:id/responder', requirePortalClient, portalEvidenceUpload, postIncidentResponse);
 router.post('/portal/mis-envios/incidencia/:id/eleccion',  requirePortalClient, postDamageChoice);
+router.post('/portal/mis-envios/incidencia/:id/no-devolucion', requirePortalClient, postDamageDecline);
 router.get('/portal/mis-envios/incidencia/:id/adjunto/:attId', requirePortalClient, getIncidentAttachment);
 router.get('/portal/mis-envios/encuestas',                    requirePortalClient, getSurveyList);
 router.get('/portal/mis-envios/encuesta/:shipmentId',         requirePortalClient, getSurveyForm);

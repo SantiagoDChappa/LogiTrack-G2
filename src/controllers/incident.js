@@ -823,6 +823,19 @@ const setResolution = async (req, res) => {
                         userId:     user.id,
                     });
                 }
+                // [prototype] Devolución aprobada: el envío pasa a "Devuelto" (igual que el flujo RETURN).
+                const ship = await shipmentModel.getById(incident.shipmentId);
+                if (ship && ship.statusId !== Status.RETURNED.id) {
+                    await shipmentModel.updateStatus(ship.id, Status.RETURNED.id);
+                    await shipmentHistoryModel.create({
+                        shipmentId:   ship.id,
+                        fromStatusId: ship.statusId,
+                        toStatusId:   Status.RETURNED.id,
+                        eventType:    ShipmentHistoryEvent.STATUS_CHANGE,
+                        comment:      `Devolución por paquete dañado (incidencia #${id}) procedente: envío marcado como Devuelto.`,
+                        userId:       user.id,
+                    });
+                }
             } else if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMPLAZO') {
                 const r = await require('../services/replacementService')
                     .generate({ originalShipmentId: incident.shipmentId });

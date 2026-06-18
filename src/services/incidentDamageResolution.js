@@ -27,39 +27,10 @@ async function setChoice({ incidentId, choice, by, userId, personId }) {
         personId:  personId || null,
     });
 
-    // Impacto en el envío (best-effort: no rompe el registro de la elección).
-    // Solo actúa si la decisión cambió, para no duplicar (cancelar de nuevo / crear 2 reemplazos).
-    if (c !== prev) {
-        try { await applyChoiceToShipment({ shipmentId: incident.shipmentId, choice: c, by, userId }); }
-        catch (e) { console.warn('[damage] applyChoiceToShipment:', e.message); }
-    }
+    // [prototype] La solicitud de devolución del cliente NO cambia el estado del envío:
+    // queda PENDIENTE de aprobación del supervisor. Al marcar la incidencia PROCEDENTE,
+    // el supervisor genera la nota de crédito y el envío pasa a "Devuelto" (ver controllers/incident.js).
     return incident;
-}
-
-// REEMBOLSO → el envío se cancela (no se reenvía). El reemplazo fue eliminado.
-async function applyChoiceToShipment({ shipmentId, choice, by, userId }) {
-    const shipmentModel = require('../models/shipment');
-    const { Shipment } = shipmentModel;
-    const shipmentHistoryModel = require('../models/shipmentHistory');
-    const { Status, NotificationEvent } = require('../constants/enums');
-    const sh = await Shipment.findByPk(shipmentId);
-    if (!sh) { return; }
-
-    if (choice === 'REEMBOLSO') {
-        if (sh.statusId === Status.CANCELLED.id) { return; }
-        const fromStatusId = sh.statusId;
-        await Shipment.update({ statusId: Status.CANCELLED.id }, { where: { id: shipmentId } });
-        await shipmentHistoryModel.create({
-            shipmentId, fromStatusId, toStatusId: Status.CANCELLED.id,
-            comment: `Envío cancelado por reembolso (paquete dañado)${by ? ' — solicitado por ' + by : ''}.`,
-            userId: userId || null, eventType: 'STATUS_CHANGE',
-        });
-        try {
-            require('../controllers/shipment')
-                .notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipmentId).catch(() => {});
-        } catch { /* notif best-effort */ }
-        return;
-    }
 }
 
 function getChoice(incident) { return incident ? incident.damageChoice || null : null; }

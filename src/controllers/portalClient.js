@@ -334,9 +334,11 @@ const getIncidentDetail = async (req, res) => {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
         incident: await loadIncidentDetailViewModel(incident),
-        damage: { isDamage, choice: incident.damageChoice || null, options: damageSvc.CHOICES, closed: !!incident.closedAt },
+        damage: { isDamage, choice: incident.damageChoice || null, options: damageSvc.CHOICES, closed: !!incident.closedAt, resolution: incident.resolution || null },
         flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.'
-            : (req.query.choice ? 'Registramos tu elección. Queda pendiente de aprobación del supervisor; cuando la apruebe, la ejecutamos.' : null),
+            : req.query.choice ? 'Registramos tu solicitud de devolución. Queda pendiente de aprobación del supervisor; cuando la apruebe, te emitimos la nota de crédito y marcamos el envío como Devuelto.'
+            : req.query.declined === '1' ? 'Registramos que no solicitás la devolución.'
+            : null,
         error: req.query.error ? String(req.query.error) : null,
     });
 };
@@ -359,6 +361,39 @@ const postDamageChoice = async (req, res) => {
             by: res.locals.portalClient?.email || res.locals.portalClient?.document || null,
         });
         return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?choice=1`);
+    } catch (e) {
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?error=${encodeURIComponent(e.message)}`);
+    }
+};
+
+// [prototype] El remitente decide NO solicitar la devolución → la incidencia se marca
+// NO_PROCEDENTE (sin cerrar: el supervisor puede revisarla). No genera nota de crédito
+// ni cambia el estado del envío.
+const postDamageDecline = async (req, res) => {
+    const incidentId = Number(req.params.id);
+    const incident = await loadOwnedIncident(incidentId, res.locals.portalClient);
+    if (!incident) {
+        return res.status(404).render('portal/misEnviosConfirmError', {
+            support: await getSupportInfo(),
+            error: 'Incidencia no encontrada.',
+        });
+    }
+    try {
+        if (incident.closedAt) { throw new Error('La incidencia ya fue cerrada'); }
+        const { Incident } = require('../models/incident');
+        const incidentHistory = require('../models/incidentHistory');
+        const { IncidentResolution, IncidentEventType } = require('../constants/enums');
+        const by = res.locals.portalClient?.email || res.locals.portalClient?.document || null;
+
+        await Incident.update({ resolution: IncidentResolution.NO_PROCEDENTE }, { where: { id: incidentId } });
+        await incidentHistory.create({
+            incidentId,
+            eventType: IncidentEventType.COMMENT,
+            fromValue: incident.resolution || null,
+            toValue:   IncidentResolution.NO_PROCEDENTE,
+            comment:   `El remitente indicó que NO solicita la devolución${by ? ' (' + by + ')' : ''}. Incidencia marcada como no procedente.`,
+        });
+        return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?declined=1`);
     } catch (e) {
         return res.redirect(`/portal/mis-envios/incidencia/${incidentId}?error=${encodeURIComponent(e.message)}`);
     }
@@ -614,6 +649,7 @@ module.exports = {
     getIncidentDetail,
     postIncidentResponse,
     postDamageChoice,
+    postDamageDecline,
     getIncidentAttachment,
     getSurveyList,
     getSurveyForm,
