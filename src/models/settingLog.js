@@ -26,14 +26,17 @@ const logChange = async (userId, key, oldValue, newValue) => {
     return await SettingLog.create({ userId, key, oldValue, newValue });
 };
 
-const getAll = async () => {
+const getAll = async ({ page = 1, limit = 10 } = {}) => {
     setupAssociations();
     const { User } = require('./user');
-    return await SettingLog.findAll({
+    const offset = (Math.max(1, page) - 1) * limit;
+    const { count, rows } = await SettingLog.findAndCountAll({
         include: [{ model: User, as: 'user', required: false }],
         order: [['changedAt', 'DESC']],
-        limit: 50
+        limit,
+        offset,
     });
+    return { rows, count, page: Number(page), pages: Math.ceil(count / limit) };
 };
 
 module.exports = { SettingLog, logChange, getAll };

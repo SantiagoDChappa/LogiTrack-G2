@@ -13,6 +13,7 @@ const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+const actionLogModel = require('../models/actionLog');
 
 // Default ETA si el operador no carga fecha estimada al crear/modificar.
 // Express → +2 días, Standard → +5, sin tipo → +3. Devuelve 'YYYY-MM-DD' (DATEONLY).
@@ -524,6 +525,7 @@ const createShipment = async (req, res) => {
 
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
 
+        actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'SHIPMENT', shipment.id, { trackingId: shipment.trackingId }, req);
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
@@ -766,6 +768,7 @@ const updateShipment = async (req, res) => {
                 await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
             });
         }
+        actionLogModel.record(res.locals.currentUser?.id, 'UPDATE', 'SHIPMENT', shipment.id, null, req);
         res.redirect('/shipment?success=2');
     } catch (err) {
         console.error('ERROR updateShipment:', err.message);
@@ -911,6 +914,7 @@ const cancelShipment = async (req, res) => {
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipment);
 */
+        actionLogModel.record(res.locals.currentUser?.id, 'CANCEL', 'SHIPMENT', Number(id), null, req);
         res.redirect(`/shipment/update/${id}?success=5`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);

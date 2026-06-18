@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Dashboard Supervisor</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <style>
+        .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; }
+        .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
+        .dash-kpi__value { font-size:2rem; font-weight:700; line-height:1; }
+        .dash-kpi__value--warn { color:#e07b00; }
+        .dash-kpi__value--ok { color:var(--color-success,#2e7d32); }
+        .dash-kpi__value--danger { color:var(--color-danger,#c62828); }
+        .dash-section-title { font-size:1rem; font-weight:600; margin:1.5rem 0 .75rem; }
+        .dash-alert-badge { display:inline-block; padding:.2rem .6rem; border-radius:4px; font-size:.8rem; font-weight:600;
+                            background:rgba(200,50,50,.12); color:#c62828; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Dashboard Supervisor — Control operativo</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/dashboard/supervisor" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/dashboard/supervisor" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+
+            <!-- KPIs rápidos -->
+            <div class="dash-kpi-grid">
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Total envíos</div>
+                    <div class="dash-kpi__value"><%= kpis.total %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Entregados</div>
+                    <div class="dash-kpi__value dash-kpi__value--ok"><%= kpis.delivered %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">En tránsito</div>
+                    <div class="dash-kpi__value"><%= kpis.in_transit %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Con demora activa</div>
+                    <div class="dash-kpi__value <%= kpis.delayed_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.delayed_count %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">OTIF</div>
+                    <div class="dash-kpi__value <%= kpis.otif_pct !== null && kpis.otif_pct >= 85 ? 'dash-kpi__value--ok' : kpis.otif_pct !== null && kpis.otif_pct >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
+                    </div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Delta prom.</div>
+                    <div class="dash-kpi__value <%= kpis.avg_delta !== null && kpis.avg_delta <= 0.3 ? 'dash-kpi__value--ok' : kpis.avg_delta !== null && kpis.avg_delta <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.avg_delta !== null ? (kpis.avg_delta > 0 ? '+' : '') + kpis.avg_delta + 'd' : '—' %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Envíos demorados -->
+            <% if (delayedShipments.length > 0) { %>
+            <div class="report-card">
+                <div class="dp-table-header">
+                    <h2>Envíos con demora activa <span class="dash-alert-badge"><%= delayedShipments.length %> alerta<%= delayedShipments.length !== 1 ? 's' : '' %></span></h2>
+                </div>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Tracking</th>
+                            <th>Zona</th>
+                            <th>Repartidor</th>
+                            <th class="text-right">Fecha comprometida</th>
+                            <th class="text-right">Días de atraso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% delayedShipments.forEach(s => { %>
+                        <tr>
+                            <td><a href="/shipment/<%= s.id %>"><%= s.trackingId %></a></td>
+                            <td><%= s.zone_name || '—' %></td>
+                            <td><%= s.driver_name || '—' %></td>
+                            <td class="text-right"><%= s.expectedDeliveryDate %></td>
+                            <td class="text-right"><span class="ot-badge ot-badge--red">+<%= s.days_overdue %> día<%= s.days_overdue !== 1 ? 's' : '' %></span></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+
+            <!-- Top 5 zonas con más fallos -->
+            <% if (topFailingZones.length > 0) { %>
+            <div class="report-card">
+                <h2>Top zonas con mayor tasa de fallo</h2>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Zona</th>
+                            <th class="text-right">Envíos</th>
+                            <th class="text-right">Intentos fallidos</th>
+                            <th class="text-right">Tasa</th>
+                            <th>Intensidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% topFailingZones.forEach(z => { %>
+                            <%
+                                const cls = z.failure_rate >= 15 ? 'ot-badge--red' : z.failure_rate >= 8 ? 'ot-badge--amber' : 'ot-badge--green';
+                                const lbl = z.failure_rate >= 15 ? 'Alta' : z.failure_rate >= 8 ? 'Media' : 'Baja';
+                            %>
+                        <tr>
+                            <td><%= z.zone_name %></td>
+                            <td class="text-right"><%= z.total_shipments %></td>
+                            <td class="text-right"><span class="ot-badge <%= cls %>"><%= z.failed_attempts %></span></td>
+                            <td class="text-right"><%= z.failure_rate %>%</td>
+                            <td><span class="ot-badge <%= cls %>"><%= lbl %></span></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+
+            <!-- Predicción vs Realidad por chofer -->
+            <% if (driverPvr.length > 0) { %>
+            <div class="report-card">
+                <h2>Predicción vs. Realidad — por repartidor</h2>
+                <table class="report-table" id="sup-driver-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-col="driver_name">Repartidor <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="total">Entregas <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_predicted">Estimado (días) <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_actual">Real (días) <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_delta">Delta <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="otif_pct">OTIF <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="sup-driver-tbody">
+                        <% driverPvr.forEach(d => { %>
+                        <tr
+                            data-driver_name="<%= d.driver_name %>"
+                            data-total="<%= d.total %>"
+                            data-avg_predicted="<%= d.avg_predicted %>"
+                            data-avg_actual="<%= d.avg_actual %>"
+                            data-avg_delta="<%= d.avg_delta %>"
+                            data-otif_pct="<%= d.otif_pct %>"
+                        >
+                            <td>
+                                <div class="dp-driver-cell">
+                                    <div class="dp-avatar"><%= (d.driver_name || '?').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
+                                    <%= d.driver_name || '—' %>
+                                </div>
+                            </td>
+                            <td class="text-right count-cell"><%= d.total %></td>
+                            <td class="text-right"><%= d.avg_predicted %>d</td>
+                            <td class="text-right"><%= d.avg_actual %>d</td>
+                            <td class="text-right">
+                                <%
+                                    const delta = d.avg_delta || 0;
+                                    const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                                %>
+                                <span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span>
+                            </td>
+                            <td class="text-right">
+                                <div class="dp-pct-cell">
+                                    <div class="dp-pct-bar-track">
+                                        <div class="dp-pct-bar-fill <%= (d.otif_pct || 0) >= 85 ? 'fill--green' : (d.otif_pct || 0) >= 70 ? 'fill--amber' : 'fill--red' %>"
+                                             style="width:<%= d.otif_pct || 0 %>%"></div>
+                                    </div>
+                                    <span class="dp-pct-label"><%= d.otif_pct || 0 %>%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+
+            <!-- Resumen por estado -->
+            <% if (statusSummary.length > 0) { %>
+            <div class="report-card">
+                <h2>Distribución por estado</h2>
+                <table class="report-table">
+                    <thead><tr><th>Estado</th><th class="text-right">Cantidad</th></tr></thead>
+                    <tbody>
+                        <% statusSummary.forEach(s => { %><tr><td><%= s.status_label %></td><td class="text-right"><%= s.total %></td></tr><% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value, to = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                if (!this.querySelector('.report-alert')) {
+                    const a = document.createElement('div');
+                    a.className = 'report-alert report-alert--error';
+                    a.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', a);
+                }
+            }
+        });
+        (function () {
+            const tbody = document.getElementById('sup-driver-tbody');
+            if (!tbody) return;
+            let lastCol = null, asc = true;
+            document.querySelectorAll('#sup-driver-table th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', () => {
+                    const col = th.dataset.col;
+                    if (lastCol === col) { asc = !asc; } else { asc = col === 'driver_name'; }
+                    lastCol = col;
+                    document.querySelectorAll('#sup-driver-table .sort-icon').forEach(i => i.textContent = '↕');
+                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        const va = a.dataset[col], vb = b.dataset[col];
+                        const cmp = col === 'driver_name' ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
+                        return asc ? cmp : -cmp;
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

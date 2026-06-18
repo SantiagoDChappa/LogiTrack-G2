@@ -1,0 +1,1 @@
+ALTER TABLE logitrack.login_log ADD COLUMN IF NOT EXISTS email VARCHAR(255);

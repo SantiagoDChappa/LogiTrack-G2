@@ -1910,19 +1910,139 @@
 
             <% if (activeSection === 'auditoria') { %>
             <span class="settings-anchor" id="sec-auditoria"></span>
+            <style>
+                .audit-action-badge { font-size:.75rem;font-weight:600;padding:.15rem .5rem;border-radius:999px;display:inline-block; }
+                .audit-action-login  { background:#d1fae5;color:#065f46; }
+                .audit-action-logout { background:var(--color-surface);color:var(--color-text-secondary);border:1px solid var(--color-border); }
+            </style>
             <section class="settings-category" id="cat-auditoria">
-                <span class="material-symbols-outlined">history</span>
-                <div><h3>Auditoría</h3><p>Registro de cambios de configuración.</p></div>
+                <span class="material-symbols-outlined">manage_search</span>
+                <div><h3>Auditoría y trazabilidad</h3><p>Registro de sesiones, acciones y cambios de configuración.</p></div>
             </section>
 
+            <%
+                const _activeNow = (activeUsers || []).filter(l => {
+                    // Filtra el último login por usuario, descarta los que luego hicieron logout
+                    return true;
+                });
+                const _activeByUser = {};
+                for (const l of _activeNow) {
+                    const uid = l.userId;
+                    if (!_activeByUser[uid]) { _activeByUser[uid] = l; }
+                }
+                const _activeList = Object.values(_activeByUser);
+            %>
+
+            <!-- Usuarios activos -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">group</span>
+                    Usuarios activos (últimas 8 h)
+                </h2>
+                <% if (_activeList.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">Ningún usuario registró actividad reciente.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Usuario</th><th>Email</th><th>Último ingreso</th><th>IP</th></tr></thead>
+                        <tbody>
+                            <% _activeList.forEach(l => { %>
+                            <tr>
+                                <td><%= l.user?.fullName || '—' %></td>
+                                <td><%= l.user?.email || '—' %></td>
+                                <td><%= new Date(l.createdAt).toLocaleString('es-AR') %></td>
+                                <td><code><%= l.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Filtros + Export -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">filter_list</span>
+                    Log de sesiones
+                </h2>
+                <form method="GET" action="/setting/auditoria" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1rem;">
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Usuario</label>
+                        <select name="userId" style="min-width:160px">
+                            <option value="">Todos</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.userId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Acción</label>
+                        <select name="action">
+                            <option value="">Todas</option>
+                            <option value="LOGIN"  <%= auditFilters.action === 'LOGIN'  ? 'selected' : '' %>>Login</option>
+                            <option value="LOGOUT" <%= auditFilters.action === 'LOGOUT' ? 'selected' : '' %>>Logout</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Desde</label>
+                        <input type="date" name="from" value="<%= auditFilters.from || '' %>">
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Hasta</label>
+                        <input type="date" name="to" value="<%= auditFilters.to || '' %>">
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Filtrar</button>
+                    <a href="/setting/auditoria" class="btn btn-ghost">Limpiar</a>
+                    <a href="/setting/auditoria/export-csv?<%= new URLSearchParams(auditFilters).toString() %>" class="btn btn-secondary" style="margin-left:auto">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">download</span>
+                        Exportar CSV
+                    </a>
+                </form>
+
+                <% if (!loginLogs || loginLogs.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay registros para los filtros seleccionados.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Usuario</th>
+                                <th>Acción</th>
+                                <th>IP</th>
+                                <th>Dispositivo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% loginLogs.forEach(log => { %>
+                            <tr>
+                                <td><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= log.user?.fullName || '—' %></td>
+                                <td>
+                                    <span class="audit-action-badge audit-action-<%= log.action.toLowerCase() %>">
+                                        <%= log.action %>
+                                    </span>
+                                </td>
+                                <td><code><%= log.ip || '—' %></code></td>
+                                <td style="font-size:.75rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= log.userAgent || '' %>">
+                                    <%= log.userAgent ? log.userAgent.slice(0, 60) + (log.userAgent.length > 60 ? '…' : '') : '—' %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Historial de cambios de configuración -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">history</span>
                     Historial de cambios de configuración
                 </h2>
-                <p class="settings-subtitle">
-                    Registro de los últimos 50 cambios realizados por administradores.
-                </p>
+                <p class="settings-subtitle">Últimos 50 cambios realizados por administradores.</p>
                 <% if (settingLogs.length === 0) { %>
                     <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay cambios registrados.</p>
                 <% } else { %>
@@ -1943,8 +2063,8 @@
                                 <td><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
                                 <td><%= log.user ? log.user.fullName : 'Sistema' %></td>
                                 <td><code><%= log.key %></code></td>
-                                <td><%= log.oldValue || '-' %></td>
-                                <td><strong><%= log.newValue || '-' %></strong></td>
+                                <td><%= log.oldValue || '—' %></td>
+                                <td><strong><%= log.newValue || '—' %></strong></td>
                             </tr>
                             <% }) %>
                         </tbody>

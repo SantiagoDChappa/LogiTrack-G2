@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 const {
     Shipment, Person, Status,
     Route, Transport, User, Branch,
-    ShipmentReturn,
+    Incident, IncidentType,
 } = require('../models/index');
 const incidentModel = require('../models/incident');
 
@@ -39,7 +39,6 @@ const buildIncidentFilters = (roleId, userId, branchId, q, numeric) => {
 };
 
 const INCIDENT_STATUS_LABEL = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
-const RETURN_STATUS_LABEL   = { SOLICITADA: 'Solicitada', EN_REVISION: 'En revisión', RESUELTA: 'Resuelta', RECHAZADA: 'Rechazada' };
 const ROLE_LABEL             = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' };
 const ROUTE_STATUS_LABEL     = {
     [RouteStatus.PLANNED]:         'Planificada',
@@ -174,14 +173,21 @@ const search = async (req, res) => {
             });
         }
 
-        // ── Returns (Supervisor + Admin) ─────────────────────────────────────
+        // ── Returns (Supervisor + Admin) — incidencias tipo RETURN ───────────
         let returnsPromise = Promise.resolve([]);
         if (role === RoleType.SUPERVISOR.id || role === RoleType.ADMIN.id) {
             const retShipmentWhere = { trackingId: like };
             if (role === RoleType.SUPERVISOR.id && branchId) retShipmentWhere.currentBranchId = branchId;
-            returnsPromise = ShipmentReturn.findAll({
+            returnsPromise = Incident.findAll({
                 include: [
-                    { model: Shipment, as: 'shipment', required: true, where: retShipmentWhere, attributes: ['id', 'trackingId'] },
+                    {
+                        model: Shipment, as: 'shipment', required: true,
+                        where: retShipmentWhere, attributes: ['id', 'trackingId'],
+                    },
+                    {
+                        model: IncidentType, as: 'type', required: true,
+                        where: { code: 'RETURN' }, attributes: ['code'],
+                    },
                 ],
                 attributes: ['id', 'status', 'shipmentId'],
                 order: [['id', 'DESC']],
@@ -233,7 +239,7 @@ const search = async (req, res) => {
             returns: returnsRaw.filter(Boolean).map(r => ({
                 id:        r.id,
                 trackingId: r.shipment?.trackingId || null,
-                status:    RETURN_STATUS_LABEL[r.status] || r.status,
+                status:    INCIDENT_STATUS_LABEL[r.status] || r.status,
             })),
             users: usersRaw.filter(Boolean).map(u => ({
                 id:       u.id,

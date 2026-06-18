@@ -3,6 +3,7 @@ const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 const branchModel = require('../models/branch');
 const { RoleType } = require('../constants/enums');
+const loginLogModel = require('../models/loginLog');
 const crypto = require('crypto');
 const trustedDeviceModel = require('../models/trustedDevice');
 const sha256 = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -125,15 +126,18 @@ const login = async (req, res) => {
 
     const user = await userModel.findByEmail(email);
     if(!user){
+        loginLogModel.record(null, 'LOGIN_FAILED', req, email);
         return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts() });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if(!match){
+        loginLogModel.record(null, 'LOGIN_FAILED', req, email);
         return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts() });
     }
 
     const remember = !!req.body.remember;
+    loginLogModel.record(user.id, 'LOGIN', req);
     const rawReturn = req.body.returnTo;
     const returnTo  = typeof rawReturn === 'string' ? rawReturn : (Array.isArray(rawReturn) ? rawReturn[0] : null);
     const safeReturn = typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
@@ -162,6 +166,13 @@ const login = async (req, res) => {
 };
 
 const logout = (req, res) => {
+    try {
+        const token = req.cookies?.token;
+        if (token) {
+            const decoded = JWT.verify(token, process.env.JWT_SECRET);
+            if (decoded?.id) { loginLogModel.record(decoded.id, 'LOGOUT', req); }
+        }
+    } catch { /* token inválido o expirado, igual hacemos logout */ }
     res.clearCookie('token');
     res.clearCookie('pre2fa');
     res.clearCookie('pre2fa_setup');

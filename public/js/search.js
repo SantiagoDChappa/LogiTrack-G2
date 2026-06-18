@@ -42,7 +42,7 @@
           }
         },
         { key: 'returns',    label: 'Devoluciones', icon: 'assignment_return',
-          urlFn: function (r) { return '/returns/' + r.id; },
+          urlFn: function (r) { return '/incident/' + r.id; },
           primaryFn:   function (r) { return 'Devolución #' + r.id + (r.trackingId ? ' · ' + r.trackingId : ''); },
           secondaryFn: function (r) { return r.status || ''; }
         },
