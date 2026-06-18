@@ -20,3 +20,10 @@
 <%# #4 PWA / modo offline del repartidor (el script se autolimita a /delivery) %>
 <link rel="manifest" href="/manifest.webmanifest">
 <script src="/js/offline-delivery.js?v=<%= assetVersion %>" defer></script>
+<% if (typeof currentUser !== 'undefined' && currentUser) { %>
+<script>window.__LGT={userId:<%= currentUser.id %>,roleId:<%= currentUser.roleId %>,onboarded:<%= currentUser.onboarded ? 'true' : 'false' %>};</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.css"/>
+<link rel="stylesheet" href="/css/onboarding-tour.css?v=<%= assetVersion %>">
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.js.iife.js"></script>
+<script src="/js/onboarding-tour.js?v=<%= assetVersion %>" defer></script>
+<% } %>
