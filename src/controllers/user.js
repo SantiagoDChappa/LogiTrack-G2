@@ -1,6 +1,7 @@
-const userModel   = require('../models/user');
-const branchModel = require('../models/branch');
-const { RoleType } = require('../constants/enums');
+const userModel      = require('../models/user');
+const branchModel    = require('../models/branch');
+const { RoleType }   = require('../constants/enums');
+const actionLogModel = require('../models/actionLog');
 const { generateTempPassword } = require('../utils/password');
 
 const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
@@ -39,6 +40,7 @@ const createUser = async (req, res) => {
     // Se muestra una sola vez en la pantalla de éxito para que el admin se la pase al usuario.
     const tempPassword = generateTempPassword();
     const createdUser = await userModel.create({ ...body, password: tempPassword, mustChangePassword: true });
+    actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'USER', createdUser?.id, { fullName: body.fullName, email: body.email, roleId: body.roleId }, req);
     return res.render('user/created', { createdUser, tempPassword });
   } catch (err) {
     console.error('ERROR createUser:', err.message);
@@ -108,6 +110,7 @@ const updateUser = async (req, res) => {
       data.driverUnavailableUntil  = null;
     }
     await userModel.update(req.params.id, data);
+    actionLogModel.record(res.locals.currentUser?.id, 'UPDATE', 'USER', Number(req.params.id), { fullName: data.fullName }, req);
     res.redirect('/user?success=2');
   } catch (err) {
     console.error('ERROR updateuser:', err.message);
@@ -118,7 +121,9 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
+    const deletedId = Number(req.params.id);
     await userModel.deleteById(req.params.id);
+    actionLogModel.record(res.locals.currentUser?.id, 'DELETE', 'USER', deletedId, null, req);
     res.redirect('/user?success=3');
   } catch (err) {
     console.error('ERROR deleteUser:', err.message);

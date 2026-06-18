@@ -40,8 +40,6 @@ const Shipment = sequelize.define('shipment', {
     // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
     portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
     // NFAL07 (LGT-158) — link accionable de un solo uso + vencimiento.
-    // Lo "arma" el envío de un aviso accionable (intento fallido / demora / devolución):
-    // setea expiresAt y limpia usedAt. Al reprogramar desde el link se marca usedAt.
     portalTokenUsedAt:    { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_used_at' },
     portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
     // Sprint 4 - Notificación de demora (LGT-160)

@@ -19,6 +19,7 @@ const incidentTypeModel = require('../models/incidentType');
 const incidentNotifConfig = require('../services/incidentNotifConfig');
 const statusModel = require('../models/status');
 const statusColors = require('../services/statusColors');
+const loginLogModel = require('../models/loginLog');
 
 // LGT-174: secciones de Ajustes (cada una es su propia página, navegada desde el menú).
 const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'incidencias', 'auditoria'];
@@ -31,9 +32,16 @@ function settingBack(req, suffix = '') {
 }
 
 const getSettings = async (req, res) => {
+    const auditFilters = req.params.section === 'auditoria' ? {
+        userId: req.query.userId || undefined,
+        action: req.query.action || undefined,
+        from:   req.query.from   || undefined,
+        to:     req.query.to     || undefined,
+    } : {};
+
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
            failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
-           customVariables, emailSnippets] = await Promise.all([
+           customVariables, emailSnippets, loginLogs, activeUsers] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
@@ -49,6 +57,8 @@ const getSettings = async (req, res) => {
         incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
         notificationVariableModel.getAll().catch(() => []),
         emailSnippetModel.getAll().catch(() => []),
+        loginLogModel.getAll(auditFilters).catch(() => []),
+        loginLogModel.getActiveUsers().catch(() => []),
     ]);
 
     // LGT-173: estados con su color configurado (o vacío) para la tarjeta de colores.
@@ -95,6 +105,7 @@ const getSettings = async (req, res) => {
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         placeholderGroups, customVariables, emailSnippets, sampleVars,
         statusColorList, incidentStatusColorList, activeSection,
+        loginLogs, activeUsers, auditFilters,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -927,6 +938,7 @@ const saveFatigueConsentNotifConfig = async (req, res) => {
     }
 };
 
+
 const triggerDelayDetection = async (req, res) => {
     try {
         const { processDelayedShipments } = require('../jobs/delayDetectionJob');
@@ -935,6 +947,56 @@ const triggerDelayDetection = async (req, res) => {
     } catch (err) {
         console.error('triggerDelayDetection:', err.message);
         res.status(500).redirect(settingBack(req, '?error=delay_triggered'));
+    }
+};
+
+const exportAuditCsv = async (req, res) => {
+    try {
+        const filters = {
+            userId: req.query.userId || undefined,
+            action: req.query.action || undefined,
+            from:   req.query.from   || undefined,
+            to:     req.query.to     || undefined,
+        };
+        const [loginLogs, settingLogs] = await Promise.all([
+            loginLogModel.getAll({ ...filters, limit: 5000 }).catch(() => []),
+            settingLogModel.getAll().catch(() => []),
+        ]);
+
+        const rows = [];
+        rows.push(['Tipo', 'Fecha y hora', 'Usuario', 'Acción / Parámetro', 'Detalle', 'IP', 'User-Agent']);
+
+        for (const l of loginLogs) {
+            rows.push([
+                'Sesión',
+                new Date(l.createdAt).toLocaleString('es-AR'),
+                l.user?.fullName || l.userId || 'Desconocido',
+                l.action,
+                '',
+                l.ip || '',
+                l.userAgent || '',
+            ]);
+        }
+        for (const l of settingLogs) {
+            rows.push([
+                'Configuración',
+                new Date(l.changedAt).toLocaleString('es-AR'),
+                l.user?.fullName || 'Sistema',
+                l.key,
+                `${l.oldValue || ''} → ${l.newValue || ''}`,
+                '',
+                '',
+            ]);
+        }
+
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const filename = `auditoria_${new Date().toISOString().slice(0, 10)}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('﻿' + csv);
+    } catch (err) {
+        console.error('exportAuditCsv:', err.message);
+        res.status(500).send('Error al exportar');
     }
 };
 
@@ -949,4 +1011,5 @@ module.exports = {
     triggerDelayDetection,
     saveDateTimeSettings,
     saveEmailProviders,
+    exportAuditCsv,
 };
