@@ -313,6 +313,9 @@
 <% } %>
                             <div style="display:flex;justify-content:space-between"><span>Recargo peso</span><span><%= fmtMoney(costClient.wSurcharge) %></span></div>
                             <div style="display:flex;justify-content:space-between"><span>Recargo volumen</span><span><%= fmtMoney(costClient.vSurcharge) %></span></div>
+                            <% if (costClient.insurance > 0) { %>
+                            <div style="display:flex;justify-content:space-between"><span>Seguro de mercadería</span><span><%= fmtMoney(costClient.insurance) %></span></div>
+                            <% } %>
                             <hr style="margin:.35rem 0;border-color:var(--color-border)">
                             <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span><%= fmtMoney(costClient.subtotal) %></span></div>
                             <% if (costClient.penalty > 0) { %>

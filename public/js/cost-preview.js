@@ -30,6 +30,7 @@
         if (b.zoneBase > 0) { html += row(`Tarifa zona${data.zoneName ? ' (' + data.zoneName + ')' : ''}`, b.zoneBase); }
         html += row('Recargo peso', b.wSurcharge);
         html += row('Recargo volumen', b.vSurcharge);
+        if (b.insurance > 0) { html += row('Seguro de mercadería', b.insurance); }
         html += '<hr style="margin:.35rem 0;border-color:var(--color-border)">';
         html += `<div style="display:flex;justify-content:space-between;font-weight:700"><span>Total estimado</span><span>${fmt(b.final)}</span></div>`;
         el.innerHTML = html;
@@ -40,6 +41,7 @@
         const postalCode = document.getElementById('postal-code')?.value;
         const weightKg = document.getElementById('weight-kg')?.value;
         const volumeM3 = document.getElementById('volume-m3')?.value;
+        const declaredValue = document.getElementById('declared-value')?.value;
 
         if ((!provinceId && !postalCode) || !weightKg) {
             render('empty');
@@ -50,7 +52,7 @@
             const res = await fetch('/api/cost-preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provinceId, postalCode, weightKg, volumeM3 }),
+                body: JSON.stringify({ provinceId, postalCode, weightKg, volumeM3, declaredValue }),
             });
             const data = await res.json();
             render('ok', data);
@@ -65,7 +67,7 @@
     }
 
     function init() {
-        ['province', 'postal-code', 'weight-kg', 'volume-m3'].forEach(function (id) {
+        ['province', 'postal-code', 'weight-kg', 'volume-m3', 'declared-value'].forEach(function (id) {
             const el = document.getElementById(id);
             if (!el) { return; }
             el.addEventListener('change', trigger);

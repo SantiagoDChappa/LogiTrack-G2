@@ -576,6 +576,12 @@
                             <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
                         </div>
 
+                        <div class="field">
+                            <label for="seguro_pct">Seguro de mercadería (%) <span class="req">*</span></label>
+                            <input type="number" id="seguro_pct" name="seguro_pct" min="0" max="100" step="0.01" value="<%= params.seguro_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">

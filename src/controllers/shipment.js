@@ -280,28 +280,31 @@ const getDetail = async (req, res) => {
 };
 
 const getNewShipmentForm = async (req, res) => {
-    const [provinces, typesShipment, pickupBranches] = await Promise.all([
+    const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
         provinceModel.getAll(),
         typeShipmentModel.getAll(),
         branchModel.getPickupEnabled(),
+        settingModel.get('seguro_pct'),
     ]);
-    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches });
+    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches, seguroPct: parseFloat(seguroPct) || 0 });
 };
 
 const createShipment = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
+            settingModel.get('seguro_pct'),
         ]);
         return res.render('shipment/new', {
             errors: errors.array().map(e => e.msg),
             body: req.body,
             provinces,
             typesShipment,
-            pickupBranches
+            pickupBranches,
+            seguroPct: parseFloat(seguroPct) || 0
         });
     }
 
@@ -477,6 +480,7 @@ const createShipment = async (req, res) => {
             weightKg:        body.weightKg       || null,
             packageQty:      body.packageQty     || null,
             volumeM3:        body.volumeM3       || null,
+            declaredValue:   body.declaredValue ? Math.max(0, parseFloat(body.declaredValue) || 0) : null,
             basePriority:    initialPriority,
             priority:        initialPriority,
             currentBranchId: resolvedCurrentBranchId,
@@ -505,11 +509,17 @@ const createShipment = async (req, res) => {
         const freshShipment = await shipmentModel.getById(shipment.id);
 
         // LGT-214 precondición: persistir costo al momento de creación.
+        // [prototype] El desglose ya incluye el seguro de mercadería; persistimos también
+        // insuranceAmount aparte para itemizarlo en factura/NC sin recalcularlo después.
         const costSvc = require('../services/shipmentCostService');
-        const costTotal = await costSvc.computeTotal(freshShipment);
-        if (costTotal > 0) {
-            await shipmentModel.Shipment.update({ costTotal }, { where: { id: freshShipment.id } });
-            freshShipment.costTotal = costTotal;
+        const breakdown = await costSvc.computeCost(freshShipment);
+        const costTotal = breakdown ? breakdown.final : 0;
+        const insuranceAmount = breakdown ? breakdown.insurance : 0;
+        const costUpdates = {};
+        if (costTotal > 0)        { costUpdates.costTotal = costTotal;             freshShipment.costTotal = costTotal; }
+        if (insuranceAmount > 0)  { costUpdates.insuranceAmount = insuranceAmount; freshShipment.insuranceAmount = insuranceAmount; }
+        if (Object.keys(costUpdates).length) {
+            await shipmentModel.Shipment.update(costUpdates, { where: { id: freshShipment.id } });
         }
 
         // Factura del envío (comprobante al remitente) con el desglose de costo.
@@ -529,17 +539,19 @@ const createShipment = async (req, res) => {
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
-        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
+            settingModel.get('seguro_pct'),
         ]);
         res.render('shipment/new', {
             errors: [err.message],
             body: req.body,
             provinces,
             typesShipment,
-            pickupBranches
+            pickupBranches,
+            seguroPct: parseFloat(seguroPct) || 0
         });
     }
 };

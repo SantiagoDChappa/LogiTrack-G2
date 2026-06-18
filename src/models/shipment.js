@@ -54,6 +54,9 @@ const Shipment = sequelize.define('shipment', {
     costTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     // Sprint 5 — dashboard analítico: transporte que realizó el envío (para métricas por camioneta).
     transportId: { type: DataTypes.INTEGER, allowNull: true },
+    // [prototype] Seguro de mercadería: valor declarado en el alta y seguro calculado/"congelado".
+    declaredValue:   { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'declaredValue' },
+    insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -136,6 +139,7 @@ const create = async (data, options = {}) => {
         weightKg:         data.weightKg       || null,
         volumeM3:         data.volumeM3        || null,
         packageQty:       data.packageQty      || null,
+        declaredValue:    data.declaredValue   || null,
         zoneId:               data.zoneId          || null,
         currentBranchId:      data.currentBranchId || null,
         expectedDeliveryDate: data.expectedDeliveryDate || null,

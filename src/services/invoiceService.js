@@ -28,6 +28,7 @@ const generate = async ({ shipmentId, userId = null }) => {
             zoneBase:        c.zoneBase,
             weightSurcharge: c.wSurcharge,
             volumeSurcharge: c.vSurcharge,
+            insuranceAmount: c.insurance || 0,
             subtotal:        c.subtotal,
             senderName:      shipment.sender?.fullName || null,
             senderDocument:  shipment.sender?.document || null,

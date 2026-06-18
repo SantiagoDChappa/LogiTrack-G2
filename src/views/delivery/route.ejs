@@ -3,6 +3,7 @@
 <head>
     <%- include('../partials/head') %>
     <title>Mi Ruta - LogiTrack</title>
+    <meta name="theme-color" content="#2563eb">
     <script src="/js/fatigue-driver.js" defer></script>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -788,6 +789,8 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <%# [prototype] Offline del repartidor: globals para el script (cargado desde head.ejs) %>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {

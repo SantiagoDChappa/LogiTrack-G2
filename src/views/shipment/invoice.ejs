@@ -64,6 +64,7 @@
                     <% if (Number(inv.zoneBase)) { %><tr><td>Costo por zona</td><td class="text-right"><%= fmtMoney(inv.zoneBase) %></td></tr><% } %>
                     <% if (Number(inv.weightSurcharge)) { %><tr><td>Adicional por peso</td><td class="text-right"><%= fmtMoney(inv.weightSurcharge) %></td></tr><% } %>
                     <% if (Number(inv.volumeSurcharge)) { %><tr><td>Adicional por volumen</td><td class="text-right"><%= fmtMoney(inv.volumeSurcharge) %></td></tr><% } %>
+                    <% if (Number(inv.insuranceAmount)) { %><tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(inv.insuranceAmount) %></td></tr><% } %>
                 </tbody>
                 <tfoot>
                     <tr><td class="text-right">Subtotal (neto)</td><td class="text-right"><%= fmtMoney(neto) %></td></tr>
