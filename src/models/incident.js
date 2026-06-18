@@ -24,6 +24,9 @@ const Incident = sequelize.define('incident', {
     damageChoice:     { type: DataTypes.STRING(12),  allowNull: true, field: 'damage_choice' }, // REEMBOLSO | REEMPLAZO
     damageChoiceAt:   { type: DataTypes.DATE,        allowNull: true, field: 'damage_choice_at' },
     damageChoiceBy:   { type: DataTypes.STRING(160), allowNull: true, field: 'damage_choice_by' },
+    // Devolución como incidencia (tipo RETURN): motivo de devolución estructurado
+    // (DEFECTUOSO | INCORRECTO | DANADO | ARREPENTIMIENTO | OTRO).
+    returnReason:     { type: DataTypes.STRING(30),  allowNull: true, field: 'return_reason' },
     createdAt:        { type: DataTypes.DATE },
     updatedAt:        { type: DataTypes.DATE }
 }, { tableName: 'incident', timestamps: true });

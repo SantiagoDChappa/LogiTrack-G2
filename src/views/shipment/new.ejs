@@ -188,7 +188,8 @@
                     <h3>Ventana de entrega <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></h3>
                     <div class="field">
                         <label for="expected-date">Fecha estimada</label>
-                        <input id="expected-date" type="date" name="expectedDeliveryDate" value="<%= body.expectedDeliveryDate || '' %>">
+                        <input id="expected-date" type="date" name="expectedDeliveryDate" value="<%= body.expectedDeliveryDate || '' %>" disabled>
+                        <small id="expected-date-hint" class="field-hint">Se completa con la estimación del modelo al cargar los datos.</small>
                     </div>
                     <div class="field">
                         <label for="expected-from">Desde</label>
@@ -203,6 +204,11 @@
                 <div id="prediction-widget" class="pred-card">
                     <h3><span class="material-symbols-outlined">psychology</span> Semáforo de fiabilidad</h3>
                     <div id="prediction-result"></div>
+                </div>
+
+                <div id="cost-preview-widget" class="pred-card">
+                    <h3><span class="material-symbols-outlined">payments</span> Costo estimado del envío</h3>
+                    <div id="cost-preview-result"></div>
                 </div>
 
                 <div id="priority-conteiner" class="priority-box">
@@ -228,6 +234,7 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/prediction.js" defer></script>
+    <script src="/js/cost-preview.js" defer></script>
     <script src="/js/address-validation.js" defer></script>
     <script src="/js/address-autocomplete.js?v=<%= assetVersion %>" defer></script>
     <script src="/js/phone-format.js?v=<%= assetVersion %>" defer></script>

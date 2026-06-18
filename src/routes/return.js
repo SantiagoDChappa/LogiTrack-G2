@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { list, detail, take, resolve } = require('../controllers/returnAdmin');
+const { getCreateForm, createInternal, take, resolve } = require('../controllers/returnIncident');
+const { requireSupervisorOrOperator, requireSupervisorOrAdmin } = require('../middlewares/auth');
 
-// Gestión interna de devoluciones (LGT-183). Montado con requireSupervisor en app.js.
-router.get('/', list);
-router.get('/:id', detail);
-router.post('/:id/take', take);
-router.post('/:id/resolve', resolve);
+// Devoluciones como incidencias (tipo RETURN). Montado con requireAuth en app.js.
+// Alta interna (staff: supervisor / operador / admin) desde el detalle de envío.
+router.get('/new',  requireSupervisorOrOperator, getCreateForm);
+router.post('/new', requireSupervisorOrOperator, createInternal);
+
+// Gestión de una devolución (supervisor / admin): tomar y resolver.
+router.post('/:id/take',    requireSupervisorOrAdmin, take);
+router.post('/:id/resolve', requireSupervisorOrAdmin, resolve);
 
 module.exports = router;

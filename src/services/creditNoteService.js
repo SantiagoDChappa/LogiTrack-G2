@@ -29,7 +29,11 @@ const generate = async ({ shipmentId, incidentId = null, returnId = null, userId
     try {
         const created = await CreditNote.create({
             number: 'TMP', shipmentId, incidentId, returnId,
-            amount, createdByUserId: userId, createdAt: new Date(),
+            amount,
+            // La NC de reembolso se emite al remitente: guardamos sus datos fiscales.
+            senderName:     shipment.sender?.fullName || null,
+            senderDocument: shipment.sender?.document || null,
+            createdByUserId: userId, createdAt: new Date(),
         });
         await created.update({ number: buildNumber(created.id) });
         return { ok: true, creditNote: created };

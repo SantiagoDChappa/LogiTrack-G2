@@ -311,6 +311,7 @@ html[data-theme="dark"] {
 .status-badge.cancelled,      .status-badge.cancelado        { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
 .status-badge.failed_attempt, .status-badge.intento_fallido  { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
 .status-badge.package_failed, .status-badge.paquete_fallido  { background: #fecaca; color: #7f1d1d; border-color: #f87171; }
+.status-badge.returned,       .status-badge.devuelto         { background: #e0e7ff; color: #3730a3; border-color: #a5b4fc; }
 
 /* ============================================================
    Priority badges

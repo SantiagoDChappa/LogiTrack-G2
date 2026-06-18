@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('partials/head') %>
+    <link rel="stylesheet" href="/css/login.css">
+    <title>Códigos de respaldo — LogiTrack</title>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-brand">
+                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
+                <h1>LogiTrack</h1>
+                <p>2FA activado ✓</p>
+            </div>
+
+            <p style="font-size:.85rem;color:var(--color-text-secondary);margin-bottom:1rem">
+                Guardá estos códigos de respaldo en un lugar seguro. Cada uno sirve <strong>una sola vez</strong>
+                para ingresar si perdés el acceso a tu app. <strong>No se vuelven a mostrar.</strong>
+            </p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem;font-family:monospace;font-size:1.02rem">
+                <% codes.forEach(function (c) { %>
+                    <div style="padding:.45rem;border:1px solid var(--color-border);border-radius:8px;text-align:center;background:var(--color-surface)"><%= c %></div>
+                <% }) %>
+            </div>
+
+            <button type="button" class="login-btn" style="background:var(--color-surface);color:var(--color-text);border:1px solid var(--color-border);margin-bottom:.6rem"
+                    onclick="navigator.clipboard.writeText(<%- JSON.stringify(codes.join('\n')) %>); this.textContent='Copiados ✓';">Copiar todos</button>
+            <a href="/home" class="login-btn" style="display:block;text-align:center;text-decoration:none">Continuar a la app</a>
+        </div>
+    </div>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

@@ -32,7 +32,6 @@ const { IncidentTask }         = require('./incidentTask');
 const { IncidentAttachment }   = require('./incidentAttachment');
 const { IncidentPendingConfirmation } = require('./incidentPendingConfirmation');
 const { ShipmentModificationRequest } = require('./shipmentModificationRequest');
-const { ShipmentReturn, ShipmentReturnHistory } = require('./shipmentReturn');
 const { CreditNote } = require('./creditNote');
 const { NotificationInApp }   = require('./notificationInApp');
 // Sprint 3 - nuevos modelos parametrizables
@@ -200,20 +199,6 @@ const safeAssociate = () => {
         if (Person) { IncidentAttachment.belongsTo(Person, { as: 'uploadedByPerson', foreignKey: 'uploadedByPersonId' }); }
     }
 
-    // LGT-182/183/186 - devoluciones
-    if (ShipmentReturn.belongsTo) {
-        if (Shipment) { ShipmentReturn.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
-        if (Branch)   { ShipmentReturn.belongsTo(Branch,   { as: 'pickupBranch', foreignKey: 'pickupBranchId' }); }
-        if (User)     { ShipmentReturn.belongsTo(User,     { as: 'reviewedBy', foreignKey: 'reviewedByUserId' }); }
-    }
-    if (ShipmentReturn.hasMany && ShipmentReturnHistory) {
-        ShipmentReturn.hasMany(ShipmentReturnHistory, { as: 'history', foreignKey: 'returnId' });
-        ShipmentReturnHistory.belongsTo(ShipmentReturn, { as: 'return', foreignKey: 'returnId' });
-        if (User) { ShipmentReturnHistory.belongsTo(User, { as: 'byUser', foreignKey: 'byUserId' }); }
-    }
-    if (Shipment.hasMany && ShipmentReturn) {
-        Shipment.hasMany(ShipmentReturn, { as: 'returns', foreignKey: 'shipmentId' });
-    }
     // LGT-214 - nota de crédito
     if (CreditNote.belongsTo) {
         if (Shipment) { CreditNote.belongsTo(Shipment, { as: 'shipment', foreignKey: 'shipmentId' }); }
@@ -263,8 +248,6 @@ module.exports = {
     IncidentAttachment,
     IncidentPendingConfirmation,
     ShipmentModificationRequest,
-    ShipmentReturn,
-    ShipmentReturnHistory,
     CreditNote,
     NotificationInApp,
     FailedAttemptReason,

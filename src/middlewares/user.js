@@ -26,16 +26,9 @@ const validateUserGeneral = [
         .bail()
         .isIn(Object.values(RoleType).map(r => String(r.id))).withMessage('El rol seleccionado no es válido'),
 ];
+// Alta de usuario: el sistema genera una contraseña temporal (el admin no la tipea),
+// por eso ya no se valida 'password' en el alta. Ver controllers/user.createUser.
 const validateUser = [
-    body('password')
-        .notEmpty().withMessage('La contraseña es obligatoria')
-        .bail()
-        .isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres')
-        .bail()
-        .isLength({ max: 128 }).withMessage('La contraseña no puede superar 128 caracteres')
-        .matches(/[A-Z]/).withMessage('Debe contener al menos una mayúscula')
-        .matches(/\d/).withMessage('Debe contener al menos un número')
-        .matches(/[^A-Za-z0-9]/).withMessage('Debe contener al menos un símbolo'),
     ...validateUserGeneral
     ];
 

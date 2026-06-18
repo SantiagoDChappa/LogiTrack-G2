@@ -9,6 +9,9 @@ const CreditNote = sequelize.define('CreditNote', {
     incidentId:      { type: DataTypes.INTEGER },
     returnId:        { type: DataTypes.INTEGER },
     amount:          { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
+    // Datos fiscales del remitente (la NC de reembolso se emite al remitente).
+    senderName:      { type: DataTypes.STRING(120) },
+    senderDocument:  { type: DataTypes.STRING(30) },
     createdByUserId: { type: DataTypes.INTEGER },
     createdAt:       { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
 }, {
