@@ -18,6 +18,7 @@ const User = sequelize.define('user', {
     driverAvailable:  { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: 'driver_available' },
     driverUnavailableReason: { type: DataTypes.STRING(120), allowNull: true, field: 'driver_unavailable_reason' },
     driverUnavailableUntil:  { type: DataTypes.DATEONLY,    allowNull: true, field: 'driver_unavailable_until' },
+    onboarded: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     // #1 Primer ingreso — contraseña temporal pendiente de cambio + fecha del último cambio.
     mustChangePassword: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'must_change_password' },
     passwordChangedAt:  { type: DataTypes.DATE,    allowNull: true,  field: 'password_changed_at' },
