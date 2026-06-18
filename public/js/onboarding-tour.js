@@ -91,6 +91,18 @@
         };
     }
 
+    function notificationBellStep() {
+        return {
+            element: '#notif-bell',
+            popover: {
+                title: 'Notificaciones',
+                description: 'Acá ves alertas importantes de la operación: demoras, incidencias, fatiga y más. El badge rojo indica pendientes de leer.',
+                side: 'bottom',
+                align: 'end',
+            },
+        };
+    }
+
     // ── Pasos por rol ──────────────────────────────────────────────────────────
 
     var STEPS_SUPERVISOR_ADMIN = [
@@ -114,10 +126,26 @@
             },
         },
         {
+            element: '.nav a[href="/shipment/kanban"]',
+            popover: {
+                title: 'Kanban',
+                description: 'Visualizá y mové envíos por columnas de estado. Ideal para seguir el flujo operativo del día de un vistazo.',
+                side: 'right',
+            },
+        },
+        {
             element: '.nav a[href="/route"]',
             popover: {
                 title: 'Ruteo',
                 description: 'Planificá y optimizá las rutas de entrega asignadas a tus repartidores.',
+                side: 'right',
+            },
+        },
+        {
+            element: '.nav a[href="/fatigue"]',
+            popover: {
+                title: 'Ojo de Patrón',
+                description: 'Monitoreá la fatiga de los repartidores y bloqueá rutas cuando haga falta por seguridad operativa.',
                 side: 'right',
             },
         },
@@ -129,6 +157,7 @@
                 side: 'right',
             },
         },
+        notificationBellStep(),
         {
             element: '#nav-group-reportes',
             popover: {
@@ -140,6 +169,14 @@
     ];
 
     var STEPS_ADMIN_EXTRA = [
+        {
+            element: '.nav a[href="/shipment/import"]',
+            popover: {
+                title: 'Importar CSV',
+                description: 'Cargá envíos de forma masiva desde un archivo CSV. Muy útil para la puesta en marcha inicial del sistema.',
+                side: 'right',
+            },
+        },
         {
             element: '#nav-group-ajustes',
             popover: {
@@ -186,6 +223,7 @@
                 side: 'right',
             },
         },
+        notificationBellStep(),
     ];
 
     function buildDeliverySteps() {
@@ -236,6 +274,8 @@
                 side: 'right',
             },
         });
+
+        steps.push(notificationBellStep());
 
         return steps;
     }
