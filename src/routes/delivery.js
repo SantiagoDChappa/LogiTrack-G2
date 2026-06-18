@@ -343,7 +343,11 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
             return res.redirect('/delivery?fatigue=1');
         }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
-        res.render('delivery/route', { route, readOnly });
+        // Para el POD offline en la misma página: saber si el envío exige código clave.
+        const settingModel = require('../models/setting');
+        const dsSetting = await settingModel.getAll().catch(() => ({}));
+        const deliverySecretEnabled = dsSetting.delivery_secret_enabled !== 'false';
+        res.render('delivery/route', { route, readOnly, deliverySecretEnabled });
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);

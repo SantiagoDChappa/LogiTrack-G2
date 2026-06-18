@@ -234,6 +234,14 @@
         for (const it of items) {
             const a = it.action;
             if (a.routeId && Number(a.routeId) !== Number(window.LT_ROUTE_ID)) { continue; }
+            // POD (entrega con foto+firma): el stopId viaja en el body urlencoded, no en el path.
+            // Sin esto, una entrega encolada offline se vería como pendiente al recargar ("ruteo desde 0").
+            if (a.kind === 'pod') {
+                let podStop = null;
+                try { podStop = new URLSearchParams(a.body || '').get('stopId'); } catch (_) { /* */ }
+                if (podStop) { window.markStopDone(podStop, 'delivered'); }
+                continue;
+            }
             const stopId = stopIdFromPath(a.path);
             if (!stopId) { continue; }
             if (a.kind === 'skip') { window.markStopSkipped(stopId, true); }
