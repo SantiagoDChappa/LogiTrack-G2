@@ -19,7 +19,7 @@ const getActive = () => IncidentType.findAll({
 
 // Tipos que un CLIENTE externo (portal público, autogestión, chatbot) puede elegir.
 // El staff sigue viendo TODOS via getActive(). Si querés cambiar el set, editá esta lista.
-const CLIENT_FACING_CODES = ['PACKAGE_BROKEN', 'DELAY', 'MISSING_ITEM', 'OTHER'];
+const CLIENT_FACING_CODES = ['PACKAGE_BROKEN', 'DELAY', 'MISSING_ITEM', 'RETURN', 'OTHER'];
 
 const getClientFacing = () => IncidentType.findAll({
     where: { active: true, code: CLIENT_FACING_CODES },

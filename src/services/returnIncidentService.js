@@ -277,6 +277,24 @@ const resolveReturn = async ({ incidentId, userId, decision, rejectionReason }) 
                 fromValue: inc.status, toValue: IncidentStatus.CLOSED,
                 comment: 'Devolución aprobada (procedente) — reembolso.', userId, transaction: t,
             });
+
+            // #5 — Devolución procedente → el envío pasa a "Devuelto" (misma transacción).
+            const { Shipment } = require('../models/shipment');
+            const shipmentHistoryModel = require('../models/shipmentHistory');
+            const current = await Shipment.findByPk(inc.shipmentId, { attributes: ['statusId'], transaction: t });
+            const fromStatusId = current ? current.statusId : Status.DELIVERED.id;
+            if (fromStatusId !== Status.RETURNED.id) {
+                await shipmentModel.updateStatus(inc.shipmentId, Status.RETURNED.id, { transaction: t });
+                await shipmentHistoryModel.create({
+                    shipmentId:   inc.shipmentId,
+                    fromStatusId,
+                    toStatusId:   Status.RETURNED.id,
+                    comment:      'Devolución aprobada (procedente): el envío pasó a Devuelto.',
+                    userId,
+                    eventType:    'STATUS_CHANGE',
+                    transaction:  t,
+                });
+            }
         });
 
         // Reembolso: nota de crédito al remitente (idempotente).

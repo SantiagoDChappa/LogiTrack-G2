@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>Códigos de respaldo 2FA — LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header"><h1><%= context === 'enabled' ? '2FA activado' : 'Nuevos códigos de respaldo' %></h1></div>
+        <div class="update-card" style="max-width:520px">
+            <p style="color:var(--color-text-secondary);font-size:.9rem">
+                Guardá estos códigos de respaldo en un lugar seguro. Cada uno sirve <strong>una sola vez</strong>
+                para ingresar si perdés acceso a tu app de autenticación. <strong>No se vuelven a mostrar.</strong>
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin:1rem 0;font-family:monospace;font-size:1.05rem">
+                <% codes.forEach(function (c) { %>
+                    <div style="padding:.5rem;border:1px solid var(--color-border);border-radius:8px;text-align:center;background:var(--color-surface)"><%= c %></div>
+                <% }) %>
+            </div>
+            <button type="button" class="btn btn--ghost" onclick="navigator.clipboard.writeText(<%- JSON.stringify(codes.join('\n')) %>); this.textContent='Copiados ✓';">Copiar todos</button>
+            <div class="form-actions" style="margin-top:1rem">
+                <a href="/account/2fa" class="action-btn action-btn--lg guardar" data-tooltip="Listo" aria-label="Listo"><span class="material-symbols-outlined">check</span></a>
+            </div>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

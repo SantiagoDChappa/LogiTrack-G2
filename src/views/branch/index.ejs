@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/users.css">
+    <title>Sucursales — LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Sucursales</h1>
+            <a href="/branch/new" class="action-btn action-btn--lg guardar" data-tooltip="Nueva sucursal" aria-label="Nueva sucursal">
+                <span class="material-symbols-outlined">add</span>
+            </a>
+        </div>
+
+        <% if (ok) { %>
+            <div class="alert" style="background:rgba(22,163,74,.12);color:#166534;border:1px solid #86efac;padding:.5rem .75rem;border-radius:8px;margin-bottom:1rem">Operación realizada con éxito.</div>
+        <% } %>
+
+        <div class="update-card">
+            <% if (!branches.length) { %>
+                <p style="color:var(--color-text-secondary)">Todavía no hay sucursales. Creá la primera con el botón "+".</p>
+            <% } else { %>
+            <div class="portal-mis-envios-table-wrap">
+                <table class="portal-mis-envios-table" style="width:100%">
+                    <thead>
+                        <tr><th>Nombre</th><th>Dirección</th><th>Teléfono</th><th>Retiro</th><th>Estado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                    <% branches.forEach(function (b) { %>
+                        <tr>
+                            <td><%= b.name %></td>
+                            <td><%= b.address %></td>
+                            <td><%= b.phone || '-' %></td>
+                            <td><%= b.pickupEnabled ? 'Sí' : 'No' %></td>
+                            <td><span class="status-badge <%= b.closed ? 'cancelado' : 'entregado' %>"><%= b.closed ? 'Cerrada' : 'Activa' %></span></td>
+                            <td>
+                                <div style="display:flex;gap:.4rem">
+                                    <a href="/branch/<%= b.id %>/edit" class="action-btn modificar" data-tooltip="Editar" aria-label="Editar"><span class="material-symbols-outlined">edit</span></a>
+                                    <form method="POST" action="/branch/<%= b.id %>/closed" style="display:inline"
+                                          onsubmit="return confirm('<%= b.closed ? "¿Reabrir esta sucursal?" : "¿Cerrar esta sucursal? No estará disponible para nuevas asignaciones." %>');">
+                                        <input type="hidden" name="closed" value="<%= b.closed ? 'false' : 'true' %>">
+                                        <button type="submit" class="action-btn <%= b.closed ? 'neutro' : 'eliminar' %>" data-tooltip="<%= b.closed ? 'Reabrir' : 'Cerrar' %>" aria-label="<%= b.closed ? 'Reabrir' : 'Cerrar' %>">
+                                            <span class="material-symbols-outlined"><%= b.closed ? 'lock_open' : 'lock' %></span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

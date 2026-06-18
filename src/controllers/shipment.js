@@ -241,7 +241,7 @@ const getDetail = async (req, res) => {
 
 
     const replacementSvc = require('../services/replacementService');
-    const [incidentsForShipment, replacementShipment, originalShipment, invoice] = await Promise.all([
+    const [incidentsForShipment, replacementShipment, originalShipment, invoice, creditNotes] = await Promise.all([
         require('../models/incident').list({ shipmentId: id, limit: 50 }),
         // Este envío generó un reemplazo (es el original).
         replacementSvc.findExistingByOrigin(id),
@@ -251,6 +251,8 @@ const getDetail = async (req, res) => {
             : Promise.resolve(null),
         // Factura del envío (comprobante al remitente).
         require('../services/invoiceService').getByShipment(id),
+        // Notas de crédito del envío (reembolsos por devolución / incidencia).
+        require('../services/creditNoteService').getByShipment(id),
     ]);
 
     // Alta interna de devolución: visible a staff cuando el envío es elegible
@@ -263,7 +265,7 @@ const getDetail = async (req, res) => {
     }
 
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,

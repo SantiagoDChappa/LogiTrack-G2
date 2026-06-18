@@ -107,6 +107,15 @@
             </form>
 
             <form id="form-baja" action="/user/delete/<%= user.id %>" method="POST" style="display:none;"></form>
+
+            <!-- #2 2FA — reset del segundo factor del usuario (solo admin). -->
+            <form action="/user/<%= user.id %>/2fa/reset" method="POST" style="margin-top:1rem"
+                  onsubmit="return confirm('¿Resetear el 2FA de este usuario? Deberá volver a configurarlo en su próximo ingreso.');">
+                <button type="submit" class="btn btn--ghost">
+                    <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">lock_reset</span>
+                    Resetear 2FA del usuario
+                </button>
+            </form>
         </div>
     </main>
 

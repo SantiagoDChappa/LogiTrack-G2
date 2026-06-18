@@ -31,4 +31,9 @@ const getPickupEnabled = ({ provinceId } = {}) => {
     return Branch.findAll({ where, order: [['name', 'ASC']] });
 };
 
-module.exports = { Branch, getAll, getById, getPickupEnabled, invalidateBranchCache };
+// ── ABM de sucursales (invalidan el cache tras cada cambio) ────────────────────
+const create = async (data) => { const b = await Branch.create(data); invalidate('branch:all'); return b; };
+const update = async (id, data) => { const r = await Branch.update(data, { where: { id } }); invalidate('branch:all'); return r; };
+const setClosed = async (id, closed) => { const r = await Branch.update({ closed: !!closed }, { where: { id } }); invalidate('branch:all'); return r; };
+
+module.exports = { Branch, getAll, getById, getPickupEnabled, invalidateBranchCache, create, update, setClosed };

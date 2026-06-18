@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>Mi perfil — LogiTrack</title>
+    <style>
+        .profile-input { width:100%;padding:.55rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text) }
+        .profile-input:disabled { background:var(--color-bg);color:var(--color-text-secondary) }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header"><h1>Mi perfil</h1></div>
+
+        <% if (ok === 'profile') { %><div class="alert" style="max-width:520px;background:rgba(22,163,74,.12);color:#166534;border:1px solid #86efac;padding:.5rem .75rem;border-radius:8px;margin-bottom:1rem">Perfil actualizado.</div><% } %>
+        <% if (ok === 'password') { %><div class="alert" style="max-width:520px;background:rgba(22,163,74,.12);color:#166534;border:1px solid #86efac;padding:.5rem .75rem;border-radius:8px;margin-bottom:1rem">Contraseña actualizada.</div><% } %>
+
+        <div class="update-card" style="max-width:520px;margin-bottom:1.25rem">
+            <h3>Datos</h3>
+            <form action="/account/profile" method="post">
+                <div style="display:flex;align-items:center;gap:1rem;margin:.5rem 0 1rem">
+                    <img id="avatarPreview" src="<%= user.avatar ? ('/account/avatar/' + user.id) : '' %>" alt="Foto de perfil"
+                         style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--color-border);<%= user.avatar ? '' : 'display:none' %>">
+                    <div id="avatarInitials" style="width:72px;height:72px;border-radius:50%;background:var(--color-primary,#2563eb);color:#fff;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;display:<%= user.avatar ? 'none' : 'flex' %>">
+                        <%= user.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %>
+                    </div>
+                    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                        <input type="file" id="avatarFile" accept="image/*" style="display:none">
+                        <input type="hidden" name="avatar" id="avatarData">
+                        <button type="button" class="btn btn--ghost" onclick="document.getElementById('avatarFile').click()">Cambiar foto</button>
+                        <button type="button" class="btn btn--ghost" id="removeAvatar" style="<%= user.avatar ? '' : 'display:none' %>">Quitar</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="fullName">Nombre y apellido</label>
+                    <input id="fullName" name="fullName" value="<%= user.fullName %>" maxlength="100" required class="profile-input">
+                </div>
+                <div class="field" style="margin-top:.6rem">
+                    <label for="email">Email</label>
+                    <input id="email" value="<%= user.email %>" disabled class="profile-input">
+                </div>
+
+                <% if (locals.error) { %><div class="alert alert-error" style="margin-top:.6rem"><%= error %></div><% } %>
+                <div class="form-actions" style="margin-top:1rem">
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar cambios" aria-label="Guardar cambios"><span class="material-symbols-outlined">save</span></button>
+                </div>
+            </form>
+        </div>
+
+        <div class="update-card" style="max-width:520px">
+            <h3>Cambiar contraseña</h3>
+            <form action="/account/password/change" method="post">
+                <div class="field">
+                    <label for="currentPassword">Contraseña actual</label>
+                    <input id="currentPassword" type="password" name="currentPassword" autocomplete="current-password" data-pw-toggle required class="profile-input">
+                </div>
+                <div class="field" style="margin-top:.6rem">
+                    <label for="newPassword">Nueva contraseña</label>
+                    <input id="newPassword" type="password" name="newPassword" autocomplete="new-password" data-pw-toggle data-pw-strength required class="profile-input">
+                </div>
+                <div class="field" style="margin-top:.6rem">
+                    <label for="confirmPassword">Repetir nueva contraseña</label>
+                    <input id="confirmPassword" type="password" name="confirmPassword" autocomplete="new-password" data-pw-toggle required class="profile-input">
+                </div>
+                <% if (twoFactorEnabled) { %>
+                <div class="field" style="margin-top:.6rem">
+                    <label for="token">Código de verificación (2FA)</label>
+                    <input id="token" name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="14" required placeholder="6 dígitos o código de respaldo" class="profile-input">
+                </div>
+                <% } %>
+
+                <% if (locals.pwError) { %><div class="alert alert-error" style="margin-top:.6rem"><%= pwError %></div><% } %>
+                <div class="form-actions" style="margin-top:1rem">
+                    <button type="submit" class="action-btn action-btn--lg modificar" data-tooltip="Cambiar contraseña" aria-label="Cambiar contraseña"><span class="material-symbols-outlined">lock_reset</span></button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/password-ui.js" defer></script>
+    <script>
+    (function () {
+        var file = document.getElementById('avatarFile');
+        var data = document.getElementById('avatarData');
+        var prev = document.getElementById('avatarPreview');
+        var inits = document.getElementById('avatarInitials');
+        var rem = document.getElementById('removeAvatar');
+        if (file) {
+            file.addEventListener('change', function (e) {
+                var f = e.target.files[0]; if (!f) { return; }
+                var r = new FileReader();
+                r.onload = function (ev) {
+                    var img = new Image();
+                    img.onload = function () {
+                        var max = 256, s = Math.min(max / img.width, max / img.height, 1);
+                        var w = Math.round(img.width * s), h = Math.round(img.height * s);
+                        var c = document.createElement('canvas'); c.width = w; c.height = h;
+                        c.getContext('2d').drawImage(img, 0, 0, w, h);
+                        var b64 = c.toDataURL('image/jpeg', 0.82);
+                        data.value = b64; prev.src = b64; prev.style.display = 'block';
+                        if (inits) { inits.style.display = 'none'; }
+                        if (rem) { rem.style.display = 'inline-block'; }
+                    };
+                    img.src = ev.target.result;
+                };
+                r.readAsDataURL(f);
+            });
+        }
+        if (rem) {
+            rem.addEventListener('click', function () {
+                data.value = '__REMOVE__';
+                if (prev) { prev.style.display = 'none'; }
+                if (inits) { inits.style.display = 'flex'; }
+                rem.style.display = 'none';
+            });
+        }
+    })();
+    </script>
+</body>
+</html>

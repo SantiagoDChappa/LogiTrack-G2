@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/login.css">
+    <title>Restablecer contraseña — LogiTrack</title>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-brand">
+                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
+                <h1>LogiTrack</h1>
+                <p>Restablecer contraseña</p>
+            </div>
+
+            <% if (done) { %>
+                <div class="login-error" style="background:rgba(22,163,74,.12);color:#166534;border-color:#86efac">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    Tu contraseña fue actualizada. Ya podés iniciar sesión con la nueva.
+                </div>
+                <div class="login-support"><a href="/login">Ir a iniciar sesión</a></div>
+            <% } else if (!token) { %>
+                <div class="login-error">
+                    <span class="material-symbols-outlined">error</span>
+                    <%= error || 'El enlace es inválido o expiró.' %>
+                </div>
+                <div class="login-support"><a href="/account/password/forgot">Pedir un nuevo enlace</a></div>
+            <% } else { %>
+                <form class="login-form" action="/account/password/reset" method="post">
+                    <input type="hidden" name="token" value="<%= token %>">
+                    <div class="login-field">
+                        <label for="newPassword">Nueva contraseña</label>
+                        <input id="newPassword" type="password" name="newPassword" autocomplete="new-password" data-pw-toggle data-pw-strength required>
+                    </div>
+                    <div class="login-field">
+                        <label for="confirmPassword">Repetir contraseña</label>
+                        <input id="confirmPassword" type="password" name="confirmPassword" autocomplete="new-password" data-pw-toggle required>
+                    </div>
+                    <% if (typeof needs2fa !== 'undefined' && needs2fa) { %>
+                    <div class="login-field">
+                        <label for="code2fa">Código de verificación (2FA)</label>
+                        <input id="code2fa" name="code2fa" inputmode="numeric" autocomplete="one-time-code" maxlength="14" required placeholder="6 dígitos o código de respaldo">
+                    </div>
+                    <% } %>
+                    <% if (locals.error) { %>
+                    <div class="login-error"><span class="material-symbols-outlined">error</span><%= error %></div>
+                    <% } %>
+                    <button type="submit" class="login-btn">Guardar contraseña</button>
+                </form>
+            <% } %>
+        </div>
+    </div>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/password-ui.js" defer></script>
+</body>
+</html>

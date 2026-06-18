@@ -32,6 +32,38 @@ const requireAuth = async (req, res, next) => {
         if (decoded?.roleId != null)  { decoded.roleId = Number(decoded.roleId); }
         if (decoded?.branchId != null){ decoded.branchId = Number(decoded.branchId); }
         res.locals.currentUser = decoded;
+
+        // #1 Primer ingreso: con contraseña temporal pendiente, forzar el cambio antes de
+        // acceder a cualquier otra ruta (salvo la propia pantalla de cambio y el logout).
+        if (decoded.mustChangePassword) {
+            const url = req.originalUrl || '';
+            if (!url.startsWith('/account/password/forced') && !url.startsWith('/logout')) {
+                if (url.startsWith('/api/')) {
+                    return res.status(403).json({ error: 'Debés cambiar tu contraseña temporal antes de continuar.' });
+                }
+                return res.redirect('/account/password/forced');
+            }
+        }
+
+        // #2 2FA obligatorio (Supervisor/Admin): NO pueden quedar con sesión completa sin 2FA.
+        // Una sesión así (p. ej. anterior a la feature) se desloguea; se reenrolan al re-loguear.
+        const { RoleType } = require('../constants/enums');
+        if (!decoded.mustChangePassword
+            && [RoleType.SUPERVISOR.id, RoleType.ADMIN.id].includes(decoded.roleId)
+            && !decoded.twoFactorEnabled) {
+            const url2 = req.originalUrl || '';
+            if (!url2.startsWith('/logout')) {
+                res.clearCookie('token');
+                if (url2.startsWith('/api/')) {
+                    return res.status(403).json({ error: '2FA requerido. Iniciá sesión de nuevo para configurarlo.' });
+                }
+                return res.redirect('/login');
+            }
+        }
+
+        // #2 Nudge: ofrecer activar 2FA a usuarios sin él (la X lo descarta por esta sesión).
+        res.locals.showTfaNudge = !decoded.twoFactorEnabled && req.cookies?.tfaNudge !== 'off';
+
         const settingModel = require('../models/setting');
         const statusModel  = require('../models/status');
         const statusColors = require('../services/statusColors');

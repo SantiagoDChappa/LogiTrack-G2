@@ -17,3 +17,6 @@
 <script src="/js/table-paginate.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/page-loader.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/search.js?v=<%= assetVersion %>" defer></script>
+<%# #4 PWA / modo offline del repartidor (el script se autolimita a /delivery) %>
+<link rel="manifest" href="/manifest.webmanifest">
+<script src="/js/offline-delivery.js?v=<%= assetVersion %>" defer></script>

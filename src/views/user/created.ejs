@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/users.css">
+    <title>Usuario creado — LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content users-module">
+        <div class="page-header"><h1>Usuario creado</h1></div>
+
+        <div class="update-card" style="max-width:560px">
+            <h3 style="display:flex;align-items:center;gap:.4rem">
+                <span class="material-symbols-outlined" style="color:var(--color-success,#16a34a)">check_circle</span>
+                <%= createdUser.fullName %>
+            </h3>
+            <p style="color:var(--color-text-secondary);font-size:.9rem">
+                Se creó el usuario con una <strong>contraseña temporal</strong>. Compartila con
+                <strong><%= createdUser.email %></strong>; en su primer ingreso el sistema le va a
+                pedir que la cambie por una propia.
+            </p>
+
+            <div class="field">
+                <label for="tempPwd">Contraseña temporal <span style="font-weight:400;color:var(--color-text-secondary)">(se muestra una sola vez)</span></label>
+                <div style="display:flex;gap:.5rem;align-items:center">
+                    <input id="tempPwd" type="text" readonly value="<%= tempPassword %>"
+                           style="font-family:monospace;font-size:1.1rem;letter-spacing:.05em;flex:1;padding:.55rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text)">
+                    <button type="button" class="action-btn action-btn--lg neutro" data-tooltip="Copiar" aria-label="Copiar contraseña"
+                            onclick="navigator.clipboard.writeText(document.getElementById('tempPwd').value); this.querySelector('.material-symbols-outlined').textContent='done';">
+                        <span class="material-symbols-outlined">content_copy</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:1.25rem">
+                <a href="/user" class="action-btn action-btn--lg volver" data-tooltip="Volver a usuarios" aria-label="Volver a usuarios">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <a href="/user/new" class="action-btn action-btn--lg guardar" data-tooltip="Crear otro usuario" aria-label="Crear otro usuario">
+                    <span class="material-symbols-outlined">person_add</span>
+                </a>
+            </div>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>
