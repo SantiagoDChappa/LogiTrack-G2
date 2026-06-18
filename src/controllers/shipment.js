@@ -25,6 +25,17 @@ const computeDefaultExpectedDeliveryDate = (shipmentTypeId) => {
     d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
 };
+
+// La fecha estimada de entrega debe ser posterior a hoy: no se admite una fecha
+// anterior ni igual al día de hoy. Si no viene (se calculará por default), es válida.
+const isValidFutureDeliveryDate = (val) => {
+    if (!val) { return true; }
+    const d = new Date(`${val}T00:00:00`);
+    if (Number.isNaN(d.getTime())) { return false; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d.getTime() > today.getTime();
+};
 const { validationResult } = require('express-validator');
 const csvImport = require('../services/csvImport');
 const csvExport = require('../services/csvExport');
@@ -230,7 +241,7 @@ const getDetail = async (req, res) => {
 
 
     const replacementSvc = require('../services/replacementService');
-    const [incidentsForShipment, replacementShipment, originalShipment] = await Promise.all([
+    const [incidentsForShipment, replacementShipment, originalShipment, invoice, creditNotes] = await Promise.all([
         require('../models/incident').list({ shipmentId: id, limit: 50 }),
         // Este envío generó un reemplazo (es el original).
         replacementSvc.findExistingByOrigin(id),
@@ -238,10 +249,23 @@ const getDetail = async (req, res) => {
         shipment.replacementOfShipmentId
             ? shipmentModel.getById(shipment.replacementOfShipmentId)
             : Promise.resolve(null),
+        // Factura del envío (comprobante al remitente).
+        require('../services/invoiceService').getByShipment(id),
+        // Notas de crédito del envío (reembolsos por devolución / incidencia).
+        require('../services/creditNoteService').getByShipment(id),
     ]);
 
+    // Alta interna de devolución: visible a staff cuando el envío es elegible
+    // (entregado + dentro de ventana + sin devolución previa). El form vuelve a validar igual.
+    const STAFF_ROLE_IDS = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id];
+    let canCreateReturn = false;
+    if (viewer && STAFF_ROLE_IDS.includes(viewer.roleId)) {
+        const elig = await require('../services/returnIncidentService').checkEligibility(shipment).catch(() => ({ ok: false }));
+        canCreateReturn = !!elig.ok;
+    }
+
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
@@ -249,6 +273,8 @@ const getDetail = async (req, res) => {
         originalShipment,
         isAdmin: isAdminUser(viewer),
         currentBranch,
+        canCreateReturn,
+        returnError: req.query.returnError || null,
     });
 };
 
@@ -285,6 +311,9 @@ const createShipment = async (req, res) => {
 
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+        if (!isValidFutureDeliveryDate(body.expectedDeliveryDate)) {
+            throw new Error('La fecha estimada de entrega debe ser posterior a hoy.');
+        }
 
         let pickupBranch = null;
         if (isPickup) {
@@ -480,6 +509,17 @@ const createShipment = async (req, res) => {
         if (costTotal > 0) {
             await shipmentModel.Shipment.update({ costTotal }, { where: { id: freshShipment.id } });
             freshShipment.costTotal = costTotal;
+        }
+
+        // Factura del envío (comprobante al remitente) con el desglose de costo.
+        // Best-effort: un fallo de facturación no debe tumbar el alta del envío.
+        try {
+            await require('../services/invoiceService').generate({
+                shipmentId: freshShipment.id,
+                userId: res.locals.currentUser?.id || null,
+            });
+        } catch (e) {
+            console.error('[createShipment] factura:', e.message);
         }
 
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);

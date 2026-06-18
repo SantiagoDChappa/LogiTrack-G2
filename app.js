@@ -34,6 +34,7 @@ const apiValidateAddressRoutes = require('./src/routes/api/validate-address');
 const apiAddressSuggestRoutes  = require('./src/routes/api/address-suggest');
 const apiRouteRoutes           = require('./src/routes/api/route');
 const apiBranchesRoutes        = require('./src/routes/api/branches');
+const apiCostPreviewRoutes     = require('./src/routes/api/cost-preview');
 const authRoutes        = require('./src/routes/auth');
 const deliveryRoutes = require('./src/routes/delivery');
 const scanRoutes     = require('./src/routes/scan');
@@ -48,10 +49,15 @@ const reportRoutes     = require('./src/routes/report');
 const notificationRoutes = require('./src/routes/notification');
 const returnRoutes = require('./src/routes/return');
 const creditNoteRoutes = require('./src/routes/creditNote');
+const invoiceRoutes = require('./src/routes/invoice');
 const notificationInAppRoutes = require('./src/routes/notificationInApp');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
 const onboardingRoutes = require('./src/routes/onboarding');
+const apiSearchRoutes  = require('./src/routes/api/search');
+const accountRoutes    = require('./src/routes/account');
+const passwordResetRoutes = require('./src/routes/passwordReset');
+const branchRoutes = require('./src/routes/branch');
 
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
@@ -115,6 +121,9 @@ app.use((req, res, next) => {
 app.use('/', portalRoutes);
 app.use('/chatbot', chatbotRoutes);
 app.use('/', authRoutes);
+// #3 Recuperar contraseña — PÚBLICO (olvidé mi contraseña). Debe ir antes del
+// /account protegido para que /account/password/forgot|reset no exija login.
+app.use('/account/password', passwordResetRoutes);
 
 
 app.use('/api/health', apiHealthRoutes);
@@ -124,6 +133,8 @@ app.use('/brand', require('./src/routes/brand'));
 
 // Rutas Protegidas
 app.use('/home', requireAuth, homeRoutes);
+// Cuenta del usuario (cambio de contraseña forzado en primer ingreso / reset).
+app.use('/account', requireAuth, accountRoutes);
 app.use('/user',          requireAuth, requireSupervisor, userRoutes);
 app.use('/shipment',      requireAuth, shipmentRoutes);
 app.use('/setting',       requireAuth, requireSupervisor, settingRoutes);
@@ -136,6 +147,8 @@ app.use('/api/validate-address',  requireAuth, apiValidateAddressRoutes);
 app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api/route',             requireAuth, apiRouteRoutes);
 app.use('/api/branches',          requireAuth, apiBranchesRoutes);
+app.use('/api/cost-preview',      requireAuth, apiCostPreviewRoutes);
+app.use('/api/search',            requireAuth, apiSearchRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/delivery', requireAuth, deliveryRoutes);
 app.use('/scan',     requireAuth, scanRoutes);
@@ -145,14 +158,19 @@ app.post('/route/scan/:id/dispatch', requireAuth, routeCtrl.dispatchRoute);
 app.use('/route',     requireAuth, requireSupervisor, routeRoutes);
 app.use('/transport', requireAuth, requireSupervisor, transportRoutes);
 app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
+// ABM de sucursales (el RBAC fino — solo admin — lo aplica cada ruta).
+app.use('/branch',    requireAuth, branchRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
 app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
 app.use('/notification', requireAuth, requireSupervisor, notificationRoutes);
-// Gestión interna de devoluciones (LGT-183): Supervisor/Admin.
-app.use('/returns', requireAuth, requireSupervisor, returnRoutes);
+// Devoluciones como incidencias (tipo RETURN): el RBAC fino lo aplica cada ruta
+// (alta interna = staff; tomar/resolver = supervisor/admin).
+app.use('/returns', requireAuth, returnRoutes);
 // Comprobante de nota de crédito (LGT-214): usuarios logueados.
 app.use('/credit-note', requireAuth, creditNoteRoutes);
+// Comprobante de factura del envío: usuarios logueados.
+app.use('/invoice', requireAuth, invoiceRoutes);
 // Centro de notificaciones in-app: por usuario, disponible para todos los roles logueados.
 app.use('/notifications', requireAuth, notificationInAppRoutes);
 app.use('/fatigue',   requireAuth, fatigueRoutes);

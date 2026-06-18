@@ -348,6 +348,8 @@
         }
     </style>
     <link rel="stylesheet" href="/css/delivery.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script src="/js/offline-delivery.js" defer></script>
 </head>
 
 <body>
@@ -637,21 +639,11 @@
             params.append(el.name, el.value);
         });
 
-        try {
-            const resp = await fetch(form.action, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: params.toString(),
-            });
-            if (resp.ok || resp.redirected) {
-                window.location = resp.url;
-                return;
-            }
-            const msg = (await resp.text()) || 'Error al confirmar entrega.';
-            showValidation(msg);
-        } catch (err) {
-            showValidation('Error de red al confirmar entrega.');
-        }
+        // #4 Offline: si no hay conexión, la entrega se encola y se sincroniza al reconectar.
+        const result = await window.LTOffline.send(form.action, params);
+        if (result.ok)     { window.location = result.url; return; }
+        if (result.queued) { window.location = '/delivery?queued=1'; return; }
+        showValidation(result.message || 'Error al confirmar entrega.');
     });
 
     function showValidation(msg) {

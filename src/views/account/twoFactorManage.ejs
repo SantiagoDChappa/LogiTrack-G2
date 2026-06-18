@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>2FA — LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header"><h1>Verificación en dos pasos (2FA)</h1></div>
+        <div class="update-card" style="max-width:520px">
+            <% if (ok === 'disabled') { %>
+                <div class="alert" style="background:var(--color-bg);border:1px solid var(--color-border);padding:.5rem .75rem;border-radius:8px;margin-bottom:.75rem">El 2FA fue desactivado.</div>
+            <% } %>
+            <p style="display:flex;align-items:center;gap:.5rem;font-weight:600;margin-bottom:1rem">
+                Estado:
+                <% if (enabled) { %>
+                    <span class="status-badge entregado">Activado</span>
+                <% } else { %>
+                    <span class="status-badge pendiente">Desactivado</span>
+                <% } %>
+            </p>
+
+            <% if (enabled) { %>
+                <p style="color:var(--color-text-secondary);font-size:.88rem">Te quedan <strong><%= remaining %></strong> códigos de respaldo de un solo uso.</p>
+                <form method="POST" action="/account/2fa/backup/regenerate" style="margin:.75rem 0">
+                    <button type="submit" class="btn btn--ghost">Regenerar códigos de respaldo</button>
+                </form>
+                <hr style="border-color:var(--color-border);margin:1rem 0">
+                <form method="POST" action="/account/2fa/disable">
+                    <div class="field">
+                        <label for="password">Para desactivar el 2FA, confirmá tu contraseña</label>
+                        <input id="password" type="password" name="password" autocomplete="current-password" required
+                               style="width:100%;padding:.5rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text)">
+                    </div>
+                    <% if (locals.error) { %><div class="alert alert-error" style="margin:.5rem 0"><%= error %></div><% } %>
+                    <button type="submit" class="action-btn action-btn--lg eliminar" data-tooltip="Desactivar 2FA" aria-label="Desactivar 2FA" style="margin-top:.5rem"><span class="material-symbols-outlined">gpp_bad</span></button>
+                </form>
+            <% } else { %>
+                <p style="color:var(--color-text-secondary);font-size:.88rem">Sumá una capa extra de seguridad: además de tu contraseña, pediremos un código temporal de tu teléfono al iniciar sesión.</p>
+                <a href="/account/2fa/setup" class="action-btn action-btn--lg guardar" data-tooltip="Activar 2FA" aria-label="Activar 2FA" style="margin-top:.5rem"><span class="material-symbols-outlined">verified_user</span></a>
+            <% } %>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

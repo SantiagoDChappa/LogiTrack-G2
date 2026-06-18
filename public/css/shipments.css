@@ -698,6 +698,7 @@
 .status-badge.expirado     { background: #92400e20; color: #92400e; border: 1px solid #92400e40; }
 .status-badge.cancelada    { background-color: var(--badge-cancelled-bg);  color: var(--badge-cancelled-text);  }
 .status-badge.en_sucursal  { background-color: var(--badge-warehouse-bg);  color: var(--badge-warehouse-text);  }
+.status-badge.devuelto     { background-color: #e0e7ff; color: #3730a3; }
 .status-badge.inicial      { background-color: var(--badge-initial-bg);    color: var(--badge-initial-text);    }
 .status-badge.asignado        { background-color: var(--badge-assigned-bg);        color: var(--badge-assigned-text);        }
 .status-badge.en_preparacion  { background-color: var(--badge-preparing-bg);       color: var(--badge-preparing-text);       }

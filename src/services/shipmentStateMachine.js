@@ -34,6 +34,7 @@ const STATUS_LABELS = {
     [S.IN_PREPARATION.id]: 'En preparación',
     [S.PACKAGE_FAILED.id]: 'Paquete fallido',
     [S.FAILED_ATTEMPT.id]: 'Intento fallido',
+    [S.RETURNED.id]: 'Devuelto',
 };
 
 // Mensajes orientados al cliente (portal publico). Sin info interna: ni actor, ni hora, ni ruta interna.
@@ -79,6 +80,7 @@ const TRANSITIONS = {
     [S.DELIVERED.id]:      [],
     [S.CANCELLED.id]:      [],
     [S.PACKAGE_FAILED.id]: [],
+    [S.RETURNED.id]:       [],
 };
 
 const RULES_TARGETED = {

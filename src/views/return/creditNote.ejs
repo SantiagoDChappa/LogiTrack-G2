@@ -13,7 +13,7 @@
             const total = Number(cn.amount || 0);
             const subtotal = Number((total / 1.21).toFixed(2));
             const iva = Number((total - subtotal).toFixed(2));
-            const recipient = shipment && shipment.recipient ? shipment.recipient : null;
+            const sender = shipment && shipment.sender ? shipment.sender : null;
             const addr = shipment && shipment.address ? shipment.address : null;
         %>
         <div class="page-header">
@@ -44,12 +44,12 @@
 
             <div style="display:flex;gap:2rem;flex-wrap:wrap;margin:1rem 0;">
                 <div>
-                    <div style="font-size:.72rem;opacity:.6;text-transform:uppercase;">Cliente</div>
-                    <% if (recipient) { %>
-                        <strong><%= recipient.fullName || '—' %></strong><br>
-                        <% if (recipient.documentNumber) { %>DNI <%= recipient.documentNumber %><br><% } %>
-                        <% if (addr) { %><%= [addr.street, addr.number].filter(Boolean).join(' ') %><% if (addr.postalCode) { %> · CP <%= addr.postalCode %><% } %><br><% } %>
-                        <% if (recipient.phone) { %>Tel <%= recipient.phone %><% } %>
+                    <div style="font-size:.72rem;opacity:.6;text-transform:uppercase;">Cliente (remitente)</div>
+                    <% const cnSenderName = (typeof cn !== 'undefined' && cn.senderName) ? cn.senderName : (sender ? sender.fullName : null);
+                       const cnSenderDoc  = (typeof cn !== 'undefined' && cn.senderDocument) ? cn.senderDocument : (sender ? sender.document : null); %>
+                    <% if (cnSenderName || cnSenderDoc) { %>
+                        <strong><%= cnSenderName || '—' %></strong><br>
+                        <% if (cnSenderDoc) { %>Doc. <%= cnSenderDoc %><br><% } %>
                     <% } else { %>—<% } %>
                 </div>
                 <div>

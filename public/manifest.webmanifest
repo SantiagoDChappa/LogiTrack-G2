@@ -1,0 +1,14 @@
+{
+  "name": "LogiTrack Repartidor",
+  "short_name": "LogiTrack",
+  "description": "Reparto con soporte offline: hoja de ruta, entregas e intentos fallidos sin conexión.",
+  "start_url": "/delivery",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/images/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/images/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
