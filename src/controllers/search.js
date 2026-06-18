@@ -3,18 +3,79 @@
 const { Op } = require('sequelize');
 const {
     Shipment, Person, Status,
-    Incident, IncidentType,
-    Route, Transport, User,
+    Route, Transport, User, Branch,
     ShipmentReturn,
 } = require('../models/index');
+const incidentModel = require('../models/incident');
+
+const RouteStatus = Object.freeze({
+    PLANNED: 1, IN_ROUTE: 2, FINISHED: 3, CANCELLED: 4,
+    INTERRUPTED: 5, BLOCKED_FATIGUE: 6, PAUSED_FATIGUE: 7,
+});
 const { RoleType } = require('../constants/enums');
 
 const LIMIT = 4;
 const isNum = (s) => /^\d{1,9}$/.test(s.trim());
+const asRole  = (roleId) => Number(roleId);
+
+/** Filtros de incidencias alineados con incidentModel.list / incidentVisibleTo. */
+const buildIncidentFilters = (roleId, userId, branchId, q, numeric) => {
+    const role = asRole(roleId);
+    const filters = { limit: LIMIT };
+    if (numeric) {
+        filters.id = parseInt(q, 10);
+    } else {
+        filters.trackingId = q;
+    }
+
+    if (role === RoleType.DELIVERY.id) {
+        filters.deliveryUserId = Number(userId);
+    } else if (role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) {
+        filters.staffScope = { branchId: branchId || null, userId: Number(userId) };
+    } else if (role !== RoleType.ADMIN.id) {
+        filters.id = -1;
+    }
+    return filters;
+};
 
 const INCIDENT_STATUS_LABEL = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
 const RETURN_STATUS_LABEL   = { SOLICITADA: 'Solicitada', EN_REVISION: 'En revisión', RESUELTA: 'Resuelta', RECHAZADA: 'Rechazada' };
 const ROLE_LABEL             = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' };
+const ROUTE_STATUS_LABEL     = {
+    [RouteStatus.PLANNED]:         'Planificada',
+    [RouteStatus.IN_ROUTE]:        'En curso',
+    [RouteStatus.FINISHED]:        'Finalizada',
+    [RouteStatus.CANCELLED]:       'Cancelada',
+    [RouteStatus.INTERRUPTED]:     'Interrumpida',
+    [RouteStatus.BLOCKED_FATIGUE]: 'Bloqueada (fatiga)',
+    [RouteStatus.PAUSED_FATIGUE]:  'Pausada (fatiga)',
+};
+
+/** Misma fuente que /delivery — filtra en memoria las rutas del repartidor. */
+const matchDriverRoute = (route, q, numeric) => {
+    const qLower = q.toLowerCase();
+    const routeId = Number(route.id);
+    if (numeric && routeId === parseInt(q, 10)) return true;
+    if (String(routeId).includes(q)) return true;
+    const transportName = route.transport?.name || '';
+    const branchName    = route.originBranch?.name || '';
+    return transportName.toLowerCase().includes(qLower)
+        || branchName.toLowerCase().includes(qLower);
+};
+
+const fetchDriverRoutes = (userId) => Route.findAll({
+    include: [
+        {
+            model: Transport, as: 'transport', required: true,
+            where: { driverUserId: Number(userId) },
+            attributes: ['id', 'name', 'driverUserId'],
+        },
+        { model: Branch, as: 'originBranch', required: false, attributes: ['name'] },
+    ],
+    attributes: ['id', 'statusId'],
+    order: [['id', 'DESC']],
+    limit: 100,
+});
 
 const search = async (req, res) => {
     try {
@@ -24,14 +85,16 @@ const search = async (req, res) => {
         }
 
         const { roleId, id: userId, branchId } = res.locals.currentUser;
+        const role = asRole(roleId);
+        const uid  = Number(userId);
         const like = { [Op.iLike]: `%${q}%` };
         const numeric = isNum(q);
 
         // ── Shipments (todos los roles) ──────────────────────────────────────
         const scopeFilter = {};
-        if (roleId === RoleType.DELIVERY.id) {
-            scopeFilter.deliveryUserId = userId;
-        } else if ((roleId === RoleType.SUPERVISOR.id || roleId === RoleType.OPERATOR.id) && branchId) {
+        if (role === RoleType.DELIVERY.id) {
+            scopeFilter.deliveryUserId = uid;
+        } else if ((role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) && branchId) {
             scopeFilter.currentBranchId = branchId;
         }
 
@@ -61,45 +124,22 @@ const search = async (req, res) => {
             return merged.slice(0, LIMIT);
         });
 
-        // ── Incidents (todos los roles) ──────────────────────────────────────
-        const incShipmentWhere = { trackingId: like };
-        if ((roleId === RoleType.SUPERVISOR.id || roleId === RoleType.OPERATOR.id) && branchId) {
-            incShipmentWhere.currentBranchId = branchId;
-        }
-        const incidentWhere = roleId === RoleType.DELIVERY.id ? { openedByUserId: userId } : {};
+        // ── Incidents (RBAC vía incidentModel.list, igual que el listado) ────
+        const incidentsPromise = incidentModel.list(
+            buildIncidentFilters(role, uid, branchId, q, numeric)
+        ).catch(() => []);
 
-        const incByTrackingPromise = Incident.findAll({
-            where: incidentWhere,
-            include: [
-                { model: Shipment, as: 'shipment', required: true, where: incShipmentWhere, attributes: ['id', 'trackingId'] },
-                { model: IncidentType, as: 'type', required: false, attributes: ['description'] },
-            ],
-            attributes: ['id', 'status', 'shipmentId'],
-            order: [['id', 'DESC']],
-            limit: LIMIT,
-        }).catch(() => []);
-
-        const incByIdPromise = numeric
-            ? Incident.findOne({
-                where: { id: parseInt(q), ...incidentWhere },
-                include: [
-                    { model: Shipment, as: 'shipment', required: false, attributes: ['id', 'trackingId'] },
-                    { model: IncidentType, as: 'type', required: false, attributes: ['description'] },
-                ],
-                attributes: ['id', 'status', 'shipmentId'],
-            }).catch(() => null)
-            : Promise.resolve(null);
-
-        const incidentsPromise = Promise.all([incByTrackingPromise, incByIdPromise]).then(([byTracking, byId]) => {
-            const merged = [...byTracking];
-            if (byId && !merged.find(r => r.id === byId.id)) merged.unshift(byId);
-            return merged.slice(0, LIMIT);
-        });
-
-        // ── Routes (Supervisor + Admin) ──────────────────────────────────────
+        // ── Routes (Repartidor: propias; Supervisor + Admin: sucursal/global) ──
         let routesPromise = Promise.resolve([]);
-        if (roleId === RoleType.SUPERVISOR.id || roleId === RoleType.ADMIN.id) {
-            const routeScope = (roleId === RoleType.SUPERVISOR.id && branchId) ? { originBranchId: branchId } : {};
+        if (role === RoleType.DELIVERY.id) {
+            routesPromise = fetchDriverRoutes(uid)
+                .then(routes => routes.filter(r => matchDriverRoute(r, q, numeric)).slice(0, LIMIT))
+                .catch((err) => {
+                    console.error('[search] delivery routes:', err.message);
+                    return [];
+                });
+        } else if (role === RoleType.SUPERVISOR.id || role === RoleType.ADMIN.id) {
+            const routeScope = (role === RoleType.SUPERVISOR.id && branchId) ? { originBranchId: branchId } : {};
             const routeIncludes = [
                 {
                     model: Transport, as: 'transport', required: false,
@@ -136,9 +176,9 @@ const search = async (req, res) => {
 
         // ── Returns (Supervisor + Admin) ─────────────────────────────────────
         let returnsPromise = Promise.resolve([]);
-        if (roleId === RoleType.SUPERVISOR.id || roleId === RoleType.ADMIN.id) {
+        if (role === RoleType.SUPERVISOR.id || role === RoleType.ADMIN.id) {
             const retShipmentWhere = { trackingId: like };
-            if (roleId === RoleType.SUPERVISOR.id && branchId) retShipmentWhere.currentBranchId = branchId;
+            if (role === RoleType.SUPERVISOR.id && branchId) retShipmentWhere.currentBranchId = branchId;
             returnsPromise = ShipmentReturn.findAll({
                 include: [
                     { model: Shipment, as: 'shipment', required: true, where: retShipmentWhere, attributes: ['id', 'trackingId'] },
@@ -151,7 +191,7 @@ const search = async (req, res) => {
 
         // ── Users (solo Admin) ────────────────────────────────────────────────
         let usersPromise = Promise.resolve([]);
-        if (roleId === RoleType.ADMIN.id) {
+        if (role === RoleType.ADMIN.id) {
             const userWhere = { active: true };
             if (numeric) {
                 userWhere[Op.or] = [{ fullName: like }, { document: parseInt(q) }];
@@ -184,9 +224,11 @@ const search = async (req, res) => {
                 status:    INCIDENT_STATUS_LABEL[i.status] || i.status,
             })),
             routes: routesRaw.filter(Boolean).map(r => ({
-                id:         r.id,
-                driverName: r.transport?.driver?.fullName || null,
-                status:     r.status?.description || null,
+                id:            r.id,
+                driverName:    r.transport?.driver?.fullName || null,
+                transportName: r.transport?.name || null,
+                branchName:    r.originBranch?.name || null,
+                status:        ROUTE_STATUS_LABEL[r.statusId] || null,
             })),
             returns: returnsRaw.filter(Boolean).map(r => ({
                 id:        r.id,

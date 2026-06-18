@@ -1,8 +1,13 @@
 const jwt = require('jsonwebtoken');
 
+const isApiRequest = (req) => (req.originalUrl || '').startsWith('/api/');
+
 const requireAuth = async (req, res, next) => {
     const token = req.cookies.token;
     if (!token) {
+        if (isApiRequest(req)) {
+            return res.status(401).json({ error: 'No autenticado' });
+        }
         const returnTo = req.originalUrl;
         return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
@@ -23,6 +28,9 @@ const requireAuth = async (req, res, next) => {
                 }
             } catch { /* ignore */ }
         }
+        if (decoded?.id != null)      { decoded.id = Number(decoded.id); }
+        if (decoded?.roleId != null)  { decoded.roleId = Number(decoded.roleId); }
+        if (decoded?.branchId != null){ decoded.branchId = Number(decoded.branchId); }
         res.locals.currentUser = decoded;
         const settingModel = require('../models/setting');
         const statusModel  = require('../models/status');
@@ -52,6 +60,9 @@ const requireAuth = async (req, res, next) => {
         res.locals.fmtTime     = (v) => dt.formatTime(v, { timeZone: tz, hour24 });
         next();
     } catch {
+        if (isApiRequest(req)) {
+            return res.status(401).json({ error: 'Sesión inválida o expirada' });
+        }
         const returnTo = req.originalUrl;
         return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }

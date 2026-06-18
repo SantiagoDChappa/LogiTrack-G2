@@ -2,6 +2,9 @@
 
 .univ-search {
     position: relative;
+    width: clamp(220px, 28vw, 420px);
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 /* Empuja el buscador (y lo que le sigue: campana + usuario) al extremo derecho */
@@ -14,30 +17,71 @@
     margin-left: 0;
 }
 
-.univ-search__btn {
+/* ── Barra de búsqueda inline ───────────────────────────────────────────────── */
+
+.univ-search__bar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
+    gap: 0.5rem;
+    width: 100%;
+    padding: clamp(0.35rem, 0.5vw, 0.5rem) clamp(0.75rem, 1vw, 1rem);
+    background-color: var(--color-bg);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full);
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.univ-search__bar:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.univ-search__bar.is-loading {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.univ-search__bar.is-loading .univ-search__icon-search {
+    opacity: 0.35;
+}
+
+.univ-search__icon-progress {
+    font-size: 1.1rem;
+    color: var(--color-primary);
+    flex-shrink: 0;
+    animation: univ-search-spin 0.75s linear infinite;
+}
+
+.univ-search__icon-progress[hidden] {
+    display: none !important;
+}
+
+@keyframes univ-search-spin {
+    to { transform: rotate(360deg); }
+}
+
+.univ-search__bar .material-symbols-outlined.univ-search__icon-search {
+    font-size: 1.1rem;
     color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
+    flex-shrink: 0;
 }
 
-.univ-search__btn:hover {
-    background: var(--color-surface-alt);
+.univ-search__bar input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: clamp(0.8rem, 0.9vw, 0.9rem);
     color: var(--color-text);
+    font-family: inherit;
 }
 
-.univ-search__btn .material-symbols-outlined {
-    font-size: 1.25rem;
+.univ-search__bar input::placeholder {
+    color: var(--color-text-muted);
 }
 
-/* ── Panel desplegable ──────────────────────────────────────────────────────── */
+/* ── Panel de resultados ────────────────────────────────────────────────────── */
 
 .univ-search__panel[hidden] {
     display: none !important;
@@ -45,48 +89,15 @@
 
 .univ-search__panel {
     position: absolute;
-    top: calc(100% + 10px);
+    top: calc(100% + 8px);
+    left: 0;
     right: 0;
-    width: 420px;
-    max-width: 92vw;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
     z-index: 1200;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-/* ── Input ──────────────────────────────────────────────────────────────────── */
-
-.univ-search__input-wrap {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.univ-search__input-wrap .material-symbols-outlined {
-    font-size: 1.1rem;
-    color: var(--color-text-secondary);
-    flex-shrink: 0;
-}
-
-.univ-search__input-wrap input {
-    flex: 1;
-    border: none;
-    outline: none;
-    background: transparent;
-    font-size: 0.9rem;
-    color: var(--color-text);
-    font-family: inherit;
-}
-
-.univ-search__input-wrap input::placeholder {
-    color: var(--color-text-secondary);
 }
 
 /* ── Resultados ─────────────────────────────────────────────────────────────── */
@@ -95,6 +106,22 @@
     overflow-y: auto;
     max-height: 400px;
     padding: 0.5rem 0;
+}
+
+.univ-search__results.is-loading {
+    pointer-events: none;
+}
+
+.univ-search__hint--loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.univ-search__count {
+    font-weight: 500;
+    opacity: 0.75;
 }
 
 .univ-search__hint,
@@ -189,9 +216,24 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 
+@media (max-width: 1024px) {
+    .top-header .univ-search {
+        flex: 1;
+        width: auto;
+        max-width: none;
+    }
+}
+
 @media (max-width: 600px) {
+    .univ-search__bar input::placeholder {
+        font-size: 0.75rem;
+    }
+
     .univ-search__panel {
-        right: -3rem;
-        width: calc(100vw - 1rem);
+        position: fixed;
+        top: calc(clamp(56px, 10vw, 68px) + 8px);
+        left: 0.75rem;
+        right: 0.75rem;
+        width: auto;
     }
 }
