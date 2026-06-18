@@ -1,6 +1,7 @@
-const userModel   = require('../models/user');
-const branchModel = require('../models/branch');
-const { RoleType } = require('../constants/enums');
+const userModel      = require('../models/user');
+const branchModel    = require('../models/branch');
+const { RoleType }   = require('../constants/enums');
+const actionLogModel = require('../models/actionLog');
 
 const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
 
@@ -34,7 +35,8 @@ const createUser = async (req, res) => {
       const branches = await branchModel.getAll();
       return res.status(400).render('user/new', { body, errors: [branchError], roleTypes: Object.values(RoleType), branches });
     }
-    await userModel.create(body);
+    const newUser = await userModel.create(body);
+    actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'USER', newUser?.id, { fullName: body.fullName, email: body.email, roleId: body.roleId }, req);
     res.redirect('/user?success=1');
   } catch (err) {
     console.error('ERROR createUser:', err.message);
@@ -104,6 +106,7 @@ const updateUser = async (req, res) => {
       data.driverUnavailableUntil  = null;
     }
     await userModel.update(req.params.id, data);
+    actionLogModel.record(res.locals.currentUser?.id, 'UPDATE', 'USER', Number(req.params.id), { fullName: data.fullName }, req);
     res.redirect('/user?success=2');
   } catch (err) {
     console.error('ERROR updateuser:', err.message);
@@ -114,7 +117,9 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
+    const deletedId = Number(req.params.id);
     await userModel.deleteById(req.params.id);
+    actionLogModel.record(res.locals.currentUser?.id, 'DELETE', 'USER', deletedId, null, req);
     res.redirect('/user?success=3');
   } catch (err) {
     console.error('ERROR deleteUser:', err.message);

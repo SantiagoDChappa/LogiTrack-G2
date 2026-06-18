@@ -33,6 +33,7 @@ const isSupOrAdmin = (u) => u?.roleId === RoleType.SUPERVISOR.id || u?.roleId ==
 const isOperator   = (u) => u?.roleId === RoleType.OPERATOR.id;
 
 const { isDamageType } = require('../services/incidentDamageResolution');
+const actionLogModel = require('../models/actionLog');
 
 // LGT-220: el Operador no puede cargar incidencias de paquete roto, así que esos tipos
 // ni se le ofrecen en los selectores (defensa en UI; el backend igual lo rechaza).
@@ -409,6 +410,7 @@ const create = async (req, res) => {
         }
     }
 
+    actionLogModel.record(user.id, 'CREATE', 'INCIDENT', incident.id, { shipmentId: shipment.id, type: type.code }, req);
     if (wantsJson) {
         return res.json({ ok: true, incidentId: incident.id, trackingId: shipment.trackingId });
     }
@@ -917,6 +919,7 @@ const close = async (req, res) => {
     }
     // Aviso al cliente: la incidencia se cerró (con comentario explicativo).
     notifyIncidentStatusChange(incident.shipmentId, id, IncidentStatus.CLOSED, String(comment).trim());
+    actionLogModel.record(user.id, 'CLOSE', 'INCIDENT', id, { resolution }, req);
 
     res.redirect(`/incident/${id}`);
 };

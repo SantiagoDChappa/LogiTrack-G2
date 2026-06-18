@@ -60,5 +60,6 @@ router.post('/flush-email-queue',          requireAdmin, settingController.flush
 // Ejecutar manualmente un proceso automático ahora (expirados | notificaciones | demoras).
 router.post('/run-process/:proc',          requireAdmin, settingController.runProcess);
 router.post('/trigger-delay-detection',   requireAdmin, settingController.triggerDelayDetection);
+router.get('/auditoria/export-csv',        requireAdmin, settingController.exportAuditCsv);
 
 module.exports = router;

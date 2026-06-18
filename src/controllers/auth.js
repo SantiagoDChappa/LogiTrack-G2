@@ -3,6 +3,7 @@ const JWT = require('jsonwebtoken');
 const userModel = require('../models/user');
 const branchModel = require('../models/branch');
 const { RoleType } = require('../constants/enums');
+const loginLogModel = require('../models/loginLog');
 
 // Cuentas de prueba del login: se arman dinámicamente desde los usuarios activos
 // en base (agrupadas por rol), así siempre reflejan lo que hay realmente.
@@ -67,11 +68,13 @@ const login = async (req, res) => {
 
     const user = await userModel.findByEmail(email);
     if(!user){
+        loginLogModel.record(null, 'LOGIN_FAILED', req, email);
         return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts() });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if(!match){
+        loginLogModel.record(null, 'LOGIN_FAILED', req, email);
         return res.render('login', { error: 'Email o contraseña incorrectos', nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts() });
     }
 
@@ -99,6 +102,7 @@ const login = async (req, res) => {
         cookieOptions.maxAge = 30 * 24 * 60 * 60 * 1000;
     }
     res.cookie('token', token, cookieOptions);
+    loginLogModel.record(user.id, 'LOGIN', req);
     const rawReturn = req.body.returnTo;
     const returnTo  = typeof rawReturn === 'string' ? rawReturn : (Array.isArray(rawReturn) ? rawReturn[0] : null);
     const safeReturn = typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
@@ -106,6 +110,13 @@ const login = async (req, res) => {
 };
 
 const logout = (req, res) => {
+    try {
+        const token = req.cookies?.token;
+        if (token) {
+            const decoded = JWT.verify(token, process.env.JWT_SECRET);
+            if (decoded?.id) { loginLogModel.record(decoded.id, 'LOGOUT', req); }
+        }
+    } catch { /* token inválido o expirado, igual hacemos logout */ }
     res.clearCookie('token');
     return res.redirect('/login');
 };

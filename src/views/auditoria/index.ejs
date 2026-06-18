@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <style>
+        .audit-wrap       { max-width: 1140px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+        .audit-hero       { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+        .audit-hero-icon  { width: 48px; height: 48px; border-radius: 14px; background: var(--color-primary-light);
+                            display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .audit-hero-icon span { color: var(--color-primary); font-size: 1.6rem; }
+        .audit-hero h1    { font-size: 1.5rem; font-weight: 700; margin: 0; }
+        .audit-hero p     { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: .1rem 0 0; }
+
+        /* Stat cards */
+        .audit-stats      { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card        { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px;
+                            padding: 1.1rem 1.3rem; display: flex; flex-direction: column; gap: .3rem; }
+        .stat-card-label  { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-secondary); }
+        .stat-card-value  { font-size: 2rem; font-weight: 700; line-height: 1; color: var(--color-text); }
+        .stat-card-sub    { font-size: .78rem; color: var(--color-text-secondary); }
+        .stat-card.green .stat-card-value { color: var(--color-success); }
+        .stat-card.blue  .stat-card-value { color: var(--color-primary); }
+
+        /* Section cards */
+        .audit-card       { background: var(--color-surface); border: 1px solid var(--color-border);
+                            border-radius: 14px; overflow: hidden; margin-bottom: 1.5rem; }
+        .audit-card-head  { display: flex; align-items: center; gap: .6rem; padding: 1.1rem 1.4rem;
+                            border-bottom: 1px solid var(--color-border); background: var(--color-surface-alt); }
+        .audit-card-head span.material-symbols-outlined { font-size: 1.2rem; color: var(--color-primary); }
+        .audit-card-head h2 { font-size: .95rem; font-weight: 600; margin: 0; flex: 1; }
+        .audit-card-head .badge-count { background: var(--color-primary-light); color: var(--color-primary);
+                                        font-size: .72rem; font-weight: 700; padding: .15rem .55rem;
+                                        border-radius: 999px; }
+        .audit-card-body  { padding: 1.2rem 1.4rem; }
+
+        /* Filters */
+        .audit-filters    { display: flex; flex-wrap: wrap; gap: .65rem; align-items: flex-end; }
+        .filter-group     { display: flex; flex-direction: column; gap: .3rem; }
+        .filter-group label { font-size: .72rem; font-weight: 600; text-transform: uppercase;
+                              letter-spacing: .05em; color: var(--color-text-secondary); }
+        .filter-group select,
+        .filter-group input[type=date] { font-size: .85rem; padding: .4rem .65rem; border-radius: 8px;
+                                          border: 1px solid var(--color-border); background: var(--color-bg);
+                                          color: var(--color-text); min-width: 140px; }
+        .filter-actions   { display: flex; gap: .5rem; align-items: center; margin-left: auto; flex-wrap: wrap; }
+        .btn-filter       { display: inline-flex; align-items: center; gap: .3rem; padding: .42rem .9rem;
+                            border-radius: 8px; font-size: .85rem; font-weight: 500; cursor: pointer;
+                            border: 1px solid var(--color-border); background: var(--color-surface);
+                            color: var(--color-text); text-decoration: none; transition: background .15s; }
+        .btn-filter:hover { background: var(--color-bg); }
+        .btn-filter.primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+        .btn-filter.primary:hover { background: var(--color-primary-dark); }
+        .btn-filter.ghost   { border-color: transparent; color: var(--color-text-secondary); }
+        .btn-filter.ghost:hover { color: var(--color-text); background: var(--color-bg); }
+        .btn-filter .material-symbols-outlined { font-size: .95rem; }
+        .btn-filter:disabled { opacity: .4; pointer-events: none; }
+
+        /* Tables */
+        .audit-table-wrap { overflow-x: auto; margin-top: 1rem; }
+        .audit-table      { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        .audit-table th   { text-align: left; padding: .55rem 1rem; font-size: .7rem; font-weight: 700;
+                            text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-secondary);
+                            background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); }
+        .audit-table td   { padding: .7rem 1rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+        .audit-table tr:last-child td { border-bottom: none; }
+        .audit-table tr:hover td { background: var(--color-surface-alt); }
+
+        /* Badges */
+        .badge-login      { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700;
+                            padding: .2rem .6rem; border-radius: 999px;
+                            background: var(--color-success-bg); color: var(--color-success); }
+        .badge-logout     { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700;
+                            padding: .2rem .6rem; border-radius: 999px;
+                            background: var(--color-danger-bg); color: var(--color-danger); }
+        .badge-failed     { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 700;
+                            padding: .2rem .6rem; border-radius: 999px;
+                            background: #fff3cd; color: #92600a; }
+        .badge-action     { display: inline-flex; align-items: center; gap: .2rem; font-size: .72rem; font-weight: 700;
+                            padding: .15rem .55rem; border-radius: 999px; }
+        .badge-create     { background: var(--color-success-bg); color: var(--color-success); }
+        .badge-update     { background: var(--color-primary-light); color: var(--color-primary); }
+        .badge-delete     { background: var(--color-danger-bg); color: var(--color-danger); }
+        .badge-cancel     { background: #fef3c7; color: #92600a; }
+        .badge-close      { background: #f3f4f6; color: #374151; }
+        .badge-role       { display: inline-block; font-size: .7rem; font-weight: 600;
+                            padding: .12rem .45rem; border-radius: 6px;
+                            background: var(--color-primary-light); color: var(--color-primary); margin-left: .3rem; }
+        .badge-login  .material-symbols-outlined,
+        .badge-logout .material-symbols-outlined,
+        .badge-failed .material-symbols-outlined { font-size: .8rem; }
+
+        /* Active user dot */
+        .active-dot       { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success);
+                            display: inline-block; margin-right: .4rem; box-shadow: 0 0 0 2px var(--color-success-bg); }
+
+        /* User agent cell */
+        .ua-cell          { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                            font-size: .75rem; color: var(--color-text-secondary); }
+
+        .empty-state      { text-align: center; padding: 2.5rem 1rem; color: var(--color-text-secondary); }
+        .empty-state .material-symbols-outlined { font-size: 2.5rem; display: block; margin-bottom: .5rem; opacity: .4; }
+
+        .filter-divider   { height: 1px; background: var(--color-border); margin: 1rem 0; }
+
+        /* Pagination */
+        .pagination       { display: flex; align-items: center; justify-content: center; gap: .5rem;
+                            padding: 1rem 0 .2rem; }
+        .pagination-info  { font-size: .8rem; color: var(--color-text-secondary); margin-right: auto; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <!-- Hero -->
+        <div class="audit-hero">
+            <div class="audit-hero-icon">
+                <span class="material-symbols-outlined">manage_search</span>
+            </div>
+            <div>
+                <h1>Auditoría y trazabilidad</h1>
+                <p>Registro de quién hizo qué, cuándo y desde dónde.</p>
+            </div>
+        </div>
+
+        <%
+            const _today = new Date().toLocaleDateString('es-AR');
+            const _loginsHoy = sessionCount || 0;
+            const _lastEvent = (loginLogs || [])[0];
+        %>
+
+        <!-- Stats -->
+        <div class="audit-stats">
+            <div class="stat-card green">
+                <div class="stat-card-label">Activos ahora</div>
+                <div class="stat-card-value"><%= activeUsers.length %></div>
+                <div class="stat-card-sub">en las últimas 8 h</div>
+            </div>
+            <div class="stat-card blue">
+                <div class="stat-card-label">Sesiones en el log</div>
+                <div class="stat-card-value"><%= sessionCount %></div>
+                <div class="stat-card-sub">con filtros aplicados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Acciones registradas</div>
+                <div class="stat-card-value"><%= actionCount %></div>
+                <div class="stat-card-sub">en el log interno</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Última actividad</div>
+                <div class="stat-card-value" style="font-size:1rem;padding-top:.3rem">
+                    <%= _lastEvent ? new Date(_lastEvent.createdAt).toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}) : '—' %>
+                </div>
+                <div class="stat-card-sub"><%= _lastEvent ? (_lastEvent.user?.fullName || '—') : 'Sin registros' %></div>
+            </div>
+        </div>
+
+        <!-- Usuarios activos -->
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">group</span>
+                <h2>Usuarios activos</h2>
+                <span class="badge-count"><%= activeUsers.length %> en las últimas 8 h</span>
+            </div>
+            <div class="audit-card-body">
+                <% if (activeUsers.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">person_off</span>
+                    Ningún usuario registró actividad reciente.
+                </div>
+                <% } else { %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Usuario</th><th>Rol</th><th>Email</th><th>Último ingreso</th><th>IP</th></tr>
+                        </thead>
+                        <tbody>
+                            <% activeUsers.forEach(l => { %>
+                            <tr>
+                                <td><span class="active-dot"></span><strong><%= l.user?.fullName || '—' %></strong></td>
+                                <td><span class="badge-role"><%= roleLabels[l.user?.roleId] || '—' %></span></td>
+                                <td style="color:var(--color-text-secondary)"><%= l.user?.email || '—' %></td>
+                                <td><%= new Date(l.createdAt).toLocaleString('es-AR') %></td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= l.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Log de sesiones -->
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">login</span>
+                <h2>Log de sesiones</h2>
+                <span class="badge-count"><%= sessionCount %> registros</span>
+                <a href="/auditoria/export-csv?userId=<%= auditFilters.userId || '' %>&action=<%= auditFilters.action || '' %>&from=<%= auditFilters.from || '' %>&to=<%= auditFilters.to || '' %>" class="btn-filter" style="margin-left:auto">
+                    <span class="material-symbols-outlined">download</span> Exportar CSV
+                </a>
+            </div>
+            <div class="audit-card-body">
+                <form method="GET" action="/auditoria" class="audit-filters">
+                    <div class="filter-group">
+                        <label>Usuario</label>
+                        <select name="userId">
+                            <option value="">Todos los usuarios</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.userId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Acción</label>
+                        <select name="action">
+                            <option value="">Todas</option>
+                            <option value="LOGIN"        <%= auditFilters.action === 'LOGIN'        ? 'selected' : '' %>>Login exitoso</option>
+                            <option value="LOGOUT"       <%= auditFilters.action === 'LOGOUT'       ? 'selected' : '' %>>Logout</option>
+                            <option value="LOGIN_FAILED" <%= auditFilters.action === 'LOGIN_FAILED' ? 'selected' : '' %>>Login fallido</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Desde</label>
+                        <input type="date" name="from" value="<%= auditFilters.from || '' %>">
+                    </div>
+                    <div class="filter-group">
+                        <label>Hasta</label>
+                        <input type="date" name="to" value="<%= auditFilters.to || '' %>">
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn-filter primary">
+                            <span class="material-symbols-outlined">filter_list</span> Filtrar
+                        </button>
+                        <a href="/auditoria" class="btn-filter ghost">Limpiar</a>
+                    </div>
+                </form>
+
+                <div class="filter-divider"></div>
+
+                <% if (!loginLogs || loginLogs.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">search_off</span>
+                    No hay registros para los filtros seleccionados.
+                </div>
+                <% } else { %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>IP</th><th>Dispositivo</th></tr>
+                        </thead>
+                        <tbody>
+                            <% loginLogs.forEach(log => { %>
+                            <tr>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
+                                <td>
+                                    <strong><%= log.user?.fullName || log.email || '—' %></strong>
+                                    <% if (log.action === 'LOGIN_FAILED' && !log.user && log.email) { %>
+                                    <div style="font-size:.75rem;color:var(--color-text-secondary)"><%= log.email %></div>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (log.user?.roleId) { %>
+                                    <span class="badge-role"><%= roleLabels[log.user.roleId] || '—' %></span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">—</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (log.action === 'LOGIN') { %>
+                                    <span class="badge-login">
+                                        <span class="material-symbols-outlined">login</span> LOGIN
+                                    </span>
+                                    <% } else if (log.action === 'LOGOUT') { %>
+                                    <span class="badge-logout">
+                                        <span class="material-symbols-outlined">logout</span> LOGOUT
+                                    </span>
+                                    <% } else { %>
+                                    <span class="badge-failed">
+                                        <span class="material-symbols-outlined">block</span> FALLIDO
+                                    </span>
+                                    <% } %>
+                                </td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.ip || '—' %></code></td>
+                                <td class="ua-cell" title="<%= log.userAgent || '' %>"><%= log.userAgent ? log.userAgent.slice(0, 55) + (log.userAgent.length > 55 ? '…' : '') : '—' %></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación sesiones -->
+                <% if (sessionPages > 1) { %>
+                <div class="pagination">
+                    <span class="pagination-info">Página <%= sessionPage %> de <%= sessionPages %> (<%= sessionCount %> registros)</span>
+                    <% const _sBase = '/auditoria?userId=' + (auditFilters.userId||'') + '&action=' + (auditFilters.action||'') + '&from=' + (auditFilters.from||'') + '&to=' + (auditFilters.to||''); %>
+                    <a href="<%= _sBase %>&sessionPage=<%= sessionPage - 1 %>" class="btn-filter <%= sessionPage <= 1 ? 'ghost' : '' %>" <%- sessionPage <= 1 ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        <span class="material-symbols-outlined">chevron_left</span> Anterior
+                    </a>
+                    <a href="<%= _sBase %>&sessionPage=<%= sessionPage + 1 %>" class="btn-filter <%= sessionPage >= sessionPages ? 'ghost' : '' %>" <%- sessionPage >= sessionPages ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        Siguiente <span class="material-symbols-outlined">chevron_right</span>
+                    </a>
+                </div>
+                <% } %>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Log de acciones internas -->
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">edit_note</span>
+                <h2>Acciones internas</h2>
+                <span class="badge-count"><%= actionCount %> registros</span>
+            </div>
+            <div class="audit-card-body">
+                <form method="GET" action="/auditoria" class="audit-filters">
+                    <!-- preserve session filters -->
+                    <% if (auditFilters.userId) { %><input type="hidden" name="userId" value="<%= auditFilters.userId %>"><% } %>
+                    <% if (auditFilters.action)  { %><input type="hidden" name="action"  value="<%= auditFilters.action %>"><% } %>
+                    <% if (auditFilters.from)    { %><input type="hidden" name="from"    value="<%= auditFilters.from %>"><% } %>
+                    <% if (auditFilters.to)      { %><input type="hidden" name="to"      value="<%= auditFilters.to %>"><% } %>
+                    <div class="filter-group">
+                        <label>Usuario</label>
+                        <select name="aUserId">
+                            <option value="">Todos</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.aUserId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Entidad</label>
+                        <select name="entity">
+                            <option value="">Todas</option>
+                            <option value="SHIPMENT" <%= auditFilters.entity === 'SHIPMENT'  ? 'selected' : '' %>>Envíos</option>
+                            <option value="USER"     <%= auditFilters.entity === 'USER'      ? 'selected' : '' %>>Usuarios</option>
+                            <option value="INCIDENT" <%= auditFilters.entity === 'INCIDENT'  ? 'selected' : '' %>>Incidencias</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn-filter primary">
+                            <span class="material-symbols-outlined">filter_list</span> Filtrar
+                        </button>
+                        <a href="/auditoria" class="btn-filter ghost">Limpiar</a>
+                    </div>
+                </form>
+
+                <div class="filter-divider"></div>
+
+                <% if (!actionLogs || actionLogs.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">history_toggle_off</span>
+                    No hay acciones internas registradas todavía.
+                </div>
+                <% } else { %>
+                <%
+                    const _actionBadgeClass = (a) => {
+                        if (a === 'CREATE') return 'badge-action badge-create';
+                        if (a === 'UPDATE') return 'badge-action badge-update';
+                        if (a === 'DELETE') return 'badge-action badge-delete';
+                        if (a === 'CANCEL') return 'badge-action badge-cancel';
+                        return 'badge-action badge-close';
+                    };
+                    const _actionIcon = (a) => {
+                        if (a === 'CREATE') return 'add_circle';
+                        if (a === 'UPDATE') return 'edit';
+                        if (a === 'DELETE') return 'delete';
+                        if (a === 'CANCEL') return 'cancel';
+                        if (a === 'CLOSE')  return 'check_circle';
+                        return 'radio_button_checked';
+                    };
+                    const _entityLabel = (e) => {
+                        if (e === 'SHIPMENT') return 'Envío';
+                        if (e === 'USER')     return 'Usuario';
+                        if (e === 'INCIDENT') return 'Incidencia';
+                        return e;
+                    };
+                %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th></tr>
+                        </thead>
+                        <tbody>
+                            <% actionLogs.forEach(log => { %>
+                            <%
+                                let _detail = {};
+                                try { _detail = log.detail ? JSON.parse(log.detail) : {}; } catch(e) { _detail = {}; }
+                            %>
+                            <tr>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
+                                <td><strong><%= log.user?.fullName || '—' %></strong></td>
+                                <td>
+                                    <% if (log.user?.roleId) { %>
+                                    <span class="badge-role"><%= roleLabels[log.user.roleId] || '—' %></span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">—</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span class="<%= _actionBadgeClass(log.action) %>">
+                                        <span class="material-symbols-outlined" style="font-size:.8rem"><%= _actionIcon(log.action) %></span>
+                                        <%= log.action %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="font-size:.8rem;color:var(--color-text-secondary)"><%= _entityLabel(log.entity) %></span>
+                                    <% if (log.entityId) { %><code style="font-size:.78rem;background:var(--color-bg);padding:.1rem .35rem;border-radius:5px;margin-left:.25rem">#<%= log.entityId %></code><% } %>
+                                </td>
+                                <td style="font-size:.8rem;color:var(--color-text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= JSON.stringify(_detail) %>">
+                                    <% const _keys = Object.keys(_detail); %>
+                                    <% if (_keys.length === 0) { %>—<% } else { %>
+                                    <%= _keys.slice(0,2).map(k => `${k}: ${_detail[k]}`).join(' · ') %><% if (_keys.length > 2) { %> …<% } %>
+                                    <% } %>
+                                </td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación acciones -->
+                <% if (actionPages > 1) { %>
+                <div class="pagination">
+                    <span class="pagination-info">Página <%= actionPage %> de <%= actionPages %> (<%= actionCount %> registros)</span>
+                    <% const _aBase = '/auditoria?aUserId=' + (auditFilters.aUserId||'') + '&entity=' + (auditFilters.entity||''); %>
+                    <a href="<%= _aBase %>&actionPage=<%= actionPage - 1 %>" class="btn-filter" <%- actionPage <= 1 ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        <span class="material-symbols-outlined">chevron_left</span> Anterior
+                    </a>
+                    <a href="<%= _aBase %>&actionPage=<%= actionPage + 1 %>" class="btn-filter" <%- actionPage >= actionPages ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        Siguiente <span class="material-symbols-outlined">chevron_right</span>
+                    </a>
+                </div>
+                <% } %>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Historial de configuración -->
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">history</span>
+                <h2>Cambios de configuración</h2>
+                <span class="badge-count"><%= settingLogs.length %> registros</span>
+            </div>
+            <div class="audit-card-body">
+                <% if (settingLogs.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">tune</span>
+                    No hay cambios de configuración registrados.
+                </div>
+                <% } else { %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Parámetro</th><th>Valor anterior</th><th>Valor nuevo</th></tr>
+                        </thead>
+                        <tbody>
+                            <% settingLogs.forEach(log => { %>
+                            <tr>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
+                                <td><strong><%= log.user ? log.user.fullName : 'Sistema' %></strong></td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.key %></code></td>
+                                <td style="color:var(--color-text-secondary)"><%= log.oldValue || '—' %></td>
+                                <td><strong style="color:var(--color-text)"><%= log.newValue || '—' %></strong></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

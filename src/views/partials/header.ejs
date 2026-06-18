@@ -36,6 +36,7 @@
                 <% if (currentUser.roleId === 4) { %>
                     <a href="/shipment/import"><ul><span class="material-symbols-outlined">upload_file</span>Importar CSV</ul></a>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
+                    <a href="/auditoria"><ul><span class="material-symbols-outlined">manage_search</span>Auditoría</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
                     <div class="nav-group" id="nav-group-reportes">
@@ -78,7 +79,6 @@
                             <a href="/setting/catalogos"><ul><span class="material-symbols-outlined">category</span>Catálogos</ul></a>
                             <a href="/setting/incidencias"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                             <a href="/fatigue/config"><ul><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (config)</ul></a>
-                            <a href="/setting/auditoria"><ul><span class="material-symbols-outlined">history</span>Auditoría</ul></a>
                         </div>
                     </div>
                 <% } %>
