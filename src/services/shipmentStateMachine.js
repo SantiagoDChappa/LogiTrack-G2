@@ -163,7 +163,7 @@ const getAvailableActions = ({ shipment, actor }) => {
     return actions;
 };
 
-const transition = ({ shipmentId, toStatusId, actor, comment, branchId, deliveryUserId, eventTypeOverride, latitude, longitude }) => {
+const transition = ({ shipmentId, toStatusId, actor, comment, branchId, deliveryUserId, eventTypeOverride, latitude, longitude, notificationEventOverride }) => {
     if (!actor || actor.roleId === undefined) {
         return Promise.reject(new StateMachineError('FORBIDDEN_ROLE', 'Actor sin rol'));
     }
@@ -232,7 +232,9 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
         // Notificacion por email (fuera de la transaccion, fire and forget).
         try {
             const { getEventCodeByShipmentStatus } = require('../models/notificationEvents');
-            const eventCode = getEventCodeByShipmentStatus(result.toStatusId);
+            // notificationEventOverride permite disparar una variante (ej. SHIPMENT_PACKAGE_FAILED_DELAY)
+            // en vez del evento genérico mapeado por estado destino.
+            const eventCode = notificationEventOverride || getEventCodeByShipmentStatus(result.toStatusId);
             if (eventCode) {
                 const shipmentCtrl = require('../controllers/shipment');
                 shipmentCtrl.notifyShipmentEvent(eventCode, shipmentId)

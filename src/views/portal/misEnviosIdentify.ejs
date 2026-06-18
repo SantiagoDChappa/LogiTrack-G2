@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis envíos - <%= support.nombre %></title>
+    <title>Portal autogestivo - <%= support.nombre %></title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <link rel="shortcut icon" href="/images/favicon.ico">
 </head>
 <body>
@@ -17,7 +17,7 @@
         <div class="portal-mis-envios-wrapper">
             <div class="portal-mis-envios-header">
                 <span class="portal-incident-eyebrow">Portal del cliente</span>
-                <h1>Mis envíos</h1>
+                <h1>Portal autogestivo</h1>
                 <p class="portal-mis-envios-lead">
                     Ingresá tu DNI y el email registrado en tus envíos. Te enviaremos un link de confirmación para acceder de forma segura.
                 </p>

@@ -11,9 +11,10 @@ const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
 const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
 const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
+const shipmentHistoryModel = require('../models/shipmentHistory');
+const { ShipmentHistoryEvent, NotificationEvent } = require('../constants/enums');
 const settingModel = require('../models/setting');
 const { URLSearchParams } = require('url');
-const { NotificationEvent } = require('../constants/enums');
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -120,6 +121,16 @@ const buildChatbotShipment = (shipment) => {
             branchName: item.branch?.name || null,
             eventType: item.eventType || null,
         })),
+        // Incidencias reales del envío (campos seguros ya armados por buildPublicIncidents),
+        // para que el chatbot pueda listarlas cuando el cliente consulta "incidencia".
+        incidents: (shipment.incidents || []).map((inc) => ({
+            id: inc.id,
+            typeLabel: inc.typeLabel,
+            statusLabel: inc.statusLabel,
+            resolutionLabel: inc.resolutionLabel,
+            createdAtLabel: inc.createdAtLabel,
+            closedAtLabel: inc.closedAtLabel,
+        })),
     });
 };
 
@@ -217,6 +228,7 @@ const getPortal = async (req, res) => {
         for (const s of shipmentsWithHistory) {
             s.incidents = await buildPublicIncidents(s.id);
             s.recovery  = await buildRecovery(s.id);
+            s.returns   = await buildPublicReturns(s.id);
         }
 
         return res.render('portal', {
@@ -303,6 +315,22 @@ const buildRecovery = async (shipmentId) => {
     });
 };
 
+const buildPublicReturns = async (shipmentId) => {
+    const returnIncidentService = require('../services/returnIncidentService');
+    const { ReturnReasonLabel } = require('../constants/enums');
+    const rows = await returnIncidentService.listByShipment(shipmentId);
+    return rows.map(r => {
+        const j = r.toJSON ? r.toJSON() : r;
+        return {
+            id:          j.id,
+            status:      j.status,
+            statusLabel: returnIncidentService.portalStatusLabel(j),
+            reasonLabel: ReturnReasonLabel[j.returnReason]  || j.returnReason || 'Devolución',
+            createdAt:   j.createdAt,
+        };
+    });
+};
+
 const findShipmentByTracking = (trackingId) => {
     const t = (trackingId || '').trim();
     if (!t) { return null; }
@@ -310,7 +338,8 @@ const findShipmentByTracking = (trackingId) => {
         where: { trackingId: t.toUpperCase() },
         include: [
             { model: Person, as: 'sender',    attributes: ['id', 'fullName', 'document', 'email'] },
-            { model: Person, as: 'recipient', attributes: ['id', 'fullName', 'document', 'email'] }
+            { model: Person, as: 'recipient', attributes: ['id', 'fullName', 'document', 'email'] },
+            { model: Status, as: 'status',    attributes: ['description'] }
         ]
     });
 };
@@ -323,7 +352,7 @@ const getPublicCreateForm = async (req, res) => {
         return res.status(404).render('portal/incidentNew', {
             shipment: null,
             trackingId,
-            types: await incidentTypeModel.getActive(),
+            types: await incidentTypeModel.getClientFacing(),
             error: 'No se encontró un envío con ese código de seguimiento.',
             form: {}
         });
@@ -332,7 +361,7 @@ const getPublicCreateForm = async (req, res) => {
     res.render('portal/incidentNew', {
         shipment,
         trackingId,
-        types: await incidentTypeModel.getActive(),
+        types: await incidentTypeModel.getClientFacing(),
         error: null,
         form: {}
     });
@@ -346,7 +375,7 @@ const getPublicCreateForm = async (req, res) => {
 // Retorna:
 //   { ok: true, pending: { token, email, expiresAt, devLink? }, shipment, type }
 //   { ok: false, status, message }
-const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, attachment }) => {
+const createIncidentFromPortal = async ({ trackingId, incidentTypeId, description, reporterName, reporterEmail, reporterDocument, otherTypeText, attachment }) => {
     const tracking = (trackingId || '').trim().toUpperCase();
     if (!tracking)                                                        { return { ok: false, status: 400, message: 'Código de seguimiento requerido.' }; }
     if (!incidentTypeId)                                                  { return { ok: false, status: 400, message: 'Seleccione un tipo de incidencia.' }; }
@@ -359,15 +388,25 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
 
     const type = await incidentTypeModel.getById(Number(incidentTypeId));
     if (!type || !type.active) { return { ok: false, status: 400, message: 'Tipo de incidencia inválido.' }; }
+    // Defensa: aunque la UI ya limita los tipos, rechazamos por las dudas si llega uno
+    // que el cliente no debería poder reportar (form manipulado / type fuera del set).
+    if (!incidentTypeModel.isClientFacing(type.code)) {
+        return { ok: false, status: 400, message: 'Ese tipo de incidencia no está disponible para reportar desde el portal.' };
+    }
 
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
-    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
-    if (eligibilityError) { return { ok: false, status: 400, message: eligibilityError }; }
+    // Mismas validaciones que el alta interna: duplicado del mismo tipo + estado
+    // bloqueado, y además bloqueo de demora si el envío sigue dentro del plazo
+    // (los canales cliente no tienen el "confirmar igual" del operador).
+    const eligibilityError = incidentRules.getClientEligibilityError(shipment, type, openIncidents);
+    // field: 'eligibility' → no es un problema de email; el chatbot NO debe mandar a
+    // "cambiá el email" sino mostrar el motivo (ej: el envío aún no está demorado).
+    if (eligibilityError) { return { ok: false, status: 400, field: 'eligibility', message: eligibilityError }; }
 
     // Validar que el email del reportante coincida con sender o recipient.
     const emailCheck = incidentEmailValidation.validateReporterEmail(shipment, reporterEmail);
     if (!emailCheck.ok) {
-        return { ok: false, status: 400, message: emailCheck.message };
+        return { ok: false, status: 400, field: 'email', message: emailCheck.message };
     }
 
     // Limpiar tokens expirados antes de insertar uno nuevo (lazy GC).
@@ -376,11 +415,18 @@ const createIncidentFromPortal = async ({ trackingId, incidentTypeId, descriptio
     const token = crypto.randomBytes(24).toString('hex'); // 48 chars hex
     const expiresAt = new Date(Date.now() + CONFIRMATION_TTL_HOURS * 60 * 60 * 1000);
 
+    // Tipo "Otro": el cliente escribe el tipo libremente; lo anteponemos a la descripción
+    // para que el operador lo vea (el tipo del catálogo sigue siendo OTHER).
+    const otherTxt = String(otherTypeText || '').trim().slice(0, 80);
+    const fullDescription = (type.code === 'OTHER' && otherTxt)
+        ? `Tipo indicado por el cliente: ${otherTxt}.\n\n${String(description).trim()}`
+        : String(description).trim();
+
     await incidentPendingModel.create({
         token,
         shipmentId:       shipment.id,
         incidentTypeId:   type.id,
-        description:      String(description).trim().slice(0, 2000),
+        description:      fullDescription.slice(0, 2000),
         reporterName:     String(reporterName).trim().slice(0, 120),
         reporterEmail:    String(reporterEmail).trim().slice(0, 160),
         reporterDocument: reporterDocument ? String(reporterDocument).trim().slice(0, 20) : null,
@@ -461,8 +507,9 @@ const confirmIncidentByToken = async (rawToken) => {
     }
 
     // Re-evaluamos elegibilidad: puede haber cambiado el estado del envio en este lapso.
+    // Mismas reglas que el alta (incluye bloqueo de demora dentro de plazo y duplicados).
     const openIncidents = await incidentModel.findOpenByShipment(shipment.id);
-    const eligibilityError = incidentRules.getEligibilityError(shipment, type, openIncidents);
+    const eligibilityError = incidentRules.getClientEligibilityError(shipment, type, openIncidents);
     if (eligibilityError) {
         await incidentPendingModel.deleteByToken(token).catch(() => {});
         return { ok: false, status: 400, message: `No se puede confirmar el reporte: ${eligibilityError}` };
@@ -529,12 +576,8 @@ const confirmIncidentByToken = async (rawToken) => {
         reporterEmail: pending.reporterEmail,
         matchedRole:   pending.matchedRole
     }).catch(e => console.error('[portal] notif incidencia confirmada:', e.message));
-
-    // Si el cliente reportó una demora, enviarle el email accionable con opciones de resolución.
-    if (type.code === 'DELAY') {
-        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_DELAYED, shipment.id)
-            .catch(e => console.error('[portal] notif SHIPMENT_DELAYED por incidencia:', e.message));
-    }
+    // El aviso accionable de demora (SHIPMENT_DELAYED) ya lo dispara notifyIncidentCreated
+    // para el tipo DELAY, así que no se reenvía acá (evita duplicado).
 
     return { ok: true, incident, shipment, type };
 };
@@ -553,7 +596,7 @@ const buildAttachmentFromFile = (file) => {
 const createPublic = async (req, res) => {
     const result = await createIncidentFromPortal({ ...req.body, attachment: buildAttachmentFromFile(req.file) });
     if (!result.ok) {
-        const types = await incidentTypeModel.getActive();
+        const types = await incidentTypeModel.getClientFacing();
         return res.status(result.status).render('portal/incidentNew', {
             shipment: await findShipmentByTracking((req.body.trackingId || '').trim().toUpperCase()),
             trackingId: (req.body.trackingId || '').trim().toUpperCase(),
@@ -654,16 +697,23 @@ const getSelfServiceForm = async (req, res) => {
         // cuándo recibiría a domicilio vs cuándo podría retirar por sucursal y decide.
         const { estimateDeliveryDate } = require('../utils/deliveryEstimate');
         const etaFmt = { day: '2-digit', month: 'long', year: 'numeric', weekday: 'long' };
+        // Recálculo ML (urgencia express): nueva fecha más pronta para el envío demorado.
+        // Si el ML no está disponible cae a una heurística rápida (no bloquea la carga).
+        const expressEta = await require('../services/deliveryEtaPredictor').predictExpressEta(shipment);
         res.render('portal/selfService', {
             shipment,
             timeWindows,
             branches,
             editable,
             saved: req.query.saved === '1',
+            accepted: req.query.accepted === '1',
             appliedCount: Number(req.query.applied) || 0,
             pendingCount: Number(req.query.pending) || 0,
             etaHomeLabel:   formatDate(estimateDeliveryDate({ mode: 'home' }), etaFmt),
             etaPickupLabel: formatDate(estimateDeliveryDate({ mode: 'branch_pickup' }), etaFmt),
+            expressEtaLabel: formatDate(expressEta.date, etaFmt),
+            expressEtaIso:   expressEta.date.toISOString().slice(0, 10),
+            expressEtaSource: expressEta.source,
         });
     } catch (err) {
         console.error('getSelfServiceForm:', err.message);
@@ -686,6 +736,45 @@ const saveSelfService = async (req, res) => {
         // NFAL07: no permitir reprogramar con un link ya usado o vencido.
         if (shipmentModel.selfServiceTokenState(shipment) !== 'ok') {
             return res.status(410).render('error', { status: 410, reason: SELF_SERVICE_LINK_INVALID_MSG });
+        }
+
+        // ── Demora: el destinatario ACEPTA esperar la nueva fecha (recálculo express) ──
+        // No cambia franja/modalidad, solo confirma la nueva fecha estimada. Antes este
+        // caso caía en "No se detectaron cambios" y dejaba la página colgada; ahora se
+        // persiste expectedDeliveryDate (visible en detalle de envío) y se consume el link.
+        const wantsJson = (req.get('accept') || '').includes('application/json');
+        if (req.body.action === 'accept_new_date') {
+            if (!canModifyShipment(shipment)) {
+                const msg = 'Este envío ya no admite cambios desde autogestión.';
+                return wantsJson ? res.status(409).json({ ok: false, error: msg })
+                    : res.status(409).render('error', { status: 409, reason: msg });
+            }
+            const iso = String(req.body.newExpectedDate || '').slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(new Date(iso).getTime())) {
+                const msg = 'La nueva fecha de entrega no es válida.';
+                return wantsJson ? res.status(400).json({ ok: false, error: msg })
+                    : res.status(400).render('error', { status: 400, reason: msg });
+            }
+            await Shipment.update({ expectedDeliveryDate: iso }, { where: { id: shipment.id } });
+            await shipmentHistoryModel.create({
+                shipmentId:   shipment.id,
+                fromStatusId: shipment.statusId,
+                toStatusId:   shipment.statusId,
+                comment:      `El destinatario aceptó esperar la nueva fecha estimada de entrega (${iso}) desde autogestión por demora.`,
+                userId:       null,
+                eventType:    ShipmentHistoryEvent.MODIFICATION_APPLIED,
+            }).catch(e => console.error('saveSelfService accept history:', e.message));
+            // Aviso de reprogramación al cliente (best-effort).
+            try {
+                require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_RESCHEDULED, shipment.id).catch(() => {});
+            } catch { /* notif best-effort */ }
+            await shipmentModel.markSelfServiceTokenUsed(shipment.id)
+                .catch(e => console.error('markSelfServiceTokenUsed:', e.message));
+
+            if (wantsJson) {
+                return res.json({ ok: true, trackingId: shipment.trackingId, newDate: iso });
+            }
+            return res.redirect(`/portal/self-saved/${shipment.trackingId}?accepted=1`);
         }
 
         const result = await submitPortalModification({
@@ -732,7 +821,10 @@ const getSelfServiceSaved = (req, res) => {
     const { trackingId } = req.params;
     const appliedCount = Number(req.query.applied) || 0;
     const pendingCount = Number(req.query.pending) || 0;
-    res.render('portal/selfServiceSaved', { trackingId, appliedCount, pendingCount });
+    res.render('portal/selfServiceSaved', {
+        trackingId, appliedCount, pendingCount,
+        accepted: req.query.accepted === '1',
+    });
 };
 
 module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };

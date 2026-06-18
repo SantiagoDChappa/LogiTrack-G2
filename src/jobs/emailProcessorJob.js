@@ -1,6 +1,60 @@
 const NotificationEmail = require('../models/notificationEmail');
 const emailSender = require('../services/notification/emailSender');
+const settingModel = require('../models/setting');
 
+// ¿Envío AUTOMÁTICO habilitado? Kill-switch desde la bandeja de Notificaciones
+// (setting 'email_auto_send_enabled'). Default ON. Apagado => el cron y el envío
+// inmediato NO procesan (los mails quedan PENDING). NO afecta el envío MANUAL
+// (botón "Enviar pendientes"), que llama processPendingEmails directo.
+// Fail-safe: si la DB falla, asume habilitado (no bloquea por un error transitorio).
+async function isAutoSendEnabled() {
+    try {
+        const v = await settingModel.get('email_auto_send_enabled');
+        return (v === null || v === undefined) ? true : (v !== '0' && v !== 'false');
+    } catch {
+        return true;
+    }
+}
+
+// Procesa UN mail: lo reclama (UPDATE atómico PENDING->PROCESSING, evita doble
+// envío entre el cron y el inmediato), lo manda y marca el resultado.
+// Devuelve 'sent' | 'retried' | 'skipped'. Lo usan el batch (cron) y queueEmail.
+async function processOneEmail(email) {
+    const claimed = await NotificationEmail.claimEmailForProcessing(email.id);
+    if (!claimed) {
+        // Otro proceso (cron o inmediato) ya lo tomó.
+        console.log(`[email-job] mail #${email.id} ya lo está procesando otro worker, se saltea`);
+        return 'skipped';
+    }
+    try {
+        const result = await emailSender.sendEmailWithResult(email.recipient, email.subject, email.body, email.format);
+        // Registra en el historial cada intento de proveedor (SendGrid/Resend/SMTP).
+        for (const att of (result.attempts || [])) {
+            await NotificationEmail.logAttempt({
+                emailId:  email.id,
+                provider: att.provider,
+                success:  att.ok,
+                error:    att.error,
+            }).catch(() => {});
+        }
+        if (result.ok) {
+            await NotificationEmail.markAsSentWithProvider(email.id, result.provider);
+            console.log(`[email-job] mail #${email.id} ENVIADO por ${result.provider}`);
+            return 'sent';
+        }
+        await NotificationEmail.scheduleRetry(email.id, email.attempts, result.error || 'fallo de envío (ver log [email] ERROR)');
+        console.warn(`[email-job] mail #${email.id} NO se envió, reprogramado (intentos=${email.attempts})`);
+        return 'retried';
+    } catch (error) {
+        await NotificationEmail.logAttempt({ emailId: email.id, provider: null, success: false, error: error.message }).catch(() => {});
+        await NotificationEmail.scheduleRetry(email.id, email.attempts, error.message);
+        console.error(`[email-job] mail #${email.id} EXCEPCIÓN, reprogramado:`, error.message);
+        return 'retried';
+    }
+}
+
+// Batch: la RED DE SEGURIDAD del cron. Barre PENDING (mails que el envío inmediato
+// no alcanzó + reintentos por nextRetryAt). El envío al instante lo hace queueEmail.
 async function processPendingEmails() {
     const emails = await NotificationEmail.findPending();
     // Resumen del lote (lo usa el botón manual de Ajustes para dar feedback).
@@ -12,32 +66,12 @@ async function processPendingEmails() {
     console.log(`[email-job] procesando ${emails.length} mail(s) pendiente(s)`);
 
     for (const email of emails) {
-        const claimed = await NotificationEmail.claimEmailForProcessing(email.id);
-
-        if (!claimed) {
-            summary.skipped += 1;
-            console.log(`[email-job] mail #${email.id} ya lo está procesando otro worker, se saltea`);
-            continue; // Otro proceso ya lo está manejando
-        }
-        try {
-            const ok = await emailSender.sendEmail(email.recipient, email.subject, email.body, email.format);
-            if (ok) {
-                await NotificationEmail.markAsSent(email.id);
-                summary.sent += 1;
-                console.log(`[email-job] mail #${email.id} marcado como ENVIADO`);
-            } else {
-                // sendEmail devolvió false (error SMTP ya logueado): reintentar luego.
-                await NotificationEmail.scheduleRetry(email.id, email.attempts, 'sendEmail devolvió false (ver log [email] ERROR)');
-                summary.retried += 1;
-                console.warn(`[email-job] mail #${email.id} NO se envió, reprogramado para reintento (intentos=${email.attempts})`);
-            }
-        } catch (error) {
-            await NotificationEmail.scheduleRetry(email.id, email.attempts, error.message);
-            summary.retried += 1;
-            console.error(`[email-job] mail #${email.id} EXCEPCIÓN, reprogramado:`, error.message);
-        }
+        const outcome = await processOneEmail(email);
+        if (outcome === 'sent') { summary.sent += 1; }
+        else if (outcome === 'retried') { summary.retried += 1; }
+        else { summary.skipped += 1; }
     }
     return summary;
 };
 
-module.exports = { processPendingEmails };
+module.exports = { processPendingEmails, processOneEmail, isAutoSendEnabled };

@@ -49,6 +49,7 @@ const CHATBOT_PUBLIC_POLICY = {
                 'lastMovementDateLabel',
                 'lastComment',
                 'history',
+                'incidents',
             ],
         },
     },
@@ -59,6 +60,18 @@ const CHATBOT_PUBLIC_POLICY = {
             'toStatus',
             'branchName',
             'comment',
+        ],
+    },
+    // Campos seguros de cada incidencia expuesta al cliente en el chatbot
+    // (mismos que ya muestra el portal publico via buildPublicIncidents).
+    incidents: {
+        allow: [
+            'id',
+            'typeLabel',
+            'statusLabel',
+            'resolutionLabel',
+            'createdAtLabel',
+            'closedAtLabel',
         ],
     },
     exposureByStatus: {

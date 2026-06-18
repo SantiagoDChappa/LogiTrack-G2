@@ -12,6 +12,11 @@ const DEFAULTS = Object.freeze({
     notifyAdmins:            true,
     notifyReporter:          false,
     notifyShipmentRecipient: false,
+    // Filtro fino: cuando notifyShipmentRecipient esta ON, ademas se respeta
+    // el toggle por tipo. Default ON para preservar comportamiento previo.
+    notifyOnDelay:           true,
+    notifyOnDamage:          true,
+    notifyOnGeneric:         true,
     customEmails:            ''
 });
 
@@ -20,7 +25,10 @@ const BOOLEAN_KEYS = [
     'notifyAssignedOperator',
     'notifyAdmins',
     'notifyReporter',
-    'notifyShipmentRecipient'
+    'notifyShipmentRecipient',
+    'notifyOnDelay',
+    'notifyOnDamage',
+    'notifyOnGeneric'
 ];
 
 const isValidEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());

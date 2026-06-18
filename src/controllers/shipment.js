@@ -13,6 +13,29 @@ const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+
+// Default ETA si el operador no carga fecha estimada al crear/modificar.
+// Express → +2 días, Standard → +5, sin tipo → +3. Devuelve 'YYYY-MM-DD' (DATEONLY).
+const computeDefaultExpectedDeliveryDate = (shipmentTypeId) => {
+    const typeId = Number(shipmentTypeId);
+    let days = 3;
+    if (typeId === ShipmentType.EXPRESS.id)  { days = 2; }
+    if (typeId === ShipmentType.STANDARD.id) { days = 5; }
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+};
+
+// La fecha estimada de entrega debe ser posterior a hoy: no se admite una fecha
+// anterior ni igual al día de hoy. Si no viene (se calculará por default), es válida.
+const isValidFutureDeliveryDate = (val) => {
+    if (!val) { return true; }
+    const d = new Date(`${val}T00:00:00`);
+    if (Number.isNaN(d.getTime())) { return false; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d.getTime() > today.getTime();
+};
 const { validationResult } = require('express-validator');
 const csvImport = require('../services/csvImport');
 const csvExport = require('../services/csvExport');
@@ -211,46 +234,45 @@ const getDetail = async (req, res) => {
         return { delivered: true, expected, actual, daysLate, penaltyPct: Math.min(50, daysLate * 5), onTime: daysLate === 0 };
     })();
 
-    // Desglose costo cliente (estimacion simple: zona base + recargo peso/vol + distancia haversine)
-    const costClient = await (async () => {
-        const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
-        const w = Number(shipment.weightKg || 0);
-        const v = Number(shipment.volumeM3 || 0);
+    // Desglose costo cliente (zona base + recargo peso/vol). Centralizado en shipmentCostService
+    // para reutilizarlo en la nota de crédito (LGT-214).
+    const costClient = await require('../services/shipmentCostService')
+        .computeCost(shipment, { penaltyPct: sla?.penaltyPct || 0 });
 
-        if (!shipment.zone) {
-            return costoBase > 0 ? {
-                costoBase,
-                zoneBase: 0,
-                wSurcharge: 0,
-                vSurcharge: 0,
-                subtotal: costoBase,
-                penalty: 0,
-                final: costoBase
-            } : null;
-        }
 
-        const zone = shipment.zone;
-        const zoneBase = Number(zone.baseCost || 0);
-        const wSurcharge = Number(zone.surchargePerKg || 0) * w;
-        const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
-        const subtotal = costoBase + zoneBase + wSurcharge + vSurcharge;
-        const penalty = sla?.penaltyPct ? subtotal * (sla.penaltyPct / 100) : 0;
-        return {
-            costoBase,
-            zoneBase,
-            wSurcharge,
-            vSurcharge,
-            subtotal,
-            penalty: Number(penalty.toFixed(2)),
-            final: Number((subtotal - penalty).toFixed(2))
-        };
-    })();
+    const replacementSvc = require('../services/replacementService');
+    const [incidentsForShipment, replacementShipment, originalShipment, invoice] = await Promise.all([
+        require('../models/incident').list({ shipmentId: id, limit: 50 }),
+        // Este envío generó un reemplazo (es el original).
+        replacementSvc.findExistingByOrigin(id),
+        // Este envío ES un reemplazo (busca el original al que apunta).
+        shipment.replacementOfShipmentId
+            ? shipmentModel.getById(shipment.replacementOfShipmentId)
+            : Promise.resolve(null),
+        // Factura del envío (comprobante al remitente).
+        require('../services/invoiceService').getByShipment(id),
+    ]);
 
+    // Alta interna de devolución: visible a staff cuando el envío es elegible
+    // (entregado + dentro de ventana + sin devolución previa). El form vuelve a validar igual.
+    const STAFF_ROLE_IDS = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id];
+    let canCreateReturn = false;
+    if (viewer && STAFF_ROLE_IDS.includes(viewer.roleId)) {
+        const elig = await require('../services/returnIncidentService').checkEligibility(shipment).catch(() => ({ ok: false }));
+        canCreateReturn = !!elig.ok;
+    }
 
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
+        incidents: incidentsForShipment,
+        replacementShipment,
+        originalShipment,
+        isAdmin: isAdminUser(viewer),
+        currentBranch,
+        canCreateReturn,
+        returnError: req.query.returnError || null,
     });
 };
 
@@ -287,6 +309,9 @@ const createShipment = async (req, res) => {
 
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+        if (!isValidFutureDeliveryDate(body.expectedDeliveryDate)) {
+            throw new Error('La fecha estimada de entrega debe ser posterior a hoy.');
+        }
 
         let pickupBranch = null;
         if (isPickup) {
@@ -453,7 +478,7 @@ const createShipment = async (req, res) => {
             priority:        initialPriority,
             currentBranchId: resolvedCurrentBranchId,
             zoneId: resolvedZone?.id || null,
-            expectedDeliveryDate: body.expectedDeliveryDate || null,
+            expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
         }, { transaction: t });
@@ -475,6 +500,26 @@ const createShipment = async (req, res) => {
         });
 
         const freshShipment = await shipmentModel.getById(shipment.id);
+
+        // LGT-214 precondición: persistir costo al momento de creación.
+        const costSvc = require('../services/shipmentCostService');
+        const costTotal = await costSvc.computeTotal(freshShipment);
+        if (costTotal > 0) {
+            await shipmentModel.Shipment.update({ costTotal }, { where: { id: freshShipment.id } });
+            freshShipment.costTotal = costTotal;
+        }
+
+        // Factura del envío (comprobante al remitente) con el desglose de costo.
+        // Best-effort: un fallo de facturación no debe tumbar el alta del envío.
+        try {
+            await require('../services/invoiceService').generate({
+                shipmentId: freshShipment.id,
+                userId: res.locals.currentUser?.id || null,
+            });
+        } catch (e) {
+            console.error('[createShipment] factura:', e.message);
+        }
+
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
 
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
@@ -565,7 +610,16 @@ const getUpdateShipment = async (req, res) => {
     const returnUrl = req.query.from || '/shipment';
     const currentUser = res.locals.currentUser;
     const canChangeStatus = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id].includes(currentUser?.roleId);
-    const availableActions = stateMachine.getAvailableActions({ shipment, actor: currentUser });
+    // Estados que son hechos físicos de campo (los confirma el repartidor por scan/ruta/POD):
+    // En Tránsito, En Sucursal, Entregado e Intento Fallido NO se setean a dedo desde el escritorio.
+    // La máquina de estados los sigue permitiendo por sus flujos operativos (despacho de ruta, scans);
+    // acá solo los sacamos de los botones de "modificar envío".
+    const DESK_BLOCKED_STATUSES = new Set([
+        Status.IN_TRANSIT.id, Status.AT_BRANCH.id, Status.DELIVERED.id, Status.FAILED_ATTEMPT.id,
+    ]);
+    const availableActions = stateMachine
+        .getAvailableActions({ shipment, actor: currentUser })
+        .filter(a => !DESK_BLOCKED_STATUSES.has(a.toStatusId));
     res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
 };
 
@@ -867,8 +921,17 @@ const cancelShipment = async (req, res) => {
 const markPackageFailed = async (req, res) => {
     try {
         const { id } = req.params;
-        const { comment } = req.body;
+        const { comment, reason } = req.body;
         const currentUser = res.locals.currentUser;
+
+        // Mapeo motivo → variante del template del cliente. Si no llega reason valido,
+        // queda el genérico SHIPMENT_PACKAGE_FAILED (backward compatible).
+        const REASON_TO_EVENT = {
+            UNDELIVERED: NotificationEvent.SHIPMENT_PACKAGE_FAILED_UNDELIVERED,
+            DELAY:       NotificationEvent.SHIPMENT_PACKAGE_FAILED_DELAY,
+            ATTEMPT:     NotificationEvent.SHIPMENT_PACKAGE_FAILED_ATTEMPT,
+        };
+        const notificationEventOverride = REASON_TO_EVENT[String(reason || '').toUpperCase()] || null;
 
         const actorCoords = await resolveUserBranchCoords(currentUser?.id);
         await stateMachine.transition({
@@ -879,6 +942,7 @@ const markPackageFailed = async (req, res) => {
             branchId: actorCoords.branchId,
             latitude: actorCoords.latitude,
             longitude: actorCoords.longitude,
+            notificationEventOverride,
         });
 /*
         const shipment = await shipmentModel.getById(id);
@@ -887,13 +951,24 @@ const markPackageFailed = async (req, res) => {
         // US-E02: generar incidencia automática por paquete fallido (dedup interno).
         try {
             const { autoCreateIncident } = require('../services/incidentAutoGen');
+            let createdIncident = null;
             await sequelize.transaction(async (t) => {
-                await autoCreateIncident({
+                createdIncident = await autoCreateIncident({
                     shipmentId:  Number(id),
                     typeCode:    'PACKAGE_BROKEN',
                     description: `Paquete fallido${comment ? `: ${comment}` : ''}.`
                 }, t);
             });
+            // PAQUETE DAÑADO → avisar SIEMPRE al cliente para que elija reembolso/reemplazo
+            // (mismo pipeline que el alta manual / portal). Solo si efectivamente se creó
+            // la incidencia (autoCreateIncident devuelve null por dedup).
+            if (createdIncident) {
+                require('../services/incidentDamageResolution').notifySenderIfDamage({
+                    incidentId: createdIncident.id,
+                    shipment:   { id: Number(id) },
+                    type:       { code: 'PACKAGE_BROKEN' },
+                }).catch(e => console.error('[shipment] notif daño cliente:', e.message));
+            }
         } catch (e) { console.error('[shipment] autoCreateIncident:', e.message); }
 
         res.redirect(`/shipment/update/${id}?success=6`);
@@ -1147,7 +1222,7 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
         }
         // Avisos sobre una incidencia ya creada (paquete dañado / incidencia / cambio de
         // estado): el enlace debe llevar a ESA incidencia, no al alta de una nueva.
-        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED];
+        const INCIDENT_EVENTS = [NotificationEvent.SHIPMENT_INCIDENT, NotificationEvent.SHIPMENT_PACKAGE_FAILED, NotificationEvent.SHIPMENT_PACKAGE_DAMAGED];
         if (!vars._incidentId && INCIDENT_EVENTS.includes(eventCode)) {
             try {
                 const { Incident } = require('../models/incident');
@@ -1160,12 +1235,33 @@ async function notifyShipmentEvent(eventCode, shipmentOrId, extraVars = {}) {
         }
         const fill = (s) => placeholders.render(s, vars);
 
-        await queueEmail({
-            recipient: recipients.join(','),
-            subject:   fill(template.subject),
-            body:      fill(template.body),
-            format:    template.format || 'text',
-        });
+        // LGT-219: el evento se envía por los canales configurados (multi-selección).
+        // Default 'email' preserva el comportamiento previo. In-app no aplica a eventos de
+        // envío (el destinatario es el cliente, un Person, no un usuario del sistema); ese
+        // canal lo consumen los eventos internos (ver LGT-89).
+        const channels = String(cfg.channels || 'email').split(',').map(s => s.trim()).filter(Boolean);
+        const wantEmail = channels.length === 0 || channels.includes('email');
+        const wantSms   = channels.includes('sms');
+
+        if (wantEmail) {
+            await queueEmail({
+                recipient: recipients.join(','),
+                subject:   fill(template.subject),
+                body:      fill(template.body),
+                format:    template.format || 'text',
+            });
+        }
+
+        if (wantSms) {
+            // Esc.3/4: SMS real por Twilio al teléfono del destinatario según el modo;
+            // si no tiene teléfono o no hay credenciales, se omite (los demás canales igual van).
+            const { sendSms } = require('../services/notification/smsSender');
+            const phones = [];
+            if ((mode === 'recipient' || mode === 'both') && shipment.recipient?.phone) { phones.push(shipment.recipient.phone); }
+            if ((mode === 'sender'    || mode === 'both') && shipment.sender?.phone)    { phones.push(shipment.sender.phone);    }
+            const smsText = fill(template.subject);
+            phones.forEach((ph) => { sendSms(ph, smsText).catch((e) => console.error('[sms] notify:', e.message)); });
+        }
     } catch (err) {
         console.error('notifyShipmentEvent error:', err.message);
     }

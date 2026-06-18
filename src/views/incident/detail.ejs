@@ -19,18 +19,24 @@
         </div>
 
         <% const errCode = (typeof query !== 'undefined' && query.error) || null; %>
+        <%# Devolución = incidencia tipo RETURN: se gestiona con panel dedicado (tomar/aprobar/rechazar). %>
+        <% const isReturn = !!(incident.type && incident.type.code === 'RETURN'); %>
         <% const errMessages = {
             resolution_required: 'Debés seleccionar una resolución (Procedente / No procedente) para cerrar la incidencia.',
-            comment_required:    'El comentario de cierre es obligatorio.',
+            comment_required:    'El comentario es obligatorio para esta acción.',
             already_closed:      'La incidencia ya estaba cerrada.',
             not_closed:          'Solo se pueden reabrir incidencias cerradas.',
             closed:              'La incidencia está cerrada; no se puede modificar.',
             invalid_status:      'Estado inválido para la transición solicitada.',
+            invalid_transition:  'Transición de estado no permitida (flujo: Abierta → En revisión → Cerrada).',
             invalid_user:        'El usuario asignado no es válido.',
             checklist_incomplete:'No se puede cerrar: quedan tareas obligatorias del checklist sin completar.',
             task_not_found:      'La tarea indicada no existe.',
             file_required:       'Seleccioná un archivo para adjuntar.',
-            file_type:           'Tipo de archivo no permitido (solo JPG, PNG o PDF).'
+            file_type:           'Tipo de archivo no permitido (solo JPG, PNG o PDF).',
+            action_requires_procedente: 'La acción sobre el envío requiere resolución procedente.',
+            shipment_already_terminal:  'El envío ya está en estado final, no se puede cancelar.',
+            resolution_required_before_close: 'Antes de cerrar tenés que marcar la resolución (Procedente / No procedente).'
         }; %>
         <% if (errCode) { %>
             <div class="alert alert-error"><%= errMessages[errCode] || errCode %></div>
@@ -47,10 +53,10 @@
                         <% } else { %>—<% } %>
                     </dd>
                     <dt>Tipo</dt><dd><%= incident.type ? incident.type.description : '—' %></dd>
-                    <dt>Estado</dt><dd><span class="incident-badge incident-badge--<%= incident.status.toLowerCase() %>"><%= incident.status %></span></dd>
-                    <dt>Resolución</dt><dd><%= incident.resolution || '—' %></dd>
+                    <dt>Estado</dt><dd><span class="incident-badge incident-badge--<%= incident.status.toLowerCase() %>"><%= IncidentStatusLabel[incident.status] || incident.status %></span></dd>
+                    <dt>Resolución</dt><dd><%= incident.resolution ? (IncidentResolutionLabel[incident.resolution] || incident.resolution) : '—' %></dd>
                     <% if (incident.damageChoice) { %>
-                    <dt>Elección del remitente</dt><dd><strong><%= incident.damageChoice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong><% if (incident.damageChoiceAt) { %> · <%= new Date(incident.damageChoiceAt).toLocaleString('es-AR') %><% } %></dd>
+                    <dt>Elección del remitente</dt><dd><strong><%= incident.damageChoice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong><% if (incident.damageChoiceAt) { %> · <%= fmtDateTime(incident.damageChoiceAt) %><% } %></dd>
                     <% } %>
                     <dt>Prioridad</dt><dd>P<%= incident.priority %></dd>
                     <dt>Escalado</dt><dd><%= incident.escalated ? 'Sí' : 'No' %></dd>
@@ -66,19 +72,21 @@
                         <% } %>
                     </dd>
                     <dt>Asignada a</dt><dd><%= incident.assignedTo ? incident.assignedTo.fullName : '—' %></dd>
-                    <dt>Creada</dt><dd><%= new Date(incident.createdAt).toLocaleString('es-AR') %></dd>
+                    <dt>Creada</dt><dd><%= fmtDateTime(incident.createdAt) %></dd>
                     <% if (incident.closedAt) { %>
-                        <dt>Cerrada</dt><dd><%= new Date(incident.closedAt).toLocaleString('es-AR') %> por <%= incident.closedBy ? incident.closedBy.fullName : '—' %></dd>
+                        <dt>Cerrada</dt><dd><%= fmtDateTime(incident.closedAt) %> por <%= incident.closedBy ? incident.closedBy.fullName : '—' %></dd>
                     <% } %>
                 </dl>
                 <h3>Descripción</h3>
                 <p class="incident-description"><%= incident.description %></p>
             </div>
 
-            <div class="incident-detail-card">
+            <div class="incident-detail-card incident-actions-card">
                 <h2>Acciones</h2>
+                <div class="incident-actions-inner">
 
                 <% if (flags.canAssign && assignableUsers.length) { %>
+                    <h4 class="incident-section-title"><span class="material-symbols-outlined">person_add</span> Asignar</h4>
                     <style>
                         .incident-assign-form { flex-direction: column; align-items: stretch; gap: .75rem; }
                         .incident-assign-form .form-group { display: flex; flex-direction: column; gap: .3rem; width: 100%; }
@@ -194,30 +202,165 @@
                         document.getElementById('assignForm').addEventListener('submit', function (e) {
                             if (!hiddenUser.value) {
                                 e.preventDefault();
-                                alert('Elegí una sucursal y un usuario antes de asignar.');
+                                showIncidentFeedback({
+                                    title: 'Falta asignar responsable',
+                                    subtitle: 'Necesitamos saber quién va a tomar esta incidencia.',
+                                    text: 'Elegí una sucursal y un usuario antes de asignar.'
+                                });
+                                return;
                             }
                         });
                     })();
                     </script>
                 <% } %>
 
-                <% if (flags.canChangeStatus) { %>
-                    <form method="POST" action="/incident/<%= incident.id %>/status" class="incident-action-form">
-                        <label>Cambiar estado a
-                            <select name="status">
-                                <% if (incident.status !== 'OPEN')      { %><option value="OPEN">Abierta</option><% } %>
-                                <% if (incident.status !== 'IN_REVIEW') { %><option value="IN_REVIEW">En revisión</option><% } %>
-                            </select>
-                        </label>
-                        <input type="text" name="comment" placeholder="Comentario (opcional)">
-                        <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Cambiar estado" aria-label="Cambiar estado">
-                            <span class="material-symbols-outlined">swap_horiz</span>
-                        </button>
-                    </form>
+                <% const hasStateActions = flags.canChangeStatus || flags.canClose || flags.canReopen || flags.canComment; %>
+                <% if (hasStateActions) { %>
+                    <h4 class="incident-section-title"><span class="material-symbols-outlined">edit_note</span> Comentario y acciones</h4>
+                    <div class="incident-master-comment">
+                        <label for="masterComment">Comentario <span class="incident-required" aria-hidden="true">*</span></label>
+                        <textarea id="masterComment" rows="3" required
+                                  placeholder="Escribí un comentario. Es obligatorio para cualquier acción (cambiar estado, cerrar, reabrir o comentar)."></textarea>
+                        <small class="incident-master-comment__hint">
+                            Al <strong>cambiar de estado / cerrar / reabrir</strong>, este comentario <strong>se le envía por mail al cliente</strong> y lo ve en el portal.
+                            Con <strong>“Solo comentar (interno)”</strong> queda <strong>interno</strong>: no se envía ni lo ve el cliente.
+                        </small>
+                        <% if (flags.canComment) { %>
+                            <form method="POST" action="/incident/<%= incident.id %>/comment" class="incident-master-comment__form" data-needs-comment="1">
+                                <input type="hidden" name="comment" value="">
+                                <button type="submit" class="btn-only-comment" title="Queda en el historial interno; el cliente no lo ve ni le llega por mail">
+                                    <span class="material-symbols-outlined">lock</span>
+                                    Solo comentar (interno)
+                                </button>
+                            </form>
+                        <% } %>
+                    </div>
+
+                    <% if (flags.canClose && !isReturn) { %>
+                        <!-- Resolución: marcar procedente / no procedente sin cerrar -->
+                        <div class="incident-resolution-block">
+                            <div class="incident-resolution-block__head">
+                                <span class="material-symbols-outlined">gavel</span>
+                                Resolución
+                                <% if (incident.resolution) { %>
+                                    <span class="incident-resolution-chip incident-resolution-chip--<%= incident.resolution === 'PROCEDENTE' ? 'ok' : 'no' %>">
+                                        <%= IncidentResolutionLabel[incident.resolution] %>
+                                    </span>
+                                <% } else { %>
+                                    <span class="incident-resolution-chip incident-resolution-chip--pending">Sin marcar</span>
+                                <% } %>
+                            </div>
+                            <div class="incident-resolution-buttons">
+                                <form method="POST" action="/incident/<%= incident.id %>/resolution" class="incident-resolution-form" data-needs-comment="1">
+                                    <input type="hidden" name="resolution" value="PROCEDENTE">
+                                    <input type="hidden" name="comment"    value="">
+                                    <button type="submit" class="btn-resolution btn-resolution--ok">
+                                        <span class="material-symbols-outlined">check_circle</span>
+                                        Marcar procedente
+                                    </button>
+                                </form>
+                                <form method="POST" action="/incident/<%= incident.id %>/resolution" class="incident-resolution-form" data-needs-comment="1">
+                                    <input type="hidden" name="resolution" value="NO_PROCEDENTE">
+                                    <input type="hidden" name="comment"    value="">
+                                    <button type="submit" class="btn-resolution btn-resolution--no">
+                                        <span class="material-symbols-outlined">cancel</span>
+                                        Marcar no procedente
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <!-- Cambio de estado: botones tipo "estado siguiente".
+                         Para devoluciones (RETURN) se ocultan; abajo va el panel dedicado. -->
+                    <% if (!isReturn) { %>
+                    <div class="incident-status-actions">
+                        <span class="incident-status-actions__label">Pasar a estado:</span>
+
+                        <% if (flags.canChangeStatus && incident.status === 'OPEN') { %>
+                            <form method="POST" action="/incident/<%= incident.id %>/status" class="incident-status-form" data-needs-comment="1">
+                                <input type="hidden" name="status"  value="IN_REVIEW">
+                                <input type="hidden" name="comment" value="">
+                                <button type="submit" class="btn-status btn-status--review">
+                                    <span class="material-symbols-outlined">play_arrow</span>
+                                    En revisión
+                                </button>
+                            </form>
+                        <% } %>
+
+                        <% if (flags.canClose) { %>
+                            <form method="POST" action="/incident/<%= incident.id %>/close" class="incident-status-form" data-needs-comment="1">
+                                <select name="shipmentAction" class="incident-close-action-inline">
+                                    <option value="none">Sin cambio de envío</option>
+                                    <option value="cancel" <%= incident.resolution !== 'PROCEDENTE' ? 'disabled' : '' %>>Cancelar envío (devolución)</option>
+                                </select>
+                                <input type="hidden" name="comment" value="">
+                                <button type="submit" class="btn-status btn-status--closed" <%= !incident.resolution ? 'disabled' : '' %>
+                                        <%= !incident.resolution ? 'title="Marcá la resolución primero"' : '' %>>
+                                    <span class="material-symbols-outlined">lock</span>
+                                    Cerrada
+                                </button>
+                            </form>
+                        <% } %>
+
+                        <% if (flags.canReopen) { %>
+                            <form method="POST" action="/incident/<%= incident.id %>/reopen" class="incident-status-form" data-needs-comment="1">
+                                <input type="hidden" name="comment" value="">
+                                <button type="submit" class="btn-status btn-status--reopen">
+                                    <span class="material-symbols-outlined">restart_alt</span>
+                                    En revisión (reabrir)
+                                </button>
+                            </form>
+                        <% } %>
+                    </div>
+                    <% } %>
+
+                    <%# Panel dedicado de devolución (incidencia tipo RETURN): tomar / aprobar (NC al remitente) / rechazar. %>
+                    <% if (isReturn && flags.canClose) { %>
+                        <div class="incident-resolution-block">
+                            <div class="incident-resolution-block__head">
+                                <span class="material-symbols-outlined">assignment_return</span>
+                                Gestión de devolución
+                            </div>
+                            <% if (incident.status === 'OPEN') { %>
+                                <form method="POST" action="/returns/<%= incident.id %>/take" class="incident-status-form" style="margin-bottom:.6rem;">
+                                    <button type="submit" class="btn-status btn-status--review">
+                                        <span class="material-symbols-outlined">play_arrow</span>
+                                        Tomar para revisión
+                                    </button>
+                                </form>
+                            <% } %>
+                            <% if (incident.status === 'OPEN' || incident.status === 'IN_REVIEW') { %>
+                                <div class="incident-resolution-buttons">
+                                    <form method="POST" action="/returns/<%= incident.id %>/resolve" class="incident-resolution-form"
+                                          onsubmit="return confirm('¿Aprobar la devolución? Se cerrará la incidencia y se emitirá una nota de crédito al remitente.');">
+                                        <input type="hidden" name="decision" value="approve">
+                                        <button type="submit" class="btn-resolution btn-resolution--ok">
+                                            <span class="material-symbols-outlined">check_circle</span>
+                                            Aprobar (reembolso al remitente)
+                                        </button>
+                                    </form>
+                                </div>
+                                <form method="POST" action="/returns/<%= incident.id %>/resolve" class="incident-action-form"
+                                      style="flex-direction:column;align-items:stretch;gap:.5rem;margin-top:.6rem;">
+                                    <input type="hidden" name="decision" value="reject">
+                                    <label for="returnRejectReason" style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--inc-muted,#64748b);">Motivo de rechazo</label>
+                                    <textarea id="returnRejectReason" name="rejectionReason" rows="2" required
+                                              placeholder="Detallá por qué la devolución no procede (se le informa al remitente)."
+                                              style="width:100%;padding:.5rem .7rem;border:1px solid var(--inc-border,#e2e8f0);border-radius:8px;background:var(--inc-surface,#fff);color:var(--inc-text,#1e293b);font:inherit;"></textarea>
+                                    <button type="submit" class="btn-resolution btn-resolution--no" style="align-self:flex-start;">
+                                        <span class="material-symbols-outlined">cancel</span>
+                                        Rechazar devolución
+                                    </button>
+                                </form>
+                            <% } %>
+                        </div>
+                    <% } %>
                 <% } %>
 
                 <% if (flags.canEscalate) { %>
-                    <form method="POST" action="/incident/<%= incident.id %>/escalate" class="incident-action-form">
+                    <h4 class="incident-section-title"><span class="material-symbols-outlined">priority_high</span> Prioridad y escalado</h4>
+                    <form method="POST" action="/incident/<%= incident.id %>/escalate" class="incident-action-form incident-action-form--escalate">
                         <input type="hidden" name="escalate" value="<%= incident.escalated ? 'false' : 'true' %>">
                         <label>Prioridad
                             <select name="priority">
@@ -226,54 +369,43 @@
                                 <% }) %>
                             </select>
                         </label>
-                        <button type="submit" class="action-btn action-btn--lg <%= incident.escalated ? 'neutro' : 'modificar' %>" data-tooltip="<%= incident.escalated ? 'Quitar escalado' : 'Escalar' %>" aria-label="<%= incident.escalated ? 'Quitar escalado' : 'Escalar' %>">
+                        <button type="submit" class="action-btn action-btn--lg <%= incident.escalated ? 'neutro' : 'modificar' %>">
                             <span class="material-symbols-outlined"><%= incident.escalated ? 'expand_more' : 'priority_high' %></span>
+                            <%= incident.escalated ? 'Quitar escalado' : 'Escalar' %>
                         </button>
                     </form>
                 <% } %>
 
-                <% if (flags.canClose) { %>
-                    <form method="POST" action="/incident/<%= incident.id %>/close" class="incident-action-form incident-close-form">
-                        <label>Acción sobre el envío
-                            <select name="shipmentAction">
-                                <option value="none">Sin cambio</option>
-                                <option value="cancel">Cancelar envío (devolución)</option>
-                            </select>
-                        </label>
-                        <label class="incident-close-comment">Comentario de cierre <span class="incident-required" aria-hidden="true">*</span>
-                            <textarea name="comment" rows="2" required minlength="1"
-                                      placeholder="Describí brevemente cómo se resolvió la incidencia (obligatorio)"></textarea>
-                        </label>
-                        <div class="incident-close-buttons">
-                            <button type="submit" name="resolution" value="PROCEDENTE" class="action-btn action-btn--lg guardar" data-tooltip="Cerrar como procedente" aria-label="Cerrar como procedente">
-                                <span class="material-symbols-outlined">check_circle</span>
-                            </button>
-                            <button type="submit" name="resolution" value="NO_PROCEDENTE" class="action-btn action-btn--lg eliminar" data-tooltip="Cerrar como no procedente" aria-label="Cerrar como no procedente">
-                                <span class="material-symbols-outlined">cancel</span>
-                            </button>
-                        </div>
-                    </form>
-                <% } %>
-
-                <% if (flags.canReopen) { %>
-                    <form method="POST" action="/incident/<%= incident.id %>/reopen" class="incident-action-form">
-                        <input type="text" name="comment" placeholder="Motivo de reapertura">
-                        <button type="submit" class="action-btn action-btn--lg neutro" data-tooltip="Reabrir" aria-label="Reabrir">
-                            <span class="material-symbols-outlined">restart_alt</span>
-                        </button>
-                    </form>
-                <% } %>
-
-                <% if (flags.canComment) { %>
-                    <form method="POST" action="/incident/<%= incident.id %>/comment" class="incident-action-form">
-                        <textarea name="comment" rows="3" placeholder="Agregar comentario..." required></textarea>
-                        <button type="submit" class="action-btn action-btn--lg neutro" data-tooltip="Comentar" aria-label="Comentar">
-                            <span class="material-symbols-outlined">comment</span>
-                        </button>
-                    </form>
-                <% } %>
+                </div><!-- /incident-actions-inner -->
             </div>
         </section>
+
+        <script>
+        (function () {
+            const master = document.getElementById('masterComment');
+            if (!master) { return; }
+            document.querySelectorAll('form[data-needs-comment="1"]').forEach((form) => {
+                form.addEventListener('submit', (ev) => {
+                    const val = (master.value || '').trim();
+                    if (val.length === 0) {
+                        ev.preventDefault();
+                        master.focus();
+                        master.classList.add('is-invalid');
+                        showIncidentFeedback({
+                            title: 'Falta comentario',
+                            subtitle: 'Toda acción sobre una incidencia necesita trazabilidad.',
+                            text: 'Escribí un comentario antes de ejecutar la acción.'
+                        });
+                        return;
+                    }
+                    master.classList.remove('is-invalid');
+                    const hidden = form.querySelector('input[name="comment"]');
+                    if (hidden) { hidden.value = val; }
+                });
+            });
+            master.addEventListener('input', () => master.classList.remove('is-invalid'));
+        })();
+        </script>
 
         <section class="incident-detail-card" id="checklist">
             <h2>Checklist de resolución</h2>
@@ -306,7 +438,7 @@
                                 </span>
                             <% } %>
                             <% if (tk.done && tk.doneBy) { %>
-                                <small class="incident-checklist__meta"><%= tk.doneBy.fullName %> — <%= new Date(tk.doneAt).toLocaleString('es-AR') %></small>
+                                <small class="incident-checklist__meta"><%= tk.doneBy.fullName %> — <%= fmtDateTime(tk.doneAt) %></small>
                             <% } %>
                         </li>
                     <% }) %>
@@ -326,7 +458,7 @@
                                 <span class="material-symbols-outlined"><%= att.mimeType === 'application/pdf' ? 'picture_as_pdf' : 'image' %></span>
                                 <%= att.fileName %>
                             </a>
-                            <small>(<%= att.source === 'PORTAL' ? 'portal' : 'interno' %> — <%= new Date(att.createdAt).toLocaleString('es-AR') %>)</small>
+                            <small>(<%= att.source === 'PORTAL' ? 'portal' : 'interno' %> — <%= fmtDateTime(att.createdAt) %>)</small>
                         </li>
                     <% }) %>
                 </ul>
@@ -343,18 +475,67 @@
 
         <section class="incident-history">
             <h2>Historial</h2>
+            <%
+                // Mapeos para mostrar eventos lindos: label en español + ícono.
+                const EVENT_LABELS = {
+                    CREATED:         { label: 'Creada',              icon: 'add_circle' },
+                    AUTO_CREATED:    { label: 'Creada (automática)', icon: 'autorenew' },
+                    STATUS_CHANGE:   { label: 'Cambio de estado',    icon: 'swap_horiz' },
+                    ASSIGNED:        { label: 'Asignación',          icon: 'person_add' },
+                    ESCALATED:       { label: 'Escalada',            icon: 'priority_high' },
+                    UNESCALATED:     { label: 'Desescalada',         icon: 'expand_more' },
+                    PRIORITY_CHANGE: { label: 'Cambio de prioridad', icon: 'flag' },
+                    COMMENT:         { label: 'Comentario',          icon: 'comment' },
+                    CLOSED:          { label: 'Cerrada',             icon: 'lock' },
+                    AUTO_CLOSED:     { label: 'Cerrada (automática)',icon: 'lock_clock' },
+                    REOPENED:        { label: 'Reabierta',           icon: 'restart_alt' },
+                    CHECKLIST_ITEM:  { label: 'Checklist',           icon: 'checklist' },
+                    EVIDENCE_ADDED:  { label: 'Evidencia',           icon: 'attach_file' }
+                };
+                // Convierte valores tecnicos (status/resolution) a labels español para el `→`.
+                const prettyValue = (v) => {
+                    if (!v) { return null; }
+                    const map = {
+                        OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada',
+                        PROCEDENTE: 'Procedente', NO_PROCEDENTE: 'No procedente',
+                        DONE: 'Hecha', PENDING: 'Pendiente'
+                    };
+                    return map[v] || v;
+                };
+            %>
             <ol class="incident-timeline">
-                <% history.forEach(h => { %>
-                    <li class="incident-timeline-item">
-                        <span class="incident-timeline-type"><%= h.eventType %></span>
-                        <span class="incident-timeline-meta">
-                            <%= new Date(h.changedAt).toLocaleString('es-AR') %>
-                            — <%= h.user ? h.user.fullName : (h.person ? h.person.fullName : 'Portal público') %>
-                        </span>
-                        <% if (h.fromValue || h.toValue) { %>
+                <% history.forEach(h => {
+                    const evCfg = EVENT_LABELS[h.eventType] || { label: h.eventType, icon: 'circle' };
+                    const evKey = (h.eventType || 'OTHER').toLowerCase();
+                    const fromPretty = prettyValue(h.fromValue);
+                    const toPretty   = prettyValue(h.toValue);
+                    // Para ASSIGNED los from/to son IDs de usuario sin label legible; el comment
+                    // ya dice "Asignada a X", entonces ocultamos la fila de valores feos.
+                    const showValues = (fromPretty || toPretty) && h.eventType !== 'ASSIGNED';
+                %>
+                    <li class="incident-timeline-item incident-timeline-item--<%= evKey %>">
+                        <div class="incident-timeline-header">
+                            <span class="incident-timeline-type incident-timeline-type--<%= evKey %>">
+                                <span class="material-symbols-outlined"><%= evCfg.icon %></span>
+                                <%= evCfg.label %>
+                            </span>
+                            <span class="incident-timeline-meta">
+                                <%= fmtDateTime(h.changedAt) %>
+                                — <%= h.user ? h.user.fullName : (h.person ? h.person.fullName : 'Portal público') %>
+                            </span>
+                        </div>
+                        <% if (showValues) { %>
                             <div class="incident-timeline-values">
-                                <%= h.fromValue || '∅' %> → <%= h.toValue || '∅' %>
+                                <% if (fromPretty) { %><span class="tl-val tl-val--from"><%= fromPretty %></span><% } else { %><span class="tl-val tl-val--empty">—</span><% } %>
+                                <span class="tl-arrow material-symbols-outlined">arrow_right_alt</span>
+                                <% if (toPretty) { %><span class="tl-val tl-val--to"><%= toPretty %></span><% } else { %><span class="tl-val tl-val--empty">—</span><% } %>
                             </div>
+                        <% } %>
+                        <% if (h.internal) { %>
+                            <span class="incident-timeline-internal" title="Comentario interno: el cliente no lo ve ni le llega por mail"
+                                  style="display:inline-flex;align-items:center;gap:.25rem;margin:.25rem 0;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;background:rgba(217,119,6,.15);color:#b45309;">
+                                <span class="material-symbols-outlined" style="font-size:14px">lock</span> Interno — no visible al cliente
+                            </span>
                         <% } %>
                         <% if (h.comment) { %>
                             <p class="incident-timeline-comment"><%= h.comment %></p>
@@ -364,6 +545,7 @@
             </ol>
         </section>
     </main>
+    <%- include('../partials/incidentFeedback.ejs') %>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
 </body>

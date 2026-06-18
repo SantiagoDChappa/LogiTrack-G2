@@ -52,6 +52,26 @@
         background: rgba(255,255,255,.06);
     }
     .active-hero:hover { transform: translateY(-2px); box-shadow: 0 20px 56px rgba(37,99,235,.45); }
+
+    /* ===== HERO INHABILITADO (rojo, sin accionable) ===== */
+    .active-hero.is-disabled {
+        background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+        box-shadow: 0 16px 48px rgba(220, 38, 38, .35);
+        cursor: pointer;
+    }
+    .active-hero.is-disabled:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 56px rgba(220, 38, 38, .45);
+    }
+    .active-hero.is-disabled:focus-visible {
+        box-shadow: 0 16px 48px rgba(220, 38, 38, .35), 0 0 0 3px rgba(255,255,255,.6);
+    }
+    .active-hero.is-disabled .badge-status {
+        background: rgba(255,255,255,.22);
+    }
+    .active-hero.is-disabled .badge-status .dot {
+        background: #fff; box-shadow: none; animation: none;
+    }
     .active-hero .badge-status {
         display: inline-flex; align-items: center; gap: 6px;
         background: rgba(255,255,255,.18);
@@ -234,7 +254,46 @@
             </div>
             <% } %>
 
-            <% if (activeSummary) { %>
+            <% if (driverDisabled && activeSummary) { %>
+                <%# Inhabilitado por fatiga: card en rojo, sin link, click abre popup. %>
+                <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"
+                     aria-label="Estás inhabilitado. Tocá para ver el detalle.">
+                    <div>
+                        <div class="badge-status">
+                            <span class="dot"></span>
+                            INHABILITADO
+                        </div>
+                        <h2>Ruta #<%= activeSummary.id %></h2>
+                        <div class="sub">
+                            <%= activeSummary.transportName %>
+                            <% if (activeSummary.originBranch) { %>· <%= activeSummary.originBranch %><% } %>
+                        </div>
+
+                        <div class="stats">
+                            <div class="stat">
+                                <div class="val"><%= activeSummary.completedStops %>/<%= activeSummary.totalStops %></div>
+                                <div class="lbl">Paradas</div>
+                            </div>
+                            <div class="stat">
+                                <div class="val"><%= activeSummary.totalDistanceKm.toFixed(1) %></div>
+                                <div class="lbl">km totales</div>
+                            </div>
+                            <div class="stat">
+                                <div class="val"><%= activeSummary.progressPct %>%</div>
+                                <div class="lbl">Progreso</div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: <%= activeSummary.progressPct %>%"></div>
+                        </div>
+                    </div>
+                    <span class="cta">
+                        <span class="material-symbols-outlined">block</span>
+                        No disponible
+                    </span>
+                </div>
+            <% } else if (activeSummary) { %>
                 <a class="active-hero" href="/delivery/route/<%= activeSummary.id %>">
                     <div>
                         <div class="badge-status">
@@ -272,6 +331,23 @@
                         <span class="material-symbols-outlined">arrow_forward</span>
                     </span>
                 </a>
+            <% } else if (driverDisabled) { %>
+                <%# Inhabilitado sin ruta activa: card rojo informativo, click abre popup. %>
+                <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"
+                     aria-label="Estás inhabilitado. Tocá para ver el detalle.">
+                    <div>
+                        <div class="badge-status">
+                            <span class="dot"></span>
+                            INHABILITADO
+                        </div>
+                        <h2>No habilitado</h2>
+                        <div class="sub">No podés iniciar ni continuar rutas hasta que tu supervisor te restablezca.</div>
+                    </div>
+                    <span class="cta">
+                        <span class="material-symbols-outlined">block</span>
+                        Ver detalle
+                    </span>
+                </div>
             <% } else { %>
                 <div class="empty-routes">
                     <span class="material-symbols-outlined">local_shipping</span>
@@ -441,6 +517,37 @@
                 confirmButtonText: 'Aceptar', confirmButtonColor: '#2563eb',
             }).then(() => history.replaceState(null, '', '/delivery'));
         }
+        // LGT-195: card INHABILITADO — al clickear, popup explicativo (no navega).
+        (function () {
+            const hero = document.getElementById('disabled-hero');
+            if (!hero) { return; }
+            <% const _reasonTxt = driverDisabled && driverDisabled.reason === 'CONSENT_REJECTED'
+                ? 'Rechazaste el consentimiento del control de fatiga las veces permitidas.'
+                : (driverDisabled && driverDisabled.reason === 'TEST_NOT_DONE'
+                    ? 'No completaste la prueba del control de fatiga.'
+                    : 'Quedaste inhabilitado por el control de fatiga.'); %>
+            const showDisabledPopup = () => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Estás inhabilitado',
+                    html: `<p><%= _reasonTxt %></p>
+                           <p><b>No podés iniciar ni continuar rutas</b> hasta que tu Supervisor te restablezca.</p>
+                           <p style="font-size:.88rem;color:#64748b;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>`,
+                    confirmButtonText: 'Entendido',
+                    confirmButtonColor: '#dc2626',
+                });
+            };
+            hero.addEventListener('click', showDisabledPopup);
+            hero.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showDisabledPopup(); }
+            });
+            // Si llegó redirigido por intentar entrar a una ruta por URL directa, mostramos el popup.
+            if (new URLSearchParams(window.location.search).get('inhabilitado') === '1') {
+                showDisabledPopup();
+                history.replaceState(null, '', '/delivery');
+            }
+        })();
+
         // LGT-195: rechazo de consentimiento — mostramos el motivo al volver al home.
         (function () {
             const q = new URLSearchParams(window.location.search);

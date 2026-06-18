@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devolución registrada - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Devolución</span>
+                <h1>Solicitud de devolución registrada</h1>
+                <p class="portal-mis-envios-lead">Incidencia <strong>#<%= incidentId %></strong> · envío <strong><%= shipment.trackingId %></strong>. Quedó pendiente de revisión; vas a poder seguir su estado desde tus devoluciones.</p>
+            </div>
+
+            <div class="portal-mis-envios-alert portal-mis-envios-alert-ok">
+                <span class="material-symbols-outlined">check_circle</span>
+                Recibimos tu solicitud. Te avisaremos cuando se gestione.
+            </div>
+
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/envio/<%= shipment.id %>" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al detalle del envío
+                </a>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

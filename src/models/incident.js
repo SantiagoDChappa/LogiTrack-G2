@@ -18,10 +18,15 @@ const Incident = sequelize.define('incident', {
     assignedToUserId: { type: DataTypes.INTEGER,     allowNull: true },
     closedByUserId:   { type: DataTypes.INTEGER,     allowNull: true },
     closedAt:         { type: DataTypes.DATE,        allowNull: true },
+    // LGT-210 — nivel de demora que clasifica el repartidor (DEMORADA | MUY_DEMORADA | REPROGRAMAR).
+    delayLevel:       { type: DataTypes.STRING(20),  allowNull: true, field: 'delay_level' },
     // LGT-204 — elección del remitente ante paquete dañado.
     damageChoice:     { type: DataTypes.STRING(12),  allowNull: true, field: 'damage_choice' }, // REEMBOLSO | REEMPLAZO
     damageChoiceAt:   { type: DataTypes.DATE,        allowNull: true, field: 'damage_choice_at' },
     damageChoiceBy:   { type: DataTypes.STRING(160), allowNull: true, field: 'damage_choice_by' },
+    // Devolución como incidencia (tipo RETURN): motivo de devolución estructurado
+    // (DEFECTUOSO | INCORRECTO | DANADO | ARREPENTIMIENTO | OTRO).
+    returnReason:     { type: DataTypes.STRING(30),  allowNull: true, field: 'return_reason' },
     createdAt:        { type: DataTypes.DATE },
     updatedAt:        { type: DataTypes.DATE }
 }, { tableName: 'incident', timestamps: true });
@@ -114,6 +119,18 @@ const findOpenByShipment = (shipmentId) => Incident.findAll({
     attributes: ['id', 'incidentTypeId', 'status']
 });
 
+// Incidencias abiertas de un envío con su tipo y prioridad, para mostrarle al operador
+// al crear una nueva incidencia qué tiene ya asociado/abierto (evitar duplicados).
+const findOpenByShipmentWithType = (shipmentId) => {
+    const { IncidentType } = require('./incidentType');
+    return Incident.findAll({
+        where: { shipmentId, status: ['OPEN', 'IN_REVIEW'] },
+        attributes: ['id', 'incidentTypeId', 'status', 'priority', 'createdAt'],
+        include: [{ model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'], required: false }],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
 const findByShipmentIds = (shipmentIds, { statusIn, excludeChannels, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const ids = Array.isArray(shipmentIds) ? shipmentIds.filter(Boolean) : [];
@@ -139,4 +156,4 @@ const findByShipmentIds = (shipmentIds, { statusIn, excludeChannels, limit = 200
     });
 };
 
-module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment, findByShipmentIds };
+module.exports = { Incident, findByIdFull, list, countOpenByShipment, findOpenByShipment, findOpenByShipmentWithType, findByShipmentIds };

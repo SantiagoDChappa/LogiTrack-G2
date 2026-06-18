@@ -139,12 +139,12 @@
                             <td><%= i.shipment ? i.shipment.trackingId : '-' %></td>
                             <td><%= i.type ? i.type.description : '-' %></td>
                             <td><span class="incident-origin incident-origin--<%= isExterno ? 'externo' : 'interno' %>"><%= originLabel %></span></td>
-                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= i.status %></span></td>
+                            <td><span class="incident-badge incident-badge--<%= i.status.toLowerCase() %>"><%= IncidentStatusLabel[i.status] || i.status %></span></td>
                             <td><span class="incident-resolution <%= resCls %>"><%= resLabel %></span></td>
                             <td><span class="incident-priority incident-priority--<%= i.priority %>">P<%= i.priority %></span></td>
                             <td><%= i.escalated ? '🔥' : '—' %></td>
                             <td><%= i.assignedTo ? i.assignedTo.fullName : '—' %></td>
-                            <td><%= new Date(i.createdAt).toLocaleString('es-AR') %></td>
+                            <td><%= fmtDateTime(i.createdAt) %></td>
                             <td><a href="/incident/<%= i.id %>" class="action-btn detalle" data-tooltip="Ver detalle" aria-label="Ver detalle"><span class="material-symbols-outlined">visibility</span></a></td>
                         </tr>
                     <% }) %>

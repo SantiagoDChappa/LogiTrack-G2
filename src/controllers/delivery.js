@@ -1,6 +1,6 @@
 const { DeliveryEvidence, Shipment } = require('../models');
 const stateMachine = require('../services/shipmentStateMachine');
-const { Status } = require('../constants/enums');
+const { Status, NotificationEvent } = require('../constants/enums');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const ShipmentModel = require('../models/shipment');
 const sequelize = require('../database/connection');
@@ -106,6 +106,11 @@ const saveFailedAttempt = async (req, res) => {
             }, t);
         });
 
+        // "Llegada de entrega no completada": avisar SIEMPRE al cliente con el email
+        // accionable (reprogramar / retiro en sucursal), respetando la config del evento.
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_FAILED_ATTEMPT, shipment.id)
+            .catch(e => console.error('[delivery] notif SHIPMENT_FAILED_ATTEMPT:', e.message));
+
         res.redirect('/delivery?failed=true');
 
     } catch (error) {
@@ -129,6 +134,17 @@ const showEvidenceForm = async (req, res) => {
         // Sprint 3 - 4.1: si el envío tiene código clave configurado, lo pedimos en el POD
         const settingModel = require('../models/setting');
         const settings = await settingModel.getAll().catch(() => ({}));
+
+        // Garantizar que el código exista antes de renderizar para evitar la race condition
+        // entre el backfill lazy y el ciclo GET→POST: si la feature está activa y el envío
+        // aún no tiene código (shipments pre-migration), lo generamos y persistimos ahora.
+        if (settings.delivery_secret_enabled !== 'false' && !shipment.deliverySecretCode) {
+            const { generateSecretCode } = require('../utils/shipmentTokens');
+            const freshCode = generateSecretCode();
+            await Shipment.update({ deliverySecretCode: freshCode }, { where: { id: shipment.id } });
+            shipment.deliverySecretCode = freshCode;
+        }
+
         const secretRequired = !!shipment.deliverySecretCode && settings.delivery_secret_enabled !== 'false';
         res.render('delivery/evidence', {
             shipmentId: shipment.trackingId,

@@ -7,7 +7,7 @@
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <link rel="stylesheet" href="/css/incidents.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
@@ -30,7 +30,52 @@
                 </form>
             </div>
 
-            <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [] }) %>
+            <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
+
+            <%# LGT-182 — Devoluciones del envío %>
+            <% var _returns = typeof returns !== 'undefined' ? returns : []; %>
+            <div class="portal-incidents-card" style="margin-top:1rem;">
+                <h3 class="portal-incidents-card__title" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                    <span style="display:inline-flex;align-items:center;gap:.45rem;">
+                        <span class="material-symbols-outlined" style="color:var(--c-primary);">assignment_return</span>
+                        Devoluciones<% if (_returns.length) { %> <span class="portal-incidents-card__count">(<%= _returns.length %>)</span><% } %>
+                    </span>
+                    <% if (typeof canRequestReturn !== 'undefined' && canRequestReturn) { %>
+                        <a href="/portal/mis-envios/envio/<%= shipment.id %>/devolucion" class="portal-card-incident-cta-link">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem;">assignment_return</span>
+                            Solicitar devolución
+                        </a>
+                    <% } %>
+                </h3>
+
+                <% if (typeof returnError !== 'undefined' && returnError) { %>
+                    <div class="portal-mis-envios-alert portal-mis-envios-alert-error" style="margin-top:.75rem;">
+                        <span class="material-symbols-outlined">error</span>
+                        <%= returnError %>
+                    </div>
+                <% } %>
+
+                <% if (_returns.length === 0) { %>
+                    <div class="portal-incidents-empty">
+                        <span class="material-symbols-outlined">assignment_return</span>
+                        <p>Este envío no tiene devoluciones registradas.</p>
+                    </div>
+                <% } else { %>
+                    <div class="portal-incidents-list">
+                        <% _returns.forEach(function(r) { %>
+                            <a href="/portal/mis-envios/devolucion/<%= r.id %>" class="portal-incident-row">
+                                <span class="portal-incident-id">#<%= r.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= r.reasonLabel %></span>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= r.status.toLowerCase() %>"><%= r.statusLabel %></span>
+                                <span class="portal-incident-date"><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                                <span class="material-symbols-outlined portal-incident-arrow" aria-hidden="true">chevron_right</span>
+                            </a>
+                        <% }); %>
+                    </div>
+                <% } %>
+            </div>
         </div>
     </section>
 

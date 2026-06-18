@@ -162,7 +162,11 @@ header {
 
 .left-header {
   width: 220px;
-  min-height: 100vh;
+  /* Altura exacta del viewport (no min-height) para que el nav interno pueda scrollear
+     cuando el menú es más alto que la pantalla. Antes los ítems de abajo (submenú de
+     Reportes) quedaban inaccesibles. */
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--color-sidebar);
   display: flex;
   flex-direction: column;
@@ -207,7 +211,18 @@ header {
 .left-header .nav {
   padding: 0.75rem 0.5rem;
   flex: 1;
+  /* min-height:0 permite que el área de navegación se achique y scrollee dentro del
+     flex column; el logo (arriba) y el theme-toggle (abajo) quedan siempre visibles. */
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
+
+/* Scrollbar fina y discreta para el menú lateral */
+.left-header .nav::-webkit-scrollbar { width: 6px; }
+.left-header .nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 3px; }
+.left-header .nav:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); }
 
 .left-header .nav li {
   display: flex;
@@ -313,6 +328,11 @@ header {
 }
 
 .top-header > i {
+  margin-left: auto;
+}
+
+/* LGT-218: la campana abre el grupo derecho (campana + perfil) y lo empuja al extremo. */
+.top-header .notif-bell {
   margin-left: auto;
 }
 
@@ -616,7 +636,9 @@ header {
     top: 0;
     left: 0;
     width: 240px;
-    min-height: 100vh;
+    /* Altura exacta para que el nav scrollee dentro del drawer (menú largo) */
+    height: 100vh;
+    height: 100dvh;
     z-index: 100;
     transform: translateX(-100%);
     transition: transform 0.25s ease;

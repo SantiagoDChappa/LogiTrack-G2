@@ -128,6 +128,11 @@
                         <th rowspan="2" class="th-sortable" data-col="5" data-sort="">
                             Estado <span class="material-symbols-outlined sort-icon">unfold_more</span>
                         </th>
+                        <% if (isAdmin) { %>
+                        <th rowspan="2" class="th-sortable" data-col="6" data-sort="">
+                            Sucursal <span class="material-symbols-outlined sort-icon">unfold_more</span>
+                        </th>
+                        <% } %>
                         <th rowspan="2" class="col-actions">Acciones</th>
                     </tr>
                     <tr>
@@ -140,7 +145,7 @@
                 <tbody>
                     <% if (shipments.length === 0) { %>
                         <tr>
-                            <td colspan="7" class="empty-row">
+                            <td colspan="<%= isAdmin ? 8 : 7 %>" class="empty-row">
                                 <span class="material-symbols-outlined">search</span>
                                 No se encontraron resultados para esa búsqueda
                             </td>
@@ -171,6 +176,9 @@
                                         </div>
                                     <% } %> -->
                                 </td>
+                                <% if (isAdmin) { %>
+                                <td><%= shipment.currentBranch ? shipment.currentBranch.name : '—' %></td>
+                                <% } %>
                                 <td class="col-actions">
                                     <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5 || shipment.statusId === 8; %>
                                     <a href="<%= _isFinalS ? '#' : '/shipment/update/' + shipment.id %>"
@@ -182,6 +190,14 @@
                                     <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
                                         <span class="material-symbols-outlined">info</span>
                                     </a>
+                                    <button type="button" class="action-btn eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia"
+                                            data-incident-open
+                                            data-shipment-id="<%= shipment.id %>"
+                                            data-tracking-id="<%= shipment.trackingId %>"
+                                            data-branch-id="<%= shipment.currentBranchId || '' %>"
+                                            data-branch-name="<%= shipment.currentBranch ? shipment.currentBranch.name : 'Sin sucursal' %>">
+                                        <span class="material-symbols-outlined">report</span>
+                                    </button>
                                     <button type="button" class="action-btn" data-tooltip="Ver QR"
                                             onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
                                         <span class="material-symbols-outlined">qr_code</span>
@@ -293,5 +309,6 @@
             });
         }
     </script>
+    <%- include('../partials/incidentQuickModal') %>
 </body>
 </html>

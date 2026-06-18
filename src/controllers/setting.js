@@ -101,6 +101,7 @@ const getSettings = async (req, res) => {
             reschedule_max_per_envio: settings.reschedule_max_per_envio || '3',
             max_intentos_fallidos:    settings.max_intentos_fallidos    || '3',
             dias_expiracion_envio:    settings.dias_expiracion_envio    || '30',
+            return_window_days:       settings.return_window_days       || '30',
             notificaciones_activas:   settings.notificaciones_activas   || 'true',
             horario_entrega_inicio:   settings.horario_entrega_inicio   || '08:00',
             horario_entrega_fin:      settings.horario_entrega_fin      || '20:00',
@@ -116,7 +117,14 @@ const getSettings = async (req, res) => {
             proceso_generar_reportes_hora:     settings.proceso_generar_reportes_hora     || '04:00',
             proceso_notificaciones_hora:       settings.proceso_notificaciones_hora       || '05:00',
             test_email_override:               settings.test_email_override               || '',
-        }
+            display_timezone:                  settings.display_timezone                  || require('../utils/datetime').DEFAULT_TZ,
+            clock_24h:                         settings.clock_24h !== '0',
+            // Toggle de Resend como respaldo (default ON). '0' = solo SendGrid.
+            email_resend_enabled:              settings.email_resend_enabled !== '0',
+        },
+        timezones: require('../utils/datetime').TIMEZONES,
+        // Estado de cada proveedor de email (configurado o no) para mostrar contexto.
+        emailProviders: require('../services/notification/emailSender').providerStatus,
     });
 };
 
@@ -137,8 +145,17 @@ const saveNotificationConfig = async (req, res) => {
             }
             if (mode !== 'custom') { custom = null; }
 
+            // LGT-219: canales (in-app/email/SMS). Un evento habilitado debe tener ≥1 canal (Esc.6).
+            const rawChannels = req.body[`channels_${cfg.eventCode}`];
+            const channels = NotificationConfigModel.serializeChannels(
+                Array.isArray(rawChannels) ? rawChannels : (rawChannels ? [rawChannels] : [])
+            );
+            if (enabled && !channels) {
+                return res.redirect(settingBack(req, '?error=channel_required'));
+            }
+
             await NotificationConfigModel.NotificationConfig.update(
-                { enabled, recipientMode: mode, customEmail: custom },
+                { enabled, recipientMode: mode, customEmail: custom, channels: channels || 'email' },
                 { where: { id: cfg.id } }
             );
         }
@@ -443,6 +460,44 @@ const saveTestEmailOverride = async (req, res) => {
     }
 };
 
+// Proveedores de email: toggle de Resend como respaldo. Apagarlo => solo SendGrid.
+// El valor lo lee la cadena de envío en cada mail (emailSender.buildProviderChain).
+const saveEmailProviders = async (req, res) => {
+    try {
+        const enabled = req.body.email_resend_enabled === 'on' ? '1' : '0';
+        const oldValue = await settingModel.get('email_resend_enabled');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'email_resend_enabled', oldValue, enabled);
+        await settingModel.set('email_resend_enabled', enabled);
+        res.redirect(settingBack(req, '?success=email_providers'));
+    } catch (err) {
+        console.error('saveEmailProviders:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=email_providers'));
+    }
+};
+
+// Zona horaria y formato de hora (12/24 hs) para todo el sistema.
+const saveDateTimeSettings = async (req, res) => {
+    try {
+        const { TIMEZONES, DEFAULT_TZ } = require('../utils/datetime');
+        const validTz = TIMEZONES.some(t => t.id === req.body.display_timezone);
+        const tz      = validTz ? req.body.display_timezone : DEFAULT_TZ;
+        const clock24 = req.body.clock_24h === 'on' ? '1' : '0';
+
+        const oldTz = await settingModel.get('display_timezone');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'display_timezone', oldTz, tz);
+        await settingModel.set('display_timezone', tz);
+
+        const oldClock = await settingModel.get('clock_24h');
+        await settingLogModel.logChange(res.locals.currentUser?.id, 'clock_24h', oldClock, clock24);
+        await settingModel.set('clock_24h', clock24);
+
+        res.redirect(settingBack(req, '?success=datetime'));
+    } catch (err) {
+        console.error('saveDateTimeSettings:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=datetime_save'));
+    }
+};
+
 // LGT-173: guarda el color personalizado de cada estado de envío.
 const saveStatusColors = async (req, res) => {
     try {
@@ -671,6 +726,7 @@ const saveParams = async (req, res) => {
             // Sprint 3 - 2.5 reglas de reprogramación
             'reschedule_default_days',
             'reschedule_max_per_envio',
+            'return_window_days',
         ];
 
         // Validaciones
@@ -682,6 +738,11 @@ const saveParams = async (req, res) => {
         const diasExpiracion = parseInt(req.body.dias_expiracion_envio);
         if (isNaN(diasExpiracion) || diasExpiracion < 1 || diasExpiracion > 365) {
             return res.redirect(settingBack(req, '?error=dias_expiracion'));
+        }
+
+        const returnWindow = parseInt(req.body.return_window_days);
+        if (isNaN(returnWindow) || returnWindow < 1 || returnWindow > 365) {
+            return res.redirect(settingBack(req, '?error=return_window_days'));
         }
         const pesoMax = parseFloat(req.body.peso_maximo_envio);
         if (isNaN(pesoMax) || pesoMax < 1 || pesoMax > 999) {
@@ -887,4 +948,6 @@ module.exports = {
     saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
     saveFatigueConsentNotifConfig,
     triggerDelayDetection,
+    saveDateTimeSettings,
+    saveEmailProviders,
 };

@@ -292,6 +292,39 @@
                 </form>
             </div>
 
+            <!-- Fecha y hora: zona horaria + formato 12/24 hs -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Fecha y hora
+                </h2>
+                <p class="settings-subtitle">
+                    Zona horaria y formato con que se muestran todas las fechas del sistema (historial, notificaciones, envíos).
+                    El servidor guarda en UTC; acá se ajusta solo la visualización.
+                </p>
+                <form method="POST" action="/setting/datetime">
+                    <div class="field" style="max-width:420px">
+                        <label for="display_timezone">Zona horaria</label>
+                        <select id="display_timezone" name="display_timezone">
+                            <% timezones.forEach(function(tz) { %>
+                                <option value="<%= tz.id %>" <%= params.display_timezone === tz.id ? 'selected' : '' %>><%= tz.label %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field" style="margin-top:.75rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" name="clock_24h" <%= params.clock_24h ? 'checked' : '' %>>
+                            Formato 24 horas (ej: 14:30). Sin tildar usa 12 hs (02:30 p. m.).
+                        </label>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar fecha y hora" aria-label="Guardar fecha y hora">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- LGT-173: Colores de estados -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -509,6 +542,12 @@
                         </div>
 
                         <div class="field">
+                            <label for="return_window_days">Ventana de devolución (días) <span class="req">*</span></label>
+                            <input type="number" id="return_window_days" name="return_window_days" min="1" max="365" value="<%= params.return_window_days %>" required>
+                            <small style="color:var(--color-text-secondary)">Entre 1 y 365. Días desde la entrega dentro de los cuales el cliente puede solicitar una devolución.</small>
+                        </div>
+
+                        <div class="field">
                             <label for="horario_entrega_inicio">Inicio de ventana de entrega <span class="req">*</span></label>
                             <input type="time" id="horario_entrega_inicio" name="horario_entrega_inicio" value="<%= params.horario_entrega_inicio %>" required>
                         </div>
@@ -681,41 +720,84 @@
                     Por cada evento podés elegir si se notifica, a quién (destinatario / remitente / ambos / un email personalizado) y editar el texto del email.
                 </p>
                 <form method="POST" action="/setting/notification-config">
-                    <div style="display:flex;flex-direction:column;gap:.6rem">
-                        <% notifConfig.filter(c => c.eventCode !== 'FATIGUE_DRIVER_DISABLED_CONSENT').forEach(config => { %>
-                            <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
-                                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
-                                    <input type="checkbox" name="enabled_<%= config.eventCode %>"
-                                        <%= config.enabled ? 'checked' : '' %>>
-                                    <%= config.description %>
-                                </label>
-
-                                <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
-                                    <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
-                                    <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
-                                    <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
-                                    <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
-                                </select>
-
-                                <input type="email" name="custom_<%= config.eventCode %>"
-                                    placeholder="email@dominio.com"
-                                    value="<%= config.customEmail || '' %>"
-                                    data-event="<%= config.eventCode %>"
-                                    class="notif-custom-input"
-                                    <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
-
-                                <button type="button" class="action-btn modificar notif-edit-tpl-btn"
-                                    data-event="<%= config.eventCode %>"
-                                    data-description="<%= config.description %>"
-                                    data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
-                                    data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
-                                    data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
-                                    data-tooltip="Editar mail" aria-label="Editar mail">
-                                    <span class="material-symbols-outlined">edit_note</span>
-                                </button>
+                    <%
+                        // Agrupacion semantica por evento. Los codigos que no matchean caen en "Otros".
+                        const sectionFor = (code) => {
+                            if (code === 'FATIGUE_DRIVER_DISABLED_CONSENT') { return null; } // gestionado en card aparte
+                            if (code === 'PORTAL_CLIENT_ACCESS')            { return null; } // card propia
+                            if (code === 'SHIPMENT_INCIDENT' || code === 'INCIDENT_STATUS_CHANGE') { return 'incidencias'; }
+                            if (code === 'SHIPMENT_PACKAGE_DAMAGED') { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_PACKAGE_FAILED')) { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_'))               { return 'envios'; }
+                            if (code.startsWith('ROUTE_'))                  { return 'rutas'; }
+                            return 'otros';
+                        };
+                        const SECTION_META = {
+                            envios:      { title: 'Envíos',     icon: 'local_shipping', desc: 'Cambios de estado del envío y avisos accionables al cliente.' },
+                            incidencias: { title: 'Incidencias', icon: 'report',         desc: 'Aperturas, cambios de estado y resoluciones de incidencias (incluye paquete fallido por motivo).' },
+                            rutas:       { title: 'Rutas',       icon: 'route',          desc: 'Eventos de las rutas de reparto.' },
+                            otros:       { title: 'Otros',       icon: 'mail',           desc: 'Notificaciones varias.' }
+                        };
+                        const grouped = { envios: [], incidencias: [], rutas: [], otros: [] };
+                        notifConfig.forEach(c => {
+                            const sec = sectionFor(c.eventCode);
+                            if (sec) { grouped[sec].push(c); }
+                        });
+                    %>
+                    <% ['envios','incidencias','rutas','otros'].forEach(secKey => {
+                        const items = grouped[secKey];
+                        if (!items || items.length === 0) { return; }
+                        const meta = SECTION_META[secKey];
+                    %>
+                        <div class="notif-section-group" style="margin-bottom:1.25rem;padding:1rem 1.1rem;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:10px;">
+                            <h3 style="display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;font-size:1rem;color:var(--color-text,#0f172a);">
+                                <span class="material-symbols-outlined" style="font-size:1.2rem;color:var(--inc-blue,#2563eb);"><%= meta.icon %></span>
+                                <%= meta.title %>
+                                <span style="margin-left:auto;font-size:.78rem;font-weight:500;color:var(--color-text-secondary,#64748b);"><%= items.length %> plantilla<%= items.length === 1 ? '' : 's' %></span>
+                            </h3>
+                            <p style="margin:0 0 .8rem;font-size:.82rem;color:var(--color-text-secondary,#64748b);"><%= meta.desc %></p>
+                            <div style="display:flex;flex-direction:column;gap:.5rem;">
+                                <% items.forEach(config => { %>
+                                    <div class="notif-config-row" style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                                            <input type="checkbox" name="enabled_<%= config.eventCode %>"
+                                                <%= config.enabled ? 'checked' : '' %>>
+                                            <%= config.description %>
+                                        </label>
+                                        <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
+                                            <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
+                                            <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
+                                            <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
+                                            <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
+                                        </select>
+                                        <input type="email" name="custom_<%= config.eventCode %>"
+                                            placeholder="email@dominio.com"
+                                            value="<%= config.customEmail || '' %>"
+                                            data-event="<%= config.eventCode %>"
+                                            class="notif-custom-input"
+                                            <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
+                                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                                            data-event="<%= config.eventCode %>"
+                                            data-description="<%= config.description %>"
+                                            data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
+                                            data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
+                                            data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
+                                            data-tooltip="Editar mail" aria-label="Editar mail">
+                                            <span class="material-symbols-outlined">edit_note</span>
+                                        </button>
+                                        <%# LGT-219 — canales por evento (multi-selección). %>
+                                        <% var _ch = config.channels || ['email']; %>
+                                        <div style="grid-column:1/-1;display:flex;gap:1.1rem;align-items:center;font-size:.84rem;flex-wrap:wrap;border-top:1px dashed var(--color-border,#e2e8f0);padding-top:.5rem;">
+                                            <span style="opacity:.7;">Canales:</span>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="in-app" <%= _ch.includes('in-app') ? 'checked' : '' %>> In-app</label>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="email" <%= _ch.includes('email') ? 'checked' : '' %>> Email</label>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="sms" <%= _ch.includes('sms') ? 'checked' : '' %>> SMS</label>
+                                        </div>
+                                    </div>
+                                <% }) %>
                             </div>
-                        <% }) %>
-                    </div>
+                        </div>
+                    <% }) %>
                     <div class="settings-actions">
                         <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones" aria-label="Guardar notificaciones">
                             <span class="material-symbols-outlined">save</span>
@@ -811,7 +893,7 @@
                     Elegí quiénes reciben un email cuando se registra una nueva incidencia interna. Se pueden combinar destinatarios por rol y emails personalizados.
                 </p>
                 <form method="POST" action="/setting/incident-notification">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
+                    <div class="notif-toggle-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
                             <input type="checkbox" name="notifySupervisorBranch" <%= incidentNotif.notifySupervisorBranch ? 'checked' : '' %>>
                             <span>Supervisor de la sucursal del usuario asignado</span>
@@ -830,9 +912,27 @@
                         </label>
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;grid-column:1/-1">
                             <input type="checkbox" name="notifyShipmentRecipient" <%= incidentNotif.notifyShipmentRecipient ? 'checked' : '' %>>
-                            <span>Destinatario del envío (usa template de <code>SHIPMENT_INCIDENT</code>)</span>
+                            <span>Destinatario del envío (template según tipo: <code>SHIPMENT_DELAYED</code>, <code>SHIPMENT_PACKAGE_FAILED</code> o <code>SHIPMENT_INCIDENT</code>)</span>
                         </label>
                     </div>
+
+                    <fieldset style="margin-top:1rem;padding:.8rem 1rem;border:1px solid var(--color-border,#e5e7eb);border-radius:8px;">
+                        <legend style="padding:0 .5rem;font-size:.85rem;font-weight:600;color:var(--color-text-secondary);">Filtro por tipo de incidencia (aplica solo si "Destinatario del envío" está activo)</legend>
+                        <div class="notif-type-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem 1rem;margin-top:.4rem;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDelay" <%= incidentNotif.notifyOnDelay !== false ? 'checked' : '' %>>
+                                <span>Demoras</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDamage" <%= incidentNotif.notifyOnDamage !== false ? 'checked' : '' %>>
+                                <span>Paquete dañado</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnGeneric" <%= incidentNotif.notifyOnGeneric !== false ? 'checked' : '' %>>
+                                <span>Otros tipos (genérico)</span>
+                            </label>
+                        </div>
+                    </fieldset>
                     <div class="field" style="margin-top:1rem">
                         <label for="incident_notif_custom">Emails personalizados extra</label>
                         <input type="text" id="incident_notif_custom" name="customEmails"
@@ -932,6 +1032,42 @@
                 </form>
             </div>
 
+            <!-- Card: Proveedores de email (SendGrid / Resend) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">alternate_email</span>
+                    Proveedores de email
+                </h2>
+                <p class="settings-subtitle">
+                    Orden de envío (se prueba en orden hasta que uno funcione): <strong>Mailjet → SendGrid → Resend</strong>.
+                    Mailjet va primero si está configurado (remitente único, no requiere dominio). El toggle de abajo activa/desactiva Resend.
+                </p>
+                <p class="settings-subtitle" style="margin-top:-.25rem">
+                    Estado:
+                    Mailjet <strong style="color:<%= emailProviders.mailjet ? '#16a34a' : '#dc2626' %>"><%= emailProviders.mailjet ? 'configurado' : 'no configurado' %></strong>
+                    · SendGrid <strong style="color:<%= emailProviders.sendgrid ? '#16a34a' : '#dc2626' %>"><%= emailProviders.sendgrid ? 'configurado' : 'no configurado' %></strong>
+                    · Resend <strong style="color:<%= emailProviders.resend ? '#16a34a' : '#dc2626' %>"><%= emailProviders.resend ? 'configurado' : 'no configurado' %></strong>
+                </p>
+                <% if (!emailProviders.sendgrid) { %>
+                <p class="settings-subtitle" style="color:#b45309">
+                    ⚠ SendGrid no está configurado. Si apagás Resend, <strong>no saldrá ningún email</strong> (salvo SMTP en local).
+                </p>
+                <% } %>
+                <form method="POST" action="/setting/email-providers">
+                    <div class="field" style="margin-top:.75rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" name="email_resend_enabled" <%= params.email_resend_enabled ? 'checked' : '' %>>
+                            Usar Resend como respaldo si SendGrid falla. Sin tildar: enviar solo por SendGrid.
+                        </label>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar proveedores" aria-label="Guardar proveedores">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card: Variables de notificación (ABM) -->
             <% } %>
             <% if (activeSection === 'plantillas') { %>
@@ -960,7 +1096,7 @@
                                 <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
                             </form>
                             <form method="POST" action="/setting/notification-variable/<%= v.id %>/delete">
-                                <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                                <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar" aria-label="Eliminar"><span class="material-symbols-outlined">delete</span></button>
                             </form>
                         </div>
                     <% }) %>
@@ -1000,7 +1136,7 @@
                             </form>
                             <% if (!s.builtin) { %>
                                 <form method="POST" action="/setting/email-snippet/<%= s.id %>/delete" class="abm-snip-del">
-                                    <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                                    <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar" aria-label="Eliminar"><span class="material-symbols-outlined">delete</span></button>
                                 </form>
                             <% } %>
                         </div>
@@ -1042,9 +1178,9 @@
                             <div class="tplm-row tplm-variant-row">
                                 <span class="tplm-label">Variante</span>
                                 <select id="tpl-variant-select" class="tplm-variant-select"></select>
-                                <button type="button" class="tplm-icon-action" id="tpl-variant-new" title="Nueva variante"><span class="material-symbols-outlined">add</span></button>
-                                <button type="button" class="tplm-icon-action" id="tpl-variant-default" title="Marcar como predeterminada"><span class="material-symbols-outlined">star</span></button>
-                                <button type="button" class="tplm-icon-action tplm-icon-action--danger" id="tpl-variant-delete" title="Eliminar variante"><span class="material-symbols-outlined">delete</span></button>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-new" title="Nueva variante" aria-label="Nueva variante"><span class="material-symbols-outlined">add</span></button>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-default" title="Marcar como predeterminada" aria-label="Marcar como predeterminada"><span class="material-symbols-outlined">star</span></button>
+                                <button type="button" class="tplm-icon-action tplm-icon-action--danger" id="tpl-variant-delete" title="Eliminar variante" aria-label="Eliminar variante"><span class="material-symbols-outlined">delete</span></button>
                             </div>
 
                             <div class="tplm-row">

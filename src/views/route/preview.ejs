@@ -161,7 +161,7 @@
             body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, assignments: buildAssignmentsFromState() }),
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Error al recalcular'); document.querySelectorAll('.proposal-card').forEach(c => c.classList.remove('recalculating')); return; }
+        if (!res.ok) { window.rtAlert(data.error || 'Error al recalcular', 'error'); document.querySelectorAll('.proposal-card').forEach(c => c.classList.remove('recalculating')); return; }
         // Mantener unassigned previos (envíos sacados manualmente) + los nuevos del recalc
         const previousUnassigned = currentState.unassigned || [];
         // Merge: si un envío reaparece en proposals, sacarlo de unassigned
@@ -205,7 +205,7 @@
             body: JSON.stringify({ shipmentIds: lastShipmentIds, branchId: window.CURRENT_BRANCH_ID, excludeTransportIds: [...excludedTxIds] }),
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.error || 'Error'); return; }
+        if (!res.ok) { window.rtAlert(data.error || 'Error', 'error'); return; }
         currentState = data;
         render();
     };
@@ -213,11 +213,11 @@
     const applyOne = async (proposal, btn) => {
         if (proposal.piggyback) {
             const ps = proposal.piggybackSummary || {};
-            const msg = `¿Sumar ${proposal.addedShipmentIds.length} envío(s) a la Ruta #${proposal.existingRouteId} (${proposal.transport.name})?\n\n`
-                + `Distancia: ${ps.previousTotalKm}km → ${ps.newTotalKm}km (+${ps.totalExtraKm}km)\n`
-                + `Costo: $${ps.previousTotalCost} → $${ps.newTotalCost} (+$${ps.totalExtraCost})\n\n`
-                + `Los envíos se agregan al final de la secuencia. Si la ruta ya está En Curso, no se podrá sumar.`;
-            if (!confirm(msg)) return;
+            const html = `Sumar <b>${proposal.addedShipmentIds.length}</b> envío(s) a la <b>Ruta #${proposal.existingRouteId}</b> (${proposal.transport.name}).<br><br>`
+                + `Distancia: ${ps.previousTotalKm}km → ${ps.newTotalKm}km (+${ps.totalExtraKm}km)<br>`
+                + `Costo: $${ps.previousTotalCost} → $${ps.newTotalCost} (+$${ps.totalExtraCost})<br><br>`
+                + `<small>Se agregan al final de la secuencia. Si la ruta ya está En Curso, no se podrá sumar.</small>`;
+            if (!(await window.rtConfirm({ title: 'Sumar a ruta existente', html: html, confirmText: 'Sí, sumar', icon: 'question' }))) return;
             btn.disabled = true; btn.textContent = 'Sumando...';
             const res = await fetch('/route/' + proposal.existingRouteId + '/append', {
                 method: 'POST',
@@ -225,7 +225,7 @@
                 body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, shipmentIds: proposal.addedShipmentIds }),
             });
             const data = await res.json();
-            if (!res.ok) { btn.disabled = false; btn.textContent = '🔗 Sumar a ruta existente'; alert(data.error || 'Error'); return; }
+            if (!res.ok) { btn.disabled = false; btn.textContent = '🔗 Sumar a ruta existente'; window.rtAlert(data.error || 'Error', 'error'); return; }
             appliedTxIds.add(proposal.transportId);
             btn.classList.add('applied');
             btn.textContent = `✅ SUMADO · Ruta #${data.routeId} (+${data.addedCount})`;
@@ -234,7 +234,7 @@
             card.querySelectorAll('.shipment-chip').forEach(ch => { ch.draggable = false; ch.style.cursor = 'default'; });
             return;
         }
-        if (!confirm(`¿Aplicar ruta para ${proposal.transport.name}? Se asignarán ${proposal.shipmentIds.length} envíos.`)) return;
+        if (!(await window.rtConfirm({ title: 'Aplicar ruta', html: `Se asignarán <b>${proposal.shipmentIds.length}</b> envío(s) a <b>${proposal.transport.name}</b>.`, confirmText: 'Sí, aplicar', icon: 'question' }))) return;
         btn.disabled = true; btn.textContent = 'Aplicando...';
         const res = await fetch('/route/confirm-one', {
             method: 'POST',
@@ -242,7 +242,7 @@
             body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, proposal }),
         });
         const data = await res.json();
-        if (!res.ok) { btn.disabled = false; btn.textContent = '✓ Aplicar ruta'; alert(data.error || 'Error'); return; }
+        if (!res.ok) { btn.disabled = false; btn.textContent = '✓ Aplicar ruta'; window.rtAlert(data.error || 'Error', 'error'); return; }
         appliedTxIds.add(proposal.transportId);
         btn.classList.add('applied');
         btn.textContent = `✅ APLICADO · Ruta #${data.routeId}`;
@@ -614,11 +614,11 @@
 
                 // Bloquear si la propuesta destino está aplicada
                 if (toTx !== 'unassigned' && appliedTxIds.has(Number(toTx))) {
-                    alert('No se puede modificar una ruta ya aplicada.');
+                    window.rtAlert('No se puede modificar una ruta ya aplicada.', 'warning');
                     return;
                 }
                 if (fromTx !== 'unassigned' && appliedTxIds.has(Number(fromTx))) {
-                    alert('No se puede sacar de una ruta ya aplicada.');
+                    window.rtAlert('No se puede sacar de una ruta ya aplicada.', 'warning');
                     return;
                 }
 

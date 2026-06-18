@@ -89,10 +89,21 @@ router.get('/', requireDelivery, async (req, res) => {
     try {
         const userId = res.locals.currentUser.id;
         const { RouteStatus } = require('../models/route');
-        const [shipments, routes] = await Promise.all([
+        const [shipments, routes, driverFatigueRow] = await Promise.all([
             shipmentModel.search({ deliveryUserId: userId }),
             routeModel.getAllByDriver(userId),
+            require('../services/fatigue').getDriverStatus(userId).catch(() => null),
         ]);
+
+        // LGT-195: si el transportista quedó INHABILITADO (rechazó el consentimiento de
+        // fatiga las veces parametrizadas), el card de ruta se muestra en rojo, sin
+        // accionable, y al clickear dispara el popup explicativo.
+        const driverDisabled = (driverFatigueRow && driverFatigueRow.status === 'DISABLED')
+            ? {
+                reason:     driverFatigueRow.reason || null,
+                disabledAt: driverFatigueRow.disabledAt || null,
+              }
+            : null;
 
         // "Activa" = IN_ROUTE (en curso) o, si no hay, la PLANNED más reciente
         const inRoute = routes.find(r => r.statusId === RouteStatus.IN_ROUTE);
@@ -156,6 +167,7 @@ router.get('/', requireDelivery, async (req, res) => {
             upcomingRoutes: upcomingRoutes.map(summarizeRoute),
             finishedRoutes: finished.map(summarizeRoute),
             fatigueBlocked,
+            driverDisabled,
         });
     } catch (err) {
         console.error(err);
@@ -212,6 +224,11 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
             }
             await RoutePause.update({ endedAt: new Date() }, { where })
                 .catch(err => console.error('stale-pause cleanup err:', err.message));
+        }
+
+        // LGT-195: transportista INHABILITADO no puede entrar a ninguna ruta, ni por URL directa.
+        if (await fatigueSvc.isDriverDisabled(res.locals.currentUser.id)) {
+            return res.redirect('/delivery?inhabilitado=1');
         }
 
         const route = await routeModel.getById(req.params.id);
@@ -599,10 +616,17 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
             return res.status(409).json({ error: `Ya tenés otra ruta en curso (#${otherActive.id}). Finalizala antes de iniciar esta.` });
         }
     }
+    const routeStartedAt = new Date();
     await Route.update(
-        { startedAt: new Date(), statusId: RouteStatus.IN_ROUTE },
+        { startedAt: routeStartedAt, statusId: RouteStatus.IN_ROUTE },
         { where: { id: req.params.id } }
     );
+    // Ojo de Patrón: ancla el conteo de manejo al inicio real de la ruta. Así el tiempo
+    // cuenta desde que arranca (no desde que se abre el widget), persiste al navegar y
+    // solo se congela cuando el conductor marca "Estoy detenido".
+    try {
+        await fatigueRecheck.startDriving(req.params.id, routeStartedAt);
+    } catch (e) { console.warn('[fatigue] startDriving:', e.message); }
     // Sprint 3 - 2.1 / 2.3: por cada envío en la ruta emitir evento OUT_FOR_DELIVERY
     // en el timeline y disparar notificación SHIPMENT_OUT_FOR_DELIVERY.
     try {

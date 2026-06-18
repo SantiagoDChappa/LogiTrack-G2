@@ -136,6 +136,37 @@
 
     <%- include('portal-modifications-history', { modifications: typeof modifications !== 'undefined' ? modifications : [] }) %>
 
+    <% var _incidents = (typeof incidents !== 'undefined' && incidents) ? incidents : []; %>
+    <div class="portal-incidents-card">
+        <h3 class="portal-incidents-card__title">
+            <span class="material-symbols-outlined">report</span>
+            Incidencias de tu envío<% if (_incidents.length) { %> <span class="portal-incidents-card__count">(<%= _incidents.length %>)</span><% } %>
+        </h3>
+        <% if (_incidents.length) { %>
+        <div class="portal-incidents-list">
+            <% _incidents.forEach(function(inc) {
+                var _sk = inc.statusLabel === 'Cerrada' ? 'closed' : (inc.statusLabel === 'En revisión' ? 'in_review' : 'open');
+            %>
+            <a href="/portal/mis-envios/incidencia/<%= inc.id %>" class="portal-incident-row">
+                <span class="portal-incident-id">#<%= inc.id %></span>
+                <span class="portal-incident-main">
+                    <span class="portal-incident-type"><%= inc.typeLabel %></span>
+                    <% if (inc.resolutionLabel) { %><span class="portal-incident-resolution">Resolución: <%= inc.resolutionLabel %></span><% } %>
+                </span>
+                <span class="portal-incident-badge portal-incident-badge--<%= _sk %>"><%= inc.statusLabel %></span>
+                <span class="portal-incident-date"><%= new Date(inc.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                <span class="material-symbols-outlined portal-incident-arrow" aria-hidden="true">chevron_right</span>
+            </a>
+            <% }); %>
+        </div>
+        <% } else { %>
+        <div class="portal-incidents-empty">
+            <span class="material-symbols-outlined">inbox</span>
+            <p>Sin incidencias registradas para este envío.</p>
+        </div>
+        <% } %>
+    </div>
+
     <div class="portal-mis-envios-actions">
         <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(s.trackingId) %>" class="portal-card-incident-cta-link">
             <span class="material-symbols-outlined">report</span>

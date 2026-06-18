@@ -19,6 +19,8 @@ const CLARIFICATION_ACTION_LABELS = {
     'show-location': 'Donde esta',
     'show-eta': 'Fecha estimada',
     'show-issues': 'Que paso con mi envio',
+    'show-incidents-menu': 'Consultar incidencias',
+    'show-all-incidents': 'Incidencias de todos mis envios',
     'show-branch': 'Sucursal o retiro',
     'show-pod': 'Comprobante de entrega',
     'show-delivery-issue': 'No reconozco la entrega',
@@ -239,6 +241,7 @@ function buildProblemMenuResponse(runtime) {
                     text: 'Si hubo un problema con tu envio, primero pasame el tracking o el DNI. Despues te ayudo a revisar demoras, intentos fallidos o un reclamo.',
                     actions: [
                         createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Consultar incidencias', 'show-incidents-menu'),
                         createAction('Reportar incidencia', 'report-incident-start'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
@@ -304,8 +307,8 @@ function buildProblemMenuResponse(runtime) {
                     : buildTrackedText(shipment, 'Si hubo un problema con {trackingId}, revisemos que paso y que opciones tenes ahora.'),
                 actions: [
                     createAction('Que paso con mi envio', 'show-issues'),
+                    createAction('Consultar incidencias', 'show-incidents-menu'),
                     createAction('Reportar incidencia', 'report-incident-start'),
-                    createAction('Sucursal o retiro', 'show-branch'),
                     createAction('Hablar con soporte', 'show-support'),
                 ],
             }),

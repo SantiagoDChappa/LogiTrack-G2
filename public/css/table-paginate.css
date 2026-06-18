@@ -115,3 +115,43 @@
     .tbl-paginate { justify-content: center; }
     .tbl-paginate__info { width: 100%; text-align: center; order: 3; }
 }
+
+/* ABM tables: barra de filtro + headers ordenables (table-tools.js) */
+.tbl-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 0.75rem;
+    flex-wrap: wrap;
+}
+.tbl-tools__search {
+    flex: 0 1 320px;
+    padding: 0.5rem 0.85rem;
+    background: var(--color-bg);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-full, 999px);
+    color: var(--color-text);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+.tbl-tools__search:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.tbl-tools__count {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
+}
+th.th-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+th.th-sortable:hover {
+    color: var(--color-primary);
+}
+.th-sort-arrow {
+    font-size: 0.75rem;
+    color: var(--color-primary);
+}

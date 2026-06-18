@@ -44,6 +44,14 @@ const Shipment = sequelize.define('shipment', {
     portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
     // Sprint 4 - Notificación de demora (LGT-160)
     delayNotifiedAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'delayNotifiedAt' },
+    // LGT-210/209 - reprogramación y trazabilidad de demora propagada en cascada.
+    pendingReschedule:    { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'pending_reschedule' },
+    rescheduleDate:       { type: DataTypes.DATEONLY,       allowNull: true,  field: 'reschedule_date' },
+    delayOriginIncidentId:{ type: DataTypes.INTEGER,        allowNull: true,  field: 'delay_origin_incident_id' },
+    // LGT-215 - envío de reposición: apunta al envío original que reemplaza.
+    replacementOfShipmentId: { type: DataTypes.INTEGER,    allowNull: true,  field: 'replacement_of_shipment_id' },
+    // LGT-214 precondición: costo total persistido al crear el envío (para nota de crédito).
+    costTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -66,7 +74,9 @@ const getAll = () => {
             { model: TypeShipment, as: 'shipmentType' },
             { model: User, as: 'deliveryUser', required: false },
             { model: Branch, as: 'pickupBranch', required: false }
-        ]
+        ],
+        order: [['id', 'DESC']],
+        limit: 500,
     });
 };
 
@@ -160,6 +170,7 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
     const { Person } = require('./person');
     const { Status } = require('./status');
     const { Address } = require('./address');
+    const { Branch } = require('./branch');
     
     const shipmentWhere  = {};
     const senderWhere    = {};
@@ -209,7 +220,11 @@ const search = ({ trackingId, role, name, document, senderName, senderDocument, 
             },
             { model: Status,  as: 'status'  },
             { model: Address, as: 'address' },
-        ]
+            { model: Branch,  as: 'currentBranch', required: false },
+        ],
+        order: [['id', 'DESC']],
+        limit: 200,
+        subQuery: false,
     });
 };
 

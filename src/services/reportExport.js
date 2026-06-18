@@ -628,7 +628,7 @@ const buildDeliveryPerformanceExport = ({ dateFrom, dateTo, rows: performanceRow
 };
 
 const buildIncidentsByPeriodExport = ({ dateFrom, dateTo, rows: incidentRows, totalIncidents }) => {
-    const columns = ['fecha_desde', 'fecha_hasta', 'tipo_incidencia', 'total', 'abiertas', 'resueltas', 'porcentaje'];
+    const columns = ['fecha_desde', 'fecha_hasta', 'tipo_incidencia', 'total', 'abiertas', 'resueltas', 'procedentes', 'no_procedentes', 'sin_clasificar', 'porcentaje'];
     const rows = incidentRows.map((row) => ({
         fecha_desde: dateFrom,
         fecha_hasta: dateTo,
@@ -636,6 +636,9 @@ const buildIncidentsByPeriodExport = ({ dateFrom, dateTo, rows: incidentRows, to
         total: row.total,
         abiertas: row.open,
         resueltas: row.resolved,
+        procedentes: row.procedente,
+        no_procedentes: row.no_procedente,
+        sin_clasificar: row.sin_clasificar,
         porcentaje: totalIncidents > 0 ? toPercent(row.total / totalIncidents * 100) : '0.0',
     }));
 
@@ -654,17 +657,23 @@ const buildIncidentsByPeriodExport = ({ dateFrom, dateTo, rows: incidentRows, to
                 title: 'Detalle por tipo de incidencia',
                 emptyMessage: 'No hay incidencias para el periodo seleccionado.',
                 columns: [
-                    { key: 'tipo_incidencia', label: 'Tipo', width: 0.40, font: 'F2' },
-                    { key: 'total', label: 'Total', width: 0.15 },
-                    { key: 'abiertas', label: 'Abiertas', width: 0.15 },
-                    { key: 'resueltas', label: 'Resueltas', width: 0.15 },
-                    { key: 'porcentaje', label: '%', width: 0.15 },
+                    { key: 'tipo_incidencia', label: 'Tipo', width: 0.28, font: 'F2' },
+                    { key: 'total', label: 'Total', width: 0.10 },
+                    { key: 'abiertas', label: 'Abiertas', width: 0.12 },
+                    { key: 'resueltas', label: 'Resueltas', width: 0.12 },
+                    { key: 'procedentes', label: 'Proc.', width: 0.10 },
+                    { key: 'no_procedentes', label: 'No proc.', width: 0.11 },
+                    { key: 'sin_clasificar', label: 'Sin clasif.', width: 0.11 },
+                    { key: 'porcentaje', label: '%', width: 0.06 },
                 ],
                 rows: rows.map((row) => ({
                     tipo_incidencia: row.tipo_incidencia,
                     total: String(row.total),
                     abiertas: String(row.abiertas),
                     resueltas: String(row.resueltas),
+                    procedentes: String(row.procedentes),
+                    no_procedentes: String(row.no_procedentes),
+                    sin_clasificar: String(row.sin_clasificar),
                     porcentaje: `${row.porcentaje}%`,
                 })),
             },
@@ -707,7 +716,7 @@ const getDimLabelsForType = (surveyType) => {
 const getDimLabelsForRow = (rowType) =>
     rowType === 'incident' ? INCIDENT_DIM_LABELS : DELIVERY_DIM_LABELS;
 
-const buildSatisfactionExport = ({ dateFrom, dateTo, surveyType, kpis, comparison, distribution, recentComments, incidentTypeId, deliveryStatus }) => {
+const buildSatisfactionExport = ({ dateFrom, dateTo, surveyType, kpis, comparison, distribution, recentComments }) => {
     const dimLabels = getDimLabelsForType(surveyType);
 
     const columns = ['fecha_desde', 'fecha_hasta', 'tipo', 'total', 'promedio_general', 'dim1', 'dim2', 'dim3'];

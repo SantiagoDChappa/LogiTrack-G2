@@ -7,8 +7,9 @@ const Province = sequelize.define('province', {
 },
 { tableName: 'province', timestamps: false });
 
-const getAll = () => {
-    return Province.findAll();
-};
+const { withTtl } = require('../utils/memoryCache');
+
+// Provincias: completamente inmutables. TTL 24h.
+const getAll = withTtl(24 * 60 * 60 * 1000, () => Province.findAll(), 'province:all');
 
 module.exports = { Province, getAll };

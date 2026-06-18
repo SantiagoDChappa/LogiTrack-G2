@@ -1,5 +1,7 @@
 const {
+    buildAllIncidentsHtml,
     buildHistoryHtml,
+    buildIncidentsHtml,
     buildIssuesHtml,
     createAction,
     createMessage,
@@ -221,6 +223,88 @@ function buildHistoryResponse(shipment) {
     };
 }
 
+// Menú de consulta de incidencias: ofrece ver las de un envío puntual o las de todos.
+function buildIncidentsMenuResponse(runtime) {
+    const shipments = runtime.context.shipments || [];
+
+    if (shipments.length === 0) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'Para consultar incidencias primero pasame el tracking o el DNI del envío.',
+                    actions: [
+                        createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    const actions = [createAction('De un envío específico', 'show-issues')];
+    if (shipments.length > 1) {
+        actions.push(createAction('De todos mis envíos', 'show-all-incidents'));
+    }
+    actions.push(createAction('Reportar incidencia', 'report-incident-start'));
+
+    const text = shipments.length > 1
+        ? '¿Querés ver las incidencias de un envío puntual o de todos tus envíos?'
+        : 'Puedo mostrarte las incidencias de tu envío. ¿Las vemos?';
+
+    return { messages: [createMessage({ text, actions })], effects: [] };
+}
+
+// Lista las incidencias de TODOS los envíos en contexto, agrupadas por envío.
+function buildAllIncidentsResponse(runtime) {
+    const shipments = runtime.context.shipments || [];
+    if (shipments.length === 0) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'Para consultar incidencias primero pasame el tracking o el DNI del envío.',
+                    actions: [
+                        createAction('Buscar mi envio', 'request-lookup'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    const withIncidents = shipments.filter(s => Array.isArray(s.incidents) && s.incidents.length);
+    if (withIncidents.length === 0) {
+        return {
+            messages: [
+                createMessage({
+                    text: 'No encontré incidencias registradas en tus envíos.',
+                    actions: [
+                        createAction('Reportar incidencia', 'report-incident-start'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    const total = withIncidents.reduce((acc, s) => acc + s.incidents.length, 0);
+    return {
+        messages: [
+            createMessage({
+                text: 'Estas son las incidencias de tus envíos (' + total + '):',
+                html: buildAllIncidentsHtml(withIncidents),
+                actions: [
+                    createAction('Reportar incidencia', 'report-incident-start'),
+                    createAction('Hablar con soporte', 'show-support'),
+                ],
+            }),
+        ],
+        effects: [],
+    };
+}
+
 function buildIssuesResponse(shipment) {
     if (!shipment) {
         return {
@@ -231,6 +315,28 @@ function buildIssuesResponse(shipment) {
                     actions: [
                         createAction('Buscar mi envio', 'request-lookup'),
                         createAction('Significado de los estados', 'show-status-guide'),
+                        createAction('Hablar con soporte', 'show-support'),
+                    ],
+                }),
+            ],
+            effects: [],
+        };
+    }
+
+    // Si el envío tiene incidencias reales registradas, las listamos en vez de
+    // devolver solo el texto enlatado por estado. (Consulta de incidencias desde el chatbot.)
+    const incidents = Array.isArray(shipment.incidents) ? shipment.incidents : [];
+    if (incidents.length) {
+        const intro = incidents.length === 1
+            ? 'Sobre este envio hay 1 incidencia registrada. Te dejo el detalle:'
+            : 'Sobre este envio hay ' + incidents.length + ' incidencias registradas. Te dejo el detalle:';
+        return {
+            messages: [
+                createMessage({
+                    text: intro,
+                    html: buildIncidentsHtml(incidents),
+                    actions: [
+                        createAction('Reportar otra incidencia', 'report-incident-start'),
                         createAction('Hablar con soporte', 'show-support'),
                     ],
                 }),
@@ -531,10 +637,12 @@ function buildNotificationsResponse(shipment) {
 }
 
 module.exports = {
+    buildAllIncidentsResponse,
     buildBranchResponse,
     buildDeliveryIssueResponse,
     buildEtaResponse,
     buildHistoryResponse,
+    buildIncidentsMenuResponse,
     buildIssuesResponse,
     buildLocationResponse,
     buildManagementResponse,

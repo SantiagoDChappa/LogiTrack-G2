@@ -7,7 +7,7 @@
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <link rel="stylesheet" href="/css/incidents.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
 </head>
@@ -101,11 +101,22 @@
             <div class="portal-incident-detail-card portal-incident-section">
                 <h2 class="portal-incident-section-title">Tu paquete llegó con daño</h2>
                 <% if (damage.choice) { %>
-                    <p class="portal-manage-hint">Elegiste: <strong><%= damage.choice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong>. El operador lo verá y actuará en consecuencia.</p>
-                    <% if (!damage.closed) { %><p class="portal-manage-hint">Podés cambiar tu elección mientras la incidencia siga abierta.</p><% } %>
+                    <p class="portal-manage-hint">Elegiste: <strong><%= damage.choice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong>. Tu solicitud quedó <strong>pendiente de aprobación del supervisor</strong>; cuando la apruebe, la ejecutamos.</p>
+                    <% if (!damage.closed) { %><p class="portal-manage-hint">Podés cambiar tu elección mientras la incidencia siga abierta y sin aprobar.</p><% } %>
                 <% } else { %>
-                    <p class="portal-manage-hint">¿Querés un reembolso o un reemplazo? Elegí una opción y el operador la gestionará.</p>
+                    <p class="portal-manage-hint">¿Cómo querés resolverlo? Elegí una opción; un supervisor la revisa y aprueba antes de ejecutarla.</p>
                 <% } %>
+
+                <%# LGT-212 Esc.4 — explicación de qué implica cada alternativa. %>
+                <ul class="portal-incident-damage-options" style="list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem;">
+                    <li style="border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.6rem .8rem;">
+                        <strong>Reembolso</strong> — te emitimos una <strong>nota de crédito por el total del envío</strong>.
+                    </li>
+                    <li style="border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.6rem .8rem;">
+                        <strong>Reemplazo</strong> — te enviamos un <strong>nuevo paquete de reposición sin cargo</strong>.
+                    </li>
+                </ul>
+
                 <% if (!damage.closed) { %>
                 <form method="POST" action="/portal/mis-envios/incidencia/<%= incident.id %>/eleccion" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
                     <button type="submit" name="choice" value="REEMBOLSO" class="portal-search-panel-btn">Solicitar reembolso</button>

@@ -5,7 +5,7 @@
     <title>Modificaciones portal - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="/css/incidents.css">
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <style>
         .mod-badge {
             display: inline-block; padding: .2rem .6rem; border-radius: 999px;
@@ -82,7 +82,7 @@
                         const reqSlug  = String(r.status || '').toLowerCase();
                     %>
                     <tr>
-                        <td><%= new Date(r.createdAt).toLocaleString('es-AR') %></td>
+                        <td><%= fmtDateTime(r.createdAt) %></td>
                         <td><a href="/shipment/detail/<%= r.shipmentId %>" class="incident-link"><%= r.trackingId %></a></td>
                         <td><%= r.recipientName || '-' %></td>
                         <td><span class="mod-type"><span class="material-symbols-outlined">edit_note</span><%= r.typeLabel %></span></td>

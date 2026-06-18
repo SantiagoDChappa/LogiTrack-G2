@@ -83,6 +83,9 @@
                                         <th class="text-right">Total</th>
                                         <th class="text-right">Abiertas</th>
                                         <th class="text-right">Resueltas</th>
+                                        <th class="text-right">Procedentes</th>
+                                        <th class="text-right">No proc.</th>
+                                        <th class="text-right">Sin clasif.</th>
                                         <th class="text-right">Porcentaje</th>
                                     </tr>
                                 </thead>
@@ -106,6 +109,15 @@
                                                     <span class="dp-na">0</span>
                                                 <% } %>
                                             </td>
+                                            <td class="text-right">
+                                                <% if (row.procedente > 0) { %><span class="ot-badge ot-badge--green"><%= row.procedente %></span><% } else { %><span class="dp-na">0</span><% } %>
+                                            </td>
+                                            <td class="text-right">
+                                                <% if (row.no_procedente > 0) { %><span class="ot-badge ot-badge--red"><%= row.no_procedente %></span><% } else { %><span class="dp-na">0</span><% } %>
+                                            </td>
+                                            <td class="text-right">
+                                                <% if (row.sin_clasificar > 0) { %><span class="ot-badge"><%= row.sin_clasificar %></span><% } else { %><span class="dp-na">0</span><% } %>
+                                            </td>
                                             <td class="text-right pct-cell">
                                                 <div class="pct-bar-wrapper">
                                                     <div class="pct-bar" style="width: <%= pct %>%"></div>
@@ -121,6 +133,9 @@
                                         <td class="text-right"><strong><%= totalIncidents %></strong></td>
                                         <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.open, 0) %></strong></td>
                                         <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.resolved, 0) %></strong></td>
+                                        <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.procedente, 0) %></strong></td>
+                                        <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.no_procedente, 0) %></strong></td>
+                                        <td class="text-right"><strong><%= rows.reduce((s, r) => s + r.sin_clasificar, 0) %></strong></td>
                                         <td class="text-right"><strong>100%</strong></td>
                                     </tr>
                                 </tfoot>
@@ -190,6 +205,39 @@
                         });
                     })();
                     </script>
+
+                    <% if (Array.isArray(otherDetails) && otherDetails.length) { %>
+                        <!-- LGT-211 Esc.2: detalle del texto libre de las incidencias tipo "Otro" -->
+                        <div class="report-card">
+                            <h2>Detalle del tipo "Otro" (<%= otherDetails.length %>)</h2>
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Fecha</th>
+                                        <th>Procedencia</th>
+                                        <th>Texto informado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% otherDetails.forEach(d => {
+                                        const f = d.created_at ? new Date(d.created_at).toLocaleDateString('es-AR') : '';
+                                        const resLabel = d.resolution === 'PROCEDENTE' ? 'Procedente'
+                                                       : d.resolution === 'NO_PROCEDENTE' ? 'No procedente' : 'Sin clasificar';
+                                        const resClass = d.resolution === 'PROCEDENTE' ? 'ot-badge ot-badge--green'
+                                                       : d.resolution === 'NO_PROCEDENTE' ? 'ot-badge ot-badge--red' : 'ot-badge';
+                                    %>
+                                        <tr>
+                                            <td><a href="/incident/<%= d.id %>">#<%= d.id %></a></td>
+                                            <td><%= f %></td>
+                                            <td><span class="<%= resClass %>"><%= resLabel %></span></td>
+                                            <td><%= d.description || '—' %></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    <% } %>
                 <% } %>
             <% } %>
 

@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-    list, getCreateForm, create, getDetail, addComment,
-    assign, changeStatus, escalate, close, reopen, searchShipments,
+    list, getCreateForm, create, getQuickData, getDetail, addComment,
+    assign, changeStatus, escalate, setResolution, close, reopen, searchShipments,
     toggleTask, uploadAttachment, downloadAttachment
 } = require('../controllers/incident.js');
 const templateCtrl = require('../controllers/incidentTaskTemplate.js');
@@ -19,6 +19,7 @@ const optionalEvidence = (req, res, next) => {
 
 router.get('/',                   list);
 router.get('/search-shipments',   searchShipments);
+router.get('/quick-data',         getQuickData);
 router.get('/new',                getCreateForm);
 router.post('/',                  create);
 
@@ -32,8 +33,9 @@ router.get('/:id',       getDetail);
 router.post('/:id/comment',  addComment);
 router.post('/:id/assign',   requireSupervisorOrAdmin, assign);
 router.post('/:id/status',   requireSupervisorOrAdmin, changeStatus);
-router.post('/:id/escalate', requireSupervisorOrAdmin, escalate);
-router.post('/:id/close',    requireSupervisorOrAdmin, close);
+router.post('/:id/escalate',   requireSupervisorOrAdmin, escalate);
+router.post('/:id/resolution', requireSupervisorOrAdmin, setResolution);
+router.post('/:id/close',      requireSupervisorOrAdmin, close);
 router.post('/:id/reopen',   requireSupervisorOrAdmin, reopen);
 
 // Checklist y evidencias

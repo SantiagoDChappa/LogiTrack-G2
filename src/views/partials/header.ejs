@@ -1,3 +1,5 @@
+<!-- LGT-217 — salto al contenido para navegación por teclado/lector de pantalla. -->
+<a href="#main-content" class="skip-to-content">Saltar al contenido</a>
 <header>
     <div class="left-header">
         <button class="nav-close-btn" id="btn-nav-close" aria-label="Cerrar menú">
@@ -24,7 +26,11 @@
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 2 || currentUser.roleId === 4) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                     <a href="/shipment/modifications"><ul><span class="material-symbols-outlined">edit_note</span>Modificaciones portal</ul></a>
-                <% } else if (currentUser.roleId === 3) { %>
+                <% } %>
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/returns"><ul><span class="material-symbols-outlined">assignment_return</span>Devoluciones</ul></a>
+                <% } %>
+                <% if (currentUser.roleId === 3) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Mis incidencias</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>
@@ -44,6 +50,16 @@
                             <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
                             <a href="/report/incidents-by-period"><ul><span class="material-symbols-outlined">warning</span>Fallas</ul></a>
                             <a href="/report/satisfaction"><ul><span class="material-symbols-outlined">sentiment_satisfied</span>Satisfacción</ul></a>
+                        </div>
+                    </div>
+                    <div class="nav-group" id="nav-group-notificaciones">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-notificaciones')" aria-expanded="false">
+                            <span class="material-symbols-outlined">notifications</span>
+                            Notificaciones
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/notification/fallidas"><ul><span class="material-symbols-outlined">mark_email_unread</span>Bandeja</ul></a>
                         </div>
                     </div>
                 <% } %>
@@ -83,7 +99,7 @@
             <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %>">
             <span><%= nombreEmpresa %></span>
         </a>
-        <i><span class="material-symbols-outlined">notifications</span></i>
+        <%- include('notificationBell') %>
         <div class="user">
             <div class="user-avatar"><%= currentUser.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
             <span class="user-name"><%= currentUser.fullName %></span>
@@ -100,3 +116,11 @@
     </div>
 </header>
 <div id="nav-overlay" class="nav-overlay"></div>
+<script>
+    // LGT-217 — marca el <main> como destino del salto de contenido y foco programático.
+    document.addEventListener('DOMContentLoaded', function () {
+        var m = document.querySelector('main');
+        if (m && !m.id) { m.id = 'main-content'; }
+        if (m && !m.hasAttribute('tabindex')) { m.setAttribute('tabindex', '-1'); }
+    });
+</script>

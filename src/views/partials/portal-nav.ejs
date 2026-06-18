@@ -1,25 +1,42 @@
+<%# LGT-217 — accesibilidad global también en el portal (foco visible, sr-only, skip-link). %>
+<link rel="stylesheet" href="/css/a11y.css">
 <nav class="portal-nav">
     <a href="/" class="portal-brand">
         <img src="/images/logo.png" alt="<%= support.nombre %>" class="portal-logo">
         <span><%= support.nombre %></span>
     </a>
     <div class="portal-nav-right">
-        <a href="/portal/mis-envios" class="portal-nav-link">
+        <%# Pestañas de sección: solo cuando el cliente está logueado / tiene token de acceso. %>
+        <% if (locals.portalClient) { %>
+        <%
+            var _cp = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : '';
+            var _navEnvios       = _cp.startsWith('/portal/mis-envios/lista') || _cp.startsWith('/portal/mis-envios/envio');
+            var _navIncidencias  = _cp.startsWith('/portal/mis-envios/incidenci');
+            var _navDevoluciones = _cp.startsWith('/portal/mis-envios/devolucion');
+            var _navEncuestas    = _cp.startsWith('/portal/mis-envios/encuesta') && !_cp.startsWith('/portal/mis-envios/encuesta-incidencia') && !_cp.startsWith('/portal/mis-envios/encuestas-incidencias');
+            var _navEncuestasInc = _cp.startsWith('/portal/mis-envios/encuesta-incidencia') || _cp.startsWith('/portal/mis-envios/encuestas-incidencias');
+        %>
+        <a href="/portal/mis-envios/lista" class="portal-nav-link <%= _navEnvios ? 'active' : '' %>">
             <span class="material-symbols-outlined">inventory_2</span>
             Mis envíos
         </a>
-        <a href="/portal/mis-envios/incidencias" class="portal-nav-link">
+        <a href="/portal/mis-envios/incidencias" class="portal-nav-link <%= _navIncidencias ? 'active' : '' %>">
             <span class="material-symbols-outlined">report</span>
             Mis incidencias
         </a>
-        <a href="/portal/mis-envios/encuestas" class="portal-nav-link">
+        <a href="/portal/mis-envios/devoluciones" class="portal-nav-link <%= _navDevoluciones ? 'active' : '' %>">
+            <span class="material-symbols-outlined">assignment_return</span>
+            Mis devoluciones
+        </a>
+        <a href="/portal/mis-envios/encuestas" class="portal-nav-link <%= _navEncuestas ? 'active' : '' %>">
             <span class="material-symbols-outlined">rate_review</span>
             Encuestas entregas
         </a>
-        <a href="/portal/mis-envios/encuestas-incidencias" class="portal-nav-link">
+        <a href="/portal/mis-envios/encuestas-incidencias" class="portal-nav-link <%= _navEncuestasInc ? 'active' : '' %>">
             <span class="material-symbols-outlined">feedback</span>
             Encuestas incidencias
         </a>
+        <% } %>
         <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
             <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
             <span id="theme-label">Modo claro</span>

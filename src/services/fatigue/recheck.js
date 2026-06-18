@@ -47,6 +47,11 @@ function nextCheckAt(session, cfg, derived) {
         return session.restUntil ? new Date(session.restUntil) : null;
     }
     if (derived.state === RecheckState.STOPPED && session.stoppedAt) {
+        // El re-chequeo se dispara solo si, además de estar detenido el mínimo, YA manejaste
+        // el mínimo. Estando detenido el manejo queda congelado: si todavía no llegaste al
+        // umbral de manejo, detenerte no va a disparar el re-chequeo → no hay "próxima hora".
+        const driveMet = (derived.driveMin || 0) >= cfg.recheckDriveMin;
+        if (!driveMet) { return null; }
         return new Date(new Date(session.stoppedAt).getTime() + cfg.recheckStoppedMin * MS_MIN);
     }
     return null;
@@ -67,6 +72,26 @@ async function ensureSession(routeId, route) {
             state: RecheckState.DRIVING,
         },
     });
+    return row;
+}
+
+// Ancla el conteo de manejo al INICIO REAL de la ruta (lo llama el endpoint de
+// inicio). Garantiza que el tiempo empiece a correr desde que arranca la ruta y no
+// desde la primera vez que se abre el widget. Si la sesión ya existía (ruta reiniciada),
+// la reancla en limpio. Mientras esté en DRIVING el conteo no frena: solo se congela
+// cuando el conductor marca "Estoy detenido" (markStopped).
+async function startDriving(routeId, startedAt = new Date()) {
+    const [row, created] = await RouteFatigueSession.findOrCreate({
+        where: { routeId },
+        defaults: { routeId, driveStartedAt: startedAt, state: RecheckState.DRIVING },
+    });
+    if (!created) {
+        await row.update({
+            driveStartedAt: startedAt, state: RecheckState.DRIVING,
+            stoppedAt: null, recheckRequestedAt: null, pausedAt: null, restUntil: null,
+            updatedAt: new Date(),
+        });
+    }
     return row;
 }
 
@@ -148,6 +173,6 @@ async function onRecheckResult(routeId, decision, cfg) {
 
 module.exports = {
     minutesBetween, deriveState, nextCheckAt, canDiscardStop,
-    ensureSession, markStopped, resume, getStatus, guardRetry, onRecheckResult,
+    ensureSession, startDriving, markStopped, resume, getStatus, guardRetry, onRecheckResult,
     RecheckState,
 };

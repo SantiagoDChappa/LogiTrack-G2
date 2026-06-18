@@ -36,6 +36,8 @@ const ACTION_HANDLERS = {
     'show-location': (runtime) => shipmentHandlers.buildLocationResponse(getSelectedShipment(runtime)),
     'show-eta': (runtime) => shipmentHandlers.buildEtaResponse(getSelectedShipment(runtime)),
     'show-history': (runtime) => shipmentHandlers.buildHistoryResponse(getSelectedShipment(runtime)),
+    'show-incidents-menu': (runtime) => shipmentHandlers.buildIncidentsMenuResponse(runtime),
+    'show-all-incidents': (runtime) => shipmentHandlers.buildAllIncidentsResponse(runtime),
     'show-issues': (runtime) => shipmentHandlers.buildIssuesResponse(getSelectedShipment(runtime)),
     'show-branch': (runtime) => shipmentHandlers.buildBranchResponse(getSelectedShipment(runtime)),
     'show-pod': (runtime) => shipmentHandlers.buildPodResponse(getSelectedShipment(runtime)),
@@ -50,6 +52,7 @@ const ACTION_HANDLERS = {
     'report-incident-start':   async (runtime) => incidentReportHandler.buildStart(runtime, await fetchActiveTypes()),
     'report-incident-type':    async (runtime, value) => incidentReportHandler.handleTypeSelect(runtime, value, await fetchTypesById()),
     'report-incident-skip-email': (runtime) => incidentReportHandler.handleSkipEmail(runtime),
+    'report-incident-edit-email': (runtime) => incidentReportHandler.handleEditEmail(runtime),
     'report-incident-confirm': (runtime) => incidentReportHandler.handleConfirm(runtime, createIncidentFromPortal),
     'report-incident-cancel':  (runtime) => incidentReportHandler.handleCancel(runtime),
 };
@@ -62,7 +65,8 @@ const TYPES_TTL_MS = 60 * 1000; // 1 minuto
 async function fetchActiveTypes() {
     const now = Date.now();
     if (typesCache && (now - typesCacheAt) < TYPES_TTL_MS) { return typesCache; }
-    const rows = await incidentTypeModel.getActive();
+    // Solo los tipos que un cliente externo puede reportar (no los internos de operación).
+    const rows = await incidentTypeModel.getClientFacing();
     typesCache = rows.map(t => ({ id: t.id, code: t.code, description: t.description }));
     typesCacheAt = now;
     return typesCache;

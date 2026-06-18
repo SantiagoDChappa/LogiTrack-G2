@@ -3,7 +3,7 @@
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <% const _hasRoute = mapData && mapData.route && mapData.route.stops && mapData.route.stops.length > 0; %>
     <% const _hasMap = mapData && (mapData.destination || (mapData.stops && mapData.stops.length > 0) || _hasRoute); %>
     <% if (_hasMap) { %>
@@ -129,9 +129,14 @@
                 <a href="<%= returnUrl %>" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
                     <span class="material-symbols-outlined">arrow_back</span>
                 </a>
-                <a href="/incident/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia">
+                <button type="button" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia"
+                        data-incident-open
+                        data-shipment-id="<%= shipment.id %>"
+                        data-tracking-id="<%= shipment.trackingId %>"
+                        data-branch-id="<%= shipment.currentBranchId || '' %>"
+                        data-branch-name="<%= currentBranch ? currentBranch.name : 'Sin sucursal' %>">
                     <span class="material-symbols-outlined">report</span>
-                </a>
+                </button>
                 <% if ((currentUser.roleId === 1 || currentUser.roleId === 2) && ![4, 5, 8].includes(shipment.statusId)) { %>
                 <a href="/shipment/update/<%= shipment.id %>?from=/shipment/detail/<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom modificar" data-tooltip="Modificar" aria-label="Modificar">
                     <span class="material-symbols-outlined">edit</span>
@@ -161,6 +166,12 @@
                     <span class="detail-tracking-id"><%= shipment.trackingId %></span>
                 </div>
                 <div style="display:flex;gap:var(--space-3);align-items:center;">
+                    <% if (isAdmin) { %>
+                        <span class="status-badge" style="display:inline-flex;align-items:center;gap:.3rem;background:var(--color-surface-alt);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+                            <span class="material-symbols-outlined" style="font-size:16px">store</span>
+                            <%= currentBranch ? currentBranch.name : 'Sin sucursal' %>
+                        </span>
+                    <% } %>
                     <span class="priority-badge <%= _priCls[_pr] %>"><%= _priLabels[_pr] || '—' %></span>
                     <span class="status-badge <%= _sk %>"><%= _slLabel %></span>
                 </div>
@@ -207,8 +218,8 @@
                                     </div>
                                     <div class="shipment-timeline-meta">
                                         <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        <%= fmtDate(h.changedAt) %>
+                                        <%= fmtTime(h.changedAt) %>
                                         <% if (h.user) { %>&nbsp;·&nbsp;<%= h.user.fullName %><% } %>
                                     </div>
                                 </div>
@@ -257,24 +268,24 @@
                         <div><span class="summary-addr-lbl">DESTINO:</span> <%= [shipment.address.street, shipment.address.number].filter(Boolean).join(' ').toUpperCase() || '-' %></div>
                     </div>
 
-                   <div id="prediction-widget"
-                    class="pred-card pred-card--embedded"
-                    data-province-id="<%= shipment.address.provinceId %>"
-                    data-street="<%= shipment.address.street || '' %>"
-                    data-number="<%= shipment.address.number || '' %>"
-                    data-weight-kg="<%= shipment.weightKg || '' %>"
-                    data-package-qty="<%= shipment.packageQty || '' %>"
-                    data-shipment-type-id="<%= shipment.shipmentTypeId || '' %>"
-                    data-autoload="true"
-                    data-shipment-id="<%= shipment.id %>"
-                    data-delivery-user-id="<%= shipment.deliveryUserId || '' %>">
-                         
-                        <h3>
-                            <span class="material-symbols-outlined">query_stats</span>
-                            Semáforo de fiabilidad
-                        </h3>
-                        <div id="prediction-result"></div>
-                    </div>
+                    <% if (shipment.expectedDeliveryDate) {
+                        const _ed = new Date(shipment.expectedDeliveryDate);
+                        const _edLabel = _ed.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                        const _today = new Date(); _today.setHours(0,0,0,0); _ed.setHours(0,0,0,0);
+                        const _diffDays = Math.round((_ed - _today) / (1000*60*60*24));
+                        const _edHint = _diffDays > 0 ? `en ${_diffDays} día${_diffDays===1?'':'s'}`
+                                       : _diffDays === 0 ? 'hoy'
+                                       : `hace ${Math.abs(_diffDays)} día${Math.abs(_diffDays)===1?'':'s'}`;
+                    %>
+                        <div style="margin-top:1rem;padding:.75rem;border-radius:8px;background:var(--color-bg);border:1px solid var(--color-border);">
+                            <strong style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem;color:var(--color-primary,#2563eb);">event</span>
+                                Fecha estimada de entrega
+                            </strong>
+                            <span style="font-size:.95rem;font-weight:600;text-transform:capitalize"><%= _edLabel %></span>
+                            <span style="display:block;margin-top:.15rem;font-size:.8rem;color:var(--color-text-secondary)">(<%= _edHint %>)</span>
+                        </div>
+                    <% } %>
 
                     <% if (typeof sla !== 'undefined' && sla) { %>
                         <div style="margin-top:1rem;padding:.75rem;border-radius:8px;background:<%= sla.delivered && sla.onTime ? 'var(--color-success-bg)' : (sla.delivered ? 'var(--color-danger-bg)' : 'var(--color-warning-bg)') %>;border:1px solid <%= sla.delivered && sla.onTime ? 'var(--color-success)' : (sla.delivered ? 'var(--color-danger)' : 'var(--color-warning)') %>;">
@@ -309,6 +320,13 @@
                             <% } %>
                             <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Total a cobrar</span><span><%= fmtMoney(costClient.final) %></span></div>
                         </div>
+                    <% } %>
+
+                    <% if (typeof invoice !== 'undefined' && invoice) { %>
+                        <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
+                            <span class="material-symbols-outlined">receipt_long</span>
+                            Ver factura <%= invoice.number %>
+                        </a>
                     <% } %>
                 </div>
 
@@ -394,12 +412,56 @@
                 </div>
                 <% } %>
 
-                <!-- ── Repartidor Asignado ── -->
-                <div class="update-card">
-                    <h3><span class="material-symbols-outlined">person_pin_circle</span> Repartidor</h3>
-                    <div class="detail-field">
-                        <span class="detail-label">Nombre y apellido</span>
-                        <span class="detail-value"><%= shipment.deliveryUser ? shipment.deliveryUser.fullName : 'Sin asignar' %></span>
+                <% const _hasIncidents = typeof incidents !== 'undefined' && incidents && incidents.length > 0; %>
+
+                <!-- ── Repartidor + Incidencias (fila inferior del top-grid) ── -->
+                <div class="ship-bottom-row">
+                    <div class="update-card">
+                        <h3><span class="material-symbols-outlined">person_pin_circle</span> Repartidor</h3>
+                        <div class="detail-field">
+                            <span class="detail-label">Nombre y apellido</span>
+                            <span class="detail-value"><%= shipment.deliveryUser ? shipment.deliveryUser.fullName : 'Sin asignar' %></span>
+                        </div>
+                    </div>
+
+                    <div class="update-card update-card--incidents">
+                        <h3>
+                            <span class="material-symbols-outlined" style="color:#dc2626;">report</span>
+                            Incidencias accionadas<% if (_hasIncidents) { %> (<%= incidents.length %>)<% } %>
+                        </h3>
+                        <% if (_hasIncidents) { %>
+                            <div class="ship-incidents-list">
+                                <% incidents.forEach(inc => {
+                                    const sCls = inc.status === 'OPEN' ? 'incident-badge--open'
+                                               : inc.status === 'IN_REVIEW' ? 'incident-badge--in_review'
+                                               : 'incident-badge--closed';
+                                    const sLabel = IncidentStatusLabel[inc.status] || inc.status;
+                                %>
+                                    <a href="/incident/<%= inc.id %>" class="ship-incident-row">
+                                        <span class="ship-incident-id">#<%= inc.id %></span>
+                                        <span class="ship-incident-type"><%= inc.type ? inc.type.description : '—' %></span>
+                                        <span class="incident-badge <%= sCls %>"><%= sLabel %></span>
+                                        <span class="ship-incident-date"><%= new Date(inc.createdAt).toLocaleDateString('es-AR') %></span>
+                                        <span class="material-symbols-outlined ship-incident-arrow">chevron_right</span>
+                                    </a>
+                                <% }) %>
+                            </div>
+                        <% } else { %>
+                            <div class="ship-incidents-empty">
+                                <span class="material-symbols-outlined">inbox</span>
+                                <p>Sin incidencias registradas para este envío.</p>
+                            </div>
+                        <% } %>
+
+                        <% if (typeof returnError !== 'undefined' && returnError) { %>
+                            <div class="alert alert-error" style="margin-top:.6rem;"><%= returnError %></div>
+                        <% } %>
+                        <% if (typeof canCreateReturn !== 'undefined' && canCreateReturn) { %>
+                            <a href="/returns/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg modificar" style="margin-top:.6rem;display:inline-flex;align-items:center;gap:.4rem;width:fit-content;" data-tooltip="Crear devolución" aria-label="Crear devolución">
+                                <span class="material-symbols-outlined">assignment_return</span>
+                                Crear devolución
+                            </a>
+                        <% } %>
                     </div>
                 </div>
 
@@ -557,6 +619,36 @@
             </div>
             <!-- ══════════ FIN BOTTOM GRID ══════════ -->
 
+            <%# LGT-215 — relación con envío de reposición (en ambas direcciones) %>
+            <% if ((typeof replacementShipment !== 'undefined' && replacementShipment) || (typeof originalShipment !== 'undefined' && originalShipment)) { %>
+            <div class="update-card" style="margin-top:1.5rem;">
+                <h3><span class="material-symbols-outlined" style="color:var(--color-warning,#d97706);">swap_horiz</span> Reposición vinculada</h3>
+                <% if (typeof replacementShipment !== 'undefined' && replacementShipment) { %>
+                <div style="display:flex;align-items:center;gap:.75rem;margin-top:.75rem;padding:.6rem .8rem;background:var(--color-surface-alt,#f8fafc);border-radius:8px;border:1px solid var(--color-border);">
+                    <span class="material-symbols-outlined" style="color:var(--color-warning,#d97706);font-size:1.2rem;">redo</span>
+                    <div>
+                        <div style="font-size:.78rem;opacity:.6;text-transform:uppercase;margin-bottom:.1rem;">Envío de reposición generado</div>
+                        <a href="/shipment/detail/<%= replacementShipment.id %>" style="font-weight:600;color:var(--color-primary);">
+                            <%= replacementShipment.trackingId %>
+                        </a>
+                        <span style="font-size:.82rem;margin-left:.5rem;opacity:.7;">· Sin cargo al cliente</span>
+                    </div>
+                </div>
+                <% } %>
+                <% if (typeof originalShipment !== 'undefined' && originalShipment) { %>
+                <div style="display:flex;align-items:center;gap:.75rem;margin-top:.75rem;padding:.6rem .8rem;background:var(--color-surface-alt,#f8fafc);border-radius:8px;border:1px solid var(--color-border);">
+                    <span class="material-symbols-outlined" style="color:var(--color-primary);font-size:1.2rem;">undo</span>
+                    <div>
+                        <div style="font-size:.78rem;opacity:.6;text-transform:uppercase;margin-bottom:.1rem;">Reposición del envío original</div>
+                        <a href="/shipment/detail/<%= originalShipment.id %>" style="font-weight:600;color:var(--color-primary);">
+                            <%= originalShipment.trackingId %>
+                        </a>
+                    </div>
+                </div>
+                <% } %>
+            </div>
+            <% } %>
+
             <% if (typeof modifications !== 'undefined' && modifications && modifications.length) { %>
             <div class="update-card" style="margin-top:1.5rem;">
                 <h3><span class="material-symbols-outlined">edit_note</span> Modificaciones desde portal</h3>
@@ -573,7 +665,7 @@
                         <tbody>
                             <% modifications.forEach(function(m) { %>
                             <tr>
-                                <td><%= new Date(m.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= fmtDateTime(m.createdAt) %></td>
                                 <td><%= m.typeLabel %></td>
                                 <td><%= m.statusLabel %></td>
                                 <td><%= m.summary %><% if (m.reviewComment) { %> — <%= m.reviewComment %><% } %></td>
@@ -643,8 +735,8 @@
                                     </div>
                                     <div class="shipment-timeline-meta">
                                         <span class="material-symbols-outlined shipment-timeline-meta-ico">schedule</span>
-                                        <%= new Date(h.changedAt).toLocaleDateString('es-AR') %>
-                                        <%= new Date(h.changedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) %>
+                                        <%= fmtDate(h.changedAt) %>
+                                        <%= fmtTime(h.changedAt) %>
                                     </div>
                                     <% if (_author3) { %>
                                         <div class="shipment-timeline-meta">
@@ -679,7 +771,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
-    <script src="/js/prediction.js" defer></script>
 
     <% if (_hasMap) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -834,5 +925,6 @@
         });
     })();
     </script>
+    <%- include('../partials/incidentQuickModal') %>
 </body>
 </html>

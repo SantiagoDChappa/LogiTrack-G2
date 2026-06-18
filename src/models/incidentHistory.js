@@ -10,10 +10,12 @@ const IncidentHistory = sequelize.define('incident_history', {
     comment:    { type: DataTypes.TEXT,       allowNull: true },
     userId:     { type: DataTypes.INTEGER,    allowNull: true },
     personId:   { type: DataTypes.INTEGER,    allowNull: true },
+    // true = comentario interno del staff: NO se ve en el portal del cliente.
+    internal:   { type: DataTypes.BOOLEAN,    allowNull: false, defaultValue: false },
     changedAt:  { type: DataTypes.DATE }
 }, { tableName: 'incident_history', timestamps: false });
 
-const create = ({ incidentId, eventType, fromValue, toValue, comment, userId, personId, transaction }) => {
+const create = ({ incidentId, eventType, fromValue, toValue, comment, userId, personId, internal, transaction }) => {
     return IncidentHistory.create({
         incidentId,
         eventType,
@@ -22,6 +24,7 @@ const create = ({ incidentId, eventType, fromValue, toValue, comment, userId, pe
         comment:   comment   || null,
         userId:    userId    || null,
         personId:  personId  || null,
+        internal:  !!internal,
         changedAt: new Date()
     }, { transaction: transaction || null });
 };

@@ -40,9 +40,33 @@ const IncidentStatus = Object.freeze({
     CLOSED:    'CLOSED',
 });
 
+const IncidentStatusLabel = Object.freeze({
+    OPEN:      'Abierta',
+    IN_REVIEW: 'En revisión',
+    CLOSED:    'Cerrada',
+});
+
 const IncidentResolution = Object.freeze({
     PROCEDENTE:    'PROCEDENTE',
     NO_PROCEDENTE: 'NO_PROCEDENTE',
+});
+
+// LGT-210 — nivel de demora que clasifica el repartidor al informarla.
+const IncidentDelayLevel = Object.freeze({
+    DEMORADA:     'DEMORADA',
+    MUY_DEMORADA: 'MUY_DEMORADA',
+    REPROGRAMAR:  'REPROGRAMAR',
+});
+
+const IncidentDelayLevelLabel = Object.freeze({
+    DEMORADA:     'Demorada',
+    MUY_DEMORADA: 'Muy demorada',
+    REPROGRAMAR:  'Se debe reprogramar',
+});
+
+const IncidentResolutionLabel = Object.freeze({
+    PROCEDENTE:    'Procedente',
+    NO_PROCEDENTE: 'No procedente',
 });
 
 const IncidentChannel = Object.freeze({
@@ -82,7 +106,12 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_CANCELLED:           'SHIPMENT_CANCELLED',
     SHIPMENT_ASSIGNED:            'SHIPMENT_ASSIGNED',
     SHIPMENT_IN_PREPARATION:      'SHIPMENT_IN_PREPARATION',
-    SHIPMENT_PACKAGE_FAILED:      'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_PACKAGE_FAILED:              'SHIPMENT_PACKAGE_FAILED',
+    SHIPMENT_PACKAGE_FAILED_UNDELIVERED:  'SHIPMENT_PACKAGE_FAILED_UNDELIVERED',
+    SHIPMENT_PACKAGE_FAILED_DELAY:        'SHIPMENT_PACKAGE_FAILED_DELAY',
+    SHIPMENT_PACKAGE_FAILED_ATTEMPT:      'SHIPMENT_PACKAGE_FAILED_ATTEMPT',
+    // LGT-204: paquete roto o dañado → aviso al remitente para que elija reembolso o reemplazo.
+    SHIPMENT_PACKAGE_DAMAGED:             'SHIPMENT_PACKAGE_DAMAGED',
     SHIPMENT_FAILED_ATTEMPT:      'SHIPMENT_FAILED_ATTEMPT',
     // Sprint 3 — eventos extendidos PDF 2.3
     SHIPMENT_OUT_FOR_DELIVERY:    'SHIPMENT_OUT_FOR_DELIVERY',   // Salida a reparto
@@ -103,6 +132,13 @@ const NotificationEvent = Object.freeze({
     // LGT-195: el transportista rechazó el consentimiento de fatiga las veces parametrizadas
     // → queda inhabilitado y se notifica a los Supervisores de su sucursal + administradores.
     FATIGUE_DRIVER_DISABLED_CONSENT: 'FATIGUE_DRIVER_DISABLED_CONSENT',
+    // Avisos de fatiga a Supervisor de la sucursal del transportista + admins. Todos
+    // editables desde Ajustes → Comunicaciones (toggle + plantilla).
+    FATIGUE_ROUTE_BLOCKED:     'FATIGUE_ROUTE_BLOCKED',     // ruta bloqueada por no superar el control
+    FATIGUE_REVIEW_NO_BLOCK:   'FATIGUE_REVIEW_NO_BLOCK',   // no apto pero autoBlock OFF: salió igual, revisar
+    FATIGUE_RECHECK_OMITTED:   'FATIGUE_RECHECK_OMITTED',   // re-chequeo en ruta no realizado a tiempo
+    FATIGUE_CONSENT_REJECTED:  'FATIGUE_CONSENT_REJECTED',  // rechazó el consentimiento (cada vez, antes del límite)
+    FATIGUE_PATTERN_RECURRENT: 'FATIGUE_PATTERN_RECURRENT', // patrón de fatiga recurrente
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
@@ -115,6 +151,7 @@ const ShipmentHistoryEvent = Object.freeze({
     RETURNED_TO_BRANCH:      'RETURNED_TO_BRANCH',
     ROUTE_ASSIGNED:          'ROUTE_ASSIGNED',
     INCIDENT_OPENED:         'INCIDENT_OPENED',
+    DELAY_PROPAGATED:        'DELAY_PROPAGATED',
     MODIFICATION_APPLIED:    'MODIFICATION_APPLIED',
     MODIFICATION_REQUESTED:  'MODIFICATION_REQUESTED',
     MODIFICATION_REJECTED:   'MODIFICATION_REJECTED',
@@ -149,6 +186,24 @@ const RouteFailureReason = Object.freeze({
     OTHER:               'OTHER',
 });
 
+// LGT-182/183/184/186 — Devoluciones. Ahora son incidencias de tipo RETURN; se conserva
+// solo el motivo estructurado (el estado/resolución los maneja la incidencia).
+const ReturnReason = Object.freeze({
+    DEFECTUOSO:      'DEFECTUOSO',
+    INCORRECTO:      'INCORRECTO',
+    DANADO:          'DANADO',
+    ARREPENTIMIENTO: 'ARREPENTIMIENTO',
+    OTRO:            'OTRO',
+});
+
+const ReturnReasonLabel = Object.freeze({
+    DEFECTUOSO:      'Producto defectuoso',
+    INCORRECTO:      'Producto incorrecto o equivocado',
+    DANADO:          'Llegó dañado',
+    ARREPENTIMIENTO: 'Arrepentimiento (ya no lo quiero)',
+    OTRO:            'Otro',
+});
+
 const mapperShipmentStatusToEvent = {
     [Status.PENDING.id]:        NotificationEvent.SHIPMENT_PENDING,
     [Status.IN_TRANSIT.id]:     NotificationEvent.SHIPMENT_IN_TRANSIT,
@@ -171,8 +226,11 @@ const EmailQueueStatus = {
 
 module.exports = {
     Status, PersonType, RoleType, ShipmentType, ShipmentPriority,
-    IncidentStatus, IncidentResolution, IncidentChannel, IncidentEventType, IncidentPriority,
+    IncidentStatus, IncidentStatusLabel, IncidentResolution, IncidentResolutionLabel,
+    IncidentDelayLevel, IncidentDelayLevelLabel,
+    IncidentChannel, IncidentEventType, IncidentPriority,
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,
     ModificationRequestStatus, ModificationChangeType, ModificationChannel,
+    ReturnReason, ReturnReasonLabel,
 };

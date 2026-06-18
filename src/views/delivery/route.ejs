@@ -571,26 +571,26 @@
                 <a class="btn-back" href="/delivery" title="Volver a Mi Ruteo">
                     <span class="material-symbols-outlined">arrow_back</span>
                 </a>
-                <button class="btn-menu" id="btn-route-menu" title="Menú">
+                <button class="btn-menu" id="btn-route-menu" title="Menú" aria-label="Menú">
                     <span class="material-symbols-outlined">menu</span>
                 </button>
             </div>
             <div class="map-actions">
                 <% if (!readOnly) { %>
-                    <button class="btn-panic"    id="btn-panic"    title="Pánico: enviar ubicación a despacho">
+                    <button class="btn-panic"    id="btn-panic"    title="Pánico: enviar ubicación a despacho" aria-label="Pánico: enviar ubicación a despacho">
                         <span class="material-symbols-outlined">sos</span>
                     </button>
-                    <button class="btn-incident" id="btn-incident" title="Reportar incidente vehicular / accidente">
+                    <button class="btn-incident" id="btn-incident" title="Reportar incidente vehicular / accidente" aria-label="Reportar incidente vehicular / accidente">
                         <span class="material-symbols-outlined">report</span>
                     </button>
-                    <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)">
+                    <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)" aria-label="Pausar ruta (almuerzo / combustible)">
                         <span class="material-symbols-outlined">pause_circle</span>
                     </button>
                 <% } %>
-                <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps">
+                <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">
                     <span class="material-symbols-outlined">map</span>
                 </button>
-                <button class="btn-recenter" id="btn-recenter" title="Centrar en mi posición">
+                <button class="btn-recenter" id="btn-recenter" title="Centrar en mi posición" aria-label="Centrar en mi posición">
                     <span class="material-symbols-outlined">my_location</span>
                 </button>
                 <% if (readOnly) { %>
@@ -1834,10 +1834,35 @@
         nextLbl.style.cssText = 'position:fixed;bottom:132px;right:16px;z-index:9999;padding:8px 12px;border-radius:10px;' +
             'background:#0f172a;color:#fff;font-weight:700;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none';
         document.body.appendChild(nextLbl);
-        const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return '--:--'; } };
+        // Zona horaria y formato 12/24h configurados en Ajustes (no la del navegador).
+        const FATIGUE_TZ  = '<%= typeof displayTimezone !== "undefined" && displayTimezone ? displayTimezone : "America/Argentina/Buenos_Aires" %>';
+        const FATIGUE_H12 = <%= (typeof clock24h !== "undefined" && !clock24h) ? "true" : "false" %>;
+        const fmtHora = (iso) => { try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: FATIGUE_TZ, hour12: FATIGUE_H12 }); } catch (_) { return '--:--'; } };
+        // Muestra la hora REAL del próximo chequeo/reintento (en la zona de Ajustes) con
+        // una cuenta regresiva en vivo. Al llegar a la hora, dispara un refresh para que
+        // el re-chequeo se active automáticamente (sin esperar el siguiente poll).
+        let nextTick = null;
         const showNext = (iso, label) => {
+            if (nextTick) { clearInterval(nextTick); nextTick = null; }
             if (!iso) { nextLbl.style.display = 'none'; return; }
-            nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span>`;
+            const target = new Date(iso).getTime();
+            let firedAtZero = false;
+            const paint = () => {
+                const remMs = target - Date.now();
+                let cd;
+                if (remMs <= 0) {
+                    cd = 'ahora';
+                    if (nextTick) { clearInterval(nextTick); nextTick = null; }
+                    if (!firedAtZero) { firedAtZero = true; refresh(); } // activa el re-chequeo puntual
+                } else {
+                    const totalSec = Math.floor(remMs / 1000);
+                    const m = Math.floor(totalSec / 60); const s = totalSec % 60;
+                    cd = m > 0 ? `en ${m}m ${String(s).padStart(2, '0')}s` : `en ${s}s`;
+                }
+                nextLbl.innerHTML = `⏱ ${label}: <span style="color:#fbbf24">${fmtHora(iso)}</span> <span style="opacity:.85">(${cd})</span>`;
+            };
+            paint();
+            nextTick = setInterval(paint, 1000);
             nextLbl.style.display = 'block';
         };
 

@@ -3,7 +3,7 @@
 <head>
     <%- include('../partials/head') %>
     <title>Cambios guardados — LogiTrack</title>
-    <link rel="stylesheet" href="/css/portal.css">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <style>
         .self-wrap { max-width: 720px; margin: 2rem auto; padding: 0 1rem; text-align: center; }
         .icon { font-size: 3rem; color: #16a34a; margin-bottom: 1rem; }
@@ -20,7 +20,9 @@
             <div class="icon">✓</div>
             <h1>Envío <span class="pill"><%= trackingId %></span></h1>
             <div class="ok">
-                <% if (pendingCount > 0 && appliedCount > 0) { %>
+                <% if (typeof accepted !== 'undefined' && accepted) { %>
+                    <strong>FORMULARIO ENTREGADO.</strong> Registramos que vas a esperar la nueva fecha estimada de entrega y actualizamos tu envío.
+                <% } else if (pendingCount > 0 && appliedCount > 0) { %>
                     Algunos cambios se aplicaron de inmediato y otros quedaron pendientes de revisión operativa.
                 <% } else if (pendingCount > 0) { %>
                     Tu solicitud quedó pendiente de revisión operativa. Te notificaremos novedades.

@@ -47,6 +47,7 @@ const getAllByBranch = (branchId) => {
             { model: Branch,    as: 'originBranch' },
         ],
         order: [['createdAt', 'DESC']],
+        limit: 200,
     });
 };
 
@@ -93,7 +94,8 @@ const getActiveByDriver = (driverUserId) => {
         include: [
             { model: Transport, as: 'transport', where: { driverUserId }, required: true },
         ],
-        order: [['createdAt', 'DESC']],
+        // Cola: la EN CURSO tiene prioridad; entre planificadas, la más vieja primero (FIFO).
+        order: [['statusId', 'DESC'], ['createdAt', 'ASC']],
     });
 };
 
@@ -108,6 +110,7 @@ const getAllByDriver = (driverUserId) => {
             { model: RouteStop, as: 'stops', required: false, attributes: ['id', 'completed', 'skipped', 'stopType', 'sequence'] },
         ],
         order: [['createdAt', 'DESC']],
+        limit: 100,
     });
 };
 

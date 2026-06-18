@@ -2,7 +2,6 @@ const settingModel = require('../models/setting');
 const shipmentModel = require('../models/shipment');
 const {
     COOKIE_NAME,
-    parseDocument,
     assertClientOwnsShipment,
     requestAccess,
     confirmAccess,
@@ -21,6 +20,7 @@ const { Branch } = require('../models/branch');
 const provinceModel = require('../models/province');
 const {
     listClientIncidents,
+    listIncidentsForShipment,
     loadIncidentDetailViewModel,
     loadOwnedIncident,
 } = require('../services/portalIncidentView');
@@ -198,6 +198,21 @@ const getShipmentDetail = async (req, res) => {
 
     const enriched = await enrichShipmentRecord(shipment);
     const modifications = formatModificationsList(await listByShipment(shipmentId));
+    const incidents = await listIncidentsForShipment(shipmentId);
+
+    // LGT-182 — devoluciones vinculadas (incidencias RETURN) + posibilidad de solicitar una nueva.
+    const returnIncidentService = require('../services/returnIncidentService');
+    const { ReturnReasonLabel, Status } = require('../constants/enums');
+    const returnRows = await returnIncidentService.listByShipment(shipmentId);
+    const returns = returnRows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        statusLabel: returnIncidentService.portalStatusLabel(r),
+        reasonLabel: ReturnReasonLabel[r.returnReason] || r.returnReason || 'Devolución',
+        createdAt: r.createdAt,
+    }));
+    const hasAnyReturn = await returnIncidentService.findAnyByShipment(shipmentId);
+    const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasAnyReturn;
 
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),
@@ -205,6 +220,10 @@ const getShipmentDetail = async (req, res) => {
         shipment: enriched,
         canSelfService: canSelfService(enriched),
         modifications,
+        incidents,
+        returns,
+        canRequestReturn,
+        returnError: req.query.returnError ? String(req.query.returnError) : null,
     });
 };
 
@@ -317,7 +336,7 @@ const getIncidentDetail = async (req, res) => {
         incident: await loadIncidentDetailViewModel(incident),
         damage: { isDamage, choice: incident.damageChoice || null, options: damageSvc.CHOICES, closed: !!incident.closedAt },
         flash: req.query.ok === '1' ? 'Tu respuesta fue enviada correctamente.'
-            : (req.query.choice ? 'Registramos tu elección. El operador la verá y actuará en consecuencia.' : null),
+            : (req.query.choice ? 'Registramos tu elección. Queda pendiente de aprobación del supervisor; cuando la apruebe, la ejecutamos.' : null),
         error: req.query.error ? String(req.query.error) : null,
     });
 };

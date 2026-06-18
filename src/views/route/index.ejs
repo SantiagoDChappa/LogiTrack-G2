@@ -35,8 +35,32 @@
             </form>
             <% } %>
 
+            <form class="search-form" data-tools-for="routes" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-rt-id">ID</label>
+                        <input type="text" id="f-rt-id" class="search-input" data-col="0" placeholder="Ej: 12">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-rt-transport">Transporte</label>
+                        <input type="text" id="f-rt-transport" class="search-input" data-col="1" placeholder="Ej: Camión 1">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-rt-driver">Conductor</label>
+                        <input type="text" id="f-rt-driver" class="search-input" data-col="2" placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-rt-state">Estado</label>
+                        <input type="text" id="f-rt-state" class="search-input" data-col="6" placeholder="Ej: Completada">
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
             <div class="table-wrapper">
-                <table data-paginate="routes">
+                <table data-tools="routes">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -100,5 +124,6 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>
