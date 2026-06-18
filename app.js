@@ -53,6 +53,7 @@ const invoiceRoutes = require('./src/routes/invoice');
 const notificationInAppRoutes = require('./src/routes/notificationInApp');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
+const apiSearchRoutes  = require('./src/routes/api/search');
 
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
@@ -138,6 +139,7 @@ app.use('/api/address-suggest',   requireAuth, apiAddressSuggestRoutes);
 app.use('/api/route',             requireAuth, apiRouteRoutes);
 app.use('/api/branches',          requireAuth, apiBranchesRoutes);
 app.use('/api/cost-preview',      requireAuth, apiCostPreviewRoutes);
+app.use('/api/search',            requireAuth, apiSearchRoutes);
 app.use('/api-docs',      requireAuth, requireSupervisor, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/delivery', requireAuth, deliveryRoutes);
 app.use('/scan',     requireAuth, scanRoutes);
