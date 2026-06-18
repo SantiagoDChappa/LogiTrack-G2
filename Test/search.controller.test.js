@@ -15,11 +15,12 @@ jest.mock('../src/models/index', () => ({
     Route: { findAll: jest.fn(), findOne: jest.fn() },
     Transport: {},
     User: { findAll: jest.fn() },
-    ShipmentReturn: { findAll: jest.fn() },
+    Incident: { findAll: jest.fn() },
+    IncidentType: {},
 }));
 
 const incidentModel = require('../src/models/incident');
-const { Shipment, Route, User, ShipmentReturn } = require('../src/models/index');
+const { Shipment, Route, User, Incident } = require('../src/models/index');
 const searchRoutes = require('../src/routes/api/search');
 
 const buildApp = (currentUser) => {
@@ -43,7 +44,7 @@ describe('Universal search RBAC', () => {
         Route.findAll.mockResolvedValue([]);
         Route.findOne.mockResolvedValue(null);
         User.findAll.mockResolvedValue([]);
-        ShipmentReturn.findAll.mockResolvedValue([]);
+        Incident.findAll.mockResolvedValue([]);
         incidentModel.list.mockResolvedValue([]);
     });
 
@@ -85,7 +86,7 @@ describe('Universal search RBAC', () => {
         expect(res.body.routes).toHaveLength(1);
         expect(res.body.routes[0].id).toBe(74);
         expect(res.body.routes[0].status).toBe('Finalizada');
-        expect(ShipmentReturn.findAll).not.toHaveBeenCalled();
+        expect(Incident.findAll).not.toHaveBeenCalled();
         expect(User.findAll).not.toHaveBeenCalled();
     });
 
@@ -123,9 +124,11 @@ describe('Universal search RBAC', () => {
         const routeCall = Route.findAll.mock.calls[0][0];
         expect(routeCall.where).toEqual(expect.objectContaining({ originBranchId: 10 }));
 
-        expect(ShipmentReturn.findAll).toHaveBeenCalled();
-        const retInclude = ShipmentReturn.findAll.mock.calls[0][0].include[0];
+        expect(Incident.findAll).toHaveBeenCalled();
+        const retInclude = Incident.findAll.mock.calls[0][0].include[0];
         expect(retInclude.where).toEqual(expect.objectContaining({ currentBranchId: 10 }));
+        const typeInclude = Incident.findAll.mock.calls[0][0].include[1];
+        expect(typeInclude.where).toEqual({ code: 'RETURN' });
     });
 
     test('admin: puede buscar usuarios', async () => {
