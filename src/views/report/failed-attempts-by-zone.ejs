@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Intentos Fallidos por Zona</title>
+    <link rel="stylesheet" href="/css/report.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Intentos Fallidos por Zona</h1>
+            </div>
+
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/failed-attempts-by-zone" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/failed-attempts-by-zone" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+                <% if (rows.length === 0) { %>
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">location_off</span>
+                            <p>No hay datos de intentos fallidos para el período <strong><%= dateFrom %></strong> → <strong><%= dateTo %></strong>.</p>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <div class="report-card">
+                        <h2>Mapa de calor — <%= rows.length %> zona<%= rows.length !== 1 ? 's' : '' %></h2>
+                        <table class="report-table" id="faz-table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-col="zone_name">Zona <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="total_shipments">Envíos <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="failed_attempts">Intentos fallidos <span class="sort-icon">↕</span></th>
+                                    <th class="sortable text-right" data-col="failure_rate">Tasa de fallo <span class="sort-icon">↕</span></th>
+                                    <th>Intensidad</th>
+                                </tr>
+                            </thead>
+                            <tbody id="faz-tbody">
+                                <% rows.forEach(row => { %>
+                                    <%
+                                        const intensity = row.failure_rate >= 15 ? 'Alta'
+                                            : row.failure_rate >= 8  ? 'Media'
+                                            : 'Baja';
+                                        const intensityClass = row.failure_rate >= 15 ? 'ot-badge--red'
+                                            : row.failure_rate >= 8  ? 'ot-badge--amber'
+                                            : 'ot-badge--green';
+                                    %>
+                                    <tr
+                                        data-zone_name="<%= row.zone_name %>"
+                                        data-total_shipments="<%= row.total_shipments %>"
+                                        data-failed_attempts="<%= row.failed_attempts %>"
+                                        data-failure_rate="<%= row.failure_rate %>"
+                                    >
+                                        <td><%= row.zone_name %></td>
+                                        <td class="text-right count-cell"><%= row.total_shipments %></td>
+                                        <td class="text-right">
+                                            <% if (row.failed_attempts > 0) { %>
+                                                <span class="ot-badge <%= intensityClass %>"><%= row.failed_attempts %></span>
+                                            <% } else { %>
+                                                <span class="dp-na">0</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="text-right">
+                                            <div class="dp-pct-cell">
+                                                <div class="dp-pct-bar-track">
+                                                    <div class="dp-pct-bar-fill <%= intensityClass === 'ot-badge--red' ? 'fill--red' : intensityClass === 'ot-badge--amber' ? 'fill--amber' : 'fill--green' %>"
+                                                         style="width:<%= Math.min(row.failure_rate, 100) %>%"></div>
+                                                </div>
+                                                <span class="dp-pct-label"><%= row.failure_rate %>%</span>
+                                            </div>
+                                        </td>
+                                        <td><span class="ot-badge <%= intensityClass %>"><%= intensity %></span></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+
+        (function () {
+            const tbody = document.getElementById('faz-tbody');
+            if (!tbody) return;
+            let lastCol = null, asc = true;
+            document.querySelectorAll('#faz-table th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', () => {
+                    const col = th.dataset.col;
+                    if (lastCol === col) { asc = !asc; } else { asc = col === 'zone_name'; }
+                    lastCol = col;
+                    document.querySelectorAll('#faz-table .sort-icon').forEach(i => i.textContent = '↕');
+                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        const va = a.dataset[col], vb = b.dataset[col];
+                        const isNum = col !== 'zone_name';
+                        const cmp = isNum ? Number(va) - Number(vb) : va.localeCompare(vb, 'es');
+                        return asc ? cmp : -cmp;
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

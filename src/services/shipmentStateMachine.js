@@ -34,6 +34,7 @@ const STATUS_LABELS = {
     [S.IN_PREPARATION.id]: 'En preparación',
     [S.PACKAGE_FAILED.id]: 'Paquete fallido',
     [S.FAILED_ATTEMPT.id]: 'Intento fallido',
+    [S.RETURNED.id]: 'Devuelto',
 };
 
 // Mensajes orientados al cliente (portal publico). Sin info interna: ni actor, ni hora, ni ruta interna.
@@ -79,6 +80,7 @@ const TRANSITIONS = {
     [S.DELIVERED.id]:      [],
     [S.CANCELLED.id]:      [],
     [S.PACKAGE_FAILED.id]: [],
+    [S.RETURNED.id]:       [],
 };
 
 const RULES_TARGETED = {
@@ -243,6 +245,31 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
         } catch (e) {
             console.error('[stateMachine] notify dispatch error:', e.message);
         }
+
+        // Sprint 5 — al entregar, completa actualDays/wasDelayed en la predicción para el dashboard analítico.
+        if (result.toStatusId === S.DELIVERED.id) {
+            try {
+                const ShipmentHistory = require('../models/shipmentHistory');
+                const { ShipmentPrediction, updateActualResult } = require('../models/shipmentPrediction');
+                const startEntry = await ShipmentHistory.findOne({
+                    where: { shipmentId, toStatusId: S.IN_TRANSIT.id },
+                    order: [['changedAt', 'ASC']],
+                });
+                if (startEntry) {
+                    const actualDays = Math.max(1, Math.ceil((Date.now() - new Date(startEntry.changedAt).getTime()) / 86_400_000));
+                    const pred = await ShipmentPrediction.findOne({
+                        where: { shipmentId },
+                        order: [['createdAt', 'DESC']],
+                    });
+                    if (pred && pred.actualDays === null) {
+                        await updateActualResult(shipmentId, actualDays, actualDays > pred.predictedDays);
+                    }
+                }
+            } catch (e) {
+                console.error('[stateMachine] actualDays update error:', e.message);
+            }
+        }
+
         return result;
     });
 };

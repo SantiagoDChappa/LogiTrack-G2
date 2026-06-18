@@ -67,6 +67,7 @@
                         name="password"
                         placeholder="••••••••"
                         autocomplete="current-password"
+                        data-pw-toggle
                         required
                     >
                 </div>
@@ -83,7 +84,7 @@
                         <input type="checkbox" name="remember">
                         <span>Recordar sesión</span>
                     </label>
-                    <a href="#" class="login-forgot">¿Olvidaste tu contraseña?</a>
+                    <a href="/account/password/forgot" class="login-forgot">¿Olvidaste tu contraseña?</a>
                 </div>
 
                 <input type="hidden" name="returnTo" value="<%= locals.returnTo || '' %>">
@@ -106,6 +107,7 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/password-ui.js" defer></script>
     <script>
     document.getElementById('dev-accounts').addEventListener('change', function () {
         if (!this.value) return;

@@ -520,13 +520,496 @@ const getSatisfactionData = async (query = {}, deps = { sequelize, QueryTypes })
     return viewModel;
 };
 
+// ─── Sprint 5: Intentos fallidos por zona ────────────────────────────────────
+
+const getFailedAttemptsByZoneData = async (query = {}, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+
+    const viewModel = {
+        dateFrom, dateTo, error: null, rows: [], hasQuery,
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+    };
+
+    if (dateFrom > dateTo) {
+        viewModel.error = 'La fecha de inicio no puede ser mayor a la fecha de fin.';
+        return viewModel;
+    }
+
+    viewModel.rows = await deps.sequelize.query(
+        `WITH zone_shipments AS (
+            SELECT s."zoneId", COUNT(DISTINCT s.id)::int AS total
+            FROM logitrack.shipment s
+            WHERE s."createdAt"::date >= :from AND s."createdAt"::date <= :to
+              AND s."zoneId" IS NOT NULL
+            GROUP BY s."zoneId"
+        ),
+        zone_failures AS (
+            SELECT s."zoneId", COUNT(DISTINCT h.id)::int AS failed_attempts
+            FROM logitrack.shipment_history h
+            JOIN logitrack.shipment s ON s.id = h."shipmentId"
+            WHERE h."toStatusId" = 9
+              AND h."changedAt"::date >= :from AND h."changedAt"::date <= :to
+              AND s."zoneId" IS NOT NULL
+            GROUP BY s."zoneId"
+        )
+        SELECT
+            z.id   AS zone_id,
+            z.name AS zone_name,
+            COALESCE(zs.total, 0)            AS total_shipments,
+            COALESCE(zf.failed_attempts, 0)  AS failed_attempts,
+            CASE WHEN COALESCE(zs.total, 0) > 0
+                 THEN ROUND(COALESCE(zf.failed_attempts, 0) * 100.0 / zs.total, 1)
+                 ELSE 0 END::float           AS failure_rate
+        FROM logitrack.zone z
+        LEFT JOIN zone_shipments zs ON zs."zoneId" = z.id
+        LEFT JOIN zone_failures  zf ON zf."zoneId" = z.id
+        WHERE COALESCE(zs.total, 0) > 0
+        ORDER BY failure_rate DESC, failed_attempts DESC`,
+        { type: deps.QueryTypes.SELECT, replacements: { from: dateFrom, to: dateTo } }
+    );
+
+    return viewModel;
+};
+
+// ─── Sprint 5: Comparación de períodos ───────────────────────────────────────
+
+const getPeriodComparisonData = async (query = {}, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+
+    if (dateFrom > dateTo) {
+        return {
+            dateFrom, dateTo, error: 'La fecha de inicio no puede ser mayor a la fecha de fin.',
+            rows: [], hasQuery, prevDateFrom: '', prevDateTo: '', yearAgoFrom: '', yearAgoTo: '',
+            exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+        };
+    }
+
+    const from = new Date(dateFrom);
+    const to   = new Date(dateTo);
+    const durationMs = to - from;
+
+    const prevTo   = new Date(from.getTime() - 86_400_000);
+    const prevFrom = new Date(prevTo.getTime() - durationMs);
+    const yearAgoFrom = new Date(from); yearAgoFrom.setFullYear(yearAgoFrom.getFullYear() - 1);
+    const yearAgoTo   = new Date(to);   yearAgoTo.setFullYear(yearAgoTo.getFullYear() - 1);
+
+    const getMetrics = async (f, t) => {
+        const [otif] = await deps.sequelize.query(
+            `SELECT COUNT(*)::int AS total,
+                    COUNT(CASE WHEN h."changedAt"::date <= s."expectedDeliveryDate" THEN 1 END)::int AS on_time
+             FROM logitrack.shipment s
+             JOIN logitrack.shipment_history h ON h."shipmentId" = s.id AND h."toStatusId" = 4
+             WHERE h."changedAt"::date >= :from AND h."changedAt"::date <= :to
+               AND s."expectedDeliveryDate" IS NOT NULL`,
+            { type: deps.QueryTypes.SELECT, replacements: { from: f, to: t } }
+        );
+        const [fails] = await deps.sequelize.query(
+            `SELECT COUNT(DISTINCT s.id)::int AS total,
+                    COUNT(DISTINCT h.id)::int AS failed_attempts
+             FROM logitrack.shipment s
+             LEFT JOIN logitrack.shipment_history h ON h."shipmentId" = s.id AND h."toStatusId" = 9
+               AND h."changedAt"::date >= :from AND h."changedAt"::date <= :to
+             WHERE s."createdAt"::date >= :from AND s."createdAt"::date <= :to`,
+            { type: deps.QueryTypes.SELECT, replacements: { from: f, to: t } }
+        );
+        const [inc] = await deps.sequelize.query(
+            `SELECT COUNT(*)::int AS open_incidents
+             FROM logitrack.incident
+             WHERE status IN ('OPEN','IN_REVIEW') AND "createdAt"::date >= :from AND "createdAt"::date <= :to`,
+            { type: deps.QueryTypes.SELECT, replacements: { from: f, to: t } }
+        );
+        const npsRows = await deps.sequelize.query(
+            `SELECT COUNT(*)::int AS total,
+                    COUNT(CASE WHEN "overallRating" >= 4 THEN 1 END)::int AS promoters,
+                    COUNT(CASE WHEN "overallRating" <= 2 THEN 1 END)::int AS detractors
+             FROM logitrack.delivery_survey
+             WHERE "createdAt"::date >= :from AND "createdAt"::date <= :to`,
+            { type: deps.QueryTypes.SELECT, replacements: { from: f, to: t } }
+        );
+        const npsRow = npsRows[0] || {};
+        return {
+            otif_pct:       otif.total > 0 ? Math.round(otif.on_time / otif.total * 1000) / 10 : null,
+            failed_pct:     fails.total > 0 ? Math.round(fails.failed_attempts / fails.total * 1000) / 10 : null,
+            open_incidents: inc.open_incidents || 0,
+            nps:            npsRow.total > 0 ? Math.round((npsRow.promoters - npsRow.detractors) / npsRow.total * 100) : null,
+        };
+    };
+
+    const [current, previous, yearAgo] = await Promise.all([
+        getMetrics(dateFrom, dateTo),
+        getMetrics(formatIsoDate(prevFrom), formatIsoDate(prevTo)),
+        getMetrics(formatIsoDate(yearAgoFrom), formatIsoDate(yearAgoTo)),
+    ]);
+
+    const rows = [
+        { label: 'Entregas a tiempo (OTIF)',  unit: '%',  invert: false, current: current.otif_pct,       previous: previous.otif_pct,       year_ago: yearAgo.otif_pct },
+        { label: 'Intentos fallidos',          unit: '%',  invert: true,  current: current.failed_pct,     previous: previous.failed_pct,     year_ago: yearAgo.failed_pct },
+        { label: 'Incidencias abiertas',       unit: '#',  invert: true,  current: current.open_incidents, previous: previous.open_incidents, year_ago: yearAgo.open_incidents },
+        { label: 'NPS',                        unit: 'pts',invert: false, current: current.nps,            previous: previous.nps,            year_ago: yearAgo.nps },
+    ].map((row) => {
+        const varMes  = (row.current !== null && row.previous !== null) ? row.current - row.previous : null;
+        const varAnio = (row.current !== null && row.year_ago !== null) ? row.current - row.year_ago : null;
+        return { ...row, var_mes: varMes !== null ? Math.round(varMes * 10) / 10 : null, var_anio: varAnio !== null ? Math.round(varAnio * 10) / 10 : null };
+    });
+
+    return {
+        dateFrom, dateTo, error: null, rows, hasQuery,
+        prevDateFrom: formatIsoDate(prevFrom), prevDateTo: formatIsoDate(prevTo),
+        yearAgoFrom: formatIsoDate(yearAgoFrom), yearAgoTo: formatIsoDate(yearAgoTo),
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+    };
+};
+
+// ─── Sprint 5: CTE base Predicción vs Realidad ───────────────────────────────
+
+const buildPvrBaseCte = (branchFilter = '') => `
+    WITH delivery_event AS (
+        SELECT DISTINCT ON ("shipmentId") "shipmentId", "changedAt" AS delivered_at
+        FROM logitrack.shipment_history
+        WHERE "toStatusId" = 4
+        ORDER BY "shipmentId", "changedAt" ASC
+    ),
+    latest_pred AS (
+        SELECT DISTINCT ON ("shipmentId") "shipmentId", "predictedDays", "actualDays", "wasDelayed", "delayProbability"
+        FROM logitrack."shipmentPrediction"
+        WHERE "actualDays" IS NOT NULL
+        ORDER BY "shipmentId", "createdAt" DESC
+    ),
+    pvr AS (
+        SELECT
+            s.id AS shipment_id,
+            s."trackingId",
+            s."zoneId"        AS zone_id,
+            z.name            AS zone_name,
+            s."deliveryUserId"AS driver_id,
+            u."fullName"      AS driver_name,
+            s."transportId"   AS transport_id,
+            t.name            AS transport_name,
+            t.plate           AS transport_plate,
+            lp."predictedDays"  AS predicted_days,
+            lp."actualDays"     AS actual_days,
+            lp."wasDelayed"     AS was_delayed,
+            lp."delayProbability" AS delay_probability,
+            (lp."actualDays" - lp."predictedDays") AS delta,
+            de.delivered_at,
+            EXTRACT(DOW FROM de.delivered_at) AS day_of_week
+        FROM logitrack.shipment s
+        JOIN latest_pred lp ON lp."shipmentId" = s.id
+        JOIN delivery_event de ON de."shipmentId" = s.id
+        LEFT JOIN logitrack.zone z ON z.id = s."zoneId"
+        LEFT JOIN logitrack.user u ON u.id = s."deliveryUserId"
+        LEFT JOIN logitrack.transport t ON t.id = s."transportId"
+        WHERE de.delivered_at::date >= :from AND de.delivered_at::date <= :to
+          ${branchFilter}
+    )`;
+
+// ─── Sprint 5: Dashboard Supervisor ──────────────────────────────────────────
+
+const getDashboardSupervisorData = async (query = {}, branchId = null, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+
+    const viewModel = {
+        dateFrom, dateTo, error: null, hasQuery,
+        branchId,
+        statusSummary: [],
+        delayedShipments: [],
+        topFailingZones: [],
+        driverPvr: [],
+        kpis: { total: 0, delivered: 0, in_transit: 0, delayed_count: 0, otif_pct: null, avg_delta: null },
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+    };
+
+    if (dateFrom > dateTo) {
+        viewModel.error = 'La fecha de inicio no puede ser mayor a la fecha de fin.';
+        return viewModel;
+    }
+
+    const branchCond  = branchId ? `AND s."currentBranchId" = :branchId` : '';
+    const branchCond2 = branchId ? `AND u."branchId" = :branchId` : '';
+    const replacements = { from: dateFrom, to: dateTo, ...(branchId ? { branchId } : {}) };
+
+    // Resumen por estado
+    viewModel.statusSummary = await deps.sequelize.query(
+        `SELECT s."statusId", st.description AS status_label, COUNT(s.id)::int AS total
+         FROM logitrack.shipment s
+         JOIN logitrack.status st ON st.id = s."statusId"
+         WHERE s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
+         GROUP BY s."statusId", st.description ORDER BY total DESC`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Envíos retrasados (en tránsito y vencida la fecha comprometida)
+    viewModel.delayedShipments = await deps.sequelize.query(
+        `SELECT s.id, s."trackingId", s."expectedDeliveryDate",
+                z.name AS zone_name, u."fullName" AS driver_name,
+                (CURRENT_DATE - s."expectedDeliveryDate")::int AS days_overdue
+         FROM logitrack.shipment s
+         LEFT JOIN logitrack.zone z ON z.id = s."zoneId"
+         LEFT JOIN logitrack.user u ON u.id = s."deliveryUserId"
+         WHERE s."statusId" IN (2, 6, 7)
+           AND s."expectedDeliveryDate" IS NOT NULL
+           AND s."expectedDeliveryDate" < CURRENT_DATE ${branchCond}
+         ORDER BY days_overdue DESC LIMIT 15`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Top 5 zonas con mayor tasa de fallo
+    viewModel.topFailingZones = await deps.sequelize.query(
+        `WITH zs AS (
+            SELECT s."zoneId", COUNT(DISTINCT s.id) AS total
+            FROM logitrack.shipment s
+            WHERE s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
+              AND s."zoneId" IS NOT NULL GROUP BY s."zoneId"
+         ),
+         zf AS (
+            SELECT s."zoneId", COUNT(DISTINCT h.id) AS fails
+            FROM logitrack.shipment_history h
+            JOIN logitrack.shipment s ON s.id = h."shipmentId"
+            WHERE h."toStatusId" = 9
+              AND h."changedAt"::date >= :from AND h."changedAt"::date <= :to ${branchCond}
+              AND s."zoneId" IS NOT NULL GROUP BY s."zoneId"
+         )
+         SELECT z.name AS zone_name,
+                COALESCE(zs.total, 0)::int AS total_shipments,
+                COALESCE(zf.fails, 0)::int AS failed_attempts,
+                CASE WHEN COALESCE(zs.total,0)>0
+                     THEN ROUND(COALESCE(zf.fails,0)*100.0/zs.total,1) ELSE 0
+                END::float AS failure_rate
+         FROM logitrack.zone z
+         LEFT JOIN zs ON zs."zoneId" = z.id
+         LEFT JOIN zf ON zf."zoneId" = z.id
+         WHERE COALESCE(zs.total,0) > 0
+         ORDER BY failure_rate DESC LIMIT 5`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Predicción vs Realidad por chofer (drivers de la sucursal)
+    const pvrCte = buildPvrBaseCte(branchCond2.replace('u."branchId"', 'u."branchId"'));
+    viewModel.driverPvr = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT driver_id, driver_name,
+                COUNT(*)::int AS total,
+                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
+                ROUND(AVG(actual_days),1)::float    AS avg_actual,
+                ROUND(AVG(delta),1)::float           AS avg_delta,
+                COUNT(CASE WHEN NOT was_delayed THEN 1 END)::int AS on_time_count,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr
+         WHERE driver_id IS NOT NULL
+         GROUP BY driver_id, driver_name
+         ORDER BY avg_delta DESC NULLS LAST`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // KPIs rápidos
+    const totals = viewModel.statusSummary;
+    viewModel.kpis.total       = totals.reduce((s, r) => s + r.total, 0);
+    viewModel.kpis.delivered   = (totals.find(r => r.statusId === 4) || {}).total || 0;
+    viewModel.kpis.in_transit  = (totals.find(r => r.statusId === 2) || {}).total || 0;
+    viewModel.kpis.delayed_count = viewModel.delayedShipments.length;
+
+    const allDvr = viewModel.driverPvr;
+    if (allDvr.length > 0) {
+        const totalDel = allDvr.reduce((s, r) => s + r.total, 0);
+        const onTimeDel = allDvr.reduce((s, r) => s + r.on_time_count, 0);
+        viewModel.kpis.otif_pct  = totalDel > 0 ? Math.round(onTimeDel / totalDel * 1000) / 10 : null;
+        viewModel.kpis.avg_delta = Math.round(allDvr.reduce((s, r) => s + (r.avg_delta || 0) * r.total, 0) / totalDel * 10) / 10;
+    }
+
+    return viewModel;
+};
+
+// ─── Sprint 5: Dashboard Administrador ───────────────────────────────────────
+
+const getDashboardAdminData = async (query = {}, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+
+    const viewModel = {
+        dateFrom, dateTo, error: null, hasQuery,
+        kpis: { total: 0, otif_pct: null, avg_delta: null, avg_predicted: null, avg_actual: null },
+        zonePvr: [], driverPvr: [], transportPvr: [], byDayOfWeek: [], weeklyEvolution: [],
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+    };
+
+    if (dateFrom > dateTo) {
+        viewModel.error = 'La fecha de inicio no puede ser mayor a la fecha de fin.';
+        return viewModel;
+    }
+
+    const replacements = { from: dateFrom, to: dateTo };
+    const pvrCte = buildPvrBaseCte();
+
+    // KPIs globales
+    const [kpi] = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT COUNT(*)::int AS total,
+                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
+                ROUND(AVG(actual_days),1)::float    AS avg_actual,
+                ROUND(AVG(delta),1)::float           AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+    if (kpi) { viewModel.kpis = { ...viewModel.kpis, ...kpi }; }
+
+    // Por zona
+    viewModel.zonePvr = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT zone_id, zone_name,
+                COUNT(*)::int AS total,
+                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
+                ROUND(AVG(actual_days),1)::float    AS avg_actual,
+                ROUND(AVG(delta),1)::float           AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr WHERE zone_id IS NOT NULL
+         GROUP BY zone_id, zone_name ORDER BY avg_delta DESC NULLS LAST`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Por chofer (top 15 por delta)
+    viewModel.driverPvr = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT driver_id, driver_name,
+                COUNT(*)::int AS total,
+                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
+                ROUND(AVG(actual_days),1)::float    AS avg_actual,
+                ROUND(AVG(delta),1)::float           AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr WHERE driver_id IS NOT NULL
+         GROUP BY driver_id, driver_name ORDER BY avg_delta DESC NULLS LAST LIMIT 15`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Por camioneta
+    viewModel.transportPvr = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT transport_id, transport_name, transport_plate,
+                COUNT(*)::int AS total,
+                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
+                ROUND(AVG(actual_days),1)::float    AS avg_actual,
+                ROUND(AVG(delta),1)::float           AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr WHERE transport_id IS NOT NULL
+         GROUP BY transport_id, transport_name, transport_plate ORDER BY avg_delta DESC NULLS LAST`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Por día de la semana (0=Dom..6=Sáb)
+    const DAY_LABELS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const byDay = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT day_of_week::int AS dow,
+                COUNT(*)::int AS total,
+                ROUND(AVG(delta),1)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr
+         GROUP BY day_of_week ORDER BY day_of_week`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+    viewModel.byDayOfWeek = byDay.map(r => ({ ...r, day_label: DAY_LABELS[r.dow] || `Día ${r.dow}` }));
+
+    // Evolución semanal
+    viewModel.weeklyEvolution = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT TO_CHAR(delivered_at, 'IYYY-IW') AS week_key,
+                MIN(delivered_at)::date            AS week_start,
+                COUNT(*)::int AS total,
+                ROUND(AVG(delta),1)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr
+         GROUP BY TO_CHAR(delivered_at, 'IYYY-IW')
+         ORDER BY week_key`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    return viewModel;
+};
+
+// ─── Sprint 5: Dashboard Dueño (visión estratégica) ──────────────────────────
+
+const getDashboardOwnerData = async (query = {}, deps = { sequelize, QueryTypes }) => {
+    const { dateFrom, dateTo, hasQuery } = resolveDateRange(query);
+
+    const viewModel = {
+        dateFrom, dateTo, error: null, hasQuery,
+        kpis: { total: 0, otif_pct: null, avg_delta: null, model_accuracy_pct: null },
+        monthlyEvolution: [], topCriticalZones: [], topCriticalDrivers: [],
+        exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
+    };
+
+    if (dateFrom > dateTo) {
+        viewModel.error = 'La fecha de inicio no puede ser mayor a la fecha de fin.';
+        return viewModel;
+    }
+
+    const replacements = { from: dateFrom, to: dateTo };
+    const pvrCte = buildPvrBaseCte();
+
+    // KPIs
+    const [kpi] = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT COUNT(*)::int AS total,
+                ROUND(AVG(delta),2)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct,
+                ROUND(COUNT(CASE WHEN delta BETWEEN -1 AND 1 THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS model_accuracy_pct
+         FROM pvr`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+    if (kpi) { viewModel.kpis = { ...viewModel.kpis, ...kpi }; }
+
+    // Evolución mensual (últimos 12 meses a partir de dateTo)
+    viewModel.monthlyEvolution = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT TO_CHAR(delivered_at, 'YYYY-MM') AS month,
+                COUNT(*)::int AS total,
+                ROUND(AVG(delta),2)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct,
+                ROUND(COUNT(CASE WHEN delta BETWEEN -1 AND 1 THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS model_accuracy_pct
+         FROM pvr
+         GROUP BY TO_CHAR(delivered_at, 'YYYY-MM')
+         ORDER BY month`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Top 5 zonas críticas
+    viewModel.topCriticalZones = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT zone_id, zone_name,
+                COUNT(*)::int AS total,
+                ROUND(AVG(delta),1)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr WHERE zone_id IS NOT NULL
+         GROUP BY zone_id, zone_name ORDER BY avg_delta DESC NULLS LAST LIMIT 5`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Top 5 choferes críticos
+    viewModel.topCriticalDrivers = await deps.sequelize.query(
+        `${pvrCte}
+         SELECT driver_id, driver_name,
+                COUNT(*)::int AS total,
+                ROUND(AVG(delta),1)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         FROM pvr WHERE driver_id IS NOT NULL
+         GROUP BY driver_id, driver_name ORDER BY avg_delta DESC NULLS LAST LIMIT 5`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    return viewModel;
+};
+
 module.exports = {
     buildExportQuery,
     computeNps,
     formatIsoDate,
     getDeliveryPerformanceData,
+    getFailedAttemptsByZoneData,
+    getDashboardAdminData,
+    getDashboardOwnerData,
+    getDashboardSupervisorData,
     getIncidentsByPeriodData,
     getOnTimeDeliveriesData,
+    getPeriodComparisonData,
     getSatisfactionData,
     getShipmentsByPeriodData,
     resolveDateRange,

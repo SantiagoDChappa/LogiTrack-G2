@@ -8,6 +8,7 @@ const Status = Object.freeze({
     IN_PREPARATION: { id: 7, description: 'En Preparacion'  },
     PACKAGE_FAILED: { id: 8, description: 'Paquete Fallido' },
     FAILED_ATTEMPT: { id: 9, description: 'Intento Fallido' },
+    RETURNED:       { id: 10, description: 'Devuelto'        },
 });
 
 const PersonType = Object.freeze({

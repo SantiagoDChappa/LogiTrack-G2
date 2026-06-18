@@ -19,8 +19,6 @@
         </div>
 
         <% const errCode = (typeof query !== 'undefined' && query.error) || null; %>
-        <%# Devolución = incidencia tipo RETURN: se gestiona con panel dedicado (tomar/aprobar/rechazar). %>
-        <% const isReturn = !!(incident.type && incident.type.code === 'RETURN'); %>
         <% const errMessages = {
             resolution_required: 'Debés seleccionar una resolución (Procedente / No procedente) para cerrar la incidencia.',
             comment_required:    'El comentario es obligatorio para esta acción.',
@@ -236,8 +234,10 @@
                         <% } %>
                     </div>
 
-                    <% if (flags.canClose && !isReturn) { %>
-                        <!-- Resolución: marcar procedente / no procedente sin cerrar -->
+                    <% if (flags.canClose) { %>
+                        <!-- Resolución: marcar procedente / no procedente sin cerrar.
+                             Misma estructura para toda incidencia; el efecto por tipo (p. ej. devolución
+                             procedente → nota de crédito + envío a Devuelto) lo aplica el backend. -->
                         <div class="incident-resolution-block">
                             <div class="incident-resolution-block__head">
                                 <span class="material-symbols-outlined">gavel</span>
@@ -271,9 +271,7 @@
                         </div>
                     <% } %>
 
-                    <!-- Cambio de estado: botones tipo "estado siguiente".
-                         Para devoluciones (RETURN) se ocultan; abajo va el panel dedicado. -->
-                    <% if (!isReturn) { %>
+                    <!-- Cambio de estado: botones tipo "estado siguiente" (mismo flujo para todas las incidencias, incluida la devolución). -->
                     <div class="incident-status-actions">
                         <span class="incident-status-actions__label">Pasar a estado:</span>
 
@@ -313,49 +311,6 @@
                             </form>
                         <% } %>
                     </div>
-                    <% } %>
-
-                    <%# Panel dedicado de devolución (incidencia tipo RETURN): tomar / aprobar (NC al remitente) / rechazar. %>
-                    <% if (isReturn && flags.canClose) { %>
-                        <div class="incident-resolution-block">
-                            <div class="incident-resolution-block__head">
-                                <span class="material-symbols-outlined">assignment_return</span>
-                                Gestión de devolución
-                            </div>
-                            <% if (incident.status === 'OPEN') { %>
-                                <form method="POST" action="/returns/<%= incident.id %>/take" class="incident-status-form" style="margin-bottom:.6rem;">
-                                    <button type="submit" class="btn-status btn-status--review">
-                                        <span class="material-symbols-outlined">play_arrow</span>
-                                        Tomar para revisión
-                                    </button>
-                                </form>
-                            <% } %>
-                            <% if (incident.status === 'OPEN' || incident.status === 'IN_REVIEW') { %>
-                                <div class="incident-resolution-buttons">
-                                    <form method="POST" action="/returns/<%= incident.id %>/resolve" class="incident-resolution-form"
-                                          onsubmit="return confirm('¿Aprobar la devolución? Se cerrará la incidencia y se emitirá una nota de crédito al remitente.');">
-                                        <input type="hidden" name="decision" value="approve">
-                                        <button type="submit" class="btn-resolution btn-resolution--ok">
-                                            <span class="material-symbols-outlined">check_circle</span>
-                                            Aprobar (reembolso al remitente)
-                                        </button>
-                                    </form>
-                                </div>
-                                <form method="POST" action="/returns/<%= incident.id %>/resolve" class="incident-action-form"
-                                      style="flex-direction:column;align-items:stretch;gap:.5rem;margin-top:.6rem;">
-                                    <input type="hidden" name="decision" value="reject">
-                                    <label for="returnRejectReason" style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--inc-muted,#64748b);">Motivo de rechazo</label>
-                                    <textarea id="returnRejectReason" name="rejectionReason" rows="2" required
-                                              placeholder="Detallá por qué la devolución no procede (se le informa al remitente)."
-                                              style="width:100%;padding:.5rem .7rem;border:1px solid var(--inc-border,#e2e8f0);border-radius:8px;background:var(--inc-surface,#fff);color:var(--inc-text,#1e293b);font:inherit;"></textarea>
-                                    <button type="submit" class="btn-resolution btn-resolution--no" style="align-self:flex-start;">
-                                        <span class="material-symbols-outlined">cancel</span>
-                                        Rechazar devolución
-                                    </button>
-                                </form>
-                            <% } %>
-                        </div>
-                    <% } %>
                 <% } %>
 
                 <% if (flags.canEscalate) { %>

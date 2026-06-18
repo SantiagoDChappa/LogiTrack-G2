@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Dashboard Administrador</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <style>
+        .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; }
+        .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
+        .dash-kpi__value { font-size:2rem; font-weight:700; line-height:1; }
+        .dash-kpi__value--warn { color:#e07b00; }
+        .dash-kpi__value--ok { color:var(--color-success,#2e7d32); }
+        .dash-kpi__value--danger { color:var(--color-danger,#c62828); }
+        .dash-tabs { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+        .dash-tab { padding:.4rem 1rem; border-radius:6px; border:1px solid var(--color-border);
+                    background:var(--color-surface); cursor:pointer; font-size:.88rem; }
+        .dash-tab.active { background:var(--color-primary,#1565c0); color:#fff; border-color:var(--color-primary,#1565c0); }
+        .dash-tab-panel { display:none; }
+        .dash-tab-panel.active { display:block; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Dashboard Administrador — Análisis de desempeño</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/dashboard/admin" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/dashboard/admin" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+
+            <!-- KPIs -->
+            <div class="dash-kpi-grid">
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Entregas analizadas</div>
+                    <div class="dash-kpi__value"><%= kpis.total || 0 %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">OTIF</div>
+                    <div class="dash-kpi__value <%= (kpis.otif_pct||0) >= 85 ? 'dash-kpi__value--ok' : (kpis.otif_pct||0) >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
+                    </div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Días estimados prom.</div>
+                    <div class="dash-kpi__value"><%= kpis.avg_predicted !== null ? kpis.avg_predicted + 'd' : '—' %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Días reales prom.</div>
+                    <div class="dash-kpi__value"><%= kpis.avg_actual !== null ? kpis.avg_actual + 'd' : '—' %></div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label">Delta prom. (desvío)</div>
+                    <div class="dash-kpi__value <%= (kpis.avg_delta||0) <= 0.3 ? 'dash-kpi__value--ok' : (kpis.avg_delta||0) <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= kpis.avg_delta !== null ? ((kpis.avg_delta > 0 ? '+' : '') + kpis.avg_delta + 'd') : '—' %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs de segmentación -->
+            <div class="dash-tabs">
+                <button class="dash-tab active" onclick="switchTab(this,'tab-zone')">Por Zona</button>
+                <button class="dash-tab" onclick="switchTab(this,'tab-driver')">Por Repartidor</button>
+                <button class="dash-tab" onclick="switchTab(this,'tab-transport')">Por Camioneta</button>
+                <button class="dash-tab" onclick="switchTab(this,'tab-weekday')">Por Día de la semana</button>
+                <button class="dash-tab" onclick="switchTab(this,'tab-evolution')">Evolución semanal</button>
+            </div>
+
+            <!-- Por zona -->
+            <div id="tab-zone" class="dash-tab-panel active report-card">
+                <h2>Predicción vs. Realidad — por zona</h2>
+                <% if (zonePvr.length === 0) { %>
+                    <div class="report-empty-state"><span class="material-symbols-outlined">map</span><p>Sin datos en el período seleccionado.</p></div>
+                <% } else { %>
+                <table class="report-table" id="adm-zone-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-col="zone_name">Zona <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="total">Entregas <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_predicted">Estimado <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_actual">Real <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_delta">Delta <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="otif_pct">OTIF <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="adm-zone-tbody">
+                        <% zonePvr.forEach(z => { %>
+                        <%
+                            const d = z.avg_delta || 0;
+                            const dClass = d <= 0.2 ? 'ot-badge--green' : d <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                        %>
+                        <tr data-zone_name="<%= z.zone_name %>" data-total="<%= z.total %>"
+                            data-avg_predicted="<%= z.avg_predicted %>" data-avg_actual="<%= z.avg_actual %>"
+                            data-avg_delta="<%= z.avg_delta %>" data-otif_pct="<%= z.otif_pct %>">
+                            <td><%= z.zone_name || '—' %></td>
+                            <td class="text-right count-cell"><%= z.total %></td>
+                            <td class="text-right"><%= z.avg_predicted %>d</td>
+                            <td class="text-right"><%= z.avg_actual %>d</td>
+                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= d > 0 ? '+' : '' %><%= d %>d</span></td>
+                            <td class="text-right">
+                                <div class="dp-pct-cell">
+                                    <div class="dp-pct-bar-track">
+                                        <div class="dp-pct-bar-fill <%= (z.otif_pct||0) >= 85 ? 'fill--green' : (z.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
+                                             style="width:<%= z.otif_pct || 0 %>%"></div>
+                                    </div>
+                                    <span class="dp-pct-label"><%= z.otif_pct || 0 %>%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <% } %>
+            </div>
+
+            <!-- Por repartidor -->
+            <div id="tab-driver" class="dash-tab-panel report-card">
+                <h2>Predicción vs. Realidad — por repartidor</h2>
+                <% if (driverPvr.length === 0) { %>
+                    <div class="report-empty-state"><span class="material-symbols-outlined">person_off</span><p>Sin datos en el período seleccionado.</p></div>
+                <% } else { %>
+                <table class="report-table" id="adm-driver-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-col="driver_name">Repartidor <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="total">Entregas <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_predicted">Estimado <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_actual">Real <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="avg_delta">Delta <span class="sort-icon">↕</span></th>
+                            <th class="sortable text-right" data-col="otif_pct">OTIF <span class="sort-icon">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="adm-driver-tbody">
+                        <% driverPvr.forEach(d => { %>
+                        <%
+                            const delta = d.avg_delta || 0;
+                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                        %>
+                        <tr data-driver_name="<%= d.driver_name %>" data-total="<%= d.total %>"
+                            data-avg_predicted="<%= d.avg_predicted %>" data-avg_actual="<%= d.avg_actual %>"
+                            data-avg_delta="<%= d.avg_delta %>" data-otif_pct="<%= d.otif_pct %>">
+                            <td>
+                                <div class="dp-driver-cell">
+                                    <div class="dp-avatar"><%= (d.driver_name || '?').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
+                                    <%= d.driver_name || '—' %>
+                                </div>
+                            </td>
+                            <td class="text-right count-cell"><%= d.total %></td>
+                            <td class="text-right"><%= d.avg_predicted %>d</td>
+                            <td class="text-right"><%= d.avg_actual %>d</td>
+                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
+                            <td class="text-right">
+                                <div class="dp-pct-cell">
+                                    <div class="dp-pct-bar-track">
+                                        <div class="dp-pct-bar-fill <%= (d.otif_pct||0) >= 85 ? 'fill--green' : (d.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
+                                             style="width:<%= d.otif_pct || 0 %>%"></div>
+                                    </div>
+                                    <span class="dp-pct-label"><%= d.otif_pct || 0 %>%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <% } %>
+            </div>
+
+            <!-- Por camioneta -->
+            <div id="tab-transport" class="dash-tab-panel report-card">
+                <h2>Predicción vs. Realidad — por camioneta</h2>
+                <% if (transportPvr.length === 0) { %>
+                    <div class="report-empty-state"><span class="material-symbols-outlined">local_shipping</span><p>Sin datos de camioneta vinculados. Los nuevos envíos se registrarán con la camioneta asignada.</p></div>
+                <% } else { %>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Camioneta</th>
+                            <th>Patente</th>
+                            <th class="text-right">Entregas</th>
+                            <th class="text-right">Estimado</th>
+                            <th class="text-right">Real</th>
+                            <th class="text-right">Delta</th>
+                            <th class="text-right">OTIF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% transportPvr.forEach(t => { %>
+                        <%
+                            const delta = t.avg_delta || 0;
+                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                        %>
+                        <tr>
+                            <td><%= t.transport_name || '—' %></td>
+                            <td><%= t.transport_plate || '—' %></td>
+                            <td class="text-right"><%= t.total %></td>
+                            <td class="text-right"><%= t.avg_predicted %>d</td>
+                            <td class="text-right"><%= t.avg_actual %>d</td>
+                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
+                            <td class="text-right"><%= t.otif_pct || 0 %>%</td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <% } %>
+            </div>
+
+            <!-- Por día de la semana -->
+            <div id="tab-weekday" class="dash-tab-panel report-card">
+                <h2>Desvío por día de la semana</h2>
+                <% if (byDayOfWeek.length === 0) { %>
+                    <div class="report-empty-state"><span class="material-symbols-outlined">calendar_month</span><p>Sin datos en el período seleccionado.</p></div>
+                <% } else { %>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Día</th>
+                            <th class="text-right">Entregas</th>
+                            <th class="text-right">Delta prom.</th>
+                            <th class="text-right">OTIF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% byDayOfWeek.forEach(d => { %>
+                        <%
+                            const delta = d.avg_delta || 0;
+                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                        %>
+                        <tr>
+                            <td><strong><%= d.day_label %></strong></td>
+                            <td class="text-right"><%= d.total %></td>
+                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
+                            <td class="text-right"><%= d.otif_pct || 0 %>%</td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <% } %>
+            </div>
+
+            <!-- Evolución semanal -->
+            <div id="tab-evolution" class="dash-tab-panel report-card">
+                <h2>Evolución semanal de eficiencia</h2>
+                <% if (weeklyEvolution.length === 0) { %>
+                    <div class="report-empty-state"><span class="material-symbols-outlined">show_chart</span><p>Sin datos en el período seleccionado.</p></div>
+                <% } else { %>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Semana</th>
+                            <th class="text-right">Entregas</th>
+                            <th class="text-right">Delta prom.</th>
+                            <th class="text-right">OTIF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% weeklyEvolution.forEach(w => { %>
+                        <%
+                            const delta = w.avg_delta || 0;
+                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                        %>
+                        <tr>
+                            <td><%= w.week_start %></td>
+                            <td class="text-right"><%= w.total %></td>
+                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
+                            <td class="text-right">
+                                <div class="dp-pct-cell">
+                                    <div class="dp-pct-bar-track">
+                                        <div class="dp-pct-bar-fill <%= (w.otif_pct||0) >= 85 ? 'fill--green' : (w.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
+                                             style="width:<%= w.otif_pct || 0 %>%"></div>
+                                    </div>
+                                    <span class="dp-pct-label"><%= w.otif_pct || 0 %>%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+                <% } %>
+            </div>
+
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value, to = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                if (!this.querySelector('.report-alert')) {
+                    const a = document.createElement('div');
+                    a.className = 'report-alert report-alert--error';
+                    a.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', a);
+                }
+            }
+        });
+
+        function switchTab(btn, panelId) {
+            document.querySelectorAll('.dash-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.dash-tab-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(panelId).classList.add('active');
+        }
+
+        (function makeSortable(tableId, tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            let lastCol = null, asc = true;
+            document.querySelectorAll('#' + tableId + ' th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', () => {
+                    const col = th.dataset.col;
+                    if (lastCol === col) { asc = !asc; } else { asc = col.includes('name'); }
+                    lastCol = col;
+                    document.querySelectorAll('#' + tableId + ' .sort-icon').forEach(i => i.textContent = '↕');
+                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        const va = a.dataset[col], vb = b.dataset[col];
+                        const cmp = col.includes('name') ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
+                        return asc ? cmp : -cmp;
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        })('adm-zone-table', 'adm-zone-tbody');
+
+        (function makeSortable(tableId, tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            let lastCol = null, asc = true;
+            document.querySelectorAll('#' + tableId + ' th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', () => {
+                    const col = th.dataset.col;
+                    if (lastCol === col) { asc = !asc; } else { asc = col.includes('name'); }
+                    lastCol = col;
+                    document.querySelectorAll('#' + tableId + ' .sort-icon').forEach(i => i.textContent = '↕');
+                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        const va = a.dataset[col], vb = b.dataset[col];
+                        const cmp = col.includes('name') ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
+                        return asc ? cmp : -cmp;
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        })('adm-driver-table', 'adm-driver-tbody');
+    </script>
+</body>
+</html>

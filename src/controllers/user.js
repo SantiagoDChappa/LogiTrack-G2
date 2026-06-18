@@ -2,6 +2,7 @@ const userModel      = require('../models/user');
 const branchModel    = require('../models/branch');
 const { RoleType }   = require('../constants/enums');
 const actionLogModel = require('../models/actionLog');
+const { generateTempPassword } = require('../utils/password');
 
 const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
 
@@ -35,9 +36,12 @@ const createUser = async (req, res) => {
       const branches = await branchModel.getAll();
       return res.status(400).render('user/new', { body, errors: [branchError], roleTypes: Object.values(RoleType), branches });
     }
-    const newUser = await userModel.create(body);
-    actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'USER', newUser?.id, { fullName: body.fullName, email: body.email, roleId: body.roleId }, req);
-    res.redirect('/user?success=1');
+    // #1 Primer ingreso: el sistema genera la contraseña temporal (el admin no la tipea).
+    // Se muestra una sola vez en la pantalla de éxito para que el admin se la pase al usuario.
+    const tempPassword = generateTempPassword();
+    const createdUser = await userModel.create({ ...body, password: tempPassword, mustChangePassword: true });
+    actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'USER', createdUser?.id, { fullName: body.fullName, email: body.email, roleId: body.roleId }, req);
+    return res.render('user/created', { createdUser, tempPassword });
   } catch (err) {
     console.error('ERROR createUser:', err.message);
     res.status(500).send('Error al crear el usuario: ' + err.message);
@@ -127,4 +131,17 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser };
+// #2 2FA — reset del segundo factor por un admin (el usuario perdió su dispositivo).
+// Desactiva el 2FA y revoca los dispositivos confiables; deberá reconfigurarlo al ingresar.
+const reset2fa = async (req, res) => {
+  try {
+    await userModel.disableTwoFactor(req.params.id);
+    await require('../models/trustedDevice').removeForUser(req.params.id);
+    res.redirect('/user/update/' + req.params.id);
+  } catch (err) {
+    console.error('ERROR reset2fa:', err.message);
+    res.status(500).send('Error al resetear el 2FA: ' + err.message);
+  }
+};
+
+module.exports = { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser, reset2fa };
