@@ -713,9 +713,10 @@ const getDashboardSupervisorData = async (query = {}, branchId = null, deps = { 
         branchId,
         statusSummary: [],
         delayedShipments: [],
+        unroutableShipments: [],
         topFailingZones: [],
         driverPvr: [],
-        kpis: { total: 0, delivered: 0, in_transit: 0, delayed_count: 0, otif_pct: null, avg_delta: null },
+        kpis: { total: 0, delivered: 0, in_transit: 0, delayed_count: 0, unroutable_count: 0, otif_pct: null, avg_delta: null },
         exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
     };
 
@@ -750,6 +751,35 @@ const getDashboardSupervisorData = async (query = {}, branchId = null, deps = { 
            AND s."expectedDeliveryDate" IS NOT NULL
            AND s."expectedDeliveryDate" < CURRENT_DATE ${branchCond}
          ORDER BY days_overdue DESC LIMIT 15`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Envíos sin zona = no ruteables: el CP del destinatario no cae en ninguna zona
+    // configurada, así que el optimizador nunca los asigna a un transportista y quedan
+    // trabados (sin repartidor) hasta vencer la fecha comprometida. No se filtran por
+    // período (igual que los demorados): son una alerta operativa de stock estancado.
+    viewModel.unroutableShipments = await deps.sequelize.query(
+        `SELECT s.id, s."trackingId", s."statusId", st.description AS status_label,
+                s."createdAt"::date AS created_at,
+                s."expectedDeliveryDate",
+                CASE WHEN s."expectedDeliveryDate" IS NOT NULL AND s."expectedDeliveryDate" < CURRENT_DATE
+                     THEN (CURRENT_DATE - s."expectedDeliveryDate")::int ELSE NULL END AS days_overdue,
+                a."postalCode" AS postal_code,
+                p.description  AS province_name,
+                CASE
+                    WHEN s."addressId" IS NULL                                   THEN 'sin_direccion'
+                    WHEN a."postalCode" IS NULL OR TRIM(a."postalCode") = ''     THEN 'sin_cp'
+                    ELSE 'sin_zona'
+                END AS reason
+         FROM logitrack.shipment s
+         JOIN logitrack.status st ON st.id = s."statusId"
+         LEFT JOIN logitrack.address  a ON a.id = s."addressId"
+         LEFT JOIN logitrack.province p ON p.id = a."provinceId"
+         WHERE s."zoneId" IS NULL
+           AND s."statusId" IN (1, 3, 7)
+           AND s."deliveryMode" <> 'branch_pickup' ${branchCond}
+         ORDER BY days_overdue DESC NULLS LAST, s."createdAt" ASC
+         LIMIT 50`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 
@@ -807,6 +837,7 @@ const getDashboardSupervisorData = async (query = {}, branchId = null, deps = { 
     viewModel.kpis.delivered   = (totals.find(r => r.statusId === 4) || {}).total || 0;
     viewModel.kpis.in_transit  = (totals.find(r => r.statusId === 2) || {}).total || 0;
     viewModel.kpis.delayed_count = viewModel.delayedShipments.length;
+    viewModel.kpis.unroutable_count = viewModel.unroutableShipments.length;
 
     const allDvr = viewModel.driverPvr;
     if (allDvr.length > 0) {

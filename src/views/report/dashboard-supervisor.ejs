@@ -15,6 +15,7 @@
         .dash-section-title { font-size:1rem; font-weight:600; margin:1.5rem 0 .75rem; }
         .dash-alert-badge { display:inline-block; padding:.2rem .6rem; border-radius:4px; font-size:.8rem; font-weight:600;
                             background:rgba(200,50,50,.12); color:#c62828; }
+        .dash-hint { font-size:.85rem; color:var(--color-text-muted); margin:.25rem 0 1rem; }
     </style>
 </head>
 <body>
@@ -79,6 +80,10 @@
                     <div class="dash-kpi__value <%= kpis.delayed_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.delayed_count %></div>
                 </div>
                 <div class="dash-kpi">
+                    <div class="dash-kpi__label">Sin zona (trabados)</div>
+                    <div class="dash-kpi__value <%= kpis.unroutable_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.unroutable_count %></div>
+                </div>
+                <div class="dash-kpi">
                     <div class="dash-kpi__label">OTIF</div>
                     <div class="dash-kpi__value <%= kpis.otif_pct !== null && kpis.otif_pct >= 85 ? 'dash-kpi__value--ok' : kpis.otif_pct !== null && kpis.otif_pct >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
                         <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
@@ -116,6 +121,48 @@
                             <td><%= s.driver_name || '—' %></td>
                             <td class="text-right"><%= s.expectedDeliveryDate %></td>
                             <td class="text-right"><span class="ot-badge ot-badge--red">+<%= s.days_overdue %> día<%= s.days_overdue !== 1 ? 's' : '' %></span></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+
+            <!-- Envíos sin zona = no ruteables (quedan trabados sin repartidor) -->
+            <% if (unroutableShipments.length > 0) {
+                const reasonLabel = { sin_zona: 'CP sin zona', sin_cp: 'Falta CP', sin_direccion: 'Sin dirección' };
+            %>
+            <div class="report-card">
+                <div class="dp-table-header">
+                    <h2>Envíos sin zona — no ruteables <span class="dash-alert-badge"><%= unroutableShipments.length %> trabado<%= unroutableShipments.length !== 1 ? 's' : '' %></span></h2>
+                </div>
+                <p class="dash-hint">No caen en ninguna zona configurada: el optimizador no los asigna a ningún transportista. Configurá una zona que cubra el CP o corregí el domicilio del envío.</p>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Tracking</th>
+                            <th>Estado</th>
+                            <th>CP</th>
+                            <th>Provincia</th>
+                            <th>Motivo</th>
+                            <th class="text-right">Fecha comprometida</th>
+                            <th class="text-right">Atraso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% unroutableShipments.forEach(s => { %>
+                        <tr>
+                            <td><a href="/shipment/<%= s.id %>"><%= s.trackingId %></a></td>
+                            <td><%= s.status_label %></td>
+                            <td><%= s.postal_code || '—' %></td>
+                            <td><%= s.province_name || '—' %></td>
+                            <td><span class="ot-badge ot-badge--amber"><%= reasonLabel[s.reason] || s.reason %></span></td>
+                            <td class="text-right"><%= s.expectedDeliveryDate || '—' %></td>
+                            <td class="text-right">
+                                <% if (s.days_overdue !== null) { %>
+                                    <span class="ot-badge ot-badge--red">+<%= s.days_overdue %> día<%= s.days_overdue !== 1 ? 's' : '' %></span>
+                                <% } else { %>—<% } %>
+                            </td>
                         </tr>
                         <% }) %>
                     </tbody>
