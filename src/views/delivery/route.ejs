@@ -561,70 +561,6 @@
         50%     { box-shadow: 0 0 0 14px rgba(37,99,235,0);}
     }
 
-    /* === POD modal (entrega en la misma página, sirve offline) === */
-    .pod-modal-overlay {
-        position: fixed; inset: 0; z-index: 9000;
-        background: rgba(15,23,42,.55);
-        display: flex; align-items: flex-end; justify-content: center;
-        padding: 0;
-    }
-    @media (min-width: 600px) { .pod-modal-overlay { align-items: center; padding: 16px; } }
-    .pod-modal {
-        background: var(--lt-surface); color: var(--lt-text);
-        width: 100%; max-width: 480px; max-height: 92vh;
-        border-radius: 20px 20px 0 0; overflow: hidden;
-        display: flex; flex-direction: column;
-        box-shadow: 0 -12px 40px rgba(15,23,42,.3);
-    }
-    @media (min-width: 600px) { .pod-modal { border-radius: 20px; } }
-    .pod-modal-head {
-        background: linear-gradient(135deg, var(--lt-blue), var(--lt-blue-soft));
-        color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px;
-    }
-    .pod-modal-head .material-symbols-outlined { font-size: 26px; }
-    .pod-modal-title { flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
-    .pod-modal-title small { font-size: .72rem; opacity: .85; }
-    .pod-modal-x {
-        background: rgba(255,255,255,.18); border: none; color: #fff;
-        width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
-        display: inline-flex; align-items: center; justify-content: center;
-    }
-    .pod-modal-body { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-    .pod-grp { display: flex; flex-direction: column; gap: 6px; }
-    .pod-grp > label { font-size: .8rem; font-weight: 700; color: var(--lt-muted); }
-    .pod-grp input[type="text"] {
-        padding: .7rem .8rem; border: 1.5px solid var(--lt-border); border-radius: 10px;
-        background: var(--lt-bg); color: var(--lt-text); font-size: 1rem; font-family: inherit;
-    }
-    .pod-secret small { font-size: .75rem; color: var(--lt-muted); }
-    .pod-gps {
-        display: flex; align-items: center; gap: 8px; font-size: .82rem;
-        padding: .6rem .8rem; border-radius: 10px; border: 1.5px solid var(--lt-border);
-        background: var(--lt-bg); color: var(--lt-muted);
-    }
-    .pod-gps.ok { border-color: var(--lt-green); color: var(--lt-green); background: rgba(22,163,74,.08); }
-    .pod-gps.warn { border-color: var(--lt-amber); color: #b45309; background: rgba(245,158,11,.08); }
-    .pod-photo-btn {
-        display: flex; align-items: center; justify-content: center; gap: 8px;
-        padding: .8rem; border: 1.5px dashed var(--lt-border); border-radius: 12px;
-        background: var(--lt-bg); color: var(--lt-muted); font-weight: 700; font-family: inherit;
-        cursor: pointer; font-size: .9rem;
-    }
-    #podPhotoPrev { width: 100%; border-radius: 10px; border: 1.5px solid var(--lt-border); }
-    #podSign {
-        width: 100%; border: 1.5px solid var(--lt-border); border-radius: 10px;
-        background: var(--lt-surface); touch-action: none; cursor: crosshair;
-    }
-    .pod-clear-btn {
-        align-self: flex-end; display: flex; align-items: center; gap: 4px;
-        padding: .35rem .6rem; border: 1.5px solid var(--lt-border); border-radius: 8px;
-        background: var(--lt-bg); color: var(--lt-muted); font-size: .75rem; cursor: pointer; font-family: inherit;
-    }
-    .pod-clear-btn .material-symbols-outlined, .pod-photo-btn .material-symbols-outlined { font-size: 18px; }
-    .pod-modal-foot {
-        display: flex; gap: 10px; padding: 14px 16px;
-        border-top: 1px solid var(--lt-border); background: var(--lt-surface);
-    }
     </style>
 </head>
 <body>
@@ -794,13 +730,8 @@
                                     </button>
                                 <% } else { %>
                                     <% if (s.shipment) { %>
-                                        <% const podSecretReq = (typeof deliverySecretEnabled === 'undefined' ? true : deliverySecretEnabled) && !!sh.deliverySecretCode; %>
                                         <a class="btn-ui btn-cta js-pod-btn"
                                            href="/delivery/evidence/<%= s.shipment.trackingId %>/pod?routeId=<%= route.id %>&stopId=<%= s.id %>"
-                                           data-tracking="<%= s.shipment.trackingId %>"
-                                           data-stop-id="<%= s.id %>"
-                                           data-secret-required="<%= podSecretReq ? '1' : '0' %>"
-                                           data-secret-code="<%= podSecretReq ? sh.deliverySecretCode : '' %>"
                                            style="width:100%">
                                             <span class="material-symbols-outlined">photo_camera</span>Confirmar Entrega (POD)
                                         </a>
@@ -856,69 +787,8 @@
             <span class="material-symbols-outlined">arrow_downward</span>Paso actual
         </button>
 
-        <%# [prototype] POD en la misma página: permite confirmar la entrega sin navegar,
-            así funciona también sin conexión (no depende de cachear /delivery/evidence). %>
-        <% if (!readOnly) { %>
-        <div class="pod-modal-overlay" id="podModal" hidden>
-            <div class="pod-modal">
-                <div class="pod-modal-head">
-                    <span class="material-symbols-outlined">local_shipping</span>
-                    <div class="pod-modal-title">
-                        <strong>Confirmar entrega</strong>
-                        <small id="podTracking">—</small>
-                    </div>
-                    <button type="button" class="pod-modal-x" id="podClose" aria-label="Cerrar">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-                <div class="pod-modal-body">
-                    <div class="pod-grp">
-                        <label>Nombre del receptor</label>
-                        <input type="text" id="podName" maxlength="60" placeholder="Nombre" autocomplete="off">
-                    </div>
-                    <div class="pod-grp">
-                        <label>Apellido del receptor</label>
-                        <input type="text" id="podLast" maxlength="60" placeholder="Apellido" autocomplete="off">
-                    </div>
-                    <div class="pod-grp">
-                        <label>DNI</label>
-                        <input type="text" id="podDni" inputmode="numeric" maxlength="11" placeholder="Ej: 12.345.678" autocomplete="off">
-                    </div>
-                    <div class="pod-gps" id="podGps">
-                        <span class="material-symbols-outlined">my_location</span>
-                        <span id="podGpsText">Obteniendo ubicación…</span>
-                    </div>
-                    <div class="pod-grp">
-                        <label>Foto del paquete</label>
-                        <input type="file" id="podPhoto" accept="image/*" capture="environment" hidden>
-                        <button type="button" class="pod-photo-btn" id="podPhotoBtn">
-                            <span class="material-symbols-outlined">add_a_photo</span><span id="podPhotoLabel">Sacar foto</span>
-                        </button>
-                        <img id="podPhotoPrev" alt="" hidden>
-                    </div>
-                    <div class="pod-grp">
-                        <label>Firma del receptor</label>
-                        <canvas id="podSign" width="440" height="150"></canvas>
-                        <button type="button" class="pod-clear-btn" id="podSignClear">
-                            <span class="material-symbols-outlined">delete</span>Limpiar firma
-                        </button>
-                    </div>
-                    <div class="pod-grp pod-secret" id="podSecretWrap" hidden>
-                        <label>Código clave de entrega</label>
-                        <input type="text" id="podSecret" maxlength="10" placeholder="Ej: H7P3KQ"
-                               style="text-transform:uppercase;letter-spacing:.25em;text-align:center;font-weight:700">
-                        <small>Pedíle al destinatario el código de 6 caracteres que recibió por mail.</small>
-                    </div>
-                </div>
-                <div class="pod-modal-foot">
-                    <button type="button" class="btn-ui" id="podCancel" style="flex:1">Cancelar</button>
-                    <button type="button" class="btn-ui btn-cta" id="podSubmit" style="flex:2">
-                        <span class="material-symbols-outlined">check_circle</span>Confirmar entrega
-                    </button>
-                </div>
-            </div>
-        </div>
-        <% } %>
+        <%# [prototype] El POD se hace en la página /delivery/evidence/:tracking/pod (online y offline).
+            El botón "Confirmar Entrega" navega a esa página; el SW la sirve cacheada sin conexión. %>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2593,206 +2463,21 @@
         if (r) window.location.href = `/delivery/route/${routeId}/summary`;
     });
 
-    // === POD en la misma página (sirve online y offline) ===========================
-    // Abre un popup con el formulario de entrega en vez de navegar a /delivery/evidence,
-    // así el repartidor puede confirmar la entrega aunque no tenga conexión. Online hace
-    // el POST normal; offline encola el POD (foto+firma) y lo sincroniza al volver.
+    // === POD: navega a la página de evidencia (sirve online y offline) ==============
+    // El botón "Confirmar Entrega" es un <a> a /delivery/evidence/:tracking/pod. Esa página
+    // hace el POST normal online y encola el POD (foto+firma) offline; el SW la sirve cacheada
+    // sin conexión. Acá solo bloqueamos la navegación si el paso anterior no está completo.
     (function () {
-        const modal = document.getElementById('podModal');
-        if (!modal || readOnly) { return; }
-
-        const $ = (id) => document.getElementById(id);
-        const nameI = $('podName'), lastI = $('podLast'), dniI = $('podDni');
-        const gpsBox = $('podGps'), gpsText = $('podGpsText');
-        const photoIn = $('podPhoto'), photoBtn = $('podPhotoBtn'), photoLbl = $('podPhotoLabel'), photoPrev = $('podPhotoPrev');
-        const canvas = $('podSign'), signClear = $('podSignClear');
-        const secretWrap = $('podSecretWrap'), secretI = $('podSecret');
-        const ctx = canvas.getContext('2d');
-
-        let current = null;          // { tracking, stopId, secretRequired, secretCode }
-        let photoB64 = '';
-        let signed = false;
-        let gps = { latitude: '', longitude: '' };
-
-        // ── Firma (canvas) ──
-        let drawing = false;
-        const sigPos = (e) => {
-            const r = canvas.getBoundingClientRect();
-            const src = e.touches ? e.touches[0] : e;
-            return { x: (src.clientX - r.left) * (canvas.width / r.width), y: (src.clientY - r.top) * (canvas.height / r.height) };
-        };
-        const sigStart = (e) => { e.preventDefault(); drawing = true; const p = sigPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
-        const sigMove = (e) => {
-            if (!drawing) { return; }
-            e.preventDefault();
-            const p = sigPos(e);
-            ctx.lineTo(p.x, p.y);
-            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--lt-text').trim() || '#0f172a';
-            ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke(); signed = true;
-        };
-        const sigEnd = () => { drawing = false; };
-        canvas.addEventListener('mousedown', sigStart); canvas.addEventListener('mousemove', sigMove); canvas.addEventListener('mouseup', sigEnd);
-        canvas.addEventListener('touchstart', sigStart); canvas.addEventListener('touchmove', sigMove); canvas.addEventListener('touchend', sigEnd);
-        signClear.addEventListener('click', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); signed = false; });
-
-        // ── Foto ──
-        photoBtn.addEventListener('click', () => photoIn.click());
-        photoIn.addEventListener('change', (e) => {
-            const f = e.target.files[0]; if (!f) { return; }
-            const fr = new FileReader();
-            fr.onload = (ev) => {
-                photoB64 = ev.target.result; photoPrev.src = photoB64; photoPrev.hidden = false;
-                photoLbl.textContent = 'Foto cargada';
-            };
-            fr.readAsDataURL(f);
-        });
-
-        // ── DNI: solo dígitos con puntos ──
-        dniI.addEventListener('input', () => {
-            const d = dniI.value.replace(/\D/g, '').slice(0, 8);
-            dniI.value = d ? d.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
-        });
-        [nameI, lastI].forEach((inp) => inp.addEventListener('input', () => {
-            inp.value = inp.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñÜü\s'-]/g, '');
-        }));
-        secretI.addEventListener('input', () => { secretI.value = secretI.value.toUpperCase(); });
-
-        function resetModal() {
-            nameI.value = ''; lastI.value = ''; dniI.value = ''; secretI.value = '';
-            photoB64 = ''; photoPrev.hidden = true; photoLbl.textContent = 'Sacar foto';
-            signed = false; ctx.clearRect(0, 0, canvas.width, canvas.height);
-            gps = { latitude: '', longitude: '' };
-            gpsBox.className = 'pod-gps'; gpsText.textContent = 'Obteniendo ubicación…';
-        }
-
-        function captureGps() {
-            if (!navigator.geolocation) {
-                gpsBox.className = 'pod-gps warn'; gpsText.textContent = 'GPS no disponible (se entrega igual)';
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(
-                (p) => { gps = { latitude: p.coords.latitude, longitude: p.coords.longitude };
-                    gpsBox.className = 'pod-gps ok'; gpsText.textContent = 'Ubicación obtenida'; },
-                () => { gpsBox.className = 'pod-gps warn'; gpsText.textContent = 'Sin ubicación (se entrega igual)'; },
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
-            );
-        }
-
-        function openModal(btn) {
-            current = {
-                tracking: btn.dataset.tracking,
-                stopId:   btn.dataset.stopId,
-                secretRequired: btn.dataset.secretRequired === '1',
-                secretCode:     btn.dataset.secretCode || '',
-            };
-            resetModal();
-            $('podTracking').textContent = current.tracking || '';
-            secretWrap.hidden = !current.secretRequired;
-            modal.hidden = false;
-            captureGps();
-        }
-        function closeModal() { modal.hidden = true; current = null; }
-
-        $('podClose').addEventListener('click', closeModal);
-        $('podCancel').addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) { closeModal(); } });
-
-        // Intercepta el botón "Confirmar Entrega (POD)" para abrir el popup en vez de navegar.
-        document.getElementById('stops-list').addEventListener('click', (e) => {
+        if (readOnly) { return; }
+        const list = document.getElementById('stops-list');
+        if (!list) { return; }
+        list.addEventListener('click', (e) => {
             const btn = e.target.closest('.js-pod-btn');
             if (!btn) { return; }
             const row = btn.closest('.stop-row');
             if (row && row.classList.contains('locked')) {
                 e.preventDefault();
                 Swal.fire({ icon: 'info', title: 'Paso bloqueado', text: 'Completá el paso anterior primero.', confirmButtonColor: '#2563eb' });
-                return;
-            }
-            e.preventDefault();
-            openModal(btn);
-        });
-
-        $('podSubmit').addEventListener('click', async () => {
-            const name = nameI.value.trim(), last = lastI.value.trim();
-            const dni = dniI.value.replace(/\D/g, '');
-            const miss = [];
-            if (!name) { miss.push('Nombre'); }
-            if (!last) { miss.push('Apellido'); }
-            if (!dni || dni.length < 7) { miss.push('DNI (mín. 7 dígitos)'); }
-            if (!photoB64) { miss.push('Foto'); }
-            if (!signed) { miss.push('Firma'); }
-            let secret = '';
-            if (current.secretRequired) {
-                secret = secretI.value.trim().toUpperCase();
-                if (!secret) { miss.push('Código clave'); }
-            }
-            if (miss.length) {
-                Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Completá: ' + miss.join(', ') + '.', confirmButtonColor: '#2563eb' });
-                return;
-            }
-            // Validación offline del código clave (lo tenemos del bundle). Online lo revalida el server.
-            if (current.secretRequired && current.secretCode && secret !== String(current.secretCode).toUpperCase()) {
-                Swal.fire({ icon: 'error', title: 'Código incorrecto', text: 'El código clave no coincide. Pedíselo de nuevo al destinatario.', confirmButtonColor: '#2563eb' });
-                return;
-            }
-
-            const params = new URLSearchParams();
-            params.set('receiverName', name);
-            params.set('receiverLastname', last);
-            params.set('receiverDni', dni);
-            params.set('latitude', gps.latitude);
-            params.set('longitude', gps.longitude);
-            params.set('photoBase64', photoB64);
-            params.set('signatureBase64', canvas.toDataURL('image/png'));
-            if (current.secretRequired) { params.set('deliverySecretCode', secret); }
-            params.set('routeId', String(routeId));
-            params.set('stopId', String(current.stopId));
-
-            const path = `/delivery/evidence/${encodeURIComponent(current.tracking)}/pod`;
-            const stopId = current.stopId;
-            const submitBtn = $('podSubmit');
-            submitBtn.disabled = true;
-
-            async function queueIt() {
-                if (!window.LTOfflineApp) { return false; }
-                try {
-                    await window.LTOfflineApp.enqueuePOD({ path, body: params.toString(), routeId });
-                    return true;
-                } catch (_) { return false; }
-            }
-
-            // Sin conexión → encolar directo.
-            if (window.LTOfflineApp && !navigator.onLine) {
-                if (await queueIt()) {
-                    closeModal(); markStopDone(stopId, 'delivered');
-                    Swal.fire({ icon: 'success', title: 'Entrega guardada', text: 'Sin conexión: se enviará automáticamente al volver internet.', confirmButtonColor: '#16a34a', timer: 2600 });
-                    submitBtn.disabled = false;
-                    return;
-                }
-            }
-
-            try {
-                const resp = await fetch(path, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: params.toString(),
-                });
-                if (resp.ok || resp.redirected) {
-                    closeModal(); markStopDone(stopId, 'delivered');
-                    Swal.fire({ icon: 'success', title: 'Entrega confirmada', confirmButtonColor: '#16a34a', timer: 1600, showConfirmButton: false });
-                } else {
-                    const msg = (await resp.text()) || 'Error al confirmar la entrega.';
-                    Swal.fire({ icon: 'error', title: 'No se pudo confirmar', text: msg.replace(/<[^>]+>/g, '').slice(0, 200), confirmButtonColor: '#2563eb' });
-                }
-            } catch (_) {
-                // Se cortó la red en pleno envío → encolar.
-                if (await queueIt()) {
-                    closeModal(); markStopDone(stopId, 'delivered');
-                    Swal.fire({ icon: 'success', title: 'Entrega guardada', text: 'Se enviará automáticamente al volver internet.', confirmButtonColor: '#16a34a', timer: 2600 });
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Error de red', text: 'No se pudo confirmar ni guardar la entrega. Reintentá.', confirmButtonColor: '#2563eb' });
-                }
-            } finally {
-                submitBtn.disabled = false;
             }
         });
     })();
