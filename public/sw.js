@@ -32,6 +32,32 @@ self.addEventListener('activate', (event) => {
     );
 });
 
+// Red de seguridad offline: en vez de una pantalla muerta de "Sin conexión", cualquier
+// navegación del repartidor a una subpágina no cacheada (resumen, detalle de envío, etc.)
+// redirige a la página de ruta cacheada — su superficie de trabajo. Así el flujo nunca se
+// interrumpe; las acciones operativas se siguen encolando desde el wrapper de fetch de la
+// página, de forma independiente a la navegación.
+async function fallbackDeliveryNav() {
+    try {
+        const cache = await caches.open(CACHE);
+        const keys = await cache.keys();
+        // Página de ruta cacheada (clave normalizada a /delivery/route/N sin query).
+        const routeKey = keys.find((k) => /^\/delivery\/route\/\d+$/.test(new URL(k.url).pathname));
+        if (routeKey) { return Response.redirect(routeKey.url, 302); }
+        // Sin ruta cacheada pero con el home: caemos al inicio del repartidor.
+        const home = await caches.match('/delivery', { ignoreSearch: true });
+        if (home) { return home; }
+    } catch (_) { /* sin Cache API */ }
+    // Caso real único: nunca se abrió la ruta con internet en este dispositivo.
+    return new Response(
+        '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<div style="font-family:Inter,system-ui,sans-serif;padding:2rem;text-align:center;color:#334155">'
+        + '<p>Abrí tu ruta con internet al menos una vez para poder operarla sin conexión.</p>'
+        + '<a href="/delivery" style="color:#2563eb;font-weight:600">Ir a Mi Ruteo</a></div>',
+        { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 200 }
+    );
+}
+
 function isAsset(url) {
     return /\.(css|js|png|jpg|jpeg|svg|ico|woff2?)$/.test(url.pathname)
         || url.host.includes('unpkg.com')
@@ -62,10 +88,7 @@ self.addEventListener('fetch', (event) => {
                 // Offline: match por la clave normalizada y, si falla, ignorando el query string.
                 .catch(() => caches.match(cacheKey)
                     .then((r) => r || caches.match(req, { ignoreSearch: true }))
-                    .then((r) => r || new Response(
-                        '<h1>Sin conexión</h1><p>Abrí esta ruta al menos una vez con internet para poder verla offline.</p>',
-                        { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 200 }
-                    )))
+                    .then((r) => r || fallbackDeliveryNav()))
         );
         return;
     }
