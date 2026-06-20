@@ -573,6 +573,9 @@ const getDashboardSupervisorData = async (query = {}, branchId = null, deps = { 
         branchId,
         statusSummary: [],
         delayedShipments: [],
+        delayedByZone: [],
+        delayedBySeverity: [],
+        delayedByStatus: [],
         topFailingZones: [],
         driverPvr: [],
         kpis: { total: 0, delivered: 0, in_transit: 0, delayed_count: 0, otif_pct: null, avg_delta: null },
@@ -610,7 +613,61 @@ const getDashboardSupervisorData = async (query = {}, branchId = null, deps = { 
            AND s."expectedDeliveryDate" IS NOT NULL
            AND s."expectedDeliveryDate" < CURRENT_DATE
            AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
-         ORDER BY days_overdue DESC LIMIT 15`,
+         ORDER BY days_overdue DESC LIMIT 25`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Demoras por estado: en qué punto del proceso se atasca
+    viewModel.delayedByStatus = await deps.sequelize.query(
+        `SELECT st.description AS status_label, s."statusId", COUNT(*)::int AS total
+         FROM logitrack.shipment s
+         JOIN logitrack.status st ON st.id = s."statusId"
+         WHERE s."statusId" IN (2, 6, 7)
+           AND s."expectedDeliveryDate" IS NOT NULL
+           AND s."expectedDeliveryDate" < CURRENT_DATE
+           AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
+         GROUP BY s."statusId", st.description ORDER BY total DESC`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Distribución de demoras por banda de severidad
+    viewModel.delayedBySeverity = await deps.sequelize.query(
+        `SELECT
+            CASE
+                WHEN (CURRENT_DATE - s."expectedDeliveryDate") <= 7  THEN '1–7 días'
+                WHEN (CURRENT_DATE - s."expectedDeliveryDate") <= 14 THEN '8–14 días'
+                WHEN (CURRENT_DATE - s."expectedDeliveryDate") <= 30 THEN '15–30 días'
+                ELSE '+30 días'
+            END AS banda,
+            CASE
+                WHEN (CURRENT_DATE - s."expectedDeliveryDate") <= 7  THEN 1
+                WHEN (CURRENT_DATE - s."expectedDeliveryDate") <= 14 THEN 2
+                WHEN (CURRENT_DATE - s."expectedDeliveryDate") <= 30 THEN 3
+                ELSE 4
+            END AS orden,
+            COUNT(*)::int AS total
+         FROM logitrack.shipment s
+         WHERE s."statusId" IN (2, 6, 7)
+           AND s."expectedDeliveryDate" IS NOT NULL
+           AND s."expectedDeliveryDate" < CURRENT_DATE
+           AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
+         GROUP BY banda, orden ORDER BY orden`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
+
+    // Demoras por zona: con repartidor vs sin asignar (para gráfico)
+    viewModel.delayedByZone = await deps.sequelize.query(
+        `SELECT COALESCE(z.name, 'Sin zona') AS zone_name,
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE s."deliveryUserId" IS NOT NULL)::int AS con_repartidor,
+                COUNT(*) FILTER (WHERE s."deliveryUserId" IS NULL)::int AS sin_asignar
+         FROM logitrack.shipment s
+         LEFT JOIN logitrack.zone z ON z.id = s."zoneId"
+         WHERE s."statusId" IN (2, 6, 7)
+           AND s."expectedDeliveryDate" IS NOT NULL
+           AND s."expectedDeliveryDate" < CURRENT_DATE
+           AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
+         GROUP BY z.name ORDER BY total DESC`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 

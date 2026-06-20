@@ -32,6 +32,12 @@
         .kpi-tip::before { content:''; position:absolute; bottom:calc(100% + 2px); left:50%; transform:translateX(-50%);
                            border:5px solid transparent; border-top-color:#1e293b; opacity:0; pointer-events:none; transition:opacity .15s; }
         .kpi-tip:hover::before { opacity:1; }
+        .status-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.75rem; }
+        .status-chip { padding:.28rem .75rem; border-radius:20px; border:1.5px solid var(--color-border); background:var(--color-surface);
+                       font-size:.76rem; font-weight:500; cursor:pointer; transition:all .15s; color:var(--color-text-muted); }
+        .status-chip.active { background:var(--color-primary,#1d4ed8); color:#fff; border-color:var(--color-primary,#1d4ed8); opacity:1; }
+        .status-chip:not(.active) { opacity:.5; }
+        .status-chip:hover { opacity:1; }
     </style>
 </head>
 <body>
@@ -88,6 +94,7 @@
                         <span class="kpi-tip" data-tip="Total de envíos creados en el período seleccionado.">?</span>
                     </div>
                     <div class="dash-kpi__value--xl"><%= kpis.total %></div>
+                    <div style="font-size:.72rem;color:var(--color-text-muted);margin-top:.3rem;">Suma todos los estados · no varía con la selección</div>
                 </div>
                 <div style="font-size:.85rem;color:var(--color-text-muted);line-height:1.5;">
                     <%= dateFrom %> — <%= dateTo %>
@@ -97,11 +104,16 @@
             <!-- Desglose por estado (suma = total) -->
             <% if (statusSummary.length > 0) { %>
             <p class="dash-section-title">Distribución por estado</p>
-            <div class="dash-kpi-grid">
+            <div class="status-chips" id="status-chips">
+                <% statusSummary.forEach(s => { %>
+                <button type="button" class="status-chip active" data-status-id="<%= s.statusId %>"><%= s.status_label %></button>
+                <% }) %>
+            </div>
+            <div class="dash-kpi-grid" id="status-kpi-grid">
                 <% statusSummary.forEach(s => {
                     const pct = kpis.total > 0 ? Math.round(s.total / kpis.total * 100) : 0;
                 %>
-                <div class="dash-kpi">
+                <div class="dash-kpi" data-status-id="<%= s.statusId %>">
                     <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
                         <%= s.status_label %>
                         <span class="kpi-tip" data-tip="Envíos creados en el período que están actualmente en estado '<%= s.status_label %>'. Representa el <%= pct %>% del total.">?</span>
@@ -146,15 +158,19 @@
             <!-- Envíos demorados -->
             <% if (delayedShipments.length > 0) { %>
             <div class="report-card">
-                <div class="dp-table-header">
+                <div class="dp-table-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
                     <h2>Envíos con demora activa <span class="dash-alert-badge"><%= kpis.delayed_count %> alerta<%= kpis.delayed_count !== 1 ? 's' : '' %></span></h2>
+                    <label style="font-size:.8rem;color:var(--color-text-muted);display:flex;align-items:center;gap:.4rem;">
+                        Mostrar
+                        <select id="delayed-limit-select" style="font-size:.8rem;padding:.2rem .4rem;border-radius:4px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);">
+                            <option value="7">7</option>
+                            <option value="15">15</option>
+                            <option value="25">25</option>
+                        </select>
+                    </label>
                 </div>
-                <% if (kpis.delayed_count > delayedShipments.length) { %>
-                <p style="font-size:.8rem;color:var(--color-text-muted);margin:0 0 .75rem;text-align:center;">
-                    Mostrando los <%= delayedShipments.length %> más críticos de <%= kpis.delayed_count %> envíos con demora.
-                </p>
-                <% } %>
-                <table class="report-table">
+                <p id="delayed-limit-note" style="font-size:.8rem;color:var(--color-text-muted);margin:.5rem 0 .75rem;text-align:center;"></p>
+                <table class="report-table" id="delayed-table">
                     <thead>
                         <tr>
                             <th>Tracking</th>
@@ -176,6 +192,42 @@
                         <% }) %>
                     </tbody>
                 </table>
+            </div>
+            <% } %>
+
+            <!-- Gráficos de demoras -->
+            <% if (delayedByZone.length > 0 || delayedBySeverity.length > 0 || delayedByStatus.length > 0) { %>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
+                <% if (delayedByZone.length > 0) { %>
+                <div class="report-card">
+                    <h2>Demoras por zona
+                        <span class="kpi-tip" data-tip="Envíos vencidos agrupados por zona. Azul = tiene repartidor asignado. Rojo = sin asignar — problema de gestión, no de entrega.">?</span>
+                    </h2>
+                    <div style="position:relative;height:<%= Math.max(180, delayedByZone.length * 52) %>px;margin-top:1rem;">
+                        <canvas id="delayed-zone-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+                <% if (delayedBySeverity.length > 0) { %>
+                <div class="report-card">
+                    <h2>Severidad de demoras
+                        <span class="kpi-tip" data-tip="Distribución de envíos vencidos según cuántos días llevan de atraso. Muestra si el problema es reciente o crónico.">?</span>
+                    </h2>
+                    <div style="position:relative;height:<%= Math.max(180, delayedByZone.length * 52) %>px;margin-top:1rem;">
+                        <canvas id="delayed-severity-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+                <% if (delayedByStatus.length > 0) { %>
+                <div class="report-card">
+                    <h2>Punto de atasco
+                        <span class="kpi-tip" data-tip="En qué estado está el envío vencido. 'En Tránsito' = el repartidor salió pero no entregó. 'Asignado' o 'En Preparación' = nunca llegó al repartidor.">?</span>
+                    </h2>
+                    <div style="position:relative;height:<%= Math.max(180, delayedByZone.length * 52) %>px;margin-top:1rem;display:flex;align-items:center;justify-content:center;">
+                        <canvas id="delayed-status-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
             </div>
             <% } %>
 
@@ -276,6 +328,7 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script>
         document.getElementById('report-form').addEventListener('submit', function (e) {
             const from = document.getElementById('from').value, to = document.getElementById('to').value;
@@ -309,6 +362,142 @@
                     });
                     rows.forEach(r => tbody.appendChild(r));
                 });
+            });
+        })();
+        (function () {
+            const isDark = document.documentElement.dataset.theme === 'dark' || document.body.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+
+            const zoneCanvas = document.getElementById('delayed-zone-chart');
+            if (zoneCanvas) {
+                const raw = <%- JSON.stringify(delayedByZone) %>;
+                new Chart(zoneCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: raw.map(r => r.zone_name),
+                        datasets: [
+                            { label: 'Con repartidor', data: raw.map(r => r.con_repartidor), backgroundColor: 'rgba(59,130,246,.75)', borderRadius: 4 },
+                            { label: 'Sin asignar',    data: raw.map(r => r.sin_asignar),    backgroundColor: 'rgba(198,40,40,.75)',  borderRadius: 4 },
+                        ],
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { color: textColor, font: { size: 12 } } },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x} envíos` } },
+                        },
+                        scales: {
+                            x: { stacked: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                            y: { stacked: true, ticks: { color: textColor, font: { size: 12 } }, grid: { display: false } },
+                        },
+                    },
+                });
+            }
+
+            const statusCanvas = document.getElementById('delayed-status-chart');
+            if (statusCanvas) {
+                const st = <%- JSON.stringify(delayedByStatus) %>;
+                const stColors = { 2: 'rgba(59,130,246,.8)', 6: 'rgba(249,115,22,.8)', 7: 'rgba(139,92,246,.8)' };
+                new Chart(statusCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: st.map(r => r.status_label),
+                        datasets: [{
+                            data: st.map(r => r.total),
+                            backgroundColor: st.map(r => stColors[r.statusId] || 'rgba(148,163,184,.7)'),
+                            borderWidth: 0,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12 }, padding: 16 } },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} envíos` } },
+                        },
+                        cutout: '62%',
+                    },
+                });
+            }
+
+            const sevCanvas = document.getElementById('delayed-severity-chart');
+            if (sevCanvas) {
+                const sev = <%- JSON.stringify(delayedBySeverity) %>;
+                const sevColors = ['rgba(234,179,8,.8)','rgba(249,115,22,.8)','rgba(239,68,68,.8)','rgba(153,27,27,.85)'];
+                new Chart(sevCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: sev.map(r => r.banda),
+                        datasets: [{
+                            label: 'Envíos',
+                            data: sev.map(r => r.total),
+                            backgroundColor: sev.map((_, i) => sevColors[i] || sevColors[3]),
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} envíos` } },
+                        },
+                        scales: {
+                            x: { ticks: { color: textColor }, grid: { display: false } },
+                            y: { ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                        },
+                    },
+                });
+            }
+        })();
+        (function () {
+            const SEL_KEY = 'sup_delayed_limit';
+            const select = document.getElementById('delayed-limit-select');
+            const note   = document.getElementById('delayed-limit-note');
+            const tbody  = document.querySelector('#delayed-table tbody');
+            if (!select || !tbody) return;
+            const totalLoaded = tbody.querySelectorAll('tr').length;
+            const totalReal   = <%= kpis.delayed_count %>;
+            const saved = Number(localStorage.getItem(SEL_KEY)) || 7;
+            select.value = String(saved);
+            const applyLimit = (limit) => {
+                tbody.querySelectorAll('tr').forEach((tr, i) => {
+                    tr.style.display = i < limit ? '' : 'none';
+                });
+                const showing = Math.min(limit, totalLoaded);
+                note.textContent = totalReal > showing
+                    ? `Mostrando los ${showing} más críticos de ${totalReal} envíos con demora.`
+                    : '';
+            };
+            applyLimit(saved);
+            select.addEventListener('change', () => {
+                const v = Number(select.value);
+                localStorage.setItem(SEL_KEY, v);
+                applyLimit(v);
+            });
+        })();
+        (function () {
+            const STORAGE_KEY = 'sup_hidden_statuses';
+            const chips = document.getElementById('status-chips');
+            const grid  = document.getElementById('status-kpi-grid');
+            if (!chips || !grid) return;
+            const hidden = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+            const apply = () => {
+                chips.querySelectorAll('.status-chip').forEach(chip => {
+                    const id = Number(chip.dataset.statusId);
+                    const isHidden = hidden.has(id);
+                    chip.classList.toggle('active', !isHidden);
+                    const card = grid.querySelector(`.dash-kpi[data-status-id="${id}"]`);
+                    if (card) card.style.display = isHidden ? 'none' : '';
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify([...hidden]));
+            };
+            apply();
+            chips.addEventListener('click', e => {
+                const chip = e.target.closest('.status-chip');
+                if (!chip) return;
+                const id = Number(chip.dataset.statusId);
+                hidden.has(id) ? hidden.delete(id) : hidden.add(id);
+                apply();
             });
         })();
     </script>
