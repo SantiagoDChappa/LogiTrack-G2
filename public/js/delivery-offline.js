@@ -58,14 +58,14 @@
             body.retrySameDay = !!b.retrySameDay;
         }
         if (/\/pause$/.test(path)) { body.pauseId = 'offline'; body.startedAt = new Date().toISOString(); }
+        // Finalizar offline: marcamos finished para que la UI muestre el flujo normal.
+        // La cola es FIFO, así que al sincronizar el server recibe primero las entregas/
+        // fallidos encolados y recién después el /finish (transiciones, mails, etc.).
+        if (/\/finish$/.test(path)) { body.finished = true; }
         return jsonResponse(200, body);
     }
 
     async function queueAndSynth(path, method, init, idemKey) {
-        // Finalizar la ruta necesita conexión (dispara transiciones + resumen del servidor).
-        if (/\/finish$/.test(path)) {
-            return jsonResponse(503, { ok: false, error: 'Para finalizar la ruta necesitás conexión a internet.' });
-        }
         const bodyStr = typeof init.body === 'string' ? init.body : '';
         await window.LTOffline.enqueue({
             path, method, body: bodyStr,

@@ -49,14 +49,18 @@ self.addEventListener('fetch', (event) => {
     // Navegación a páginas del repartidor (ruta, POD de evidencia, inicio): network-first
     // (cachea la última versión vista), fallback al cache cuando no hay conexión.
     if (req.mode === 'navigate' && url.origin === self.location.origin && url.pathname.startsWith('/delivery')) {
+        // La página de ruta cambia de query en cada paso (?delivered=true, ?queued=1, …).
+        // Si guardáramos una entrada por variante, al volver offline `ignoreSearch` podía
+        // devolver una copia VIEJA (la primera insertada, con todo pendiente) y las paradas
+        // ya entregadas aparecían como nuevas. Normalizamos la clave a pathname sin query:
+        // así queda SIEMPRE una sola copia, la más reciente, y offline servimos esa.
+        const isRoutePage = /^\/delivery\/route\/\d+$/.test(url.pathname);
+        const cacheKey = isRoutePage ? new Request(url.origin + url.pathname) : req;
         event.respondWith(
             fetch(req)
-                .then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return r; })
-                // Offline: probamos match exacto y, si falla, ignorando el query string
-                // (ej: redirect a /delivery?delivered=true&queued=1 tras encolar una entrega).
-                // Sin ignoreSearch, esos query params rompían la navegación y mostraban
-                // la pantalla "Sin conexión" aunque la página estuviera cacheada.
-                .catch(() => caches.match(req)
+                .then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(cacheKey, copy)); return r; })
+                // Offline: match por la clave normalizada y, si falla, ignorando el query string.
+                .catch(() => caches.match(cacheKey)
                     .then((r) => r || caches.match(req, { ignoreSearch: true }))
                     .then((r) => r || new Response(
                         '<h1>Sin conexión</h1><p>Abrí esta ruta al menos una vez con internet para poder verla offline.</p>',
@@ -96,7 +100,25 @@ self.addEventListener('message', (event) => {
 
 async function flushAndNotify() {
     const result = await self.LTOffline.flushOutbox((url, opts) => fetch(url, Object.assign({ credentials: 'include' }, opts)));
+    // Si sincronizamos algo con la app cerrada, el HTML cacheado de la ruta quedó viejo
+    // (muestra paradas ya entregadas como pendientes). Lo re-fetcheamos para refrescar la
+    // copia normalizada, así la próxima apertura offline ve el estado real del servidor.
+    if (result && result.sent > 0) { await refreshRouteCache(); }
     const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
     clients.forEach((c) => c.postMessage({ type: 'lt-sync-done', result }));
     return result;
+}
+
+async function refreshRouteCache() {
+    try {
+        const cache = await caches.open(CACHE);
+        const keys = await cache.keys();
+        const routePages = keys.filter((req) => /^\/delivery\/route\/\d+$/.test(new URL(req.url).pathname));
+        for (const req of routePages) {
+            try {
+                const fresh = await fetch(req.url, { credentials: 'include' });
+                if (fresh.ok) { await cache.put(req, fresh.clone()); }
+            } catch (_) { /* se cortó la red de nuevo: queda la copia anterior */ }
+        }
+    } catch (_) { /* sin Cache API */ }
 }
