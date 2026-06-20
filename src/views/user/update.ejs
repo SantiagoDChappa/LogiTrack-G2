@@ -116,6 +116,23 @@
                     Resetear 2FA del usuario
                 </button>
             </form>
+
+            <!-- LGT-193 — desbloqueo manual de cuenta bloqueada por intentos fallidos de login. -->
+            <% if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) { %>
+            <div style="margin-top:1rem;padding:.75rem 1rem;background:#fff3cd;border:1px solid #f6c200;border-radius:10px">
+                <p style="margin:0 0 .5rem;font-size:.85rem;color:#92600a">
+                    <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">lock</span>
+                    Esta cuenta está bloqueada hasta las <%= new Date(user.lockedUntil).toLocaleString('es-AR') %> por intentos fallidos de login.
+                </p>
+                <form action="/user/<%= user.id %>/unlock" method="POST"
+                      onsubmit="return confirm('¿Desbloquear esta cuenta ahora?');">
+                    <button type="submit" class="btn btn--ghost">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">lock_open</span>
+                        Desbloquear cuenta ahora
+                    </button>
+                </form>
+            </div>
+            <% } %>
         </div>
     </main>
 

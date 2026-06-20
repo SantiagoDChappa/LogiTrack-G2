@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría · Acciones internas - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <%- include('_header', { active: 'acciones', pageTitle: 'Acciones internas', pageDesc: 'Altas, modificaciones y bajas sobre envíos, usuarios e incidencias.' }) %>
+
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">edit_note</span>
+                <h2>Acciones internas</h2>
+                <span class="badge-count"><%= actionCount %> registros</span>
+            </div>
+            <div class="audit-card-body">
+                <form method="GET" action="/auditoria/acciones" class="audit-filters">
+                    <div class="filter-group">
+                        <label>Usuario</label>
+                        <select name="aUserId">
+                            <option value="">Todos</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.aUserId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Entidad</label>
+                        <select name="entity">
+                            <option value="">Todas</option>
+                            <option value="SHIPMENT" <%= auditFilters.entity === 'SHIPMENT'  ? 'selected' : '' %>>Envíos</option>
+                            <option value="USER"     <%= auditFilters.entity === 'USER'      ? 'selected' : '' %>>Usuarios</option>
+                            <option value="INCIDENT" <%= auditFilters.entity === 'INCIDENT'  ? 'selected' : '' %>>Incidencias</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn-filter primary">
+                            <span class="material-symbols-outlined">filter_list</span> Filtrar
+                        </button>
+                        <a href="/auditoria/acciones" class="btn-filter ghost">Limpiar</a>
+                    </div>
+                </form>
+
+                <div class="filter-divider"></div>
+
+                <% if (!actionLogs || actionLogs.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">history_toggle_off</span>
+                    No hay acciones internas registradas todavía.
+                </div>
+                <% } else { %>
+                <%
+                    const _actionBadgeClass = (a) => {
+                        if (a === 'CREATE') return 'badge-action badge-create';
+                        if (a === 'UPDATE') return 'badge-action badge-update';
+                        if (a === 'DELETE') return 'badge-action badge-delete';
+                        if (a === 'CANCEL') return 'badge-action badge-cancel';
+                        if (a === 'UNLOCK') return 'badge-action badge-create';
+                        return 'badge-action badge-close';
+                    };
+                    const _actionIcon = (a) => {
+                        if (a === 'CREATE') return 'add_circle';
+                        if (a === 'UPDATE') return 'edit';
+                        if (a === 'DELETE') return 'delete';
+                        if (a === 'CANCEL') return 'cancel';
+                        if (a === 'CLOSE')  return 'check_circle';
+                        if (a === 'UNLOCK') return 'lock_open';
+                        return 'radio_button_checked';
+                    };
+                    const _entityLabel = (e) => {
+                        if (e === 'SHIPMENT') return 'Envío';
+                        if (e === 'USER')     return 'Usuario';
+                        if (e === 'INCIDENT') return 'Incidencia';
+                        return e;
+                    };
+                %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th></tr>
+                        </thead>
+                        <tbody>
+                            <% actionLogs.forEach(log => { %>
+                            <%
+                                let _detail = {};
+                                try { _detail = log.detail ? JSON.parse(log.detail) : {}; } catch(e) { _detail = {}; }
+                            %>
+                            <tr>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)">
+                                    <span data-ts="<%= new Date(log.createdAt).toISOString() %>" title="<%= new Date(log.createdAt).toLocaleString('es-AR') %>"><%= new Date(log.createdAt).toLocaleString('es-AR') %></span>
+                                </td>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= avatarColor(log.user?.fullName) %>"><%= initials(log.user?.fullName) %></span>
+                                        <strong><%= log.user?.fullName || '—' %></strong>
+                                    </div>
+                                </td>
+                                <td>
+                                    <% if (log.user?.roleId) { %>
+                                    <span class="badge-role"><%= roleLabels[log.user.roleId] || '—' %></span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">—</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span class="<%= _actionBadgeClass(log.action) %>">
+                                        <span class="material-symbols-outlined" style="font-size:.8rem"><%= _actionIcon(log.action) %></span>
+                                        <%= log.action %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="font-size:.8rem;color:var(--color-text-secondary)"><%= _entityLabel(log.entity) %></span>
+                                    <% if (log.entityId) { %><code style="font-size:.78rem;background:var(--color-bg);padding:.1rem .35rem;border-radius:5px;margin-left:.25rem">#<%= log.entityId %></code><% } %>
+                                </td>
+                                <td style="font-size:.8rem;max-width:220px;">
+                                    <%
+                                        const _ROLE_NAMES = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' };
+                                        const _RES_LABELS = { PROCEDENTE: 'Procedente', NO_PROCEDENTE: 'No procedente' };
+                                        let _parts = [];
+                                        if (log.entity === 'USER') {
+                                            if (_detail.fullName) { _parts.push(_detail.fullName); }
+                                            if (_detail.email)    { _parts.push(_detail.email); }
+                                            if (_detail.roleId)   { _parts.push(_ROLE_NAMES[_detail.roleId] || 'Rol ' + _detail.roleId); }
+                                        } else if (log.entity === 'SHIPMENT') {
+                                            if (_detail.trackingId) { _parts.push('Tracking: ' + _detail.trackingId); }
+                                        } else if (log.entity === 'INCIDENT') {
+                                            if (_detail.type)       { _parts.push('Tipo: ' + _detail.type); }
+                                            if (_detail.shipmentId) { _parts.push('Envío #' + _detail.shipmentId); }
+                                            if (_detail.resolution) { _parts.push(_RES_LABELS[_detail.resolution] || _detail.resolution); }
+                                        }
+                                    %>
+                                    <% if (_parts.length === 0) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text)" title="<%= _parts.join(' · ') %>"><%= _parts.join(' · ') %></span>
+                                    <% } %>
+                                </td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación acciones -->
+                <% if (actionPages > 1) { %>
+                <div class="pagination">
+                    <span class="pagination-info">Página <%= actionPage %> de <%= actionPages %> (<%= actionCount %> registros)</span>
+                    <% const _aBase = '/auditoria/acciones?aUserId=' + (auditFilters.aUserId||'') + '&entity=' + (auditFilters.entity||''); %>
+                    <a href="<%= _aBase %>&actionPage=<%= actionPage - 1 %>" class="btn-filter" <%- actionPage <= 1 ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        <span class="material-symbols-outlined">chevron_left</span> Anterior
+                    </a>
+                    <a href="<%= _aBase %>&actionPage=<%= actionPage + 1 %>" class="btn-filter" <%- actionPage >= actionPages ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        Siguiente <span class="material-symbols-outlined">chevron_right</span>
+                    </a>
+                </div>
+                <% } %>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <%- include('_relativeTime') %>
+</body>
+</html>
