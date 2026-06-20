@@ -3,40 +3,18 @@ const actionLogModel = require('../models/actionLog');
 const settingLogModel = require('../models/settingLog');
 const userModel = require('../models/user');
 const { RoleType } = require('../constants/enums');
+const { avatarColor, initials } = require('../utils/auditHelpers');
 
 const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
 
-const getAuditoria = async (req, res) => {
-    const sessionPage = Math.max(1, parseInt(req.query.sessionPage) || 1);
-    const actionPage  = Math.max(1, parseInt(req.query.actionPage)  || 1);
-    const settingPage = Math.max(1, parseInt(req.query.settingPage) || 1);
-
-    const sessionFilters = {
-        userId: req.query.userId || undefined,
-        action: req.query.action || undefined,
-        from:   req.query.from   || undefined,
-        to:     req.query.to     || undefined,
-        page:   sessionPage,
-        limit:  15,
-    };
-
-    const actionFilters = {
-        userId: req.query.aUserId || undefined,
-        entity: req.query.entity  || undefined,
-        from:   req.query.from    || undefined,
-        to:     req.query.to      || undefined,
-        page:   actionPage,
-        limit:  15,
-    };
-
-    const [sessionResult, actionResult, settingResult, activeUsers, users, failedCount, activityRows] = await Promise.all([
-        loginLogModel.getAll(sessionFilters).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
-        actionLogModel.getAll(actionFilters).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
-        settingLogModel.getAll({ page: settingPage, limit: 15 }).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
+const getResumen = async (req, res) => {
+    const [sessionTotal, actionTotal, activeUsers, failedAccounts, activityRows, activeUserStats] = await Promise.all([
+        loginLogModel.getAll({ page: 1, limit: 1 }).catch(() => ({ count: 0, rows: [] })),
+        actionLogModel.getAll({ page: 1, limit: 1 }).catch(() => ({ count: 0 })),
         loginLogModel.getActiveUsers().catch(() => []),
-        userModel.getAll().catch(() => []),
         loginLogModel.getFailedByAccount({ hours: 24, minAttempts: 3 }).catch(() => []),
         loginLogModel.getActivityByDay({ days: 7 }).catch(() => []),
+        loginLogModel.getActiveUserStats().catch(() => ({ dau: 0, wau: 0, mau: 0 })),
     ]);
 
     const activityMap = {};
@@ -52,27 +30,85 @@ const getAuditoria = async (req, res) => {
         });
     }
 
-    res.render('auditoria/index', {
+    res.render('auditoria/resumen', {
+        activeUsersCount: activeUsers.length,
+        sessionCount: sessionTotal.count,
+        actionCount: actionTotal.count,
+        lastEvent: sessionTotal.rows[0] || null,
+        failedAccounts,
+        activity,
+        activeUserStats,
+        roleLabels: ROLE_LABELS,
+    });
+};
+
+const getUsuariosActivos = async (req, res) => {
+    const activeUsers = await loginLogModel.getActiveUsers().catch(() => []);
+    res.render('auditoria/usuariosActivos', { activeUsers, roleLabels: ROLE_LABELS, avatarColor, initials });
+};
+
+const getSesiones = async (req, res) => {
+    const sessionPage = Math.max(1, parseInt(req.query.sessionPage) || 1);
+    const sessionFilters = {
+        userId: req.query.userId || undefined,
+        action: req.query.action || undefined,
+        from:   req.query.from   || undefined,
+        to:     req.query.to     || undefined,
+        page:   sessionPage,
+        limit:  15,
+    };
+    const [sessionResult, users] = await Promise.all([
+        loginLogModel.getAll(sessionFilters).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
+        userModel.getAll().catch(() => []),
+    ]);
+    res.render('auditoria/sesiones', {
         loginLogs:    sessionResult.rows,
         sessionCount: sessionResult.count,
         sessionPage:  sessionResult.page,
         sessionPages: sessionResult.pages,
-
-        actionLogs:   actionResult.rows,
-        actionCount:  actionResult.count,
-        actionPage:   actionResult.page,
-        actionPages:  actionResult.pages,
-
-        settingLogs:   settingResult.rows,
-        settingCount:  settingResult.count,
-        settingPage:   settingResult.page,
-        settingPages:  settingResult.pages,
-        activeUsers,
         users,
-        auditFilters: { ...sessionFilters, aUserId: actionFilters.userId, entity: actionFilters.entity },
         roleLabels: ROLE_LABELS,
-        failedAccounts: failedCount,
-        activity,
+        auditFilters: sessionFilters,
+        avatarColor,
+        initials,
+    });
+};
+
+const getAcciones = async (req, res) => {
+    const actionPage = Math.max(1, parseInt(req.query.actionPage) || 1);
+    const actionFilters = {
+        userId: req.query.aUserId || undefined,
+        entity: req.query.entity  || undefined,
+        from:   req.query.from    || undefined,
+        to:     req.query.to      || undefined,
+        page:   actionPage,
+        limit:  15,
+    };
+    const [actionResult, users] = await Promise.all([
+        actionLogModel.getAll(actionFilters).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 })),
+        userModel.getAll().catch(() => []),
+    ]);
+    res.render('auditoria/acciones', {
+        actionLogs:  actionResult.rows,
+        actionCount: actionResult.count,
+        actionPage:  actionResult.page,
+        actionPages: actionResult.pages,
+        users,
+        roleLabels: ROLE_LABELS,
+        auditFilters: { aUserId: actionFilters.userId, entity: actionFilters.entity },
+        avatarColor,
+        initials,
+    });
+};
+
+const getConfiguracion = async (req, res) => {
+    const settingPage = Math.max(1, parseInt(req.query.settingPage) || 1);
+    const settingResult = await settingLogModel.getAll({ page: settingPage, limit: 15 }).catch(() => ({ rows: [], count: 0, page: 1, pages: 0 }));
+    res.render('auditoria/configuracion', {
+        settingLogs:  settingResult.rows,
+        settingCount: settingResult.count,
+        settingPage:  settingResult.page,
+        settingPages: settingResult.pages,
     });
 };
 
@@ -114,4 +150,4 @@ const exportCsv = async (req, res) => {
     }
 };
 
-module.exports = { getAuditoria, exportCsv };
+module.exports = { getResumen, getUsuariosActivos, getSesiones, getAcciones, getConfiguracion, exportCsv };

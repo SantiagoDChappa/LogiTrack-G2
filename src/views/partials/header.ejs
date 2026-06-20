@@ -45,7 +45,20 @@
                 <% if (currentUser.roleId === 4) { %>
                     <a href="/shipment/import"><ul><span class="material-symbols-outlined">upload_file</span>Importar CSV</ul></a>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
-                    <a href="/auditoria"><ul><span class="material-symbols-outlined">manage_search</span>Auditoría</ul></a>
+                    <div class="nav-group" id="nav-group-auditoria">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-auditoria')" aria-expanded="false">
+                            <span class="material-symbols-outlined">manage_search</span>
+                            Auditoría
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/auditoria"><ul><span class="material-symbols-outlined">dashboard</span>Resumen</ul></a>
+                            <a href="/auditoria/usuarios-activos"><ul><span class="material-symbols-outlined">group</span>Usuarios activos</ul></a>
+                            <a href="/auditoria/sesiones"><ul><span class="material-symbols-outlined">login</span>Log de sesiones</ul></a>
+                            <a href="/auditoria/acciones"><ul><span class="material-symbols-outlined">edit_note</span>Acciones internas</ul></a>
+                            <a href="/auditoria/configuracion"><ul><span class="material-symbols-outlined">history</span>Cambios de configuración</ul></a>
+                        </div>
+                    </div>
                     <a href="/branch"><ul><span class="material-symbols-outlined">store</span>Sucursales</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
@@ -61,8 +74,6 @@
                             <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
                             <a href="/report/incidents-by-period"><ul><span class="material-symbols-outlined">warning</span>Fallas</ul></a>
                             <a href="/report/satisfaction"><ul><span class="material-symbols-outlined">sentiment_satisfied</span>Satisfacción</ul></a>
-                            <a href="/report/failed-attempts-by-zone"><ul><span class="material-symbols-outlined">location_off</span>Intentos Fallidos por Zona</ul></a>
-                            <a href="/report/period-comparison"><ul><span class="material-symbols-outlined">compare_arrows</span>Comparación de Períodos</ul></a>
                         </div>
                     </div>
                     <div class="nav-group" id="nav-group-dashboard">
@@ -72,7 +83,7 @@
                             <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
                         </button>
                         <div class="nav-group-items">
-                            <a href="/report/dashboard/supervisor"><ul><span class="material-symbols-outlined">manage_accounts</span>Supervisor</ul></a>
+                            <a href="/report/dashboard/supervisor"><ul><span class="material-symbols-outlined">manage_accounts</span>Panel de Control Operativo</ul></a>
                             <% if (currentUser.roleId === 4) { %>
                                 <a href="/report/dashboard/admin"><ul><span class="material-symbols-outlined">analytics</span>Administrador</ul></a>
                                 <a href="/report/dashboard/owner"><ul><span class="material-symbols-outlined">trending_up</span>Estratégico</ul></a>
@@ -105,7 +116,6 @@
                             <a href="/setting/catalogos"><ul><span class="material-symbols-outlined">category</span>Catálogos</ul></a>
                             <a href="/setting/incidencias"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                             <a href="/fatigue/config"><ul><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (config)</ul></a>
-                            <a href="/setting/auditoria"><ul><span class="material-symbols-outlined">history</span>Auditoría</ul></a>
                             <a href="/account/2fa"><ul><span class="material-symbols-outlined">security</span>Seguridad (2FA)</ul></a>
                         </div>
                     </div>

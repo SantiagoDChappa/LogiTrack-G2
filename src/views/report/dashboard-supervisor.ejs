@@ -2,19 +2,42 @@
 <html lang="es">
 <head>
     <%- include('../partials/head') %>
-    <title>Dashboard Supervisor</title>
+    <title>Panel de Control Operativo</title>
     <link rel="stylesheet" href="/css/report.css">
     <style>
-        .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; }
+        .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem; margin-bottom:1rem; }
+        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; cursor:default; }
+        .dash-kpi--total { display:flex; align-items:center; gap:1.5rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1rem 1.6rem; margin-bottom:1rem; }
         .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
+        .dash-kpi__label--inline { font-size:.82rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; }
         .dash-kpi__value { font-size:2rem; font-weight:700; line-height:1; }
+        .dash-kpi__value--xl { font-size:2.8rem; font-weight:800; line-height:1; }
+        .dash-kpi__value--sm { font-size:1.5rem; font-weight:700; line-height:1; }
+        .dash-kpi__pct { font-size:.75rem; color:var(--color-text-muted); margin-top:.3rem; }
         .dash-kpi__value--warn { color:#e07b00; }
         .dash-kpi__value--ok { color:var(--color-success,#2e7d32); }
         .dash-kpi__value--danger { color:var(--color-danger,#c62828); }
-        .dash-section-title { font-size:1rem; font-weight:600; margin:1.5rem 0 .75rem; }
+        .dash-kpi__hint { font-size:.68rem; font-weight:400; opacity:.65; display:block; margin-top:.15rem; }
+        .dash-section-title { font-size:.82rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--color-text-muted); margin:.25rem 0 .6rem; }
         .dash-alert-badge { display:inline-block; padding:.2rem .6rem; border-radius:4px; font-size:.8rem; font-weight:600;
                             background:rgba(200,50,50,.12); color:#c62828; }
+        .kpi-tip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%;
+                   background:var(--color-border,#e2e8f0); color:var(--color-text-muted,#64748b); font-size:.62rem; font-weight:700;
+                   cursor:help; margin-left:.35rem; vertical-align:middle; position:relative; flex-shrink:0; }
+        .kpi-tip::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+                          background:#1e293b; color:#f1f5f9; font-size:.72rem; font-weight:400; text-transform:none; letter-spacing:0;
+                          padding:.55rem .75rem; border-radius:6px; width:230px; white-space:normal; line-height:1.45;
+                          opacity:0; pointer-events:none; transition:opacity .15s; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+        .kpi-tip:hover::after { opacity:1; }
+        .kpi-tip::before { content:''; position:absolute; bottom:calc(100% + 2px); left:50%; transform:translateX(-50%);
+                           border:5px solid transparent; border-top-color:#1e293b; opacity:0; pointer-events:none; transition:opacity .15s; }
+        .kpi-tip:hover::before { opacity:1; }
+        .status-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.75rem; }
+        .status-chip { padding:.28rem .75rem; border-radius:20px; border:1.5px solid var(--color-border); background:var(--color-surface);
+                       font-size:.76rem; font-weight:500; cursor:pointer; transition:all .15s; color:var(--color-text-muted); }
+        .status-chip.active { background:var(--color-primary,#1d4ed8); color:#fff; border-color:var(--color-primary,#1d4ed8); opacity:1; }
+        .status-chip:not(.active) { opacity:.5; }
+        .status-chip:hover { opacity:1; }
         .dash-hint { font-size:.85rem; color:var(--color-text-muted); margin:.25rem 0 1rem; }
     </style>
 </head>
@@ -24,7 +47,7 @@
         <div class="report-wrapper">
 
             <div class="page-header">
-                <h1>Dashboard Supervisor — Control operativo</h1>
+                <h1>Panel de Control Operativo</h1>
             </div>
 
             <!-- Filtro -->
@@ -60,23 +83,57 @@
             </div>
 
             <% if (!error) { %>
+            <%
+                const statusCls = { 4:'dash-kpi__value--ok', 5:'dash-kpi__value--danger', 8:'dash-kpi__value--danger', 9:'dash-kpi__value--warn', 10:'dash-kpi__value--warn' };
+            %>
 
-            <!-- KPIs rápidos -->
+            <!-- Total del período -->
+            <div class="dash-kpi--total">
+                <div>
+                    <div class="dash-kpi__label--inline" style="display:flex;align-items:center;gap:.3rem;">
+                        Envíos en el período
+                        <span class="kpi-tip" data-tip="Total de envíos creados en el período seleccionado.">?</span>
+                    </div>
+                    <div class="dash-kpi__value--xl"><%= kpis.total %></div>
+                    <div style="font-size:.72rem;color:var(--color-text-muted);margin-top:.3rem;">Suma todos los estados · no varía con la selección</div>
+                </div>
+                <div style="font-size:.85rem;color:var(--color-text-muted);line-height:1.5;">
+                    <%= dateFrom %> — <%= dateTo %>
+                </div>
+            </div>
+
+            <!-- Desglose por estado (suma = total) -->
+            <% if (statusSummary.length > 0) { %>
+            <p class="dash-section-title">Distribución por estado</p>
+            <div class="status-chips" id="status-chips">
+                <% statusSummary.forEach(s => { %>
+                <button type="button" class="status-chip active" data-status-id="<%= s.statusId %>"><%= s.status_label %></button>
+                <% }) %>
+            </div>
+            <div class="dash-kpi-grid" id="status-kpi-grid">
+                <% statusSummary.forEach(s => {
+                    const pct = kpis.total > 0 ? Math.round(s.total / kpis.total * 100) : 0;
+                %>
+                <div class="dash-kpi" data-status-id="<%= s.statusId %>">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        <%= s.status_label %>
+                        <span class="kpi-tip" data-tip="Envíos creados en el período que están actualmente en estado '<%= s.status_label %>'. Representa el <%= pct %>% del total.">?</span>
+                    </div>
+                    <div class="dash-kpi__value--sm <%= statusCls[s.statusId] || '' %>"><%= s.total %></div>
+                    <div class="dash-kpi__pct"><%= pct %>%</div>
+                </div>
+                <% }) %>
+            </div>
+            <% } %>
+
+            <!-- Indicadores operativos -->
+            <p class="dash-section-title">Indicadores operativos</p>
             <div class="dash-kpi-grid">
                 <div class="dash-kpi">
-                    <div class="dash-kpi__label">Total envíos</div>
-                    <div class="dash-kpi__value"><%= kpis.total %></div>
-                </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">Entregados</div>
-                    <div class="dash-kpi__value dash-kpi__value--ok"><%= kpis.delivered %></div>
-                </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">En tránsito</div>
-                    <div class="dash-kpi__value"><%= kpis.in_transit %></div>
-                </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">Con demora activa</div>
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        Con demora activa
+                        <span class="kpi-tip" data-tip="Envíos del período que siguen en tránsito y ya superaron su fecha de entrega comprometida. Requieren atención inmediata.">?</span>
+                    </div>
                     <div class="dash-kpi__value <%= kpis.delayed_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.delayed_count %></div>
                 </div>
                 <div class="dash-kpi">
@@ -84,13 +141,19 @@
                     <div class="dash-kpi__value <%= kpis.unroutable_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.unroutable_count %></div>
                 </div>
                 <div class="dash-kpi">
-                    <div class="dash-kpi__label">OTIF</div>
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        OTIF
+                        <span class="kpi-tip" data-tip="On Time In Full: porcentaje de envíos del período entregados antes o en su fecha comprometida. Verde ≥ 85%, Amarillo 70–84%, Rojo < 70%.">?</span>
+                    </div>
                     <div class="dash-kpi__value <%= kpis.otif_pct !== null && kpis.otif_pct >= 85 ? 'dash-kpi__value--ok' : kpis.otif_pct !== null && kpis.otif_pct >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
                         <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
                     </div>
                 </div>
                 <div class="dash-kpi">
-                    <div class="dash-kpi__label">Delta prom.</div>
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        Delta promedio
+                        <span class="kpi-tip" data-tip="Diferencia promedio entre los días estimados por el modelo predictivo y los días reales de entrega. Positivo = llegó tarde, negativo = llegó antes. Verde ≤ 0.3d, Amarillo ≤ 1d, Rojo > 1d.">?</span>
+                    </div>
                     <div class="dash-kpi__value <%= kpis.avg_delta !== null && kpis.avg_delta <= 0.3 ? 'dash-kpi__value--ok' : kpis.avg_delta !== null && kpis.avg_delta <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
                         <%= kpis.avg_delta !== null ? (kpis.avg_delta > 0 ? '+' : '') + kpis.avg_delta + 'd' : '—' %>
                     </div>
@@ -100,31 +163,76 @@
             <!-- Envíos demorados -->
             <% if (delayedShipments.length > 0) { %>
             <div class="report-card">
-                <div class="dp-table-header">
-                    <h2>Envíos con demora activa <span class="dash-alert-badge"><%= delayedShipments.length %> alerta<%= delayedShipments.length !== 1 ? 's' : '' %></span></h2>
+                <div class="dp-table-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                    <h2>Envíos con demora activa <span class="dash-alert-badge"><%= kpis.delayed_count %> alerta<%= kpis.delayed_count !== 1 ? 's' : '' %></span></h2>
+                    <label style="font-size:.8rem;color:var(--color-text-muted);display:flex;align-items:center;gap:.4rem;">
+                        Mostrar
+                        <select id="delayed-limit-select" style="font-size:.8rem;padding:.2rem .4rem;border-radius:4px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);">
+                            <option value="7">7</option>
+                            <option value="15">15</option>
+                            <option value="25">25</option>
+                        </select>
+                    </label>
                 </div>
-                <table class="report-table">
+                <p id="delayed-limit-note" style="font-size:.8rem;color:var(--color-text-muted);margin:.5rem 0 .75rem;text-align:center;"></p>
+                <table class="report-table" id="delayed-table">
                     <thead>
                         <tr>
                             <th>Tracking</th>
                             <th>Zona</th>
                             <th>Repartidor</th>
-                            <th class="text-right">Fecha comprometida</th>
-                            <th class="text-right">Días de atraso</th>
+                            <th class="text-right">Fecha comprometida <span class="kpi-tip" data-tip="Fecha límite de entrega acordada con el cliente al momento de crear el envío.">?</span></th>
+                            <th class="text-right">Días de atraso <span class="kpi-tip" data-tip="Cantidad de días transcurridos desde la fecha comprometida hasta hoy sin que el envío haya sido entregado.">?</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         <% delayedShipments.forEach(s => { %>
                         <tr>
-                            <td><a href="/shipment/<%= s.id %>"><%= s.trackingId %></a></td>
+                            <td><a href="/shipment/detail/<%= s.id %>" target="_blank" rel="noopener"><%= s.trackingId %></a></td>
                             <td><%= s.zone_name || '—' %></td>
-                            <td><%= s.driver_name || '—' %></td>
+                            <td><%= s.driver_name || 'Sin asignar' %></td>
                             <td class="text-right"><%= s.expectedDeliveryDate %></td>
                             <td class="text-right"><span class="ot-badge ot-badge--red">+<%= s.days_overdue %> día<%= s.days_overdue !== 1 ? 's' : '' %></span></td>
                         </tr>
                         <% }) %>
                     </tbody>
                 </table>
+            </div>
+            <% } %>
+
+            <!-- Gráficos de demoras -->
+            <% if (delayedByZone.length > 0 || delayedBySeverity.length > 0 || delayedByStatus.length > 0) { %>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem;">
+                <% if (delayedByZone.length > 0) { %>
+                <div class="report-card">
+                    <h2>Demoras por zona
+                        <span class="kpi-tip" data-tip="Envíos vencidos agrupados por zona. Azul = tiene repartidor asignado. Rojo = sin asignar — problema de gestión, no de entrega.">?</span>
+                    </h2>
+                    <div style="position:relative;height:<%= Math.max(180, delayedByZone.length * 52) %>px;margin-top:1rem;">
+                        <canvas id="delayed-zone-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+                <% if (delayedBySeverity.length > 0) { %>
+                <div class="report-card">
+                    <h2>Severidad de demoras
+                        <span class="kpi-tip" data-tip="Distribución de envíos vencidos según cuántos días llevan de atraso. Muestra si el problema es reciente o crónico.">?</span>
+                    </h2>
+                    <div style="position:relative;height:<%= Math.max(180, delayedByZone.length * 52) %>px;margin-top:1rem;">
+                        <canvas id="delayed-severity-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+                <% if (delayedByStatus.length > 0) { %>
+                <div class="report-card">
+                    <h2>Punto de atasco
+                        <span class="kpi-tip" data-tip="En qué estado está el envío vencido. 'En Tránsito' = el repartidor salió pero no entregó. 'Asignado' o 'En Preparación' = nunca llegó al repartidor.">?</span>
+                    </h2>
+                    <div style="position:relative;height:<%= Math.max(180, delayedByZone.length * 52) %>px;margin-top:1rem;display:flex;align-items:center;justify-content:center;">
+                        <canvas id="delayed-status-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
             </div>
             <% } %>
 
@@ -260,18 +368,6 @@
             </div>
             <% } %>
 
-            <!-- Resumen por estado -->
-            <% if (statusSummary.length > 0) { %>
-            <div class="report-card">
-                <h2>Distribución por estado</h2>
-                <table class="report-table">
-                    <thead><tr><th>Estado</th><th class="text-right">Cantidad</th></tr></thead>
-                    <tbody>
-                        <% statusSummary.forEach(s => { %><tr><td><%= s.status_label %></td><td class="text-right"><%= s.total %></td></tr><% }) %>
-                    </tbody>
-                </table>
-            </div>
-            <% } %>
 
             <% } %>
         </div>
@@ -279,6 +375,7 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script>
         document.getElementById('report-form').addEventListener('submit', function (e) {
             const from = document.getElementById('from').value, to = document.getElementById('to').value;
@@ -312,6 +409,142 @@
                     });
                     rows.forEach(r => tbody.appendChild(r));
                 });
+            });
+        })();
+        (function () {
+            const isDark = document.documentElement.dataset.theme === 'dark' || document.body.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+
+            const zoneCanvas = document.getElementById('delayed-zone-chart');
+            if (zoneCanvas) {
+                const raw = <%- JSON.stringify(delayedByZone) %>;
+                new Chart(zoneCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: raw.map(r => r.zone_name),
+                        datasets: [
+                            { label: 'Con repartidor', data: raw.map(r => r.con_repartidor), backgroundColor: 'rgba(59,130,246,.75)', borderRadius: 4 },
+                            { label: 'Sin asignar',    data: raw.map(r => r.sin_asignar),    backgroundColor: 'rgba(198,40,40,.75)',  borderRadius: 4 },
+                        ],
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top', labels: { color: textColor, font: { size: 12 } } },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x} envíos` } },
+                        },
+                        scales: {
+                            x: { stacked: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                            y: { stacked: true, ticks: { color: textColor, font: { size: 12 } }, grid: { display: false } },
+                        },
+                    },
+                });
+            }
+
+            const statusCanvas = document.getElementById('delayed-status-chart');
+            if (statusCanvas) {
+                const st = <%- JSON.stringify(delayedByStatus) %>;
+                const stColors = { 2: 'rgba(59,130,246,.8)', 6: 'rgba(249,115,22,.8)', 7: 'rgba(139,92,246,.8)' };
+                new Chart(statusCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: st.map(r => r.status_label),
+                        datasets: [{
+                            data: st.map(r => r.total),
+                            backgroundColor: st.map(r => stColors[r.statusId] || 'rgba(148,163,184,.7)'),
+                            borderWidth: 0,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 12 }, padding: 16 } },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} envíos` } },
+                        },
+                        cutout: '62%',
+                    },
+                });
+            }
+
+            const sevCanvas = document.getElementById('delayed-severity-chart');
+            if (sevCanvas) {
+                const sev = <%- JSON.stringify(delayedBySeverity) %>;
+                const sevColors = ['rgba(234,179,8,.8)','rgba(249,115,22,.8)','rgba(239,68,68,.8)','rgba(153,27,27,.85)'];
+                new Chart(sevCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: sev.map(r => r.banda),
+                        datasets: [{
+                            label: 'Envíos',
+                            data: sev.map(r => r.total),
+                            backgroundColor: sev.map((_, i) => sevColors[i] || sevColors[3]),
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} envíos` } },
+                        },
+                        scales: {
+                            x: { ticks: { color: textColor }, grid: { display: false } },
+                            y: { ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor } },
+                        },
+                    },
+                });
+            }
+        })();
+        (function () {
+            const SEL_KEY = 'sup_delayed_limit';
+            const select = document.getElementById('delayed-limit-select');
+            const note   = document.getElementById('delayed-limit-note');
+            const tbody  = document.querySelector('#delayed-table tbody');
+            if (!select || !tbody) return;
+            const totalLoaded = tbody.querySelectorAll('tr').length;
+            const totalReal   = <%= kpis.delayed_count %>;
+            const saved = Number(localStorage.getItem(SEL_KEY)) || 7;
+            select.value = String(saved);
+            const applyLimit = (limit) => {
+                tbody.querySelectorAll('tr').forEach((tr, i) => {
+                    tr.style.display = i < limit ? '' : 'none';
+                });
+                const showing = Math.min(limit, totalLoaded);
+                note.textContent = totalReal > showing
+                    ? `Mostrando los ${showing} más críticos de ${totalReal} envíos con demora.`
+                    : '';
+            };
+            applyLimit(saved);
+            select.addEventListener('change', () => {
+                const v = Number(select.value);
+                localStorage.setItem(SEL_KEY, v);
+                applyLimit(v);
+            });
+        })();
+        (function () {
+            const STORAGE_KEY = 'sup_hidden_statuses';
+            const chips = document.getElementById('status-chips');
+            const grid  = document.getElementById('status-kpi-grid');
+            if (!chips || !grid) return;
+            const hidden = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+            const apply = () => {
+                chips.querySelectorAll('.status-chip').forEach(chip => {
+                    const id = Number(chip.dataset.statusId);
+                    const isHidden = hidden.has(id);
+                    chip.classList.toggle('active', !isHidden);
+                    const card = grid.querySelector(`.dash-kpi[data-status-id="${id}"]`);
+                    if (card) card.style.display = isHidden ? 'none' : '';
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify([...hidden]));
+            };
+            apply();
+            chips.addEventListener('click', e => {
+                const chip = e.target.closest('.status-chip');
+                if (!chip) return;
+                const id = Number(chip.dataset.statusId);
+                hidden.has(id) ? hidden.delete(id) : hidden.add(id);
+                apply();
             });
         })();
     </script>
