@@ -4,8 +4,6 @@ const {
     getDeliveryPerformanceData,
     getIncidentsByPeriodData,
     getSatisfactionData,
-    getFailedAttemptsByZoneData,
-    getPeriodComparisonData,
     getDashboardSupervisorData,
     getDashboardAdminData,
     getDashboardOwnerData,
@@ -140,16 +138,6 @@ const resolveRoleAndBranch = (req, res) => {
     };
 };
 
-const getFailedAttemptsByZone = async (req, res) => {
-    const viewModel = await getFailedAttemptsByZoneData(req.query);
-    res.render('report/failed-attempts-by-zone', viewModel);
-};
-
-const getPeriodComparison = async (req, res) => {
-    const viewModel = await getPeriodComparisonData(req.query);
-    res.render('report/period-comparison', viewModel);
-};
-
 const getDashboardSupervisor = async (req, res) => {
     const { isAdmin, branchId } = resolveRoleAndBranch(req, res);
     const viewModel = await getDashboardSupervisorData(req.query, branchId);
@@ -174,13 +162,11 @@ module.exports = {
     exportSatisfactionReport,
     exportShipmentsByPeriod,
     getDeliveryPerformance,
-    getFailedAttemptsByZone,
     getDashboardAdmin,
     getDashboardOwner,
     getDashboardSupervisor,
     getIncidentsByPeriod,
     getOnTimeDeliveries,
-    getPeriodComparison,
     getSatisfactionReport,
     getShipmentsByPeriod,
 };
