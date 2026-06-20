@@ -16,6 +16,23 @@
 
     const origFetch = window.fetch.bind(window);
 
+    // [sync-debug] Manda eventos del flush (que corre en navegador/SW) a Render, vía origFetch
+    // para no encolarse a sí mismo. Best-effort: si no hay red, se pierde y no rompe nada.
+    // También loguea en consola para depurar desde el celular con DevTools. Quitar al resolver.
+    function slog(event, data) {
+        try { console.log('[sync]', event, data || ''); } catch (_) { /* */ }
+        if (!navigator.onLine) { return; }
+        try {
+            origFetch('/delivery/sync-log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ event, routeId: window.LT_ROUTE_ID || null, ...(data || {}) }),
+                keepalive: true,
+            }).catch(() => {});
+        } catch (_) { /* */ }
+    }
+
     // Acciones operativas encolables offline (van por fetch JSON).
     const QUEUEABLE = /\/delivery\/route\/\d+\/(stop\/\d+\/(arrive|complete|pickup-confirmed|failed|skip|unskip|delivered)|pause|resume|finish)$/;
 
@@ -165,7 +182,11 @@
         } catch (_) { /* el fallback es el evento 'online' */ }
     }
     async function triggerFlush() {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        let count = -1;
+        try { count = await window.LTOffline.outboxCount(); } catch (_) { /* */ }
+        const viaSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+        slog('flush:trigger', { queued: count, online: navigator.onLine, via: viaSW ? 'sw' : 'page' });
+        if (viaSW) {
             navigator.serviceWorker.controller.postMessage({ type: 'lt-flush' });
         } else {
             handleSyncResult(await window.LTOffline.flushOutbox(origFetch));
@@ -177,7 +198,11 @@
     }
     let reloadScheduled = false;
     function handleSyncResult(res) {
-        if (!res) { updatePill(); return; }
+        if (!res) { slog('flush:result', { result: null }); updatePill(); return; }
+        slog('flush:result', {
+            sent: res.sent, remaining: res.remaining,
+            conflicts: (res.conflicts || []).length, authError: !!res.authError,
+        });
         updatePill();
         if (res.authError) {
             notify('warning', 'Sesión expirada', 'Volvé a iniciar sesión para sincronizar las acciones que quedaron en cola.');
@@ -225,7 +250,7 @@
     async function prefetchPodPages(bundle) {
         if (!('caches' in window) || !bundle || !bundle.stops) { return; }
         try {
-            const cache = await caches.open('lt-delivery-v2');  // debe coincidir con CACHE en sw.js
+            const cache = await caches.open('lt-delivery-v3');  // debe coincidir con CACHE en sw.js
             const pending = bundle.stops.filter((s) => s.stopType === 'delivery' && s.shipment && !s.completed);
             for (const s of pending.slice(0, 40)) {
                 const url = `/delivery/evidence/${encodeURIComponent(s.shipment.trackingId)}/pod?routeId=${bundle.routeId}&stopId=${s.id}`;
