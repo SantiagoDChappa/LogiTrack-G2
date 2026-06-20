@@ -52,10 +52,16 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(req)
                 .then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return r; })
-                .catch(() => caches.match(req).then((r) => r || new Response(
-                    '<h1>Sin conexión</h1><p>Abrí esta ruta al menos una vez con internet para poder verla offline.</p>',
-                    { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 200 }
-                )))
+                // Offline: probamos match exacto y, si falla, ignorando el query string
+                // (ej: redirect a /delivery?delivered=true&queued=1 tras encolar una entrega).
+                // Sin ignoreSearch, esos query params rompían la navegación y mostraban
+                // la pantalla "Sin conexión" aunque la página estuviera cacheada.
+                .catch(() => caches.match(req)
+                    .then((r) => r || caches.match(req, { ignoreSearch: true }))
+                    .then((r) => r || new Response(
+                        '<h1>Sin conexión</h1><p>Abrí esta ruta al menos una vez con internet para poder verla offline.</p>',
+                        { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 200 }
+                    )))
         );
         return;
     }
@@ -65,7 +71,9 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             caches.match(req).then((cached) => cached || fetch(req)
                 .then((resp) => { const copy = resp.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return resp; })
-                .catch(() => cached))
+                // Offline y sin match exacto (ej: cambió ?v=assetVersion tras un deploy):
+                // reintentamos ignorando el query string para no romper el modo offline.
+                .catch(() => caches.match(req, { ignoreSearch: true })))
         );
         return;
     }

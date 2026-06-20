@@ -294,6 +294,9 @@
     }
 
     function markComplete() {
+        // Evitar que el tour vuelva a dispararse en esta misma carga aunque el POST
+        // tarde o falle (el refresco real de onboarded viene del server en la próxima carga).
+        if (window.__LGT) window.__LGT.onboarded = true;
         clearTourRedirectFlag();
         fetch('/api/onboarding/complete', {
             method: 'POST',
@@ -337,6 +340,10 @@
                 skipBtn.className = 'lgt-tour-skip';
                 skipBtn.addEventListener('click', function (e) {
                     e.stopPropagation();
+                    // destroy() público hace teardown directo SIN disparar onDestroyStarted,
+                    // así que marcamos completado acá para que el tour no vuelva a aparecer.
+                    markComplete();
+                    closeMobileNav();
                     driverObj.destroy();
                 });
                 var navBtns = popover.footer.querySelector('.driver-popover-navigation-btns');

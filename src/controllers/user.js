@@ -137,7 +137,7 @@ const reset2fa = async (req, res) => {
   try {
     await userModel.disableTwoFactor(req.params.id);
     await require('../models/trustedDevice').removeForUser(req.params.id);
-    res.redirect('/user/update/' + req.params.id);
+    res.redirect('/user/update/' + req.params.id + '?twofa=reset');
   } catch (err) {
     console.error('ERROR reset2fa:', err.message);
     res.status(500).send('Error al resetear el 2FA: ' + err.message);

@@ -485,11 +485,11 @@
     <script>
         document.getElementById('btn-reschedule-failed')?.addEventListener('click', async (ev) => {
             ev.preventDefault();
-            if (!confirm('¿Devolver tus envíos con intento fallido a sucursal para reprogramar?')) return;
+            if (!(await window.ltConfirm({ title: '¿Devolver tus envíos con intento fallido?', text: 'Volverán a sucursal para reprogramar.', confirmButtonText: 'Sí, devolver' }))) return;
             const r = await fetch('/delivery/reschedule-failed', { method: 'POST' });
             const d = await r.json();
-            if (r.ok) { alert('Reprogramados: ' + d.rescheduled); location.reload(); }
-            else { alert(d.error || 'Error'); }
+            if (r.ok) { await window.ltAlert({ icon: 'success', title: 'Listo', text: 'Reprogramados: ' + d.rescheduled }); location.reload(); }
+            else { await window.ltAlert({ icon: 'error', title: 'Error', text: d.error || 'No se pudo procesar.' }); }
         });
 
         function showQR(id, trackingId) {

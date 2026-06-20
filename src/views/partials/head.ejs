@@ -17,6 +17,9 @@
 <script src="/js/table-paginate.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/page-loader.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/search.js?v=<%= assetVersion %>" defer></script>
+<%# Diálogos in-page (SweetAlert) — reemplazan confirm()/alert() del navegador en todo el sistema %>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="/js/dialogs.js?v=<%= assetVersion %>" defer></script>
 <%# [prototype] PWA / modo offline del repartidor (los scripts se autolimitan a /delivery) %>
 <link rel="manifest" href="/manifest.webmanifest">
 <script src="/js/offline-db.js?v=<%= assetVersion %>" defer></script>
