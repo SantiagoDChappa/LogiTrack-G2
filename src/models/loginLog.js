@@ -72,16 +72,55 @@ const getActiveUsers = async () => {
     return Object.values(latest).filter(l => l.action === 'LOGIN');
 };
 
+// Agrupa los LOGIN_FAILED en "episodios": si pasan más de 10 min sin un nuevo
+// intento fallido para la misma cuenta, se considera una ronda distinta (evita
+// mezclar pruebas/ataques separados en el tiempo bajo un solo contador).
 const getFailedByAccount = async ({ hours = 24, minAttempts = 3 } = {}) => {
     const { QueryTypes } = require('sequelize');
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
     const rows = await sequelize.query(
-        `SELECT COALESCE(email, 'desconocido') AS email, COUNT(*)::int AS attempts
-         FROM logitrack.login_log
-         WHERE action = 'LOGIN_FAILED' AND created_at >= :since
-         GROUP BY email
+        `WITH failed AS (
+            SELECT
+                ll.created_at,
+                COALESCE(ll.email, u.email, 'desconocido') AS email,
+                u.id AS user_id,
+                u."fullName" AS full_name,
+                u."roleId" AS role_id,
+                b.name AS branch_name,
+                u.locked_until,
+                LAG(ll.created_at) OVER (
+                    PARTITION BY COALESCE(ll.email, u.email, 'desconocido')
+                    ORDER BY ll.created_at
+                ) AS prev_at
+            FROM logitrack.login_log ll
+            LEFT JOIN logitrack."user" u ON u.id = ll.user_id
+                OR (ll.user_id IS NULL AND u.email = ll.email AND u.active = true)
+            LEFT JOIN logitrack.branch b ON b.id = u."branchId"
+            WHERE ll.action = 'LOGIN_FAILED' AND ll.created_at >= :since
+         ),
+         grouped AS (
+            SELECT *,
+                SUM(CASE WHEN prev_at IS NULL OR created_at - prev_at > INTERVAL '10 minutes' THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY email ORDER BY created_at) AS episode
+            FROM failed
+         )
+         SELECT
+            email,
+            episode,
+            COUNT(*)::int AS attempts,
+            MIN(created_at) AS "firstAttempt",
+            MAX(created_at) AS "lastAttempt",
+            user_id AS "userId",
+            full_name AS "fullName",
+            role_id AS "roleId",
+            branch_name AS "branchName",
+            locked_until AS "lockedUntil",
+            (SELECT MAX(ll2.created_at) FROM logitrack.login_log ll2
+                WHERE ll2.user_id = user_id AND ll2.action = 'LOGIN') AS "lastLogin"
+         FROM grouped
+         GROUP BY email, episode, user_id, full_name, role_id, branch_name, locked_until
          HAVING COUNT(*) >= :min
-         ORDER BY attempts DESC`,
+         ORDER BY "lastAttempt" DESC`,
         { type: QueryTypes.SELECT, replacements: { since, min: minAttempts } }
     );
     return rows;
@@ -99,4 +138,26 @@ const getActivityByDay = async ({ days = 7 } = {}) => {
     );
 };
 
-module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay };
+const getUniqueActiveCount = async ({ days } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await sequelize.query(
+        `SELECT COUNT(DISTINCT user_id)::int AS total
+         FROM logitrack.login_log
+         WHERE action = 'LOGIN' AND user_id IS NOT NULL AND created_at >= :since`,
+        { type: QueryTypes.SELECT, replacements: { since } }
+    );
+    return rows[0]?.total || 0;
+};
+
+// DAU/WAU/MAU — usuarios únicos con al menos un login en 1/7/30 días.
+const getActiveUserStats = async () => {
+    const [dau, wau, mau] = await Promise.all([
+        getUniqueActiveCount({ days: 1 }),
+        getUniqueActiveCount({ days: 7 }),
+        getUniqueActiveCount({ days: 30 }),
+    ]);
+    return { dau, wau, mau };
+};
+
+module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay, getActiveUserStats };

@@ -144,4 +144,16 @@ const reset2fa = async (req, res) => {
   }
 };
 
-module.exports = { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser, reset2fa };
+// LGT-193 — desbloqueo manual de cuenta (un admin la libera antes de los 30 min).
+const unlockAccount = async (req, res) => {
+  try {
+    await userModel.unlockAccount(req.params.id);
+    actionLogModel.record(res.locals.currentUser?.id, 'UNLOCK', 'USER', Number(req.params.id), null, req);
+    res.redirect('/user/update/' + req.params.id);
+  } catch (err) {
+    console.error('ERROR unlockAccount:', err.message);
+    res.status(500).send('Error al desbloquear la cuenta: ' + err.message);
+  }
+};
+
+module.exports = { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser, reset2fa, unlockAccount };

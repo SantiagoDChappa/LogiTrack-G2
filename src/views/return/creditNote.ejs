@@ -70,6 +70,10 @@
                         <% if (breakdown.zoneBase) { %><tr><td>Costo por zona</td><td class="text-right"><%= fmtMoney(breakdown.zoneBase) %></td></tr><% } %>
                         <% if (breakdown.wSurcharge) { %><tr><td>Adicional por peso</td><td class="text-right"><%= fmtMoney(breakdown.wSurcharge) %></td></tr><% } %>
                         <% if (breakdown.vSurcharge) { %><tr><td>Adicional por volumen</td><td class="text-right"><%= fmtMoney(breakdown.vSurcharge) %></td></tr><% } %>
+                        <% if (breakdown.insurance) { %><tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(breakdown.insurance) %></td></tr><% } %>
+                    <% } else if (cn.insuranceAmount && Number(cn.insuranceAmount) > 0) { %>
+                        <tr><td>Servicio de envío</td><td class="text-right"><%= fmtMoney(subtotal - Number(cn.insuranceAmount)) %></td></tr>
+                        <tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(cn.insuranceAmount) %></td></tr>
                     <% } else { %>
                         <tr><td>Servicio de envío</td><td class="text-right"><%= fmtMoney(subtotal) %></td></tr>
                     <% } %>

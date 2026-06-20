@@ -576,6 +576,12 @@
                             <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
                         </div>
 
+                        <div class="field">
+                            <label for="seguro_pct">Seguro de mercadería (%) <span class="req">*</span></label>
+                            <input type="number" id="seguro_pct" name="seguro_pct" min="0" max="100" step="0.01" value="<%= params.seguro_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
@@ -645,22 +651,6 @@
                             <small style="color:var(--color-text-secondary)">Procesa y envía notificaciones acumuladas al cliente.</small>
                         </div>
 
-                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
-                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
-                                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">bolt</span>
-                                Ejecución manual
-                            </label>
-                            <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
-                                Disparar el análisis de demoras ahora, sin esperar al horario programado.
-                            </small>
-                            <form method="POST" action="/setting/trigger-delay-detection" style="margin-top:var(--space-2)">
-                                <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
-                                    <span class="material-symbols-outlined" style="font-size:1.1rem">play_arrow</span>
-                                    Ejecutar detección de demoras ahora
-                                </button>
-                            </form>
-                        </div>
-
                     </div>
 
                     <div class="settings-actions">
@@ -669,6 +659,24 @@
                         </button>
                     </div>
                 </form>
+
+                <%# Ejecución manual: form aparte (NO anidar dentro del form de parámetros,
+                    los forms anidados rompen el botón Guardar). %>
+                <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-4);">
+                    <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">bolt</span>
+                        Ejecución manual
+                    </label>
+                    <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
+                        Disparar el análisis de demoras ahora, sin esperar al horario programado.
+                    </small>
+                    <form method="POST" action="/setting/trigger-delay-detection" style="margin-top:var(--space-2)">
+                        <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem">play_arrow</span>
+                            Ejecutar detección de demoras ahora
+                        </button>
+                    </form>
+                </div>
             </div>
 
             <!-- Card: Ejecutar procesos manualmente (sin esperar al horario programado) -->

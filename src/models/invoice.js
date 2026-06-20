@@ -12,6 +12,8 @@ const Invoice = sequelize.define('Invoice', {
     zoneBase:        { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
     weightSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
     volumeSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
+    // [prototype] Seguro de mercadería itemizado (parte del subtotal/total).
+    insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0, field: 'insuranceAmount' },
     subtotal:        { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
     senderName:      { type: DataTypes.STRING(120) },
     senderDocument:  { type: DataTypes.STRING(30) },

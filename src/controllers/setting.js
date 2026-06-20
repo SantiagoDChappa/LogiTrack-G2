@@ -119,6 +119,7 @@ const getSettings = async (req, res) => {
             peso_maximo_envio:        settings.peso_maximo_envio        || '50',
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
             costo_base_envio:         settings.costo_base_envio         || '500',
+            seguro_pct:               settings.seguro_pct               || '0',
             nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
             logo_empresa:             settings.logo_empresa             || '',
             telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
@@ -727,6 +728,7 @@ const saveParams = async (req, res) => {
             'peso_maximo_envio',
             'cantidad_maxima_paquetes',
             'costo_base_envio',
+            'seguro_pct',
             // 'nombre_empresa' se gestiona en la tarjeta "Identidad visual" (/setting/identity) — LGT-172
             'telefono_soporte',
             'email_soporte',
@@ -768,6 +770,12 @@ const saveParams = async (req, res) => {
         const costoBase = parseFloat(req.body.costo_base_envio);
         if (isNaN(costoBase) || costoBase < 0) {
             return res.redirect(settingBack(req, '?error=costo_base'));
+        }
+
+        // [prototype] % de seguro de mercadería: entre 0 y 100.
+        const seguroPct = parseFloat(req.body.seguro_pct);
+        if (isNaN(seguroPct) || seguroPct < 0 || seguroPct > 100) {
+            return res.redirect(settingBack(req, '?error=seguro_pct'));
         }
 
         const horaInicio = req.body.horario_entrega_inicio;

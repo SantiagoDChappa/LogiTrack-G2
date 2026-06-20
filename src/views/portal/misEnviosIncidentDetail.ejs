@@ -100,28 +100,27 @@
             <% if (typeof damage !== 'undefined' && damage.isDamage) { %>
             <div class="portal-incident-detail-card portal-incident-section">
                 <h2 class="portal-incident-section-title">Tu paquete llegó con daño</h2>
-                <% if (damage.choice) { %>
-                    <p class="portal-manage-hint">Elegiste: <strong><%= damage.choice === 'REEMBOLSO' ? 'Reembolso' : 'Reemplazo' %></strong>. Tu solicitud quedó <strong>pendiente de aprobación del supervisor</strong>; cuando la apruebe, la ejecutamos.</p>
-                    <% if (!damage.closed) { %><p class="portal-manage-hint">Podés cambiar tu elección mientras la incidencia siga abierta y sin aprobar.</p><% } %>
-                <% } else { %>
-                    <p class="portal-manage-hint">¿Cómo querés resolverlo? Elegí una opción; un supervisor la revisa y aprueba antes de ejecutarla.</p>
-                <% } %>
-
-                <%# LGT-212 Esc.4 — explicación de qué implica cada alternativa. %>
-                <ul class="portal-incident-damage-options" style="list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem;">
-                    <li style="border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.6rem .8rem;">
-                        <strong>Reembolso</strong> — te emitimos una <strong>nota de crédito por el total del envío</strong>.
-                    </li>
-                    <li style="border:1px solid var(--portal-border,#e2e8f0);border-radius:10px;padding:.6rem .8rem;">
-                        <strong>Reemplazo</strong> — te enviamos un <strong>nuevo paquete de reposición sin cargo</strong>.
-                    </li>
-                </ul>
-
-                <% if (!damage.closed) { %>
-                <form method="POST" action="/portal/mis-envios/incidencia/<%= incident.id %>/eleccion" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-                    <button type="submit" name="choice" value="REEMBOLSO" class="portal-search-panel-btn">Solicitar reembolso</button>
-                    <button type="submit" name="choice" value="REEMPLAZO" class="portal-search-panel-btn">Solicitar reemplazo</button>
-                </form>
+                <% if (damage.choice === 'REEMBOLSO') { %>
+                    <%# Ya solicitó la devolución: queda pendiente de aprobación del supervisor. %>
+                    <p class="portal-manage-hint">Solicitaste la <strong>devolución</strong>. Quedó <strong>pendiente de aprobación del supervisor</strong>; cuando la apruebe, te emitimos la <strong>nota de crédito por el total del envío</strong> y marcamos el envío como <strong>Devuelto</strong>.</p>
+                <% } else if (damage.resolution === 'NO_PROCEDENTE') { %>
+                    <%# Ya indicó que no quiere la devolución. %>
+                    <p class="portal-manage-hint">Indicaste que <strong>no</strong> solicitás la devolución. Si cambiás de idea, contactanos por soporte.</p>
+                <% } else if (!damage.closed) { %>
+                    <p class="portal-manage-hint">¿Querés <strong>solicitar la devolución</strong>? Si confirmás, te emitimos una <strong>nota de crédito por el total del envío</strong> (un supervisor la aprueba antes de ejecutarla).</p>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+                        <form method="POST" action="/portal/mis-envios/incidencia/<%= incident.id %>/eleccion">
+                            <input type="hidden" name="choice" value="REEMBOLSO">
+                            <button type="submit" class="portal-search-panel-btn" style="display:inline-flex;align-items:center;gap:6px;background:var(--portal-success,#16a34a);border-color:var(--portal-success,#16a34a);color:#fff">
+                                <span class="material-symbols-outlined">check</span> Sí, solicitar devolución
+                            </button>
+                        </form>
+                        <form method="POST" action="/portal/mis-envios/incidencia/<%= incident.id %>/no-devolucion">
+                            <button type="submit" class="portal-search-panel-btn" style="display:inline-flex;align-items:center;gap:6px;background:transparent;border-color:var(--portal-danger,#dc2626);color:var(--portal-danger,#dc2626)">
+                                <span class="material-symbols-outlined">close</span> No
+                            </button>
+                        </form>
+                    </div>
                 <% } %>
             </div>
             <% } %>

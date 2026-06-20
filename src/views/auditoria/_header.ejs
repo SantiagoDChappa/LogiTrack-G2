@@ -1,0 +1,16 @@
+<div class="audit-hero">
+    <div class="audit-hero-icon">
+        <span class="material-symbols-outlined">manage_search</span>
+    </div>
+    <div>
+        <h1><%= pageTitle %></h1>
+        <p><%= pageDesc %></p>
+    </div>
+</div>
+<div class="audit-tabs">
+    <a href="/auditoria" class="audit-tab <%= active === 'resumen' ? 'active' : '' %>"><span class="material-symbols-outlined">dashboard</span>Resumen</a>
+    <a href="/auditoria/usuarios-activos" class="audit-tab <%= active === 'usuarios' ? 'active' : '' %>"><span class="material-symbols-outlined">group</span>Usuarios activos</a>
+    <a href="/auditoria/sesiones" class="audit-tab <%= active === 'sesiones' ? 'active' : '' %>"><span class="material-symbols-outlined">login</span>Log de sesiones</a>
+    <a href="/auditoria/acciones" class="audit-tab <%= active === 'acciones' ? 'active' : '' %>"><span class="material-symbols-outlined">edit_note</span>Acciones internas</a>
+    <a href="/auditoria/configuracion" class="audit-tab <%= active === 'configuracion' ? 'active' : '' %>"><span class="material-symbols-outlined">history</span>Cambios de configuración</a>
+</div>

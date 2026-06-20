@@ -8,7 +8,7 @@ const costSvc = require('../../services/shipmentCostService');
 
 router.post('/', async (req, res) => {
     try {
-        const { provinceId, postalCode, weightKg, volumeM3 } = req.body;
+        const { provinceId, postalCode, weightKg, volumeM3, declaredValue } = req.body;
         const zone = await resolveZone({
             postalCode,
             provinceId: provinceId ? Number(provinceId) : null,
@@ -17,6 +17,8 @@ router.post('/', async (req, res) => {
             zone,
             weightKg: Number(weightKg) || 0,
             volumeM3: Number(volumeM3) || 0,
+            // [prototype] seguro de mercadería: el % global se aplica sobre el valor declarado.
+            declaredValue: Number(declaredValue) || 0,
         };
         const breakdown = await costSvc.computeCost(pseudoShipment);
         if (!breakdown) { return res.json({ ok: false }); }

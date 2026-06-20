@@ -12,6 +12,8 @@ const CreditNote = sequelize.define('CreditNote', {
     // Datos fiscales del remitente (la NC de reembolso se emite al remitente).
     senderName:      { type: DataTypes.STRING(120) },
     senderDocument:  { type: DataTypes.STRING(30) },
+    // [prototype] Importe de seguro itemizado (parte del total `amount`).
+    insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
     createdByUserId: { type: DataTypes.INTEGER },
     createdAt:       { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
 }, {

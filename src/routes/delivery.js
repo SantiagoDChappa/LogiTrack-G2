@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
 const { requireAuth, requireDelivery } = require('../middlewares/auth');
 const shipmentModel = require('../models/shipment');
 const deliveryController = require('../controllers/delivery');
@@ -84,6 +84,107 @@ function checkStopOrder(route, stopId) {
     }
     return { ok: true, target };
 }
+
+// ── Offline ([prototype]) ────────────────────────────────────────────────
+// Idempotencia + "gana el servidor" para las acciones que el repartidor encoló
+// sin conexión. Se activa SOLO cuando el cliente manda el header Idempotency-Key
+// (es decir, al re-sincronizar la cola); el flujo online normal no se ve afectado.
+async function recordOfflineAction(req, res, statusCode, body, conflict) {
+    try {
+        const ridMatch = (req.path.match(/\/route\/(\d+)/) || [])[1];
+        const rid = ridMatch || (req.body && req.body.routeId) || null;
+        await sequelize.query(
+            `INSERT INTO logitrack.offline_action
+                ("idempotencyKey","userId","routeId","method","path","statusCode","responseBody","conflict","queuedAt","syncedAt")
+             VALUES (:k,:uid,:rid,:method,:path,:code,:body,:conflict,:queuedAt,now())
+             ON CONFLICT ("idempotencyKey") DO NOTHING`,
+            { replacements: {
+                k:        req.get('Idempotency-Key'),
+                uid:      res.locals.currentUser ? res.locals.currentUser.id : null,
+                rid:      rid ? Number(rid) : null,
+                method:   req.method,
+                path:     String(req.originalUrl).slice(0, 255),
+                code:     statusCode,
+                body:     body ? JSON.stringify(body).slice(0, 4000) : null,
+                conflict: !!conflict,
+                queuedAt: req.get('X-Queued-At') ? new Date(Number(req.get('X-Queued-At'))) : null,
+            } }
+        );
+    } catch (e) { console.error('recordOfflineAction:', e.message); }
+}
+
+async function offlineIdempotency(req, res, next) {
+    if (req.method !== 'POST') { return next(); }
+    const key = req.get('Idempotency-Key');
+    if (!key) { return next(); }
+    try {
+        const rows = await sequelize.query(
+            'SELECT "statusCode","responseBody" FROM logitrack.offline_action WHERE "idempotencyKey"=:k',
+            { replacements: { k: key }, type: QueryTypes.SELECT }
+        );
+        if (rows.length) {
+            // Ya aplicada: respondemos sin volver a ejecutar el handler (dedupe del reintento).
+            const code = rows[0].statusCode || 200;
+            return res.status(code).json({ ok: code < 400, deduped: true });
+        }
+        // Gana el servidor: si la ruta ya está cerrada/cancelada/interrumpida, rechazamos.
+        const m = req.path.match(/^\/route\/(\d+)\//);
+        if (m) {
+            const route = await Route.findByPk(Number(m[1]), { attributes: ['statusId'] }).catch(() => null);
+            if (route && [RouteStatus.FINISHED, RouteStatus.CANCELLED, RouteStatus.INTERRUPTED].includes(route.statusId)) {
+                const body = { ok: false, conflict: true, error: 'La ruta fue cerrada o reasignada mientras estabas sin conexión; esta acción no se aplicó.' };
+                await recordOfflineAction(req, res, 409, body, true);
+                return res.status(409).json(body);
+            }
+        }
+        // Registra la acción al terminar la respuesta (cubre json, redirect y send) para
+        // deduplicar reintentos futuros con la misma clave.
+        res.on('finish', () => { recordOfflineAction(req, res, res.statusCode || 200, null, false); });
+        return next();
+    } catch (e) {
+        console.error('offlineIdempotency:', e.message);
+        return next();
+    }
+}
+router.use(offlineIdempotency);
+
+// Bundle del ruteo activo para operar offline. Solo la ruta IN_ROUTE del propio
+// repartidor, con los datos mínimos necesarios (se cachean CIFRADOS en el dispositivo).
+router.get('/route/:id/offline-bundle', requireDelivery, async (req, res) => {
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+    if (route.statusId !== RouteStatus.IN_ROUTE) {
+        return res.status(409).json({ error: 'La ruta no está en tránsito', code: 'NOT_ACTIVE' });
+    }
+    const stops = (route.stops || []).map((s) => ({
+        id: s.id, sequence: s.sequence, stopType: s.stopType,
+        completed: s.completed, skipped: s.skipped,
+        lat: s.lat, lng: s.lng,
+        distanceFromPrevKm: s.distanceFromPrevKm, estimatedMinutes: s.estimatedMinutes,
+        branch: s.branch ? { name: s.branch.name, address: s.branch.address } : null,
+        shipment: s.shipment ? {
+            id: s.shipment.id, trackingId: s.shipment.trackingId, statusId: s.shipment.statusId,
+            deliverySecretCode: s.shipment.deliverySecretCode || null,
+            codAmount: s.shipment.codAmount, codMethod: s.shipment.codMethod,
+            fragile: s.shipment.fragile, refrigerated: s.shipment.refrigerated, oversized: s.shipment.oversized,
+            weightKg: s.shipment.weightKg, packageQty: s.shipment.packageQty,
+            specialInstructions: s.shipment.specialInstructions,
+            expectedDeliveryFrom: s.shipment.expectedDeliveryFrom, expectedDeliveryTo: s.shipment.expectedDeliveryTo,
+            recipient: s.shipment.recipient ? { fullName: s.shipment.recipient.fullName, phone: s.shipment.recipient.phone } : null,
+            address: s.shipment.address ? { street: s.shipment.address.street, number: s.shipment.address.number } : null,
+        } : null,
+    }));
+    res.json({
+        routeId: route.id, statusId: route.statusId,
+        totalDistanceKm: route.totalDistanceKm,
+        transportName: route.transport ? route.transport.name : '',
+        originBranch: route.originBranch ? route.originBranch.name : '',
+        cachedAt: new Date().toISOString(),
+        stops,
+    });
+});
 
 router.get('/', requireDelivery, async (req, res) => {
     try {
@@ -242,7 +343,11 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
             return res.redirect('/delivery?fatigue=1');
         }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
-        res.render('delivery/route', { route, readOnly });
+        // Para el POD offline en la misma página: saber si el envío exige código clave.
+        const settingModel = require('../models/setting');
+        const dsSetting = await settingModel.getAll().catch(() => ({}));
+        const deliverySecretEnabled = dsSetting.delivery_secret_enabled !== 'false';
+        res.render('delivery/route', { route, readOnly, deliverySecretEnabled });
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
