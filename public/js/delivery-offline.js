@@ -175,6 +175,7 @@
         if (window.Swal) { window.Swal.fire({ icon, title, html, confirmButtonText: 'Entendido', confirmButtonColor: '#2563eb' }); }
         else { alert(title + (html ? '\n\n' + html.replace(/<[^>]+>/g, '') : '')); }
     }
+    let reloadScheduled = false;
     function handleSyncResult(res) {
         if (!res) { updatePill(); return; }
         updatePill();
@@ -187,9 +188,17 @@
             notify('warning', 'Algunas acciones no se aplicaron',
                 `Mientras estabas sin conexión, el servidor cambió estos envíos. Gana el estado del servidor:<ul style="text-align:left;margin:.5rem 0">${li}</ul>`);
         }
-        // Si se aplicó algo y hay conexión, recargamos la ruta para reflejar el estado real del servidor.
-        if (res.sent > 0 && navigator.onLine && window.LT_ROUTE_ID) {
-            setTimeout(() => window.location.reload(), res.conflicts && res.conflicts.length ? 3500 : 800);
+        // Mientras queden acciones en cola NO recargamos: si la red volvió a medias o son
+        // varias entregas con foto, recargar acá mostraría un estado parcial. Seguimos
+        // drenando y recién recargamos cuando la cola quedó vacía (estado real del server).
+        if (res.remaining > 0 && navigator.onLine) {
+            setTimeout(triggerFlush, 2000);
+            return;
+        }
+        // Cola drenada: si se aplicó algo y estamos en la ruta, recargamos UNA sola vez.
+        if (res.sent > 0 && navigator.onLine && window.LT_ROUTE_ID && !reloadScheduled) {
+            reloadScheduled = true;
+            setTimeout(() => window.location.reload(), res.conflicts && res.conflicts.length ? 3500 : 500);
         }
     }
 
@@ -216,7 +225,7 @@
     async function prefetchPodPages(bundle) {
         if (!('caches' in window) || !bundle || !bundle.stops) { return; }
         try {
-            const cache = await caches.open('lt-delivery-v1');
+            const cache = await caches.open('lt-delivery-v2');  // debe coincidir con CACHE en sw.js
             const pending = bundle.stops.filter((s) => s.stopType === 'delivery' && s.shipment && !s.completed);
             for (const s of pending.slice(0, 40)) {
                 const url = `/delivery/evidence/${encodeURIComponent(s.shipment.trackingId)}/pod?routeId=${bundle.routeId}&stopId=${s.id}`;
