@@ -332,6 +332,9 @@
                         <span class="material-symbols-outlined">arrow_forward</span>
                     </span>
                 </a>
+                <%# [prototype] Offline: si la ruta está EN CURSO, delivery-offline.js la deja lista
+                    para operar sin conexión aunque el repartidor se quede sin señal en el home. %>
+                <script>window.LT_ACTIVE_ROUTE_ID = <%= activeSummary.id %>; window.LT_ACTIVE_ROUTE_INROUTE = <%= activeSummary.statusId === 2 ? 'true' : 'false' %>;</script>
             <% } else if (driverDisabled) { %>
                 <%# Inhabilitado sin ruta activa: card rojo informativo, click abre popup. %>
                 <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"

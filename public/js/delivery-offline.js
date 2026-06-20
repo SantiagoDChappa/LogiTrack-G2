@@ -15,6 +15,7 @@
     if (!/^\/delivery(\/|$)/.test(location.pathname)) { return; }
 
     const origFetch = window.fetch.bind(window);
+    const CACHE_NAME = 'lt-delivery-v4';  // debe coincidir con CACHE en sw.js
 
     // [sync-debug] Manda eventos del flush (que corre en navegador/SW) a Render, vía origFetch
     // para no encolarse a sí mismo. Best-effort: si no hay red, se pierde y no rompe nada.
@@ -184,8 +185,12 @@
     async function triggerFlush() {
         let count = -1;
         try { count = await window.LTOffline.outboxCount(); } catch (_) { /* */ }
+        // [sync-debug] Incluimos el rastro de encolado: si la cola está vacía pero el rastro
+        // muestra 'enq', es que algo la vació; si tampoco hay 'enq', es que nunca se encoló. Quitar al resolver.
+        let trail = [];
+        try { trail = await window.LTOffline.readTrail(); } catch (_) { /* */ }
         const viaSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
-        slog('flush:trigger', { queued: count, online: navigator.onLine, via: viaSW ? 'sw' : 'page' });
+        slog('flush:trigger', { queued: count, online: navigator.onLine, via: viaSW ? 'sw' : 'page', trail });
         if (viaSW) {
             navigator.serviceWorker.controller.postMessage({ type: 'lt-flush' });
         } else {
@@ -203,6 +208,8 @@
             sent: res.sent, remaining: res.remaining,
             conflicts: (res.conflicts || []).length, authError: !!res.authError,
         });
+        // [sync-debug] Cola drenada del todo: limpiamos el rastro para no acumular. Quitar al resolver.
+        if (res.remaining === 0) { window.LTOffline.clearTrail().catch(() => {}); }
         updatePill();
         if (res.authError) {
             notify('warning', 'Sesión expirada', 'Volvé a iniciar sesión para sincronizar las acciones que quedaron en cola.');
@@ -236,12 +243,37 @@
             if (b && Number(b.routeId) === Number(window.LT_ROUTE_ID)) { await window.LTOffline.clearAll().catch(() => {}); }
             return;
         }
-        if (!navigator.onLine) { return; }
+        await prefetchRouteForOffline(window.LT_ROUTE_ID);
+    }
+
+    // Desde el HOME del repartidor: si hay una ruta EN CURSO, la dejamos lista para operar
+    // sin conexión. Así puede cargar el home con señal, quedarse sin datos en esa pantalla y
+    // entrar a la ruta + hacer el flujo igual (HTML de la ruta, bundle y páginas de POD ya cacheados).
+    async function prefetchActiveRouteFromHome() {
+        if (!/^\/delivery\/?$/.test(location.pathname)) { return; }
+        if (!window.LT_ACTIVE_ROUTE_ID || !window.LT_ACTIVE_ROUTE_INROUTE) { return; }
+        await prefetchRouteForOffline(window.LT_ACTIVE_ROUTE_ID);
+    }
+
+    // Deja una ruta lista para operar offline: 1) cachea el HTML de la página de ruta bajo la
+    // MISMA clave normalizada (sin query) que usa el SW, 2) guarda el bundle cifrado, 3) precarga
+    // las páginas de POD. Reutilizada por la página de ruta y por el home.
+    async function prefetchRouteForOffline(routeId) {
+        if (!routeId || !navigator.onLine) { return; }
+        if ('caches' in window) {
+            try {
+                const resp = await origFetch(`/delivery/route/${routeId}`, { credentials: 'include' });
+                if (resp.ok) {
+                    const cache = await caches.open(CACHE_NAME);
+                    await cache.put(new Request(location.origin + `/delivery/route/${routeId}`), resp.clone());
+                }
+            } catch (_) { /* sin red: queda lo ya cacheado */ }
+        }
         try {
-            const resp = await origFetch(`/delivery/route/${window.LT_ROUTE_ID}/offline-bundle`, { credentials: 'include' });
-            if (!resp.ok) { return; }
+            const resp = await origFetch(`/delivery/route/${routeId}/offline-bundle`, { credentials: 'include' });
+            if (!resp.ok) { return; }  // 409 si la ruta no está IN_ROUTE: nada que precargar
             const data = await resp.json();
-            await window.LTOffline.saveBundle(window.LT_ROUTE_ID, data, 24 * 60 * 60 * 1000);
+            await window.LTOffline.saveBundle(routeId, data, 24 * 60 * 60 * 1000);
             await prefetchPodPages(data);  // así el POD de cada entrega abre sin conexión
         } catch (_) { /* sin conexión: se usa lo ya cacheado */ }
     }
@@ -250,7 +282,7 @@
     async function prefetchPodPages(bundle) {
         if (!('caches' in window) || !bundle || !bundle.stops) { return; }
         try {
-            const cache = await caches.open('lt-delivery-v3');  // debe coincidir con CACHE en sw.js
+            const cache = await caches.open(CACHE_NAME);
             const pending = bundle.stops.filter((s) => s.stopType === 'delivery' && s.shipment && !s.completed);
             for (const s of pending.slice(0, 40)) {
                 const url = `/delivery/evidence/${encodeURIComponent(s.shipment.trackingId)}/pod?routeId=${bundle.routeId}&stopId=${s.id}`;
@@ -313,6 +345,7 @@
         ensurePill();
         updatePill();
         cacheActiveBundle();
+        prefetchActiveRouteFromHome();
         applyOutboxOverlay();
         if (navigator.onLine) { triggerFlush(); }  // reenvía lo que haya quedado de una sesión previa
     }
