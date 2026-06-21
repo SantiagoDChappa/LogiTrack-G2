@@ -3,6 +3,7 @@
 
     var MIN_TOUR_STEPS = 2;
     var TOUR_REDIRECT_KEY = 'lgt_tour_redirected';
+    var TOUR_DISMISSED_KEY = 'lgt_tour_dismissed';
     var START_DELAY_MS = 450;
     var MOBILE_BP = '(max-width: 1024px)';
 
@@ -293,15 +294,28 @@
         try { sessionStorage.removeItem(TOUR_REDIRECT_KEY); } catch (_) { /* ignore */ }
     }
 
+    function clearTourDismissedFlag() {
+        try { sessionStorage.removeItem(TOUR_DISMISSED_KEY); } catch (_) { /* ignore */ }
+    }
+
+    function isTourDismissed() {
+        if (window.__LGT && window.__LGT.onboarded) return true;
+        try { return sessionStorage.getItem(TOUR_DISMISSED_KEY) === '1'; } catch (_) { return false; }
+    }
+
     function markComplete() {
+        if (window.__LGT) window.__LGT.onboarded = true;
+        try { sessionStorage.setItem(TOUR_DISMISSED_KEY, '1'); } catch (_) { /* ignore */ }
         clearTourRedirectFlag();
         fetch('/api/onboarding/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
         }).catch(function () {});
     }
 
     function ensureTourLanding(roleId) {
+        if (isTourDismissed()) return true;
         var home = getTourHome(roleId);
         if (window.location.pathname === home) return true;
         if (sessionStorage.getItem(TOUR_REDIRECT_KEY)) return true;
@@ -311,7 +325,7 @@
     }
 
     function startTour() {
-        if (!window.__LGT || window.__LGT.onboarded) return;
+        if (!window.__LGT || isTourDismissed()) return;
 
         var roleId = asRole(window.__LGT.roleId);
         if (!ensureTourLanding(roleId)) return;
@@ -374,13 +388,15 @@
             })
                 .then(function () {
                     clearTourRedirectFlag();
+                    clearTourDismissedFlag();
+                    if (window.__LGT) window.__LGT.onboarded = false;
                     window.location.href = getTourHome(roleId);
                 })
                 .catch(function () {});
         });
     }
 
-    if (!window.__LGT || window.__LGT.onboarded) return;
+    if (!window.__LGT || isTourDismissed()) return;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', scheduleTour);
