@@ -52,7 +52,9 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
     try {
         const { sendEmail } = require('../services/notification/emailSender');
         const admins = await userModel.getActiveAdmins();
-        const emails = admins.map(a => a.email).filter(Boolean);
+        // SendGrid rechaza el envío entero si hay un email duplicado en la lista
+        // de destinatarios (puede pasar si dos cuentas activas comparten el mismo email).
+        const emails = [...new Set(admins.map(a => a.email).filter(Boolean))];
         if (emails.length === 0) { return; }
 
         const subject = `Alerta de seguridad: ${lockedCount} cuentas bloqueadas simultáneamente en LogiTrack`;

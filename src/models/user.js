@@ -64,6 +64,12 @@ const update = async (id, data) => {
     if (updateData.active !== undefined) {
         updateData.active = updateData.active === 'true' || updateData.active === true;
     }
+    // El select de sucursal queda oculto (no deshabilitado) para roles sin sucursal
+    // (ej. Administrador), así que igual llega "" en el form — Postgres rechaza
+    // eso para una columna INTEGER si no lo normalizamos a null.
+    if (updateData.branchId === '') {
+        updateData.branchId = null;
+    }
     return User.update(updateData, { where: { id } });
 };
 
