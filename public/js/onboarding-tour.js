@@ -314,6 +314,12 @@
         }).catch(function () {});
     }
 
+    function finishTour(driverObj) {
+        markComplete();
+        closeMobileNav();
+        if (driverObj) driverObj.destroy(false);
+    }
+
     function ensureTourLanding(roleId) {
         if (isTourDismissed()) return true;
         var home = getTourHome(roleId);
@@ -333,7 +339,13 @@
         var steps = filterSteps(getSteps(roleId).map(withNavHooks));
         if (steps.length < MIN_TOUR_STEPS) return;
 
-        var tourStarted = false;
+        var tourFinished = false;
+
+        function completeTourOnce(driverObj) {
+            if (tourFinished) return;
+            tourFinished = true;
+            finishTour(driverObj);
+        }
 
         var driverObj = window.driver.js.driver({
             showProgress: true,
@@ -351,7 +363,8 @@
                 skipBtn.className = 'lgt-tour-skip';
                 skipBtn.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    driverObj.destroy();
+                    e.preventDefault();
+                    completeTourOnce(driverObj);
                 });
                 var navBtns = popover.footer.querySelector('.driver-popover-navigation-btns');
                 if (navBtns) {
@@ -361,14 +374,11 @@
                 }
             },
             onDestroyStarted: function () {
-                if (tourStarted) markComplete();
-                closeMobileNav();
-                driverObj.destroy();
+                completeTourOnce(driverObj);
             },
             steps: steps,
         });
 
-        tourStarted = true;
         driverObj.drive();
     }
 
@@ -394,6 +404,16 @@
                 })
                 .catch(function () {});
         });
+    }
+
+    // Si saltó el tour en la página anterior pero la DB aún no se actualizó, no relanzar.
+    if (window.__LGT && !window.__LGT.onboarded) {
+        try {
+            if (sessionStorage.getItem(TOUR_DISMISSED_KEY) === '1') {
+                window.__LGT.onboarded = true;
+                markComplete();
+            }
+        } catch (_) { /* ignore */ }
     }
 
     if (!window.__LGT || isTourDismissed()) return;
