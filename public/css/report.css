@@ -575,6 +575,11 @@ html[data-theme="dark"] {
     color: #dc2626;
 }
 
+.ot-badge--amber {
+    background: rgba(245, 158, 11, .12);
+    color: #d97706;
+}
+
 .pct-bar--green {
     background: rgba(34, 197, 94, .65);
 }

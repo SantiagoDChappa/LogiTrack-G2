@@ -8,15 +8,13 @@ const resolveRoleAndBranch = (req, res) => {
     const currentUser = res.locals.currentUser || {};
     const isAdmin = currentUser.roleId === RoleType.ADMIN.id;
     return {
-        isAdmin,
         branchId: isAdmin ? (req.query.branchId ? Number(req.query.branchId) : null) : (currentUser.branchId || null),
     };
 };
 
 const getDashboardOperaciones = async (req, res) => {
-    const { isAdmin, branchId } = resolveRoleAndBranch(req, res);
+    const { branchId } = resolveRoleAndBranch(req, res);
     const viewModel = await getDashboardOperacionesData(req.query, branchId);
-    viewModel.isAdmin = isAdmin;
     res.render('report/dashboard-operaciones', viewModel);
 };
 

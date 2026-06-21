@@ -577,7 +577,8 @@ const getDashboardOperacionesData = async (query = {}, branchId = null, deps = {
         delayedBySeverity: [],
         delayedByStatus: [],
         topFailingZones: [],
-        kpis: { total: 0, delivered: 0, in_transit: 0, delayed_count: 0, otif_pct: null },
+        delayedTrend: [],
+        kpis: { total: 0, delivered: 0, in_transit: 0, delayed_count: 0, otif_pct: null, otif_on_time: 0, otif_delivered: 0 },
         exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
     };
 
@@ -730,6 +731,21 @@ const getDashboardOperacionesData = async (query = {}, branchId = null, deps = {
     viewModel.kpis.otif_pct = otifKpi?.delivered > 0
         ? Math.round(otifKpi.on_time / otifKpi.delivered * 1000) / 10
         : null;
+    viewModel.kpis.otif_on_time = otifKpi?.on_time || 0;
+    viewModel.kpis.otif_delivered = otifKpi?.delivered || 0;
+
+    viewModel.delayedTrend = await deps.sequelize.query(
+        `SELECT TO_CHAR(DATE_TRUNC('week', s."createdAt"::date), 'YYYY-MM-DD') AS week_start,
+                COUNT(*)::int AS delayed
+         FROM logitrack.shipment s
+         WHERE s."statusId" IN (2, 6, 7)
+           AND s."expectedDeliveryDate" IS NOT NULL
+           AND s."expectedDeliveryDate" < CURRENT_DATE
+           AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
+         GROUP BY DATE_TRUNC('week', s."createdAt"::date)
+         ORDER BY week_start`,
+        { type: deps.QueryTypes.SELECT, replacements }
+    );
 
     return viewModel;
 };
