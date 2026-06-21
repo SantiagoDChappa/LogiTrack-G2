@@ -147,7 +147,10 @@
         const db = await openDB();
         const rows = await reqP(db.transaction(STORE_OUTBOX, 'readonly').objectStore(STORE_OUTBOX).getAll());
         const out = [];
-        for (const r of rows) { out.push({ id: r.id, ts: r.ts, action: await decrypt(r.enc) }); }
+        // idempotencyKey: imprescindible. flushOutbox lo manda como header Idempotency-Key;
+        // si falta, el server recibe "undefined" y TODAS las acciones colisionan en la misma
+        // fila → dedupe → nunca se aplican ("encola pero no actualiza"). r.id == la clave.
+        for (const r of rows) { out.push({ id: r.id, idempotencyKey: r.idempotencyKey || r.id, ts: r.ts, action: await decrypt(r.enc) }); }
         out.sort((a, b) => a.ts - b.ts);  // FIFO
         return out;
     }

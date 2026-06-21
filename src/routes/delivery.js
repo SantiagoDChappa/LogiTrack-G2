@@ -116,7 +116,10 @@ async function recordOfflineAction(req, res, statusCode, body, conflict) {
 async function offlineIdempotency(req, res, next) {
     if (req.method !== 'POST') { return next(); }
     const key = req.get('Idempotency-Key');
-    if (!key) { return next(); }
+    // 'undefined'/'null' llegan como string si el cliente setea el header con un valor JS
+    // undefined. Tratarlos como sin-clave evita que TODAS las acciones colisionen en una
+    // única fila y se deduplicen entre sí (bug "encola pero no actualiza").
+    if (!key || key === 'undefined' || key === 'null') { return next(); }
     // [sync-debug] Toda acción re-sincronizada llega acá (lleva Idempotency-Key). Log visible
     // en Render para diagnosticar por qué "encola pero no actualiza". Quitar cuando se resuelva.
     const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
