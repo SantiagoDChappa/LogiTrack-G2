@@ -13,6 +13,12 @@
 
         <%- include('_header', { active: 'resumen', pageTitle: 'Auditoría y trazabilidad', pageDesc: 'Registro de quién hizo qué, cuándo y desde dónde.' }) %>
 
+        <div style="display:flex;justify-content:flex-end;margin:-1.4rem 0 1.2rem">
+            <a href="/auditoria/resumen/export-csv" class="btn-filter">
+                <span class="material-symbols-outlined">download</span> Exportar resumen (CSV)
+            </a>
+        </div>
+
         <%
             const _maxActivity = Math.max(1, ...(activity||[]).map(a => a.total));
         %>

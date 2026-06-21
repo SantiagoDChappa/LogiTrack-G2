@@ -7,7 +7,8 @@ const { avatarColor, initials } = require('../utils/auditHelpers');
 
 const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r.description]));
 
-const getResumen = async (req, res) => {
+// Compartido entre la página de Resumen y su export CSV, para no duplicar las queries.
+const buildResumenData = async () => {
     const [sessionTotal, actionTotal, activeUsers, failedAccounts, activityRows, activeUserStats] = await Promise.all([
         loginLogModel.getAll({ page: 1, limit: 1 }).catch(() => ({ count: 0, rows: [] })),
         actionLogModel.getAll({ page: 1, limit: 1 }).catch(() => ({ count: 0 })),
@@ -26,11 +27,15 @@ const getResumen = async (req, res) => {
         const key = d.toISOString().slice(0, 10);
         activity.push({
             label: d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' }),
+            // Día completo + fecha numérica para el export CSV: evita que Excel
+            // confunda "mar" (martes, abreviado) con "marzo" y reformatee la celda.
+            dayName: d.toLocaleDateString('es-AR', { weekday: 'long' }),
+            date: d.toLocaleDateString('es-AR'),
             total: activityMap[key] || 0,
         });
     }
 
-    res.render('auditoria/resumen', {
+    return {
         activeUsersCount: activeUsers.length,
         sessionCount: sessionTotal.count,
         actionCount: actionTotal.count,
@@ -38,8 +43,12 @@ const getResumen = async (req, res) => {
         failedAccounts,
         activity,
         activeUserStats,
-        roleLabels: ROLE_LABELS,
-    });
+    };
+};
+
+const getResumen = async (req, res) => {
+    const data = await buildResumenData();
+    res.render('auditoria/resumen', { ...data, roleLabels: ROLE_LABELS });
 };
 
 const getUsuariosActivos = async (req, res) => {
@@ -150,4 +159,57 @@ const exportCsv = async (req, res) => {
     }
 };
 
-module.exports = { getResumen, getUsuariosActivos, getSesiones, getAcciones, getConfiguracion, exportCsv };
+// Export CSV de la página Resumen: stats generales, DAU/WAU/MAU, actividad de
+// 7 días y el detalle de cuentas con intentos fallidos (la alerta de seguridad).
+const exportResumenCsv = async (req, res) => {
+    try {
+        const data = await buildResumenData();
+        const rows = [];
+
+        rows.push(['Resumen general']);
+        rows.push(['Activos ahora (8h)', data.activeUsersCount]);
+        rows.push(['Sesiones en el log (total)', data.sessionCount]);
+        rows.push(['Acciones registradas', data.actionCount]);
+        rows.push(['Última actividad', data.lastEvent ? new Date(data.lastEvent.createdAt).toLocaleString('es-AR') : '—']);
+        rows.push(['Última actividad — usuario', data.lastEvent?.user?.fullName || data.lastEvent?.email || '—']);
+        rows.push([]);
+
+        rows.push(['Usuarios activos por período']);
+        rows.push(['Hoy (DAU)', data.activeUserStats.dau]);
+        rows.push(['Esta semana (WAU)', data.activeUserStats.wau]);
+        rows.push(['Este mes (MAU)', data.activeUserStats.mau]);
+        rows.push([]);
+
+        rows.push(['Actividad de los últimos 7 días']);
+        rows.push(['Fecha', 'Día', 'Logins']);
+        for (const a of data.activity) { rows.push([a.date, a.dayName, a.total]); }
+        rows.push([]);
+
+        rows.push(['Cuentas con intentos fallidos (últimas 24 h)']);
+        rows.push(['Email', 'Usuario', 'Rol', 'Sucursal', 'Intentos', 'Primer intento', 'Último intento', 'Bloqueada hasta', 'Último login OK']);
+        for (const a of data.failedAccounts) {
+            rows.push([
+                a.email,
+                a.userId ? a.fullName : 'No registrada',
+                a.roleId ? (ROLE_LABELS[a.roleId] || '') : '',
+                a.branchName || '',
+                a.attempts,
+                new Date(a.firstAttempt).toLocaleString('es-AR'),
+                new Date(a.lastAttempt).toLocaleString('es-AR'),
+                a.lockedUntil && new Date(a.lockedUntil) > new Date() ? new Date(a.lockedUntil).toLocaleString('es-AR') : '',
+                a.lastLogin ? new Date(a.lastLogin).toLocaleString('es-AR') : '',
+            ]);
+        }
+
+        const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+        const filename = `auditoria_resumen_${new Date().toISOString().slice(0, 10)}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('﻿' + csv);
+    } catch (err) {
+        console.error('exportResumenCsv:', err.message);
+        res.status(500).send('Error al exportar');
+    }
+};
+
+module.exports = { getResumen, getUsuariosActivos, getSesiones, getAcciones, getConfiguracion, exportCsv, exportResumenCsv };
