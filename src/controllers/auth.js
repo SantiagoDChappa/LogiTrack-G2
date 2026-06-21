@@ -16,9 +16,8 @@ const RESET_TTL_MIN = 60;
 // #LGT-193 — alerta por mail al titular de la cuenta cuando se bloquea por intentos fallidos.
 // Incluye un link de cambio de contraseña de un solo uso (mismo mecanismo que "Olvidé mi contraseña").
 const sendLockoutEmail = async (user, ip, lockedUntil) => {
-    let diag = { to: user.email, result: null, error: null };
     try {
-        const { sendEmailWithResult } = require('../services/notification/emailSender');
+        const { sendEmail } = require('../services/notification/emailSender');
         const resetTokenModel = require('../models/passwordResetToken');
 
         await resetTokenModel.invalidateForUser(user.id);
@@ -40,31 +39,39 @@ const sendLockoutEmail = async (user, ip, lockedUntil) => {
             <p style="font-size:13px;color:#64748b">Si no fuiste vos quien intentó ingresar, cambiá tu contraseña con el botón de arriba o avisale a un administrador. El enlace vence en ${RESET_TTL_MIN} minutos y es de un solo uso.</p>
             <p style="font-size:13px;color:#64748b">Si fuiste vos, esperá hasta las ${unlockTime} y volvé a intentar con la contraseña correcta.</p>
         </div>`;
-        diag.result = await sendEmailWithResult(user.email, subject, html, 'html');
+        await sendEmail(user.email, subject, html, 'html');
     } catch (e) {
-        diag.error = e.message;
         console.error('[login] error enviando alerta de bloqueo:', e.message);
-    } finally {
-        try {
-            const actionLogModel = require('../models/actionLog');
-            await actionLogModel.record(null, 'EMAIL_DIAG', 'SYSTEM', null, diag, null);
-        } catch { /* no-op */ }
     }
 };
 
 // #LGT-193 — si hay 2+ cuentas bloqueadas al mismo tiempo, puede ser un ataque
-// coordinado (no solo un usuario que se equivocó de contraseña). Avisamos a los
-// admins activos para que lo revisen en Auditoría.
+// coordinado (no solo un usuario que se equivocó de contraseña). Si además los
+// intentos vienen de la misma IP en varias cuentas, la bloqueamos automáticamente.
+// Avisamos a los admins activos con el resultado para que lo revisen en Auditoría.
+const IP_BLOCK_MINUTES = 60;
+
 const notifyAdminsSuspiciousActivity = async (lockedCount) => {
-    let diag = { emails: [], result: null, error: null };
     try {
-        const { sendEmailWithResult } = require('../services/notification/emailSender');
+        const { sendEmail } = require('../services/notification/emailSender');
+        const blockedIpModel = require('../models/blockedIp');
+
+        const sharedIps = await loginLogModel.getSharedAttackIps({ hours: 2 }).catch(() => []);
+        const blockedIps = [];
+        for (const row of sharedIps) {
+            await blockedIpModel.block(row.ip, IP_BLOCK_MINUTES, `Intentos fallidos contra ${row.accounts} cuentas distintas`);
+            blockedIps.push(row.ip);
+        }
+
         const admins = await userModel.getActiveAdmins();
         // SendGrid rechaza el envío entero si hay un email duplicado en la lista
         // de destinatarios (puede pasar si dos cuentas activas comparten el mismo email).
         const emails = [...new Set(admins.map(a => a.email).filter(Boolean))];
-        diag.emails = emails;
         if (emails.length === 0) { return; }
+
+        const ipSection = blockedIps.length > 0
+            ? `<p style="font-size:15px;color:#1e293b">Los intentos vinieron de la <strong>misma IP</strong> en varias cuentas, así que la bloqueamos automáticamente por ${IP_BLOCK_MINUTES} minutos: <strong>${blockedIps.join(', ')}</strong>.</p>`
+            : `<p style="font-size:15px;color:#1e293b">Las cuentas bloqueadas no comparten la misma IP de origen, así que no se bloqueó ninguna IP automáticamente. Te recomendamos revisarlo igual.</p>`;
 
         const subject = `Alerta de seguridad: ${lockedCount} cuentas bloqueadas simultáneamente en LogiTrack`;
         const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
@@ -72,20 +79,13 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
             <p style="color:#64748b;margin-top:0">Alerta de seguridad</p>
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
             <p style="font-size:15px;color:#1e293b">Hay <strong>${lockedCount} cuentas bloqueadas</strong> al mismo tiempo por intentos fallidos de login. Esto puede indicar un intento de acceso coordinado contra varias cuentas.</p>
+            ${ipSection}
             <p style="margin:20px 0"><a href="${appBaseUrl()}/auditoria" style="background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;display:inline-block">Revisar en Auditoría</a></p>
             <p style="font-size:13px;color:#64748b">Recibís este aviso porque sos administrador de LogiTrack.</p>
         </div>`;
-        diag.result = await sendEmailWithResult(emails, subject, html, 'html');
+        await sendEmail(emails, subject, html, 'html');
     } catch (e) {
-        diag.error = e.message;
         console.error('[login] error avisando a admins por actividad sospechosa:', e.message);
-    } finally {
-        // Diagnóstico temporal (LGT-193): sin acceso a logs del servidor, registramos
-        // el resultado del envío en action_log para poder revisarlo desde la app/SQL.
-        try {
-            const actionLogModel = require('../models/actionLog');
-            await actionLogModel.record(null, 'EMAIL_DIAG', 'SYSTEM', null, diag, null);
-        } catch { /* no-op */ }
     }
 };
 
@@ -204,6 +204,16 @@ const login = async (req, res) => {
     const nombreEmpresa = nombreEmpresaRaw || 'LogiTrack';
     const logoEmpresa   = logoEmpresaRaw || '/images/logo.png';
     const {email, password} = req.body;
+
+    // IP bloqueada automáticamente por atacar varias cuentas a la vez: ni
+    // siquiera buscamos el usuario, para no filtrar si el email existe o no.
+    const blockedIpModel = require('../models/blockedIp');
+    if (await blockedIpModel.isBlocked(getIp(req)).catch(() => false)) {
+        return res.render('login', {
+            error: 'Detectamos actividad sospechosa desde tu conexión. Probá de nuevo más tarde.',
+            nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts(),
+        });
+    }
 
     const user = await userModel.findByEmail(email);
     if(!user){

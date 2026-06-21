@@ -37,6 +37,7 @@
                             <option value="SHIPMENT" <%= auditFilters.entity === 'SHIPMENT'  ? 'selected' : '' %>>Envíos</option>
                             <option value="USER"     <%= auditFilters.entity === 'USER'      ? 'selected' : '' %>>Usuarios</option>
                             <option value="INCIDENT" <%= auditFilters.entity === 'INCIDENT'  ? 'selected' : '' %>>Incidencias</option>
+                            <option value="IP"       <%= auditFilters.entity === 'IP'        ? 'selected' : '' %>>IPs bloqueadas</option>
                         </select>
                     </div>
                     <div class="filter-actions">
@@ -77,6 +78,7 @@
                         if (e === 'SHIPMENT') return 'Envío';
                         if (e === 'USER')     return 'Usuario';
                         if (e === 'INCIDENT') return 'Incidencia';
+                        if (e === 'IP')       return 'IP';
                         return e;
                     };
                 %>

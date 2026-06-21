@@ -160,4 +160,25 @@ const getActiveUserStats = async () => {
     return { dau, wau, mau };
 };
 
-module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay, getActiveUserStats };
+// IPs que aparecen en intentos fallidos de 2+ cuentas DISTINTAS, ambas
+// actualmente bloqueadas — señal fuerte de ataque coordinado desde un mismo origen.
+const getSharedAttackIps = async ({ hours = 2 } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const rows = await sequelize.query(
+        `SELECT ll.ip, COUNT(DISTINCT ll.user_id)::int AS accounts
+         FROM logitrack.login_log ll
+         JOIN logitrack."user" u ON u.id = ll.user_id
+         WHERE u.locked_until > NOW()
+           AND ll.action = 'LOGIN_FAILED'
+           AND ll.ip IS NOT NULL
+           AND ll.created_at >= :since
+         GROUP BY ll.ip
+         HAVING COUNT(DISTINCT ll.user_id) >= 2
+         ORDER BY accounts DESC`,
+        { type: QueryTypes.SELECT, replacements: { since } }
+    );
+    return rows;
+};
+
+module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay, getActiveUserStats, getSharedAttackIps };
