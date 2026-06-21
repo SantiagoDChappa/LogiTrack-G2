@@ -16,8 +16,9 @@ const RESET_TTL_MIN = 60;
 // #LGT-193 — alerta por mail al titular de la cuenta cuando se bloquea por intentos fallidos.
 // Incluye un link de cambio de contraseña de un solo uso (mismo mecanismo que "Olvidé mi contraseña").
 const sendLockoutEmail = async (user, ip, lockedUntil) => {
+    let diag = { to: user.email, result: null, error: null };
     try {
-        const { sendEmail } = require('../services/notification/emailSender');
+        const { sendEmailWithResult } = require('../services/notification/emailSender');
         const resetTokenModel = require('../models/passwordResetToken');
 
         await resetTokenModel.invalidateForUser(user.id);
@@ -39,9 +40,15 @@ const sendLockoutEmail = async (user, ip, lockedUntil) => {
             <p style="font-size:13px;color:#64748b">Si no fuiste vos quien intentó ingresar, cambiá tu contraseña con el botón de arriba o avisale a un administrador. El enlace vence en ${RESET_TTL_MIN} minutos y es de un solo uso.</p>
             <p style="font-size:13px;color:#64748b">Si fuiste vos, esperá hasta las ${unlockTime} y volvé a intentar con la contraseña correcta.</p>
         </div>`;
-        await sendEmail(user.email, subject, html, 'html');
+        diag.result = await sendEmailWithResult(user.email, subject, html, 'html');
     } catch (e) {
+        diag.error = e.message;
         console.error('[login] error enviando alerta de bloqueo:', e.message);
+    } finally {
+        try {
+            const actionLogModel = require('../models/actionLog');
+            await actionLogModel.record(null, 'EMAIL_DIAG', 'SYSTEM', null, diag, null);
+        } catch { /* no-op */ }
     }
 };
 
@@ -49,12 +56,14 @@ const sendLockoutEmail = async (user, ip, lockedUntil) => {
 // coordinado (no solo un usuario que se equivocó de contraseña). Avisamos a los
 // admins activos para que lo revisen en Auditoría.
 const notifyAdminsSuspiciousActivity = async (lockedCount) => {
+    let diag = { emails: [], result: null, error: null };
     try {
-        const { sendEmail } = require('../services/notification/emailSender');
+        const { sendEmailWithResult } = require('../services/notification/emailSender');
         const admins = await userModel.getActiveAdmins();
         // SendGrid rechaza el envío entero si hay un email duplicado en la lista
         // de destinatarios (puede pasar si dos cuentas activas comparten el mismo email).
         const emails = [...new Set(admins.map(a => a.email).filter(Boolean))];
+        diag.emails = emails;
         if (emails.length === 0) { return; }
 
         const subject = `Alerta de seguridad: ${lockedCount} cuentas bloqueadas simultáneamente en LogiTrack`;
@@ -66,9 +75,17 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
             <p style="margin:20px 0"><a href="${appBaseUrl()}/auditoria" style="background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;display:inline-block">Revisar en Auditoría</a></p>
             <p style="font-size:13px;color:#64748b">Recibís este aviso porque sos administrador de LogiTrack.</p>
         </div>`;
-        await sendEmail(emails, subject, html, 'html');
+        diag.result = await sendEmailWithResult(emails, subject, html, 'html');
     } catch (e) {
+        diag.error = e.message;
         console.error('[login] error avisando a admins por actividad sospechosa:', e.message);
+    } finally {
+        // Diagnóstico temporal (LGT-193): sin acceso a logs del servidor, registramos
+        // el resultado del envío en action_log para poder revisarlo desde la app/SQL.
+        try {
+            const actionLogModel = require('../models/actionLog');
+            await actionLogModel.record(null, 'EMAIL_DIAG', 'SYSTEM', null, diag, null);
+        } catch { /* no-op */ }
     }
 };
 
