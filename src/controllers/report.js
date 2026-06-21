@@ -4,9 +4,6 @@ const {
     getDeliveryPerformanceData,
     getIncidentsByPeriodData,
     getSatisfactionData,
-    getDashboardSupervisorData,
-    getDashboardAdminData,
-    getDashboardOwnerData,
 } = require('../services/reportData');
 const {
     buildDeliveryPerformanceExport,
@@ -127,34 +124,6 @@ const exportSatisfactionReport = async (req, res) => {
     }
 };
 
-const resolveRoleAndBranch = (req, res) => {
-    const { RoleType } = require('../constants/enums');
-    const currentUser = res.locals.currentUser || {};
-    const isAdmin = currentUser.roleId === RoleType.ADMIN.id;
-    return {
-        isAdmin,
-        branchId: isAdmin ? (req.query.branchId ? Number(req.query.branchId) : null) : (currentUser.branchId || null),
-        currentUser,
-    };
-};
-
-const getDashboardSupervisor = async (req, res) => {
-    const { isAdmin, branchId } = resolveRoleAndBranch(req, res);
-    const viewModel = await getDashboardSupervisorData(req.query, branchId);
-    viewModel.isAdmin = isAdmin;
-    res.render('report/dashboard-supervisor', viewModel);
-};
-
-const getDashboardAdmin = async (req, res) => {
-    const viewModel = await getDashboardAdminData(req.query);
-    res.render('report/dashboard-admin', viewModel);
-};
-
-const getDashboardOwner = async (req, res) => {
-    const viewModel = await getDashboardOwnerData(req.query);
-    res.render('report/dashboard-owner', viewModel);
-};
-
 module.exports = {
     exportDeliveryPerformance,
     exportIncidentsByPeriod,
@@ -162,9 +131,6 @@ module.exports = {
     exportSatisfactionReport,
     exportShipmentsByPeriod,
     getDeliveryPerformance,
-    getDashboardAdmin,
-    getDashboardOwner,
-    getDashboardSupervisor,
     getIncidentsByPeriod,
     getOnTimeDeliveries,
     getSatisfactionReport,

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <%- include('../partials/head') %>
-    <title>Panel de Control Operativo</title>
+    <title>Panel de Operaciones</title>
     <link rel="stylesheet" href="/css/report.css">
     <style>
         .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem; margin-bottom:1rem; }
@@ -47,12 +47,12 @@
         <div class="report-wrapper">
 
             <div class="page-header">
-                <h1>Panel de Control Operativo</h1>
+                <h1>Panel de Operaciones</h1>
             </div>
 
             <!-- Filtro -->
             <div class="report-card filter-card">
-                <form method="GET" action="/report/dashboard/supervisor" id="report-form" novalidate>
+                <form method="GET" action="/dashboard/operaciones" id="report-form" novalidate>
                     <div class="filter-row">
                         <div class="filter-field">
                             <label for="from">Desde</label>
@@ -67,7 +67,7 @@
                                 <span class="material-symbols-outlined">search</span>
                             </button>
                             <% if (hasQuery) { %>
-                                <a href="/report/dashboard/supervisor" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <a href="/dashboard/operaciones" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
                                     <span class="material-symbols-outlined">refresh</span>
                                 </a>
                             <% } %>
@@ -136,26 +136,13 @@
                     </div>
                     <div class="dash-kpi__value <%= kpis.delayed_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.delayed_count %></div>
                 </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">Sin zona (trabados)</div>
-                    <div class="dash-kpi__value <%= kpis.unroutable_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.unroutable_count %></div>
-                </div>
-                <div class="dash-kpi">
+<div class="dash-kpi">
                     <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
                         OTIF
                         <span class="kpi-tip" data-tip="On Time In Full: porcentaje de envíos del período entregados antes o en su fecha comprometida. Verde ≥ 85%, Amarillo 70–84%, Rojo < 70%.">?</span>
                     </div>
                     <div class="dash-kpi__value <%= kpis.otif_pct !== null && kpis.otif_pct >= 85 ? 'dash-kpi__value--ok' : kpis.otif_pct !== null && kpis.otif_pct >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
                         <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
-                    </div>
-                </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
-                        Delta promedio
-                        <span class="kpi-tip" data-tip="Diferencia promedio entre los días estimados por el modelo predictivo y los días reales de entrega. Positivo = llegó tarde, negativo = llegó antes. Verde ≤ 0.3d, Amarillo ≤ 1d, Rojo > 1d.">?</span>
-                    </div>
-                    <div class="dash-kpi__value <%= kpis.avg_delta !== null && kpis.avg_delta <= 0.3 ? 'dash-kpi__value--ok' : kpis.avg_delta !== null && kpis.avg_delta <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
-                        <%= kpis.avg_delta !== null ? (kpis.avg_delta > 0 ? '+' : '') + kpis.avg_delta + 'd' : '—' %>
                     </div>
                 </div>
             </div>
@@ -236,48 +223,6 @@
             </div>
             <% } %>
 
-            <!-- Envíos sin zona = no ruteables (quedan trabados sin repartidor) -->
-            <% if (unroutableShipments.length > 0) {
-                const reasonLabel = { sin_zona: 'CP sin zona', sin_cp: 'Falta CP', sin_direccion: 'Sin dirección' };
-            %>
-            <div class="report-card">
-                <div class="dp-table-header">
-                    <h2>Envíos sin zona — no ruteables <span class="dash-alert-badge"><%= unroutableShipments.length %> trabado<%= unroutableShipments.length !== 1 ? 's' : '' %></span></h2>
-                </div>
-                <p class="dash-hint">No caen en ninguna zona configurada: el optimizador no los asigna a ningún transportista. Configurá una zona que cubra el CP o corregí el domicilio del envío.</p>
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Tracking</th>
-                            <th>Estado</th>
-                            <th>CP</th>
-                            <th>Provincia</th>
-                            <th>Motivo</th>
-                            <th class="text-right">Fecha comprometida</th>
-                            <th class="text-right">Atraso</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% unroutableShipments.forEach(s => { %>
-                        <tr>
-                            <td><a href="/shipment/<%= s.id %>"><%= s.trackingId %></a></td>
-                            <td><%= s.status_label %></td>
-                            <td><%= s.postal_code || '—' %></td>
-                            <td><%= s.province_name || '—' %></td>
-                            <td><span class="ot-badge ot-badge--amber"><%= reasonLabel[s.reason] || s.reason %></span></td>
-                            <td class="text-right"><%= s.expectedDeliveryDate || '—' %></td>
-                            <td class="text-right">
-                                <% if (s.days_overdue !== null) { %>
-                                    <span class="ot-badge ot-badge--red">+<%= s.days_overdue %> día<%= s.days_overdue !== 1 ? 's' : '' %></span>
-                                <% } else { %>—<% } %>
-                            </td>
-                        </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
-            <% } %>
-
             <!-- Top 5 zonas con más fallos -->
             <% if (topFailingZones.length > 0) { %>
             <div class="report-card">
@@ -311,62 +256,6 @@
             </div>
             <% } %>
 
-            <!-- Predicción vs Realidad por chofer -->
-            <% if (driverPvr.length > 0) { %>
-            <div class="report-card">
-                <h2>Predicción vs. Realidad — por repartidor</h2>
-                <table class="report-table" id="sup-driver-table">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-col="driver_name">Repartidor <span class="sort-icon">↕</span></th>
-                            <th class="sortable text-right" data-col="total">Entregas <span class="sort-icon">↕</span></th>
-                            <th class="sortable text-right" data-col="avg_predicted">Estimado (días) <span class="sort-icon">↕</span></th>
-                            <th class="sortable text-right" data-col="avg_actual">Real (días) <span class="sort-icon">↕</span></th>
-                            <th class="sortable text-right" data-col="avg_delta">Delta <span class="sort-icon">↕</span></th>
-                            <th class="sortable text-right" data-col="otif_pct">OTIF <span class="sort-icon">↕</span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="sup-driver-tbody">
-                        <% driverPvr.forEach(d => { %>
-                        <tr
-                            data-driver_name="<%= d.driver_name %>"
-                            data-total="<%= d.total %>"
-                            data-avg_predicted="<%= d.avg_predicted %>"
-                            data-avg_actual="<%= d.avg_actual %>"
-                            data-avg_delta="<%= d.avg_delta %>"
-                            data-otif_pct="<%= d.otif_pct %>"
-                        >
-                            <td>
-                                <div class="dp-driver-cell">
-                                    <div class="dp-avatar"><%= (d.driver_name || '?').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
-                                    <%= d.driver_name || '—' %>
-                                </div>
-                            </td>
-                            <td class="text-right count-cell"><%= d.total %></td>
-                            <td class="text-right"><%= d.avg_predicted %>d</td>
-                            <td class="text-right"><%= d.avg_actual %>d</td>
-                            <td class="text-right">
-                                <%
-                                    const delta = d.avg_delta || 0;
-                                    const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
-                                %>
-                                <span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span>
-                            </td>
-                            <td class="text-right">
-                                <div class="dp-pct-cell">
-                                    <div class="dp-pct-bar-track">
-                                        <div class="dp-pct-bar-fill <%= (d.otif_pct || 0) >= 85 ? 'fill--green' : (d.otif_pct || 0) >= 70 ? 'fill--amber' : 'fill--red' %>"
-                                             style="width:<%= d.otif_pct || 0 %>%"></div>
-                                    </div>
-                                    <span class="dp-pct-label"><%= d.otif_pct || 0 %>%</span>
-                                </div>
-                            </td>
-                        </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
-            <% } %>
 
 
             <% } %>
@@ -389,28 +278,6 @@
                 }
             }
         });
-        (function () {
-            const tbody = document.getElementById('sup-driver-tbody');
-            if (!tbody) return;
-            let lastCol = null, asc = true;
-            document.querySelectorAll('#sup-driver-table th.sortable').forEach(th => {
-                th.style.cursor = 'pointer';
-                th.addEventListener('click', () => {
-                    const col = th.dataset.col;
-                    if (lastCol === col) { asc = !asc; } else { asc = col === 'driver_name'; }
-                    lastCol = col;
-                    document.querySelectorAll('#sup-driver-table .sort-icon').forEach(i => i.textContent = '↕');
-                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    rows.sort((a, b) => {
-                        const va = a.dataset[col], vb = b.dataset[col];
-                        const cmp = col === 'driver_name' ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
-                        return asc ? cmp : -cmp;
-                    });
-                    rows.forEach(r => tbody.appendChild(r));
-                });
-            });
-        })();
         (function () {
             const isDark = document.documentElement.dataset.theme === 'dark' || document.body.classList.contains('dark');
             const textColor = isDark ? '#94a3b8' : '#64748b';

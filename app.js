@@ -47,6 +47,7 @@ const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
+const dashboardRoutes  = require('./src/routes/dashboard');
 const notificationRoutes = require('./src/routes/notification');
 const returnRoutes = require('./src/routes/return');
 const creditNoteRoutes = require('./src/routes/creditNote');
@@ -164,7 +165,8 @@ app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/branch',    requireAuth, branchRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
-app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
+app.use('/report',     requireAuth, requireSupervisor, reportRoutes);
+app.use('/dashboard',  requireAuth, requireSupervisor, dashboardRoutes);
 app.use('/notification', requireAuth, requireSupervisor, notificationRoutes);
 // Devoluciones como incidencias (tipo RETURN): el RBAC fino lo aplica cada ruta
 // (alta interna = staff; tomar/resolver = supervisor/admin).
