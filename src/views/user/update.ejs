@@ -108,6 +108,12 @@
 
             <form id="form-baja" action="/user/delete/<%= user.id %>" method="POST" style="display:none;"></form>
 
+            <!-- Historial: ingresos y cambios sobre la cuenta. -->
+            <a href="/user/<%= user.id %>/historial" class="btn btn--ghost" style="margin-top:1rem;display:inline-flex">
+                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">history</span>
+                Ver historial
+            </a>
+
             <!-- #2 2FA — reset del segundo factor del usuario (solo admin). -->
             <form id="form-2fa-reset" action="/user/<%= user.id %>/2fa/reset" method="POST" style="margin-top:1rem">
                 <button type="button" id="btn-2fa-reset" class="btn btn-warning">

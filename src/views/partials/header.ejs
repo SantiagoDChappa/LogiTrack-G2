@@ -75,6 +75,9 @@
                             <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
                             <a href="/report/incidents-by-period"><ul><span class="material-symbols-outlined">warning</span>Fallas</ul></a>
                             <a href="/report/satisfaction"><ul><span class="material-symbols-outlined">sentiment_satisfied</span>Satisfacción</ul></a>
+                            <% if (currentUser.roleId === 4) { %>
+                            <a href="/report/users"><ul><span class="material-symbols-outlined">groups</span>Usuarios</ul></a>
+                            <% } %>
                         </div>
                     </div>
                     <div class="nav-group" id="nav-group-dashboard">
