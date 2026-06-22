@@ -35,13 +35,14 @@ const record = async (userId, action, entity, entityId, detail, req) => {
     }
 };
 
-const getAll = async ({ userId, entity, action, from, to, page = 1, limit = 50 } = {}) => {
+const getAll = async ({ userId, entity, entityId, action, from, to, page = 1, limit = 50 } = {}) => {
     setupAssociations();
     const { User } = require('./user');
     const { Op } = require('sequelize');
     const where = {};
     if (userId) { where.userId = userId; }
     if (entity) { where.entity = entity; }
+    if (entityId) { where.entityId = entityId; }
     if (action) { where.action = action; }
     if (from || to) {
         where.createdAt = {};
@@ -59,4 +60,21 @@ const getAll = async ({ userId, entity, action, from, to, page = 1, limit = 50 }
     return { rows, count, page: Number(page), pages: Math.ceil(count / limit) };
 };
 
-module.exports = { ActionLog, record, getAll };
+// Cantidad de cambios por entidad (ej. USER) en un rango de fechas — para el
+// Reporte de usuarios. Devuelve { [entityId]: count }.
+const getChangeCountsByEntity = async ({ entity = 'USER', from, to } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    let where = 'entity = :entity AND entity_id IS NOT NULL';
+    const replacements = { entity };
+    if (from) { where += ' AND created_at >= :from'; replacements.from = new Date(from); }
+    if (to)   { where += ' AND created_at <= :to';   replacements.to = new Date(to + 'T23:59:59'); }
+    const rows = await sequelize.query(
+        `SELECT entity_id, COUNT(*)::int AS total FROM logitrack.action_log WHERE ${where} GROUP BY entity_id`,
+        { type: QueryTypes.SELECT, replacements }
+    );
+    const map = {};
+    for (const row of rows) { map[row.entity_id] = row.total; }
+    return map;
+};
+
+module.exports = { ActionLog, record, getAll, getChangeCountsByEntity };
