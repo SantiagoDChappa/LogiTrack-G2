@@ -104,6 +104,18 @@
         };
     }
 
+    function helpCenterStep() {
+        return {
+            element: '#help-header-btn',
+            popover: {
+                title: 'Centro de ayuda',
+                description: '¿Necesitás más detalle? El manual completo está en el ícono ? del header. En pantallas complejas también tenés un tour contextual (ícono bandera) y enlaces al manual.',
+                side: 'bottom',
+                align: 'end',
+            },
+        };
+    }
+
     // ── Pasos por rol ──────────────────────────────────────────────────────────
 
     var STEPS_SUPERVISOR_ADMIN = [
@@ -276,6 +288,7 @@
             },
         });
 
+        steps.push(helpCenterStep());
         steps.push(notificationBellStep());
 
         return steps;
@@ -283,11 +296,14 @@
 
     function getSteps(roleId) {
         var role = asRole(roleId);
-        if (role === 4) return STEPS_SUPERVISOR_ADMIN.concat(STEPS_ADMIN_EXTRA);
-        if (role === 1) return STEPS_SUPERVISOR_ADMIN;
-        if (role === 2) return STEPS_OPERATOR;
-        if (role === 3) return buildDeliverySteps();
-        return [];
+        var steps;
+        if (role === 4) steps = STEPS_SUPERVISOR_ADMIN.concat(STEPS_ADMIN_EXTRA);
+        else if (role === 1) steps = STEPS_SUPERVISOR_ADMIN.slice();
+        else if (role === 2) steps = STEPS_OPERATOR.slice();
+        else if (role === 3) return buildDeliverySteps();
+        else return [];
+        steps.push(helpCenterStep());
+        return steps;
     }
 
     function clearTourRedirectFlag() {

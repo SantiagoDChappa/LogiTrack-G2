@@ -50,4 +50,31 @@ describe('Help center', () => {
             .get('/help/import-csv')
             .expect(404);
     });
+
+    test('glosario accesible para todos los roles staff y repartidor', async () => {
+        const res = await request(buildApp({ id: 3, roleId: 3, fullName: 'Repartidor' }))
+            .get('/help/glosario')
+            .expect(200);
+
+        expect(res.text).toContain('Glosario');
+        expect(res.text).toContain('Ojo de Patrón');
+    });
+
+    test('índice muestra banner de glosario y tours', async () => {
+        const res = await request(buildApp({ id: 1, roleId: 4, fullName: 'Admin' }))
+            .get('/help')
+            .expect(200);
+
+        expect(res.text).toContain('Tours contextuales');
+        expect(res.text).toContain('/help/glosario');
+    });
+
+    test('operador ve portal-cliente-staff pero no transportes-zonas', async () => {
+        const res = await request(buildApp({ id: 4, roleId: 2, fullName: 'Operador' }))
+            .get('/help')
+            .expect(200);
+
+        expect(res.text).toContain('Portal del cliente');
+        expect(res.text).not.toContain('Transportes y zonas');
+    });
 });

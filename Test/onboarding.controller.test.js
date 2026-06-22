@@ -91,6 +91,23 @@ describe('Onboarding API', () => {
             expect(markHelpModuleSeen).toHaveBeenCalledWith(9, 'kanban');
         });
 
+        it('acepta módulos contextuales adicionales', async () => {
+            markHelpModuleSeen.mockResolvedValue({ incidencias: true, 'entregas-repartidor': true });
+            const app = buildApp({ id: 9 });
+
+            const resInc = await request(app)
+                .post('/api/onboarding/module-complete')
+                .send({ module: 'incidencias' });
+            expect(resInc.status).toBe(200);
+            expect(markHelpModuleSeen).toHaveBeenCalledWith(9, 'incidencias');
+
+            const resDel = await request(app)
+                .post('/api/onboarding/module-complete')
+                .send({ module: 'entregas-repartidor' });
+            expect(resDel.status).toBe(200);
+            expect(markHelpModuleSeen).toHaveBeenCalledWith(9, 'entregas-repartidor');
+        });
+
         it('rechaza módulo inválido', async () => {
             const app = buildApp({ id: 9 });
 

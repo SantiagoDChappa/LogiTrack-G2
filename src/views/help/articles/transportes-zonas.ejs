@@ -1,0 +1,44 @@
+<h2>Transportes</h2>
+<p>En <a href="/transport">/transport</a> administrás los vehículos y motos de la flota. Cada transporte se asocia a un repartidor/conductor y define capacidad y tipo de unidad.</p>
+<ul>
+    <li>Alta, edición y baja de transportes.</li>
+    <li>Asignación de patente, tipo y repartidor responsable.</li>
+    <li>Estado activo/inactivo para incluir o excluir del ruteo.</li>
+</ul>
+
+<h2>Zonas</h2>
+<p>En <a href="/zone">/zone</a> definís las zonas de cobertura geográfica. Cada zona agrupa códigos postales o áreas y determina qué envíos puede atender un transporte.</p>
+<ul>
+    <li>Creación de zonas con nombre y área de cobertura.</li>
+    <li>Asociación de transportes a una o más zonas.</li>
+    <li>Impacto directo en qué envíos aparecen al optimizar rutas.</li>
+</ul>
+
+<h2>Impacto en el ruteo</h2>
+<p>Sin transportes y zonas configurados, la optimización en <a href="/help/ruteo">Ruteo</a> no puede asignar envíos correctamente. Un transporte solo recibe envíos cuya dirección cae dentro de sus zonas asignadas. Consultá también el parámetro de <a href="/help/glosario">piggyback</a> en Ajustes si necesitás sumar envíos a rutas ya planificadas.</p>
+
+<h2>Paso a paso</h2>
+<ol>
+    <li>Creá las <a href="/zone">Zonas</a> de cobertura según tu operación (por CP, barrio o región).</li>
+    <li>Dá de alta los <a href="/transport">Transportes</a> con patente, tipo y repartidor asignado.</li>
+    <li>Asociá cada transporte a las zonas que cubre.</li>
+    <li>Verificá que los transportes estén activos antes de ir a <a href="/route">Ruteo</a>.</li>
+    <li>Optimizá rutas seleccionando envíos y el transporte correspondiente a su zona.</li>
+</ol>
+
+<h2>Errores frecuentes</h2>
+<ul>
+    <li><strong>Un envío no aparece al optimizar:</strong> su dirección puede quedar fuera de la zona del transporte seleccionado; revisá la asignación zona–transporte.</li>
+    <li><strong>El repartidor no tiene transporte:</strong> cada transporte debe tener conductor asignado; sin eso no puede despacharse la ruta.</li>
+    <li><strong>Cambié zonas pero las rutas viejas no se actualizaron:</strong> las rutas ya despachadas mantienen su planificación; los cambios aplican a optimizaciones nuevas.</li>
+</ul>
+
+<div class="help-tip">Configurá transportes y zonas antes de la primera optimización del día. Es prerequisito para un ruteo eficiente.</div>
+
+<h2>Artículos relacionados</h2>
+<ul>
+    <li><a href="/help/ruteo">Ruteo y optimización</a></li>
+    <li><a href="/help/usuarios-ajustes">Usuarios, sucursales y ajustes</a></li>
+    <li><a href="/help/ojo-patron">Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/glosario">Glosario</a></li>
+</ul>

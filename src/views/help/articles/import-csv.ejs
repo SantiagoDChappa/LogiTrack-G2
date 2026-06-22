@@ -1,7 +1,7 @@
 <h2>Cuándo usarlo</h2>
 <p>Ideal para la <strong>puesta en marcha</strong> o cuando tenés muchos envíos para cargar de una vez. Accedé desde <a href="/shipment/import">Importar CSV</a>.</p>
 
-<h2>Pasos</h2>
+<h2>Pasos de importación</h2>
 <ol>
     <li>Descargá la plantilla de ejemplo si está disponible.</li>
     <li>Completá el CSV con los datos requeridos (remitente, destinatario, dirección, etc.).</li>
@@ -9,4 +9,33 @@
     <li>Confirmá la importación — los envíos válidos se crean en lote.</li>
 </ol>
 
+<h2>Identificadores en el CSV</h2>
+<p>Los envíos terminados (Entregado, Cancelado) se identifican con prefijo <a href="/help/glosario">HIST-</a> (ej. HIST-001). Los envíos activos (Pendiente, En tránsito, En sucursal) con prefijo <a href="/help/glosario">IENV-</a> (ej. IENV-001).</p>
+
+<h2>Tour contextual</h2>
+<p>En Importar CSV encontrás el ícono <strong>tour</strong> en la barra superior con un recorrido por plantilla, carga y validación.</p>
+
+<h2>Paso a paso</h2>
+<ol>
+    <li>Entrá a <a href="/shipment/import">Importar CSV</a> desde el menú de administración.</li>
+    <li>Descargá la plantilla y completala respetando columnas obligatorias y formatos.</li>
+    <li>Subí el archivo CSV y esperá el preview de validación fila por fila.</li>
+    <li>Corregí errores en el archivo si los hay y volvé a subir, o confirmá solo las filas válidas.</li>
+    <li>Verificá en <a href="/help/envios">Envíos</a> que los registros se crearon con su código de <a href="/help/glosario">tracking</a>.</li>
+</ol>
+
+<h2>Errores frecuentes</h2>
+<ul>
+    <li><strong>Muchas filas fallan la validación:</strong> revisá CP, dirección y campos obligatorios; un error en una columna invalida la fila completa.</li>
+    <li><strong>Confundí prefijos HIST- e IENV-:</strong> usá IENV- para envíos activos e HIST- solo para registros históricos terminados.</li>
+    <li><strong>Importé duplicados:</strong> verificá que no existan envíos con el mismo identificador antes de confirmar la importación masiva.</li>
+</ul>
+
 <div class="help-tip">Revisá los errores de validación fila por fila antes de confirmar. Corregí el CSV y reimportá solo las filas fallidas si el sistema lo permite.</div>
+
+<h2>Artículos relacionados</h2>
+<ul>
+    <li><a href="/help/envios">Gestión de envíos</a></li>
+    <li><a href="/help/ruteo">Ruteo y optimización</a></li>
+    <li><a href="/help/glosario">Glosario</a></li>
+</ul>

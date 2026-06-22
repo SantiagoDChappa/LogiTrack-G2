@@ -5,6 +5,7 @@ const CATEGORIES = Object.freeze({
     operaciones:   { label: 'Operaciones',     order: 2 },
     administracion:{ label: 'Administración',  order: 3 },
     reparto:       { label: 'Reparto',         order: 4 },
+    referencia:    { label: 'Referencia',      order: 5 },
 });
 
 /** Catálogo estático del manual. roles = roleIds que pueden ver el artículo. */
@@ -158,6 +159,46 @@ const ARTICLES = [
         roles: [3],
         keywords: 'incidencia repartidor problema entrega',
         partial: 'incidencias-repartidor',
+    },
+    {
+        slug: 'notificaciones',
+        title: 'Notificaciones',
+        summary: 'Campana del header, centro de notificaciones y tipos de alerta.',
+        category: 'operaciones',
+        icon: 'notifications',
+        roles: [1, 2, 3, 4],
+        keywords: 'notificación alerta campana aviso email',
+        partial: 'notificaciones',
+    },
+    {
+        slug: 'transportes-zonas',
+        title: 'Transportes y zonas',
+        summary: 'Vehículos, conductores, zonas de cobertura e impacto en el ruteo.',
+        category: 'administracion',
+        icon: 'local_shipping',
+        roles: [4],
+        keywords: 'transporte vehículo zona cobertura patente conductor',
+        partial: 'transportes-zonas',
+    },
+    {
+        slug: 'portal-cliente-staff',
+        title: 'Portal del cliente (vista staff)',
+        summary: 'Qué ve el cliente externo y cómo impacta en la operación interna.',
+        category: 'operaciones',
+        icon: 'public',
+        roles: [2, 4],
+        keywords: 'portal cliente externo token dni daño elección',
+        partial: 'portal-cliente-staff',
+    },
+    {
+        slug: 'glosario',
+        title: 'Glosario',
+        summary: 'Términos y conceptos frecuentes de LogiTrack.',
+        category: 'referencia',
+        icon: 'menu_book',
+        roles: [1, 2, 3, 4],
+        keywords: 'glosario término concepto definición fatiga return hist ienv',
+        partial: 'glosario',
     },
 ];
 

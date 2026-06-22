@@ -10,10 +10,11 @@
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header import-page-header">
             <h1>Importación masiva de envíos</h1>
             <div class="page-header__actions">
-                <a href="/shipment/import/history" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Historial" aria-label="Historial">
+                <%- include('../partials/page-help-btn', { helpModule: 'import-csv' }) %>
+                <a href="/shipment/import/history" class="action-btn action-btn--lg action-btn--tip-bottom neutro import-history-btn" data-tooltip="Historial" aria-label="Historial">
                     <span class="material-symbols-outlined">history</span>
                 </a>
                 <a href="/shipment" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
@@ -43,7 +44,7 @@
             </div>
 
             <!-- Paso 1: Descargar template -->
-            <div class="import-card">
+            <div class="import-card" id="import-step-template">
                 <h2 class="import-card-title">
                     <span class="import-step-num">1</span>
                     <span class="material-symbols-outlined">download</span>
@@ -58,7 +59,7 @@
             </div>
 
             <!-- Paso 2: Subir archivo -->
-            <div class="import-card">
+            <div class="import-card" id="import-step-upload">
                 <h2 class="import-card-title">
                     <span class="import-step-num">2</span>
                     <span class="material-symbols-outlined">upload_file</span>
