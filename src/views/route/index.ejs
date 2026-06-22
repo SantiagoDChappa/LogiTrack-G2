@@ -125,5 +125,26 @@
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
+    <script>
+    (function () {
+        var q = new URLSearchParams(window.location.search).get('q');
+        if (!q) return;
+        function apply() {
+            var idEl = document.getElementById('f-rt-id');
+            var driverEl = document.getElementById('f-rt-driver');
+            var transportEl = document.getElementById('f-rt-transport');
+            if (!idEl && !driverEl) return;
+            var target = /^\d{1,9}$/.test(q.trim()) ? idEl : (driverEl || transportEl);
+            if (!target) return;
+            target.value = q.trim();
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', apply);
+        } else {
+            apply();
+        }
+    })();
+    </script>
 </body>
 </html>
