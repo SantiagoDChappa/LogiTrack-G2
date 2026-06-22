@@ -170,6 +170,33 @@
     color: var(--color-text);
 }
 
+.univ-search__item.is-focused,
+.univ-search__more.is-focused {
+    background: var(--color-primary-light);
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.univ-search__item:focus-visible,
+.univ-search__more:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.univ-search__more {
+    display: block;
+    padding: 0.4rem 1rem 0.55rem 3.75rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.univ-search__more:hover {
+    text-decoration: underline;
+    color: var(--color-primary-dark, var(--color-primary));
+}
+
 .univ-search__item-icon {
     display: flex;
     align-items: center;

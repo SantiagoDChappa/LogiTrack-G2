@@ -1,25 +1,27 @@
 <h2>Dónde está</h2>
-<p>La barra de búsqueda está en el header superior, junto a la campana de <a href="/help/notificaciones">notificaciones</a>. Escribí al menos <strong>2 caracteres</strong> para ver resultados.</p>
+<p>La barra de búsqueda está en el header superior, junto a la campana de <a href="/help/notificaciones">notificaciones</a>. Escribí al menos <strong>2 caracteres</strong> para ver resultados. Podés usar <strong>Ctrl+K</strong> (o <strong>Cmd+K</strong> en Mac) para enfocarla desde cualquier pantalla.</p>
 
 <h2>Qué podés buscar</h2>
 <ul>
-    <li><strong>Envíos</strong> — por código de <a href="/help/glosario">tracking</a>, nombre del destinatario o remitente.</li>
-    <li><strong>Incidencias</strong> — por número o código de envío asociado (internas y externas).</li>
-    <li><strong>Rutas</strong> — por número de ruta o nombre del repartidor (supervisor y administrador).</li>
-    <li><strong>Devoluciones</strong> — incidencias tipo <a href="/help/glosario">RETURN</a> vinculadas a envíos.</li>
+    <li><strong>Envíos</strong> — por código de <a href="/help/glosario">tracking</a>, <strong>legacy ID</strong> (importación CSV), nombre del destinatario o remitente.</li>
+    <li><strong>Incidencias</strong> — por número, código de envío asociado o <strong>tipo de incidencia</strong> (ej. daño, retraso).</li>
+    <li><strong>Rutas</strong> — por número de ruta o nombre del repartidor (supervisor, operador y administrador).</li>
+    <li><strong>Devoluciones</strong> — incidencias tipo <a href="/help/glosario">RETURN</a> vinculadas a envíos (supervisor y administrador).</li>
+    <li><strong>Modificaciones portal</strong> — solicitudes de cambio hechas por clientes (tracking, DNI, email o destinatario).</li>
+    <li><strong>Clientes portal</strong> — personas con envíos asociados por documento, email o nombre.</li>
     <li><strong>Tus rutas</strong> — si sos repartidor, solo las asignadas a vos.</li>
-    <li><strong>Usuarios</strong> — por nombre o documento (administrador).</li>
+    <li><strong>Usuarios</strong> — por nombre, email o documento (administrador).</li>
 </ul>
 
-<p>Los resultados se agrupan por categoría. Hacé click en cualquier ítem para ir al detalle.</p>
+<p>Los resultados se agrupan por categoría (hasta 6 por tipo). Si hay más coincidencias, aparece <strong>Ver todos →</strong> para ir al listado filtrado de esa sección.</p>
 
 <h2>Paso a paso</h2>
 <ol>
-    <li>Hacé click en el campo de búsqueda del header o usá el atajo de teclado si está disponible.</li>
-    <li>Escribí al menos 2 caracteres: código de tracking, nombre, número de incidencia o ruta.</li>
+    <li>Usá <strong>Ctrl+K</strong> o hacé click en el campo de búsqueda del header.</li>
+    <li>Escribí al menos 2 caracteres: código de tracking, legacy ID, nombre, número de incidencia o ruta.</li>
     <li>Esperá a que aparezca el panel de resultados agrupados por tipo.</li>
-    <li>Revisá la categoría correcta (Envíos, Incidencias, Rutas, etc.) y hacé click en el ítem deseado.</li>
-    <li>Desde el detalle podés continuar la gestión (cambiar estado, crear incidencia, ver historial).</li>
+    <li>Usá las flechas ↑↓ para moverte entre resultados y Enter para abrir el seleccionado.</li>
+    <li>Revisá la categoría correcta y hacé click en el ítem deseado, o en <strong>Ver todos →</strong> si necesitás ver más.</li>
 </ol>
 
 <h2>Errores frecuentes</h2>
@@ -27,14 +29,16 @@
     <li><strong>No aparecen resultados:</strong> verificá que escribiste al menos 2 caracteres y que el envío o incidencia está dentro de tu alcance (sucursal/rol).</li>
     <li><strong>Encuentro el envío pero no puedo editarlo:</strong> algunos estados finales (Entregado, Cancelado) limitan las acciones disponibles.</li>
     <li><strong>Como repartidor no veo rutas de otros:</strong> la búsqueda respeta tu rol; solo verás envíos, rutas e incidencias asignadas a vos.</li>
+    <li><strong>Legacy ID no encuentra nada:</strong> el envío debe haberse importado con el campo <code>legacyTrackingId</code> completado en el CSV.</li>
 </ul>
 
-<div class="help-tip">Los resultados respetan tu rol: un repartidor solo ve sus envíos, rutas e incidencias asignadas.</div>
+<div class="help-tip">Los resultados respetan tu rol: un repartidor solo ve sus envíos, rutas e incidencias asignadas. Modificaciones portal y clientes portal solo los ve staff (supervisor, operador, admin).</div>
 
 <h2>Artículos relacionados</h2>
 <ul>
     <li><a href="/help/envios">Gestión de envíos</a></li>
     <li><a href="/help/incidencias">Incidencias operativas</a></li>
+    <li><a href="/help/modificaciones-portal">Modificaciones desde el portal</a></li>
     <li><a href="/help/ruteo">Ruteo y optimización</a></li>
     <li><a href="/help/glosario">Glosario</a></li>
 </ul>
