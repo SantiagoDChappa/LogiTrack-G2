@@ -149,7 +149,10 @@ const unlockAccount = async (req, res) => {
   try {
     await userModel.unlockAccount(req.params.id);
     actionLogModel.record(res.locals.currentUser?.id, 'UNLOCK', 'USER', Number(req.params.id), null, req);
-    res.redirect('/user/update/' + req.params.id);
+    // Si vino desde Auditoría > Seguridad, volvemos ahí en vez de a la ficha del usuario.
+    const returnTo = req.body.returnTo;
+    const safeReturn = typeof returnTo === 'string' && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+    res.redirect(safeReturn || '/user/update/' + req.params.id);
   } catch (err) {
     console.error('ERROR unlockAccount:', err.message);
     res.status(500).send('Error al desbloquear la cuenta: ' + err.message);
