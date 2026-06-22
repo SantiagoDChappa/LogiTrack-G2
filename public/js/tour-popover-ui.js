@@ -30,7 +30,11 @@
                 manualLink = document.createElement('a');
                 manualLink.href = '/help/' + opts.helpSlug;
                 manualLink.className = 'lgt-tour-manual-link';
-                manualLink.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">menu_book</span><span>Ver manual</span>';
+                manualLink.innerHTML =
+                    '<span class="lgt-tour-manual-icon" aria-hidden="true">' +
+                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" focusable="false">' +
+                    '<path fill="currentColor" d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T740-80H260Zm280-520v-320H240v640h480v-440H520ZM240-880v640-640Z"/>' +
+                    '</svg></span><span>Ver manual</span>';
             }
 
             var topRow = document.createElement('div');

@@ -97,10 +97,17 @@
     padding: 0 !important;
 }
 
-.driver-popover.lgt-tour-popover .lgt-tour-manual-link .material-symbols-outlined {
-    font-size: 1rem;
-    line-height: 1;
+.lgt-tour-manual-icon {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
     color: var(--color-primary);
+}
+
+.lgt-tour-manual-icon svg {
+    width: 1rem;
+    height: 1rem;
+    display: block;
 }
 
 .driver-popover.lgt-tour-popover .lgt-tour-manual-link:hover,
