@@ -33,7 +33,20 @@ html[data-theme="dark"] {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+    width: 100%;
     max-width: 1300px;
+    /* Centrado: sin esto el reporte queda pegado a la izquierda en monitores
+       grandes (30") con todo el vacío a la derecha. */
+    margin-inline: auto;
+}
+
+/* Monitores grandes (27"–30"): el reporte respira más en vez de quedar
+   angosto al centro de una pantalla enorme. */
+@media (min-width: 1440px) {
+    .report-wrapper { max-width: 1480px; }
+}
+@media (min-width: 2560px) {
+    .report-wrapper { max-width: 1800px; }
 }
 
 .report-card {

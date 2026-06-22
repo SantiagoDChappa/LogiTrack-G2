@@ -2078,6 +2078,7 @@
 /* ── Layout ──────────────────────────────────────────────────── */
 .kanban-page {
   height: 100vh;
+  height: 100dvh; /* iPhone Safari: la barra del navegador no corta el tablero */
   min-height: unset;
   display: flex;
   flex-direction: column;
@@ -2563,7 +2564,7 @@
   .kanban-page { height: auto; overflow: visible; }
   .kanban-board-wrap { overflow-x: auto; overflow-y: visible; }
   .kanban-board { height: auto; align-items: flex-start; }
-  .k-col { width: 240px; max-height: 80vh; }
+  .k-col { width: 240px; max-height: 80vh; max-height: 80dvh; }
   .k-filter-hint { display: none; }
   .k-search-box input { width: 130px; }
 }

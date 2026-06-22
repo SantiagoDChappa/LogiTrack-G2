@@ -1,0 +1,195 @@
+/* ============================================================
+   RESPONSIVE BASE — Cimiento de responsividad y cajas/forms
+   Fuente única de verdad para:
+     · Escala de breakpoints (documentada abajo)
+     · Soporte iPhone (notch / safe-area / dynamic viewport)
+     · Escalado en monitores grandes (27"–30")
+     · Cajas (.lt-box), formularios (.lt-form) y acciones centradas
+   Todo usa variables --color-*/--space-* → claro/oscuro automático.
+   No redefine layout existente; solo agrega utilidades + fixes.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   ESCALA DE BREAKPOINTS — ÚNICA Y OBLIGATORIA
+   CSS no permite variables dentro de @media, así que la escala
+   es una convención: usar SIEMPRE estos 5 anchos, ninguno más.
+
+     ≤ 480px   → móvil (iPhone / Samsung en vertical)
+     ≤ 768px   → tablet vertical
+     ≤ 1024px  → tablet horizontal / sidebar colapsa
+     ≥ 1440px  → desktop grande
+     ≥ 2560px  → monitor 27"–30"
+   ------------------------------------------------------------ */
+
+/* ============================================================
+   1. iPhone iOS — notch, home-indicator y viewport dinámico
+   ============================================================ */
+
+/* 100vh está roto en Safari móvil (la barra del navegador come alto).
+   100dvh sigue al viewport real. Mantenemos 100vh como fallback. */
+.main-content {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Safe-area: solo donde el sidebar desaparece (≤1024) el contenido
+   toca los bordes físicos del teléfono. Respetamos notch e indicador. */
+@supports (padding: max(0px)) {
+  @media (max-width: 1024px) {
+    .main-content {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* ============================================================
+   2. Monitores grandes (27"–30") — que no quede todo chico
+   ============================================================ */
+
+/* Contenedor fluido reutilizable: ancho cómodo en todo lado,
+   pero crece en pantallas enormes en vez de dejar vacío a los lados. */
+.lt-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+@media (min-width: 1440px) {
+  .lt-container { max-width: 1320px; }
+}
+@media (min-width: 2560px) {
+  .lt-container { max-width: 1600px; }
+  html { font-size: 18px; } /* escala tipográfica global en 30" */
+}
+
+/* ============================================================
+   3. CAJA ESTÁNDAR (.lt-box) — misma forma/color en todo el sistema
+   Mirror de .card pero pensada para centrar contenido y forms.
+   Claro/oscuro vía tokens, sin reglas extra.
+   ============================================================ */
+
+/* Wrapper que centra una caja en su espacio disponible. */
+.lt-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.lt-box {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-8);
+}
+
+.lt-box--sm { max-width: 460px; }
+.lt-box--lg { max-width: 900px; }
+
+.lt-box__header {
+  margin-bottom: var(--space-6);
+  text-align: center;
+}
+.lt-box__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.lt-box__subtitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 480px) {
+  .lt-box { padding: var(--space-5); border-radius: var(--radius-md); }
+}
+
+/* ============================================================
+   4. FORMULARIO ESTÁNDAR (.lt-form) — mismo input/label/foco
+   ============================================================ */
+
+.lt-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+}
+/* Una columna en mobile/tablet vertical. */
+@media (max-width: 768px) {
+  .lt-form { grid-template-columns: 1fr; }
+}
+
+/* Campo que ocupa el ancho completo (textarea, título, etc.). */
+.lt-form .field--full { grid-column: 1 / -1; }
+
+.lt-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lt-form label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.lt-form input,
+.lt-form select,
+.lt-form textarea {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition), box-shadow var(--transition);
+  /* ≥44px de alto: target táctil cómodo en iOS/Android. */
+  min-height: 44px;
+}
+
+.lt-form input:focus,
+.lt-form select:focus,
+.lt-form textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  outline: none;
+}
+
+.lt-form .field__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.lt-form .field__error {
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
+}
+
+/* Fila de acciones: centrada, botones a ancho completo en mobile. */
+.lt-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+@media (max-width: 480px) {
+  .lt-form__actions { flex-direction: column; }
+  .lt-form__actions .btn { width: 100%; }
+}
+
+/* ============================================================
+   5. Touch targets — dedo cómodo en táctil sin afectar desktop
+   ============================================================ */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+}
