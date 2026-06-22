@@ -64,6 +64,40 @@
                     <% if (a.userId && a.lastLogin) { %>
                         <span style="color:#9a7b3a">· último login OK: <%= new Date(a.lastLogin).toLocaleString('es-AR') %></span>
                     <% } %>
+                    <% if (_isLockedNow && a.userId) { %>
+                        <form action="/user/<%= a.userId %>/unlock" method="POST" style="margin-left:auto"
+                              onsubmit="return confirm('¿Desbloquear esta cuenta ahora?');">
+                            <button type="submit" class="btn-filter" style="padding:.25rem .6rem;font-size:.75rem">
+                                <span class="material-symbols-outlined" style="font-size:.85rem">lock_open</span> Desbloquear
+                            </button>
+                        </form>
+                    <% } %>
+                </div>
+                <% }) %>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- IPs bloqueadas automáticamente -->
+        <% if (blockedIps && blockedIps.length > 0) { %>
+        <div class="audit-card" style="margin-bottom:1.5rem;border-color:#dc2626">
+            <div class="audit-card-head" style="background:#dc262611">
+                <span class="material-symbols-outlined" style="color:#dc2626">block</span>
+                <h2>IPs bloqueadas automáticamente</h2>
+                <span class="badge-count" style="background:#dc262622;color:#dc2626"><%= blockedIps.length %> activa<%= blockedIps.length === 1 ? '' : 's' %></span>
+            </div>
+            <div class="audit-card-body">
+                <% blockedIps.forEach((b) => { %>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--color-border)">
+                    <code style="font-size:.85rem;background:var(--color-bg);padding:.2rem .5rem;border-radius:5px"><%= b.ip %></code>
+                    <span style="font-size:.8rem;color:var(--color-text-secondary)"><%= b.reason || 'Patrón de ataque detectado' %></span>
+                    <span style="font-size:.78rem;color:var(--color-text-secondary)">· bloqueada hasta las <%= new Date(b.blockedUntil).toLocaleString('es-AR') %></span>
+                    <form action="/auditoria/blocked-ip/<%= b.id %>/unblock" method="POST" style="margin-left:auto"
+                          onsubmit="return confirm('¿Desbloquear esta IP ahora?');">
+                        <button type="submit" class="btn-filter">
+                            <span class="material-symbols-outlined">lock_open</span> Desbloquear
+                        </button>
+                    </form>
                 </div>
                 <% }) %>
             </div>
