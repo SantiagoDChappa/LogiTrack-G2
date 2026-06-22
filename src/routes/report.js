@@ -11,9 +11,6 @@ const {
     exportDeliveryPerformance,
     exportIncidentsByPeriod,
     exportSatisfactionReport,
-    getDashboardSupervisor,
-    getDashboardAdmin,
-    getDashboardOwner,
 } = require('../controllers/report');
 const { getUsersReport, exportUsersReport } = require('../controllers/userReport');
 const { requireAdmin } = require('../middlewares/auth');
@@ -32,10 +29,5 @@ router.get('/satisfaction/export', exportSatisfactionReport);
 // Reporte de usuarios: solo Administrador (historial de cuentas + actividad).
 router.get('/users', requireAdmin, getUsersReport);
 router.get('/users/export', requireAdmin, exportUsersReport);
-
-// Sprint 5 — dashboards analíticos por perfil
-router.get('/dashboard/supervisor', getDashboardSupervisor);
-router.get('/dashboard/admin', getDashboardAdmin);
-router.get('/dashboard/owner', getDashboardOwner);
 
 module.exports = router;

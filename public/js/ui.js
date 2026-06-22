@@ -3,11 +3,24 @@ function toggleNavGroup(id) {
     if (group) group.classList.toggle('open');
 }
 
-// Auto-abrir grupo de reportes si la URL actual es /report/...
+// Auto-abrir el nav group que contiene la página actual
 (function () {
-    if (window.location.pathname.startsWith('/report/')) {
-        const group = document.getElementById('nav-group-reportes');
-        if (group) group.classList.add('open');
+    const path = window.location.pathname;
+    if (path.startsWith('/dashboard/')) {
+        const g = document.getElementById('nav-group-dashboard');
+        if (g) g.classList.add('open');
+    } else if (path.startsWith('/report/')) {
+        const g = document.getElementById('nav-group-reportes');
+        if (g) g.classList.add('open');
+    } else if (path.startsWith('/auditoria')) {
+        const g = document.getElementById('nav-group-auditoria');
+        if (g) g.classList.add('open');
+    } else if (path.startsWith('/setting/')) {
+        const g = document.getElementById('nav-group-ajustes');
+        if (g) g.classList.add('open');
+    } else if (path.startsWith('/notification/')) {
+        const g = document.getElementById('nav-group-notificaciones');
+        if (g) g.classList.add('open');
     }
 })();
 
