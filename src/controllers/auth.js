@@ -56,9 +56,15 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
         const { sendEmail } = require('../services/notification/emailSender');
         const blockedIpModel = require('../models/blockedIp');
 
+        const whitelistedIpModel = require('../models/whitelistedIp');
         const sharedIps = await loginLogModel.getSharedAttackIps({ hours: 2 }).catch(() => []);
         const blockedIps = [];
+        const skippedIps = [];
         for (const row of sharedIps) {
+            if (await whitelistedIpModel.isWhitelisted(row.ip)) {
+                skippedIps.push(row.ip);
+                continue;
+            }
             await blockedIpModel.block(row.ip, IP_BLOCK_MINUTES, `Intentos fallidos contra ${row.accounts} cuentas distintas`);
             blockedIps.push(row.ip);
         }
@@ -69,9 +75,14 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
         const emails = [...new Set(admins.map(a => a.email).filter(Boolean))];
         if (emails.length === 0) { return; }
 
-        const ipSection = blockedIps.length > 0
-            ? `<p style="font-size:15px;color:#1e293b">Los intentos vinieron de la <strong>misma IP</strong> en varias cuentas, así que la bloqueamos automáticamente por ${IP_BLOCK_MINUTES} minutos: <strong>${blockedIps.join(', ')}</strong>.</p>`
-            : `<p style="font-size:15px;color:#1e293b">Las cuentas bloqueadas no comparten la misma IP de origen, así que no se bloqueó ninguna IP automáticamente. Te recomendamos revisarlo igual.</p>`;
+        let ipSection;
+        if (blockedIps.length > 0) {
+            ipSection = `<p style="font-size:15px;color:#1e293b">Los intentos vinieron de la <strong>misma IP</strong> en varias cuentas, así que la bloqueamos automáticamente por ${IP_BLOCK_MINUTES} minutos: <strong>${blockedIps.join(', ')}</strong>.</p>`;
+        } else if (skippedIps.length > 0) {
+            ipSection = `<p style="font-size:15px;color:#1e293b">Los intentos vinieron de la misma IP en varias cuentas (<strong>${skippedIps.join(', ')}</strong>), pero está en la lista de IPs de confianza, así que no se bloqueó automáticamente. Revisalo igual.</p>`;
+        } else {
+            ipSection = `<p style="font-size:15px;color:#1e293b">Las cuentas bloqueadas no comparten la misma IP de origen, así que no se bloqueó ninguna IP automáticamente. Te recomendamos revisarlo igual.</p>`;
+        }
 
         const subject = `Alerta de seguridad: ${lockedCount} cuentas bloqueadas simultáneamente en LogiTrack`;
         const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
@@ -80,7 +91,7 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
             <p style="font-size:15px;color:#1e293b">Hay <strong>${lockedCount} cuentas bloqueadas</strong> al mismo tiempo por intentos fallidos de login. Esto puede indicar un intento de acceso coordinado contra varias cuentas.</p>
             ${ipSection}
-            <p style="margin:20px 0"><a href="${appBaseUrl()}/auditoria" style="background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;display:inline-block">Revisar en Auditoría</a></p>
+            <p style="margin:20px 0"><a href="${appBaseUrl()}/auditoria/seguridad" style="background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;display:inline-block">Revisar en Auditoría</a></p>
             <p style="font-size:13px;color:#64748b">Recibís este aviso porque sos administrador de LogiTrack.</p>
         </div>`;
         await sendEmail(emails, subject, html, 'html');

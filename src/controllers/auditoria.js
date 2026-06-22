@@ -2,7 +2,9 @@ const loginLogModel  = require('../models/loginLog');
 const actionLogModel = require('../models/actionLog');
 const settingLogModel = require('../models/settingLog');
 const userModel = require('../models/user');
+const branchModel = require('../models/branch');
 const blockedIpModel = require('../models/blockedIp');
+const whitelistedIpModel = require('../models/whitelistedIp');
 const { RoleType } = require('../constants/enums');
 const { avatarColor, initials } = require('../utils/auditHelpers');
 
@@ -10,14 +12,13 @@ const ROLE_LABELS = Object.fromEntries(Object.values(RoleType).map(r => [r.id, r
 
 // Compartido entre la página de Resumen y su export CSV, para no duplicar las queries.
 const buildResumenData = async () => {
-    const [sessionTotal, actionTotal, activeUsers, failedAccounts, activityRows, activeUserStats, blockedIps] = await Promise.all([
+    const [sessionTotal, actionTotal, activeUsers, failedAccounts, activityRows, activeUserStats] = await Promise.all([
         loginLogModel.getAll({ page: 1, limit: 1 }).catch(() => ({ count: 0, rows: [] })),
         actionLogModel.getAll({ page: 1, limit: 1 }).catch(() => ({ count: 0 })),
         loginLogModel.getActiveUsers().catch(() => []),
         loginLogModel.getFailedByAccount({ hours: 24, minAttempts: 3 }).catch(() => []),
         loginLogModel.getActivityByDay({ days: 7 }).catch(() => []),
         loginLogModel.getActiveUserStats().catch(() => ({ dau: 0, wau: 0, mau: 0 })),
-        blockedIpModel.getAllActive().catch(() => []),
     ]);
 
     const activityMap = {};
@@ -45,13 +46,51 @@ const buildResumenData = async () => {
         failedAccounts,
         activity,
         activeUserStats,
-        blockedIps,
     };
 };
 
 const getResumen = async (req, res) => {
     const data = await buildResumenData();
-    res.render('auditoria/resumen', { ...data, roleLabels: ROLE_LABELS });
+    res.render('auditoria/resumen', data);
+};
+
+const getSeguridad = async (req, res) => {
+    const [failedAccounts, blockedIps, branches, whitelistedIps] = await Promise.all([
+        loginLogModel.getFailedByAccount({ hours: 24, minAttempts: 3 }).catch(() => []),
+        blockedIpModel.getAllActive().catch(() => []),
+        branchModel.getAll().catch(() => []),
+        whitelistedIpModel.getAll().catch(() => []),
+    ]);
+    res.render('auditoria/seguridad', { failedAccounts, blockedIps, branches, whitelistedIps, roleLabels: ROLE_LABELS, avatarColor, initials });
+};
+
+// LGT-193 — agregar una IP a la lista de confianza (nunca se bloquea automáticamente).
+const addWhitelistedIp = async (req, res) => {
+    try {
+        const ip = String(req.body.ip || '').trim();
+        if (!ip) { return res.redirect('/auditoria/seguridad'); }
+        await whitelistedIpModel.add(ip, req.body.note);
+        // Si esa IP ya estaba bloqueada, la liberamos al instante: no tiene sentido
+        // que quede bloqueada una IP que acabamos de marcar como de confianza.
+        await blockedIpModel.unblockByIp(ip);
+        actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'IP', null, { ip, note: req.body.note }, req);
+        res.redirect('/auditoria/seguridad');
+    } catch (err) {
+        console.error('ERROR addWhitelistedIp:', err.message);
+        res.status(500).send('Error al agregar la IP: ' + err.message);
+    }
+};
+
+// Quitar una IP de la lista de confianza.
+const removeWhitelistedIp = async (req, res) => {
+    try {
+        await whitelistedIpModel.remove(req.params.id);
+        actionLogModel.record(res.locals.currentUser?.id, 'DELETE', 'IP', Number(req.params.id), null, req);
+        res.redirect('/auditoria/seguridad');
+    } catch (err) {
+        console.error('ERROR removeWhitelistedIp:', err.message);
+        res.status(500).send('Error al quitar la IP: ' + err.message);
+    }
 };
 
 const getUsuariosActivos = async (req, res) => {
@@ -227,4 +266,4 @@ const unblockIp = async (req, res) => {
     }
 };
 
-module.exports = { getResumen, getUsuariosActivos, getSesiones, getAcciones, getConfiguracion, exportCsv, exportResumenCsv, unblockIp };
+module.exports = { getResumen, getSeguridad, getUsuariosActivos, getSesiones, getAcciones, getConfiguracion, exportCsv, exportResumenCsv, unblockIp, addWhitelistedIp, removeWhitelistedIp };

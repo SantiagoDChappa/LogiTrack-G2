@@ -123,9 +123,8 @@
                     <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">lock</span>
                     Esta cuenta está bloqueada hasta las <%= new Date(user.lockedUntil).toLocaleString('es-AR') %> por intentos fallidos de login.
                 </p>
-                <form action="/user/<%= user.id %>/unlock" method="POST"
-                      onsubmit="return confirm('¿Desbloquear esta cuenta ahora?');">
-                    <button type="submit" class="btn btn--ghost">
+                <form id="form-unlock" action="/user/<%= user.id %>/unlock" method="POST">
+                    <button type="button" id="btn-unlock" class="btn btn--ghost">
                         <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">lock_open</span>
                         Desbloquear cuenta ahora
                     </button>
@@ -162,6 +161,25 @@
                         cancelButtonColor: isDark ? '#475569' : '#6b7280',
                     }, swalTheme)).then(function (result) {
                         if (result.isConfirmed) { document.getElementById('form-2fa-reset').submit(); }
+                    });
+                });
+            }
+
+            // LGT-193 — desbloqueo manual de cuenta: confirmación in-page (no popup del navegador).
+            var btnUnlock = document.getElementById('btn-unlock');
+            if (btnUnlock) {
+                btnUnlock.addEventListener('click', function () {
+                    Swal.fire(Object.assign({
+                        icon: 'question',
+                        title: '¿Desbloquear esta cuenta ahora?',
+                        text: 'El usuario va a poder volver a intentar ingresar de inmediato.',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, desbloquear',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#dc2626',
+                        cancelButtonColor: isDark ? '#475569' : '#6b7280',
+                    }, swalTheme)).then(function (result) {
+                        if (result.isConfirmed) { document.getElementById('form-unlock').submit(); }
                     });
                 });
             }

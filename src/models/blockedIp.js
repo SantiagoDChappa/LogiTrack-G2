@@ -31,4 +31,7 @@ const getAllActive = () =>
 
 const unblock = (id) => BlockedIp.destroy({ where: { id } });
 
-module.exports = { BlockedIp, block, isBlocked, getAllActive, unblock };
+// Usado al agregar una IP a la lista de confianza: si ya estaba bloqueada, se libera.
+const unblockByIp = (ip) => BlockedIp.destroy({ where: { ip } });
+
+module.exports = { BlockedIp, block, isBlocked, getAllActive, unblock, unblockByIp };
