@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser, reset2fa, unlockAccount } = require('../controllers/user.js');
+const { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser, reset2fa, unlockAccount, getHistorial } = require('../controllers/user.js');
 const { validateUser, handleValidationErrors, validateUpdateUser, handleUpdateValidationErrors } = require('../middlewares/user.js');
 const { requireAdmin } = require('../middlewares/auth.js');
 
@@ -15,5 +15,7 @@ router.post('/delete/:id', requireAdmin, deleteUser);
 router.post('/:id/2fa/reset', requireAdmin, reset2fa);
 // LGT-193 — desbloqueo manual de cuenta bloqueada por intentos fallidos.
 router.post('/:id/unlock', requireAdmin, unlockAccount);
+// Historial del usuario: ingresos y cambios sobre su cuenta.
+router.get('/:id/historial', requireAdmin, getHistorial);
 
 module.exports = router;
