@@ -332,6 +332,9 @@
                         <span class="material-symbols-outlined">arrow_forward</span>
                     </span>
                 </a>
+                <%# [prototype] Offline: si la ruta está EN CURSO, delivery-offline.js la deja lista
+                    para operar sin conexión aunque el repartidor se quede sin señal en el home. %>
+                <script>window.LT_ACTIVE_ROUTE_ID = <%= activeSummary.id %>; window.LT_ACTIVE_ROUTE_INROUTE = <%= activeSummary.statusId === 2 ? 'true' : 'false' %>;</script>
             <% } else if (driverDisabled) { %>
                 <%# Inhabilitado sin ruta activa: card rojo informativo, click abre popup. %>
                 <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"
@@ -485,11 +488,11 @@
     <script>
         document.getElementById('btn-reschedule-failed')?.addEventListener('click', async (ev) => {
             ev.preventDefault();
-            if (!confirm('¿Devolver tus envíos con intento fallido a sucursal para reprogramar?')) return;
+            if (!(await window.ltConfirm({ title: '¿Devolver tus envíos con intento fallido?', text: 'Volverán a sucursal para reprogramar.', confirmButtonText: 'Sí, devolver' }))) return;
             const r = await fetch('/delivery/reschedule-failed', { method: 'POST' });
             const d = await r.json();
-            if (r.ok) { alert('Reprogramados: ' + d.rescheduled); location.reload(); }
-            else { alert(d.error || 'Error'); }
+            if (r.ok) { await window.ltAlert({ icon: 'success', title: 'Listo', text: 'Reprogramados: ' + d.rescheduled }); location.reload(); }
+            else { await window.ltAlert({ icon: 'error', title: 'Error', text: d.error || 'No se pudo procesar.' }); }
         });
 
         function showQR(id, trackingId) {

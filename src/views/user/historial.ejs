@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Historial de <%= user.fullName %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <div class="audit-hero">
+            <div class="audit-hero-icon">
+                <span class="material-symbols-outlined">history</span>
+            </div>
+            <div>
+                <h1>Historial de <%= user.fullName %></h1>
+                <p><%= user.email %> — Ingresos al sistema y cambios sobre su cuenta.</p>
+            </div>
+            <a href="<%= returnUrl %>" class="btn-filter" style="margin-left:auto">
+                <span class="material-symbols-outlined">arrow_back</span> Volver
+            </a>
+        </div>
+
+        <% if ((!logins || logins.length === 0) && (!changes || changes.length === 0)) { %>
+        <div class="audit-card">
+            <div class="audit-card-body">
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">inbox</span>
+                    Sin actividad registrada.
+                </div>
+            </div>
+        </div>
+        <% } else { %>
+
+        <div class="audit-tabs">
+            <a href="#" class="audit-tab active" data-tab="ingresos"><span class="material-symbols-outlined">login</span>Ingresos <span class="badge-count"><%= logins.length %></span></a>
+            <a href="#" class="audit-tab" data-tab="cambios"><span class="material-symbols-outlined">edit_note</span>Cambios <span class="badge-count"><%= changes.length %></span></a>
+        </div>
+
+        <!-- Ingresos -->
+        <div class="audit-card" id="tab-ingresos">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">login</span>
+                <h2>Ingresos al sistema</h2>
+                <span class="badge-count"><%= logins.length %> registro<%= logins.length === 1 ? '' : 's' %></span>
+            </div>
+            <div class="audit-card-body">
+                <% if (logins.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">person_off</span>
+                    Este usuario nunca ingresó al sistema.
+                </div>
+                <% } else { %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>IP</th></tr>
+                        </thead>
+                        <tbody>
+                            <% logins.forEach(l => { %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= new Date(l.createdAt).toLocaleString('es-AR') %></td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= l.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Cambios -->
+        <div class="audit-card" id="tab-cambios" style="display:none">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">edit_note</span>
+                <h2>Cambios sobre la cuenta</h2>
+                <span class="badge-count"><%= changes.length %> registro<%= changes.length === 1 ? '' : 's' %></span>
+            </div>
+            <div class="audit-card-body">
+                <% if (changes.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">history_toggle_off</span>
+                    No hay cambios registrados sobre esta cuenta.
+                </div>
+                <% } else { %>
+                <%
+                    const _actionLabel = (a) => {
+                        if (a === 'CREATE') return 'Cuenta creada';
+                        if (a === 'UPDATE') return 'Datos modificados';
+                        if (a === 'DELETE') return 'Usuario dado de baja';
+                        if (a === 'UNLOCK') return 'Cuenta desbloqueada manualmente';
+                        return a;
+                    };
+                %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Quién</th><th>Acción</th><th>Detalle</th></tr>
+                        </thead>
+                        <tbody>
+                            <% changes.forEach(c => { %>
+                            <%
+                                let _detail = {};
+                                try { _detail = c.detail ? JSON.parse(c.detail) : {}; } catch (e) { _detail = {}; }
+                            %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= new Date(c.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= c.user?.fullName || 'Sistema' %></td>
+                                <td><span class="badge-role"><%= _actionLabel(c.action) %></span></td>
+                                <td style="font-size:.85rem">
+                                    <% if (c.action === 'UPDATE' && Array.isArray(_detail.changes) && _detail.changes.length > 0) { %>
+                                    <% _detail.changes.forEach(ch => { %>
+                                    <div><strong><%= ch.field %>:</strong> <span style="color:var(--color-text-secondary)"><%= ch.before || '—' %></span> → <%= ch.after || '—' %></div>
+                                    <% }) %>
+                                    <% } else if (c.action === 'CREATE') { %>
+                                    <span style="color:var(--color-text-secondary)"><%= _detail.email || '' %><% if (_detail.roleId) { %> · rol #<%= _detail.roleId %><% } %></span>
+                                    <% } else { %>
+                                    —
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+        </div>
+        <% } %>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.querySelectorAll('.audit-tab[data-tab]').forEach((tab) => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.audit-tab[data-tab]').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('[id^="tab-"]').forEach(el => { el.style.display = 'none'; });
+                const target = document.getElementById('tab-' + tab.dataset.tab);
+                if (target) { target.style.display = ''; }
+            });
+        });
+    </script>
+</body>
+</html>

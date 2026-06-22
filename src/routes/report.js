@@ -12,6 +12,8 @@ const {
     exportIncidentsByPeriod,
     exportSatisfactionReport,
 } = require('../controllers/report');
+const { getUsersReport, exportUsersReport } = require('../controllers/userReport');
+const { requireAdmin } = require('../middlewares/auth');
 
 router.get('/shipments-by-period', getShipmentsByPeriod);
 router.get('/shipments-by-period/export', exportShipmentsByPeriod);
@@ -23,5 +25,9 @@ router.get('/incidents-by-period', getIncidentsByPeriod);
 router.get('/incidents-by-period/export', exportIncidentsByPeriod);
 router.get('/satisfaction', getSatisfactionReport);
 router.get('/satisfaction/export', exportSatisfactionReport);
+
+// Reporte de usuarios: solo Administrador (historial de cuentas + actividad).
+router.get('/users', requireAdmin, getUsersReport);
+router.get('/users/export', requireAdmin, exportUsersReport);
 
 module.exports = router;

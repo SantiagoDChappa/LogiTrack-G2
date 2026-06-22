@@ -116,7 +116,14 @@ async function recordOfflineAction(req, res, statusCode, body, conflict) {
 async function offlineIdempotency(req, res, next) {
     if (req.method !== 'POST') { return next(); }
     const key = req.get('Idempotency-Key');
-    if (!key) { return next(); }
+    // 'undefined'/'null' llegan como string si el cliente setea el header con un valor JS
+    // undefined. Tratarlos como sin-clave evita que TODAS las acciones colisionen en una
+    // única fila y se deduplicen entre sí (bug "encola pero no actualiza").
+    if (!key || key === 'undefined' || key === 'null') { return next(); }
+    // [sync-debug] Toda acción re-sincronizada llega acá (lleva Idempotency-Key). Log visible
+    // en Render para diagnosticar por qué "encola pero no actualiza". Quitar cuando se resuelva.
+    const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
+    console.log(`[sync] recv user=${uid} ${req.method} ${req.originalUrl} key=${key} queuedAt=${req.get('X-Queued-At') || '-'}`);
     try {
         const rows = await sequelize.query(
             'SELECT "statusCode","responseBody" FROM logitrack.offline_action WHERE "idempotencyKey"=:k',
@@ -125,6 +132,7 @@ async function offlineIdempotency(req, res, next) {
         if (rows.length) {
             // Ya aplicada: respondemos sin volver a ejecutar el handler (dedupe del reintento).
             const code = rows[0].statusCode || 200;
+            console.log(`[sync] dedupe key=${key} prevStatus=${code} (NO se re-ejecuta el handler)`);
             return res.status(code).json({ ok: code < 400, deduped: true });
         }
         // Gana el servidor: si la ruta ya está cerrada/cancelada/interrumpida, rechazamos.
@@ -132,6 +140,7 @@ async function offlineIdempotency(req, res, next) {
         if (m) {
             const route = await Route.findByPk(Number(m[1]), { attributes: ['statusId'] }).catch(() => null);
             if (route && [RouteStatus.FINISHED, RouteStatus.CANCELLED, RouteStatus.INTERRUPTED].includes(route.statusId)) {
+                console.log(`[sync] conflict route=${m[1]} statusId=${route.statusId} key=${key} → 409 (ruta cerrada)`);
                 const body = { ok: false, conflict: true, error: 'La ruta fue cerrada o reasignada mientras estabas sin conexión; esta acción no se aplicó.' };
                 await recordOfflineAction(req, res, 409, body, true);
                 return res.status(409).json(body);
@@ -139,7 +148,10 @@ async function offlineIdempotency(req, res, next) {
         }
         // Registra la acción al terminar la respuesta (cubre json, redirect y send) para
         // deduplicar reintentos futuros con la misma clave.
-        res.on('finish', () => { recordOfflineAction(req, res, res.statusCode || 200, null, false); });
+        res.on('finish', () => {
+            console.log(`[sync] applied key=${key} ${req.method} ${req.originalUrl} → status=${res.statusCode}`);
+            recordOfflineAction(req, res, res.statusCode || 200, null, false);
+        });
         return next();
     } catch (e) {
         console.error('offlineIdempotency:', e.message);
@@ -147,6 +159,15 @@ async function offlineIdempotency(req, res, next) {
     }
 }
 router.use(offlineIdempotency);
+
+// [sync-debug] Beacon cliente→Render: el flush de la cola corre en el navegador/SW, así que
+// sus decisiones no se ven en los logs del server. La página postea acá para reflejarlas en
+// Render (igual que /fatigue/voz-log). Best-effort, sin auth estricta. Quitar al resolver.
+router.post('/sync-log', requireDelivery, (req, res) => {
+    const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
+    console.log(`[sync][cliente] user=${uid}`, JSON.stringify(req.body).slice(0, 1000));
+    res.status(204).end();
+});
 
 // Bundle del ruteo activo para operar offline. Solo la ruta IN_ROUTE del propio
 // repartidor, con los datos mínimos necesarios (se cachean CIFRADOS en el dispositivo).

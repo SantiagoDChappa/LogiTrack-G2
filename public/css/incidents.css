@@ -271,7 +271,9 @@ html[data-theme="dark"] {
 
 .portal-incident-form {
     max-width: 720px;
-    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+    /* Centrado: capado a 720px pero antes quedaba pegado a la izquierda en
+       monitores grandes. El padding interno conserva el margen en mobile. */
+    margin: 1rem auto;
     padding: 1.75rem 1.75rem 1.5rem;
     background: var(--inc-surface);
     border: 1px solid var(--inc-border);
@@ -796,6 +798,7 @@ section.incident-detail-card {
     position: relative;
     padding: clamp(28px, 5vw, 56px) 24px 64px;
     min-height: calc(100vh - 64px);
+    min-height: calc(100dvh - 64px); /* iPhone Safari: alto real sin barra del navegador */
     background:
         radial-gradient(circle at top left, rgba(37, 99, 235, .16), transparent 32%),
         radial-gradient(circle at bottom right, rgba(14, 165, 233, .10), transparent 28%),

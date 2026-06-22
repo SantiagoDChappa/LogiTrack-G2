@@ -2460,7 +2460,19 @@
         });
         if (!c.isConfirmed) return;
         const r = await post(`/delivery/route/${routeId}/finish`);
-        if (r) window.location.href = `/delivery/route/${routeId}/summary`;
+        if (!r) return;
+        // Offline: el /finish quedó en la cola (queued). Avisamos y volvemos al inicio;
+        // al recuperar internet se sincroniza todo (estados, fallidos, mails de incidencia).
+        if (r.queued) {
+            await Swal.fire({
+                icon: 'success', title: 'Ruta finalizada',
+                html: 'Quedó guardada sin conexión. Cuando vuelva internet se sincronizan los estados de envío, la ruta y los avisos automáticamente.',
+                confirmButtonColor: '#16a34a',
+            });
+            window.location.href = '/delivery';
+            return;
+        }
+        window.location.href = `/delivery/route/${routeId}/summary`;
     });
 
     // === POD: navega a la página de evidencia (sirve online y offline) ==============

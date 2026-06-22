@@ -108,8 +108,26 @@
         const db = await openDB();
         const t = db.transaction(STORE_OUTBOX, 'readwrite');
         t.objectStore(STORE_OUTBOX).clear();
-        return txDone(t);
+        await txDone(t);
+        // [sync-debug] El rastro NO se borra acá a propósito: así, si un clearAll vacía la
+        // cola entre el encolado y el flush, queda registrado y lo vemos en Render. Quitar al resolver.
+        await pushTrail({ ev: 'clearAll' }).catch(() => {});
     }
+
+    // ── [sync-debug] Rastro de encolado (texto plano, sin datos personales) ──────────────
+    // slog no puede llegar a Render estando offline. Persistimos un breadcrumb por cada
+    // acción encolada (kind/stop, NO trackingId) para reportarlo al reconectar y ver en
+    // Render qué se encoló realmente y si algo lo borró. Cap 60. Quitar cuando se resuelva.
+    async function pushTrail(entry) {
+        try {
+            const arr = (await metaGet('syncTrail')) || [];
+            arr.push(Object.assign({ t: Date.now() }, entry));
+            while (arr.length > 60) { arr.shift(); }
+            await metaSet('syncTrail', arr);
+        } catch (_) { /* best-effort */ }
+    }
+    async function readTrail() { try { return (await metaGet('syncTrail')) || []; } catch (_) { return []; } }
+    async function clearTrail() { try { await metaDel('syncTrail'); } catch (_) { /* */ } }
 
     // ── Outbox (cola de acciones, cifrada) ──
     async function enqueue(action) {
@@ -121,13 +139,18 @@
         const t = db.transaction(STORE_OUTBOX, 'readwrite');
         t.objectStore(STORE_OUTBOX).put({ id, idempotencyKey: id, enc, ts: action.ts });
         await txDone(t);
+        // [sync-debug] breadcrumb del encolado (sin trackingId). Quitar al resolver.
+        await pushTrail({ ev: 'enq', kind: action.kind || null, routeId: action.routeId || null }).catch(() => {});
         return id;
     }
     async function listOutbox() {
         const db = await openDB();
         const rows = await reqP(db.transaction(STORE_OUTBOX, 'readonly').objectStore(STORE_OUTBOX).getAll());
         const out = [];
-        for (const r of rows) { out.push({ id: r.id, ts: r.ts, action: await decrypt(r.enc) }); }
+        // idempotencyKey: imprescindible. flushOutbox lo manda como header Idempotency-Key;
+        // si falta, el server recibe "undefined" y TODAS las acciones colisionan en la misma
+        // fila → dedupe → nunca se aplican ("encola pero no actualiza"). r.id == la clave.
+        for (const r of rows) { out.push({ id: r.id, idempotencyKey: r.idempotencyKey || r.id, ts: r.ts, action: await decrypt(r.enc) }); }
         out.sort((a, b) => a.ts - b.ts);  // FIFO
         return out;
     }
@@ -182,5 +205,6 @@
     global.LTOffline = {
         saveBundle, getBundle, clearAll,
         enqueue, listOutbox, removeFromOutbox, outboxCount, flushOutbox,
+        pushTrail, readTrail, clearTrail,
     };
 })(typeof self !== 'undefined' ? self : this);
