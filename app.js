@@ -56,6 +56,7 @@ const notificationInAppRoutes = require('./src/routes/notificationInApp');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
 const onboardingRoutes = require('./src/routes/onboarding');
+const helpRoutes       = require('./src/routes/help');
 const apiSearchRoutes  = require('./src/routes/api/search');
 const accountRoutes    = require('./src/routes/account');
 const passwordResetRoutes = require('./src/routes/passwordReset');
@@ -135,6 +136,7 @@ app.use('/brand', require('./src/routes/brand'));
 
 // Rutas Protegidas
 app.use('/home', requireAuth, homeRoutes);
+app.use('/help', requireAuth, helpRoutes);
 // Cuenta del usuario (cambio de contraseña forzado en primer ingreso / reset).
 app.use('/account', requireAuth, accountRoutes);
 app.use('/user',          requireAuth, requireSupervisor, userRoutes);

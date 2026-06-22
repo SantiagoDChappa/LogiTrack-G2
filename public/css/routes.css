@@ -526,7 +526,8 @@ html[data-theme="dark"] {
 .page-header__actions {
     display: flex;
     gap: .55rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
 }
 
 /* ============================================================

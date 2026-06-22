@@ -53,13 +53,16 @@
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header fatigue-page-header">
             <h1>👁 Ojo de Patrón — Control de fatiga</h1>
+            <div class="page-header__actions">
+                <%- include('../partials/page-help-btn', { helpModule: 'ojo-patron' }) %>
             <% if (isAdmin) { %>
                 <a href="/fatigue/config" class="btn-secondary">
                     <span class="material-symbols-outlined">tune</span>Configuración
                 </a>
             <% } %>
+            </div>
         </div>
 
         <div class="settings-content">
@@ -69,7 +72,7 @@
             </p>
 
             <!-- Rutas bloqueadas -->
-            <section>
+            <section id="fatigue-blocked-section">
                 <h2 class="fb-section-title">Rutas bloqueadas por fatiga</h2>
                 <% if (!blocked.length) { %>
                     <p class="fb-empty">No hay rutas bloqueadas por fatiga.</p>
@@ -98,7 +101,7 @@
             </section>
 
             <!-- Avisos sin bloqueo (autoBlock OFF + no apto): salió igual, decidir qué hacer -->
-            <section>
+            <section id="fatigue-review-section">
                 <h2 class="fb-section-title">Avisos de fatiga sin bloqueo</h2>
                 <% if (!reviews || !reviews.length) { %>
                     <p class="fb-empty">No hay avisos pendientes. (Aparecen cuando un transportista no supera el control pero el bloqueo automático está desactivado.)</p>

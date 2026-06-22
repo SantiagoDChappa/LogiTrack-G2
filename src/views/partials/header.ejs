@@ -141,6 +141,9 @@
             <span><%= nombreEmpresa %></span>
         </a>
         <%- include('search') %>
+        <a href="/help" class="help-header-btn" aria-label="Centro de ayuda" title="Centro de ayuda">
+            <span class="material-symbols-outlined">help</span>
+        </a>
         <%- include('notificationBell') %>
         <div class="user">
             <% if (currentUser.hasAvatar) { %>
@@ -156,6 +159,7 @@
             <li>
                 <ul><a href="/account/profile"><span class="material-symbols-outlined">person</span>Mi perfil</a></ul>
                 <ul><a href="/account/2fa"><span class="material-symbols-outlined">security</span>Seguridad (2FA)</a></ul>
+                <ul><a href="/help"><span class="material-symbols-outlined">menu_book</span>Centro de ayuda</a></ul>
                 <ul><a href="#" id="btn-replay-tour"><span class="material-symbols-outlined">tour</span>Ver tour de nuevo</a></ul>
                 <div class="dropdown-divider"></div>
                 <ul class="danger"><a href="/logout"><span class="material-symbols-outlined">logout</span>Cerrar sesión</a></ul>

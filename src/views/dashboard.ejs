@@ -14,6 +14,7 @@
             <div class="page-header">
                 <h1>Inicio - Panel General</h1>
                 <div class="header-quick-actions">
+                    <%- include('partials/page-help-btn', { helpModule: 'panel-general', showTour: false }) %>
                     <a href="/shipment/new" class="btn-primary quick-btn">
                         <span class="material-symbols-outlined">add_box</span>
                         Crear Nuevo Envío

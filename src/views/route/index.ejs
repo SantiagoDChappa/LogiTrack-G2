@@ -79,7 +79,7 @@
                             <tr>
                                 <td colspan="9" class="empty-row">
                                     <span class="material-symbols-outlined">route</span>
-                                    Sin rutas creadas.
+                                    <%- include('../partials/help-empty-hint', { message: 'Sin rutas creadas.', helpSlug: 'ruteo', actionHref: '/route/optimize', actionLabel: 'Optimizar ruteo' }) %>
                                 </td>
                             </tr>
                         <% } else { %>
