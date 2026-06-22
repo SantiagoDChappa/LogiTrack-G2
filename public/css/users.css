@@ -255,6 +255,16 @@ html[data-theme="dark"] .users-module {
 .users-module .action-btn.modificar:hover { border-color: var(--usr-blue);  color: var(--usr-blue); }
 .users-module .action-btn.eliminar:hover  { border-color: var(--usr-red);   color: var(--usr-red); }
 
+/* CTAs "grandes" del formulario (Guardar / Dar de baja / Volver): conservan el color
+   semántico del sistema en vez del estilo neutro de los íconos de la tabla, que de otro
+   modo los pinta de gris (el override de .users-module .action-btn ganaba por orden de carga). */
+.users-module .action-btn--lg.guardar  { background: var(--color-success-bg); color: var(--color-success); border-color: transparent; }
+.users-module .action-btn--lg.eliminar { background: var(--btn-eliminar-bg);  color: var(--btn-eliminar-text); border-color: transparent; }
+.users-module .action-btn--lg.volver   { background: var(--color-surface-alt); color: var(--color-text-secondary); border-color: transparent; }
+.users-module .action-btn--lg.guardar:hover  { background: var(--color-success-bg); color: var(--color-success); border-color: transparent; filter: brightness(.95); }
+.users-module .action-btn--lg.eliminar:hover { background: var(--btn-eliminar-bg);  color: var(--btn-eliminar-text); border-color: transparent; filter: brightness(.95); }
+.users-module .action-btn--lg.volver:hover   { background: var(--color-surface-alt); color: var(--color-text-secondary); border-color: transparent; filter: brightness(.95); }
+
 .users-module .action-btn[data-tooltip]::after {
     content: attr(data-tooltip);
     position: absolute;

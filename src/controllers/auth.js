@@ -46,14 +46,43 @@ const sendLockoutEmail = async (user, ip, lockedUntil) => {
 };
 
 // #LGT-193 — si hay 2+ cuentas bloqueadas al mismo tiempo, puede ser un ataque
-// coordinado (no solo un usuario que se equivocó de contraseña). Avisamos a los
-// admins activos para que lo revisen en Auditoría.
+// coordinado (no solo un usuario que se equivocó de contraseña). Si además los
+// intentos vienen de la misma IP en varias cuentas, la bloqueamos automáticamente.
+// Avisamos a los admins activos con el resultado para que lo revisen en Auditoría.
+const IP_BLOCK_MINUTES = 60;
+
 const notifyAdminsSuspiciousActivity = async (lockedCount) => {
     try {
         const { sendEmail } = require('../services/notification/emailSender');
+        const blockedIpModel = require('../models/blockedIp');
+
+        const whitelistedIpModel = require('../models/whitelistedIp');
+        const sharedIps = await loginLogModel.getSharedAttackIps({ hours: 2 }).catch(() => []);
+        const blockedIps = [];
+        const skippedIps = [];
+        for (const row of sharedIps) {
+            if (await whitelistedIpModel.isWhitelisted(row.ip)) {
+                skippedIps.push(row.ip);
+                continue;
+            }
+            await blockedIpModel.block(row.ip, IP_BLOCK_MINUTES, `Intentos fallidos contra ${row.accounts} cuentas distintas`);
+            blockedIps.push(row.ip);
+        }
+
         const admins = await userModel.getActiveAdmins();
-        const emails = admins.map(a => a.email).filter(Boolean);
+        // SendGrid rechaza el envío entero si hay un email duplicado en la lista
+        // de destinatarios (puede pasar si dos cuentas activas comparten el mismo email).
+        const emails = [...new Set(admins.map(a => a.email).filter(Boolean))];
         if (emails.length === 0) { return; }
+
+        let ipSection;
+        if (blockedIps.length > 0) {
+            ipSection = `<p style="font-size:15px;color:#1e293b">Los intentos vinieron de la <strong>misma IP</strong> en varias cuentas, así que la bloqueamos automáticamente por ${IP_BLOCK_MINUTES} minutos: <strong>${blockedIps.join(', ')}</strong>.</p>`;
+        } else if (skippedIps.length > 0) {
+            ipSection = `<p style="font-size:15px;color:#1e293b">Los intentos vinieron de la misma IP en varias cuentas (<strong>${skippedIps.join(', ')}</strong>), pero está en la lista de IPs de confianza, así que no se bloqueó automáticamente. Revisalo igual.</p>`;
+        } else {
+            ipSection = `<p style="font-size:15px;color:#1e293b">Las cuentas bloqueadas no comparten la misma IP de origen, así que no se bloqueó ninguna IP automáticamente. Te recomendamos revisarlo igual.</p>`;
+        }
 
         const subject = `Alerta de seguridad: ${lockedCount} cuentas bloqueadas simultáneamente en LogiTrack`;
         const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:8px">
@@ -61,7 +90,8 @@ const notifyAdminsSuspiciousActivity = async (lockedCount) => {
             <p style="color:#64748b;margin-top:0">Alerta de seguridad</p>
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">
             <p style="font-size:15px;color:#1e293b">Hay <strong>${lockedCount} cuentas bloqueadas</strong> al mismo tiempo por intentos fallidos de login. Esto puede indicar un intento de acceso coordinado contra varias cuentas.</p>
-            <p style="margin:20px 0"><a href="${appBaseUrl()}/auditoria" style="background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;display:inline-block">Revisar en Auditoría</a></p>
+            ${ipSection}
+            <p style="margin:20px 0"><a href="${appBaseUrl()}/auditoria/seguridad" style="background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;display:inline-block">Revisar en Auditoría</a></p>
             <p style="font-size:13px;color:#64748b">Recibís este aviso porque sos administrador de LogiTrack.</p>
         </div>`;
         await sendEmail(emails, subject, html, 'html');
@@ -185,6 +215,16 @@ const login = async (req, res) => {
     const nombreEmpresa = nombreEmpresaRaw || 'LogiTrack';
     const logoEmpresa   = logoEmpresaRaw || '/images/logo.png';
     const {email, password} = req.body;
+
+    // IP bloqueada automáticamente por atacar varias cuentas a la vez: ni
+    // siquiera buscamos el usuario, para no filtrar si el email existe o no.
+    const blockedIpModel = require('../models/blockedIp');
+    if (await blockedIpModel.isBlocked(getIp(req)).catch(() => false)) {
+        return res.render('login', {
+            error: 'Detectamos actividad sospechosa desde tu conexión. Probá de nuevo más tarde.',
+            nombreEmpresa, logoEmpresa, devAccounts: await buildDevAccounts(),
+        });
+    }
 
     const user = await userModel.findByEmail(email);
     if(!user){

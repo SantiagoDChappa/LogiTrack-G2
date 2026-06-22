@@ -306,11 +306,15 @@ async function buildProviderChain() {
 //   { ok, provider, attempts: [{ provider, ok, error, at }] }
 // Prueba cada proveedor en orden hasta que uno tenga éxito (fallback automático).
 async function sendEmailWithResult(to, subject, content, format = 'text') {
-    const recipients = []
-        .concat(to || [])
-        .flatMap((v) => String(v).split(','))
-        .map((v) => v.trim())
-        .filter(Boolean);
+    // SendGrid (y otros) rechazan el envío entero si la lista de destinatarios
+    // trae un email repetido, así que deduplicamos siempre antes de mandar.
+    const recipients = [...new Set(
+        []
+            .concat(to || [])
+            .flatMap((v) => String(v).split(','))
+            .map((v) => v.trim())
+            .filter(Boolean)
+    )];
 
     const attempts = [];
     if (recipients.length === 0) {

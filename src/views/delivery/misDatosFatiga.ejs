@@ -37,16 +37,16 @@
 </div>
 <script>
 async function suprimir() {
-    if (!confirm('¿Solicitar la supresión de todos tus datos de fatiga? Esta acción queda auditada.')) { return; }
+    if (!(await window.ltConfirm({ title: '¿Suprimir tus datos de fatiga?', text: 'Se eliminarán todos tus registros. Esta acción queda auditada.', confirmButtonText: 'Sí, suprimir', confirmButtonColor: '#dc2626' }))) { return; }
     const r = await fetch('/delivery/fatigue/mis-datos/suprimir', { method: 'POST' });
     const j = await r.json().catch(() => ({}));
-    alert(j.ok ? ('Se eliminaron ' + j.deleted + ' registros.') : 'No se pudo procesar.');
+    await window.ltAlert(j.ok ? { icon: 'success', title: 'Listo', text: 'Se eliminaron ' + j.deleted + ' registros.' } : { icon: 'error', title: 'No se pudo procesar' });
     location.reload();
 }
 async function revocar() {
-    if (!confirm('Si revocás el consentimiento no podrás iniciar rutas hasta volver a aceptarlo. ¿Continuar?')) { return; }
+    if (!(await window.ltConfirm({ title: '¿Revocar el consentimiento?', text: 'No podrás iniciar rutas hasta volver a aceptarlo.', confirmButtonText: 'Sí, revocar', confirmButtonColor: '#dc2626' }))) { return; }
     await fetch('/delivery/fatigue/consent/revoke', { method: 'POST' });
-    alert('Consentimiento revocado.');
+    await window.ltAlert({ icon: 'success', title: 'Consentimiento revocado' });
 }
 </script>
 </body>

@@ -225,12 +225,12 @@
                 }
                 btn.disabled = false;
                 btn.textContent = 'Acepto esperar esta nueva fecha';
-                alert((res.data && res.data.error) || 'No se pudo registrar la nueva fecha. Intentá de nuevo.');
+                window.ltAlert({ icon: 'error', title: 'No se pudo registrar', text: (res.data && res.data.error) || 'No se pudo registrar la nueva fecha. Intentá de nuevo.' });
             })
             .catch(function () {
                 btn.disabled = false;
                 btn.textContent = 'Acepto esperar esta nueva fecha';
-                alert('Error de red. Intentá de nuevo.');
+                window.ltAlert({ icon: 'error', title: 'Error de red', text: 'Intentá de nuevo.' });
             });
         });
     })();
