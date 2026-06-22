@@ -60,7 +60,7 @@ html[data-theme="dark"] {
     color: var(--shp-text-strong);
 }
 
-.page-header__actions { display: flex; gap: .55rem; flex-wrap: wrap; }
+.page-header__actions { display: flex; gap: .55rem; flex-wrap: nowrap; align-items: center; }
 
 /* ============================================================
    Search/filter form — glass

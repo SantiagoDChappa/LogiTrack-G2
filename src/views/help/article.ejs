@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title><%= article.title %> - Centro de ayuda</title>
+    <link rel="stylesheet" href="/css/help.css?v=<%= assetVersion %>">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="help-wrap help-wrap--article">
+            <nav class="help-breadcrumb" aria-label="Miga de pan">
+                <a href="/help">Centro de ayuda</a>
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                <span><%= categoryLabel %></span>
+            </nav>
+
+            <article class="help-article">
+                <header class="help-article__header">
+                    <div class="help-article__header-row">
+                        <div class="help-article__icon">
+                            <span class="material-symbols-outlined"><%= article.icon %></span>
+                        </div>
+                        <div class="help-article__titles">
+                            <h1><%= article.title %></h1>
+                            <p class="help-article__lead"><%= article.summary %></p>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="help-article__content">
+                    <%- include('articles/' + article.partial) %>
+                </div>
+
+                <footer class="help-article__footer">
+                    <a href="/help" class="help-btn help-btn--outline">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                        Volver al centro de ayuda
+                    </a>
+                </footer>
+            </article>
+        </div>
+    </main>
+    <script src="/js/theme.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/ui.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>

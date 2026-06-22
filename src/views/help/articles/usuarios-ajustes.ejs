@@ -1,0 +1,48 @@
+<h2>Usuarios</h2>
+<p>En <a href="/user">Usuarios</a> administrás las cuentas del sistema:</p>
+<ul>
+    <li>Alta de supervisor, operador, repartidor o administrador.</li>
+    <li>Asignación de sucursal y rol.</li>
+    <li>Activar / desactivar cuentas.</li>
+    <li>Desbloqueo manual tras intentos fallidos de login.</li>
+</ul>
+
+<h2>Sucursales</h2>
+<p><a href="/branch">Sucursales</a> define los puntos físicos de la operación. Los envíos y usuarios se asocian a una sucursal para el alcance de datos.</p>
+
+<h2>Ajustes del sistema</h2>
+<p>En <strong>Ajustes</strong> configurás:</p>
+<ul>
+    <li>Datos de la empresa y logo.</li>
+    <li>Comunicaciones y plantillas de email.</li>
+    <li>Parámetros de ruteo (incluido <a href="/help/glosario">piggyback</a>), catálogos e incidencias.</li>
+    <li>Seguridad (2FA obligatorio para admin/supervisor).</li>
+    <li>Umbrales de <a href="/help/ojo-patron">Ojo de Patrón</a> (<a href="/help/glosario">fatiga</a>).</li>
+</ul>
+
+<h2>Paso a paso</h2>
+<ol>
+    <li>Para dar de alta un usuario, andá a <a href="/user">Usuarios</a> → Crear y completá rol, sucursal y datos personales.</li>
+    <li>Asigná la sucursal correcta: define qué envíos e incidencias verá el usuario.</li>
+    <li>Configurá sucursales en <a href="/branch">Sucursales</a> antes de asociar usuarios.</li>
+    <li>En <strong>Ajustes</strong>, revisá comunicaciones, ruteo y parámetros de incidencias según tu operación.</li>
+    <li>Configurá <a href="/help/transportes-zonas">Transportes y zonas</a> para habilitar el ruteo.</li>
+</ol>
+
+<h2>Errores frecuentes</h2>
+<ul>
+    <li><strong>El usuario no ve envíos de otra sucursal:</strong> el alcance está ligado a la sucursal asignada; solo admin ve panorama global.</li>
+    <li><strong>Cuenta bloqueada por intentos fallidos:</strong> desbloqueala desde el detalle del usuario en Usuarios.</li>
+    <li><strong>Cambié ajustes de ruteo y no surten efecto:</strong> verificá que guardaste en Ajustes; algunos parámetros (piggyback, desvío máximo) aplican a rutas nuevas.</li>
+</ul>
+
+<div class="help-tip">Los cambios de configuración quedan registrados en Auditoría para trazabilidad.</div>
+
+<h2>Artículos relacionados</h2>
+<ul>
+    <li><a href="/help/transportes-zonas">Transportes y zonas</a></li>
+    <li><a href="/help/ojo-patron">Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/import-csv">Importar envíos por CSV</a></li>
+    <li><a href="/help/notificaciones">Notificaciones</a></li>
+    <li><a href="/help/glosario">Glosario</a></li>
+</ul>

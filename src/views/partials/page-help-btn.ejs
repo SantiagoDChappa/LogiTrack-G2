@@ -1,0 +1,18 @@
+<%#
+  Parámetros:
+  - helpModule: clave del tour ('kanban', 'ruteo', …)
+  - helpSlug: slug del artículo en /help (opcional; por defecto = helpModule)
+  - showTour: false para ocultar el botón de tour (solo manual)
+%>
+<div class="page-help-actions">
+    <% if (typeof showTour === 'undefined' || showTour !== false) { %>
+    <button type="button" class="page-help-btn" data-lgt-help-tour="<%= helpModule %>"
+            data-tooltip="Tour de esta pantalla" aria-label="Ver tour de esta pantalla">
+        <span class="material-symbols-outlined">tour</span>
+    </button>
+    <% } %>
+    <a href="/help/<%= typeof helpSlug !== 'undefined' ? helpSlug : helpModule %>" class="page-help-btn"
+       data-tooltip="Ver en el manual" aria-label="Ver ayuda en el manual">
+        <span class="material-symbols-outlined">help</span>
+    </a>
+</div>

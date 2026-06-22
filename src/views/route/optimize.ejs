@@ -55,11 +55,14 @@
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header route-optimize-header">
             <h1>Optimizar Ruteo</h1>
-            <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
-                <span class="material-symbols-outlined">arrow_back</span>
-            </a>
+            <div style="display:flex;gap:var(--space-3);align-items:center;">
+                <%- include('../partials/page-help-btn', { helpModule: 'ruteo' }) %>
+                <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+            </div>
         </div>
 
         <div class="shipments-wrapper">
@@ -103,7 +106,7 @@
             <form id="optimize-form">
 
                 <!-- Envíos -->
-                <div class="update-card" style="margin-bottom:var(--space-5)">
+                <div class="update-card" id="route-optimize-shipments" style="margin-bottom:var(--space-5)">
                     <h3><span class="material-symbols-outlined">inventory_2</span> Envíos pendientes (<%= shipments.length %>)</h3>
                     <div class="table-wrapper" style="margin-top:var(--space-4)">
                         <table>
@@ -143,7 +146,7 @@
                 </div>
 
                 <!-- Transportes -->
-                <div class="update-card" style="margin-bottom:var(--space-5)">
+                <div class="update-card" id="route-optimize-transports" style="margin-bottom:var(--space-5)">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
                         <h3><span class="material-symbols-outlined">local_shipping</span> Transportes de la sucursal</h3>
                         <button type="button" id="toggle-manual-tx" class="action-btn neutro" data-tooltip="Elegir transporte manualmente" aria-label="Elegir transporte manualmente">
@@ -234,7 +237,7 @@
                 </div>
 
                 <div style="display:flex;justify-content:flex-end;padding-bottom:var(--space-6)">
-                    <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Calcular ruta óptima" aria-label="Calcular ruta óptima">
+                    <button type="submit" id="route-optimize-submit" class="action-btn action-btn--lg buscar" data-tooltip="Calcular ruta óptima" aria-label="Calcular ruta óptima">
                         <span class="material-symbols-outlined">alt_route</span>
                     </button>
                 </div>
