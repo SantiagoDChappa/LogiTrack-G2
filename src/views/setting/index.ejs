@@ -1469,11 +1469,11 @@
                     document.getElementById('tpl-variant-default').addEventListener('click', () => {
                         if (variantSel.value) { postForm('/setting/email-template/default/' + variantSel.value); }
                     });
-                    document.getElementById('tpl-variant-delete').addEventListener('click', () => {
+                    document.getElementById('tpl-variant-delete').addEventListener('click', async () => {
                         const list = TPL[currentEvent] || [];
                         if (!variantSel.value) { return; }
-                        if (list.length <= 1) { alert('No se puede eliminar la única variante del evento.'); return; }
-                        if (confirm('¿Eliminar esta variante?')) { postForm('/setting/email-template/delete/' + variantSel.value); }
+                        if (list.length <= 1) { await window.ltAlert({ icon: 'warning', title: 'No se puede eliminar', text: 'Es la única variante del evento.' }); return; }
+                        if (await window.ltConfirm({ title: '¿Eliminar esta variante?', confirmButtonColor: '#dc2626' })) { postForm('/setting/email-template/delete/' + variantSel.value); }
                     });
 
                     // ---- Abrir modal ----
@@ -1664,7 +1664,7 @@
                                 <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
                                 <td>
                                     <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar este motivo?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1703,7 +1703,7 @@
                                 <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
                                 <td>
                                     <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Desactivar este tipo?" data-confirm-color="#dc2626" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1772,7 +1772,7 @@
                             </label>
                             <div class="tw-actions">
                                 <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar esta franja?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                             </div>
                         </form>
                     <% }) %>

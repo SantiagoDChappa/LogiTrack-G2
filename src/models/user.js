@@ -29,9 +29,11 @@ const User = sequelize.define('user', {
     twoFactorBackupCodes: { type: DataTypes.TEXT,    allowNull: true,  field: 'two_factor_backup_codes' },
     // Perfil — foto (data URL base64) opcional.
     avatar: { type: DataTypes.TEXT, allowNull: true },
-    // Bloqueo de cuenta tras intentos fallidos de login (3 intentos -> 30 min bloqueada).
+    // Bloqueo de cuenta tras intentos fallidos de login (3 intentos -> bloqueo escalable).
     failedLoginAttempts: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'failed_login_attempts' },
     lockedUntil:         { type: DataTypes.DATE,    allowNull: true,  field: 'locked_until' },
+    // Reincidencia: cuántos bloqueos sin un login exitoso de por medio (escala la duración).
+    lockoutCount:        { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0, field: 'lockout_count' },
 }, { tableName: 'user', timestamps: false });
 
 // Limite defensivo para que la UI de admin no se rompa con miles de usuarios.
@@ -64,6 +66,12 @@ const update = async (id, data) => {
     }
     if (updateData.active !== undefined) {
         updateData.active = updateData.active === 'true' || updateData.active === true;
+    }
+    // El select de sucursal queda oculto (no deshabilitado) para roles sin sucursal
+    // (ej. Administrador), así que igual llega "" en el form — Postgres rechaza
+    // eso para una columna INTEGER si no lo normalizamos a null.
+    if (updateData.branchId === '') {
+        updateData.branchId = null;
     }
     return User.update(updateData, { where: { id } });
 };
@@ -148,28 +156,32 @@ const setBackupCodes = (id, backupCodesJson) =>
 
 // ── Bloqueo de cuenta tras intentos fallidos de login ─────────────────────────
 const LOCKOUT_THRESHOLD = 3;
-const LOCKOUT_MINUTES = 30;
+// Escalada por reincidencia: 1er bloqueo 30 min, 2do 2 h, 3ro o más 24 h.
+// Se resetea con un login exitoso (no con un desbloqueo manual de un admin).
+const LOCKOUT_DURATIONS_MIN = [30, 120, 1440];
 
 const isLocked = (user) => !!(user.lockedUntil && new Date(user.lockedUntil) > new Date());
 
-// Suma un intento fallido; si llega al umbral, bloquea la cuenta por 30 min y
-// reinicia el contador. Devuelve { locked, attempts, lockedUntil }.
+// Suma un intento fallido; si llega al umbral, bloquea la cuenta (duración según
+// reincidencia) y reinicia el contador de intentos. Devuelve { locked, attempts, lockedUntil, lockoutCount }.
 const registerFailedLogin = async (id) => {
     const user = await User.findByPk(id);
     if (!user) { return { locked: false, attempts: 0, lockedUntil: null }; }
     const attempts = user.failedLoginAttempts + 1;
     if (attempts >= LOCKOUT_THRESHOLD) {
-        const lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
-        await user.update({ failedLoginAttempts: 0, lockedUntil });
-        return { locked: true, attempts, lockedUntil };
+        const lockoutCount = user.lockoutCount + 1;
+        const minutes = LOCKOUT_DURATIONS_MIN[Math.min(lockoutCount, LOCKOUT_DURATIONS_MIN.length) - 1];
+        const lockedUntil = new Date(Date.now() + minutes * 60 * 1000);
+        await user.update({ failedLoginAttempts: 0, lockedUntil, lockoutCount });
+        return { locked: true, attempts, lockedUntil, lockoutCount, minutes };
     }
     await user.update({ failedLoginAttempts: attempts });
     return { locked: false, attempts, lockedUntil: null };
 };
 
-// Login exitoso: limpia el contador y cualquier bloqueo vigente.
+// Login exitoso: limpia el contador, el bloqueo vigente y la reincidencia.
 const resetFailedLogin = (id) =>
-    User.update({ failedLoginAttempts: 0, lockedUntil: null }, { where: { id } });
+    User.update({ failedLoginAttempts: 0, lockedUntil: null, lockoutCount: 0 }, { where: { id } });
 
 // Desbloqueo manual por un admin (antes de que expiren los 30 min).
 const unlockAccount = (id) =>

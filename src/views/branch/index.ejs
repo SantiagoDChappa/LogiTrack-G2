@@ -81,7 +81,7 @@
                                             <span class="material-symbols-outlined">edit</span>
                                         </a>
                                         <form method="POST" action="/branch/<%= b.id %>/closed" style="display:inline"
-                                              onsubmit="return confirm('<%= b.closed ? "¿Reabrir esta sucursal?" : "¿Cerrar esta sucursal? No estará disponible para nuevas asignaciones." %>');">
+                                              data-confirm="<%= b.closed ? "¿Reabrir esta sucursal?" : "¿Cerrar esta sucursal? No estará disponible para nuevas asignaciones." %>">
                                             <input type="hidden" name="closed" value="<%= b.closed ? 'false' : 'true' %>">
                                             <button type="submit" class="action-btn <%= b.closed ? 'neutro' : 'eliminar' %>" data-tooltip="<%= b.closed ? 'Reabrir' : 'Cerrar' %>" aria-label="<%= b.closed ? 'Reabrir' : 'Cerrar' %>">
                                                 <span class="material-symbols-outlined"><%= b.closed ? 'lock_open' : 'lock' %></span>

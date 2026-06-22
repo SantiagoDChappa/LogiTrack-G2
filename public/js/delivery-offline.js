@@ -15,6 +15,24 @@
     if (!/^\/delivery(\/|$)/.test(location.pathname)) { return; }
 
     const origFetch = window.fetch.bind(window);
+    const CACHE_NAME = 'lt-delivery-v5';  // debe coincidir con CACHE en sw.js
+
+    // [sync-debug] Manda eventos del flush (que corre en navegador/SW) a Render, vía origFetch
+    // para no encolarse a sí mismo. Best-effort: si no hay red, se pierde y no rompe nada.
+    // También loguea en consola para depurar desde el celular con DevTools. Quitar al resolver.
+    function slog(event, data) {
+        try { console.log('[sync]', event, data || ''); } catch (_) { /* */ }
+        if (!navigator.onLine) { return; }
+        try {
+            origFetch('/delivery/sync-log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ event, routeId: window.LT_ROUTE_ID || null, ...(data || {}) }),
+                keepalive: true,
+            }).catch(() => {});
+        } catch (_) { /* */ }
+    }
 
     // Acciones operativas encolables offline (van por fetch JSON).
     const QUEUEABLE = /\/delivery\/route\/\d+\/(stop\/\d+\/(arrive|complete|pickup-confirmed|failed|skip|unskip|delivered)|pause|resume|finish)$/;
@@ -58,14 +76,14 @@
             body.retrySameDay = !!b.retrySameDay;
         }
         if (/\/pause$/.test(path)) { body.pauseId = 'offline'; body.startedAt = new Date().toISOString(); }
+        // Finalizar offline: marcamos finished para que la UI muestre el flujo normal.
+        // La cola es FIFO, así que al sincronizar el server recibe primero las entregas/
+        // fallidos encolados y recién después el /finish (transiciones, mails, etc.).
+        if (/\/finish$/.test(path)) { body.finished = true; }
         return jsonResponse(200, body);
     }
 
     async function queueAndSynth(path, method, init, idemKey) {
-        // Finalizar la ruta necesita conexión (dispara transiciones + resumen del servidor).
-        if (/\/finish$/.test(path)) {
-            return jsonResponse(503, { ok: false, error: 'Para finalizar la ruta necesitás conexión a internet.' });
-        }
         const bodyStr = typeof init.body === 'string' ? init.body : '';
         await window.LTOffline.enqueue({
             path, method, body: bodyStr,
@@ -165,7 +183,15 @@
         } catch (_) { /* el fallback es el evento 'online' */ }
     }
     async function triggerFlush() {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        let count = -1;
+        try { count = await window.LTOffline.outboxCount(); } catch (_) { /* */ }
+        // [sync-debug] Incluimos el rastro de encolado: si la cola está vacía pero el rastro
+        // muestra 'enq', es que algo la vació; si tampoco hay 'enq', es que nunca se encoló. Quitar al resolver.
+        let trail = [];
+        try { trail = await window.LTOffline.readTrail(); } catch (_) { /* */ }
+        const viaSW = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+        slog('flush:trigger', { queued: count, online: navigator.onLine, via: viaSW ? 'sw' : 'page', trail });
+        if (viaSW) {
             navigator.serviceWorker.controller.postMessage({ type: 'lt-flush' });
         } else {
             handleSyncResult(await window.LTOffline.flushOutbox(origFetch));
@@ -175,8 +201,15 @@
         if (window.Swal) { window.Swal.fire({ icon, title, html, confirmButtonText: 'Entendido', confirmButtonColor: '#2563eb' }); }
         else { alert(title + (html ? '\n\n' + html.replace(/<[^>]+>/g, '') : '')); }
     }
+    let reloadScheduled = false;
     function handleSyncResult(res) {
-        if (!res) { updatePill(); return; }
+        if (!res) { slog('flush:result', { result: null }); updatePill(); return; }
+        slog('flush:result', {
+            sent: res.sent, remaining: res.remaining,
+            conflicts: (res.conflicts || []).length, authError: !!res.authError,
+        });
+        // [sync-debug] Cola drenada del todo: limpiamos el rastro para no acumular. Quitar al resolver.
+        if (res.remaining === 0) { window.LTOffline.clearTrail().catch(() => {}); }
         updatePill();
         if (res.authError) {
             notify('warning', 'Sesión expirada', 'Volvé a iniciar sesión para sincronizar las acciones que quedaron en cola.');
@@ -187,9 +220,17 @@
             notify('warning', 'Algunas acciones no se aplicaron',
                 `Mientras estabas sin conexión, el servidor cambió estos envíos. Gana el estado del servidor:<ul style="text-align:left;margin:.5rem 0">${li}</ul>`);
         }
-        // Si se aplicó algo y hay conexión, recargamos la ruta para reflejar el estado real del servidor.
-        if (res.sent > 0 && navigator.onLine && window.LT_ROUTE_ID) {
-            setTimeout(() => window.location.reload(), res.conflicts && res.conflicts.length ? 3500 : 800);
+        // Mientras queden acciones en cola NO recargamos: si la red volvió a medias o son
+        // varias entregas con foto, recargar acá mostraría un estado parcial. Seguimos
+        // drenando y recién recargamos cuando la cola quedó vacía (estado real del server).
+        if (res.remaining > 0 && navigator.onLine) {
+            setTimeout(triggerFlush, 2000);
+            return;
+        }
+        // Cola drenada: si se aplicó algo y estamos en la ruta, recargamos UNA sola vez.
+        if (res.sent > 0 && navigator.onLine && window.LT_ROUTE_ID && !reloadScheduled) {
+            reloadScheduled = true;
+            setTimeout(() => window.location.reload(), res.conflicts && res.conflicts.length ? 3500 : 500);
         }
     }
 
@@ -202,12 +243,37 @@
             if (b && Number(b.routeId) === Number(window.LT_ROUTE_ID)) { await window.LTOffline.clearAll().catch(() => {}); }
             return;
         }
-        if (!navigator.onLine) { return; }
+        await prefetchRouteForOffline(window.LT_ROUTE_ID);
+    }
+
+    // Desde el HOME del repartidor: si hay una ruta EN CURSO, la dejamos lista para operar
+    // sin conexión. Así puede cargar el home con señal, quedarse sin datos en esa pantalla y
+    // entrar a la ruta + hacer el flujo igual (HTML de la ruta, bundle y páginas de POD ya cacheados).
+    async function prefetchActiveRouteFromHome() {
+        if (!/^\/delivery\/?$/.test(location.pathname)) { return; }
+        if (!window.LT_ACTIVE_ROUTE_ID || !window.LT_ACTIVE_ROUTE_INROUTE) { return; }
+        await prefetchRouteForOffline(window.LT_ACTIVE_ROUTE_ID);
+    }
+
+    // Deja una ruta lista para operar offline: 1) cachea el HTML de la página de ruta bajo la
+    // MISMA clave normalizada (sin query) que usa el SW, 2) guarda el bundle cifrado, 3) precarga
+    // las páginas de POD. Reutilizada por la página de ruta y por el home.
+    async function prefetchRouteForOffline(routeId) {
+        if (!routeId || !navigator.onLine) { return; }
+        if ('caches' in window) {
+            try {
+                const resp = await origFetch(`/delivery/route/${routeId}`, { credentials: 'include' });
+                if (resp.ok) {
+                    const cache = await caches.open(CACHE_NAME);
+                    await cache.put(new Request(location.origin + `/delivery/route/${routeId}`), resp.clone());
+                }
+            } catch (_) { /* sin red: queda lo ya cacheado */ }
+        }
         try {
-            const resp = await origFetch(`/delivery/route/${window.LT_ROUTE_ID}/offline-bundle`, { credentials: 'include' });
-            if (!resp.ok) { return; }
+            const resp = await origFetch(`/delivery/route/${routeId}/offline-bundle`, { credentials: 'include' });
+            if (!resp.ok) { return; }  // 409 si la ruta no está IN_ROUTE: nada que precargar
             const data = await resp.json();
-            await window.LTOffline.saveBundle(window.LT_ROUTE_ID, data, 24 * 60 * 60 * 1000);
+            await window.LTOffline.saveBundle(routeId, data, 24 * 60 * 60 * 1000);
             await prefetchPodPages(data);  // así el POD de cada entrega abre sin conexión
         } catch (_) { /* sin conexión: se usa lo ya cacheado */ }
     }
@@ -216,7 +282,7 @@
     async function prefetchPodPages(bundle) {
         if (!('caches' in window) || !bundle || !bundle.stops) { return; }
         try {
-            const cache = await caches.open('lt-delivery-v1');
+            const cache = await caches.open(CACHE_NAME);
             const pending = bundle.stops.filter((s) => s.stopType === 'delivery' && s.shipment && !s.completed);
             for (const s of pending.slice(0, 40)) {
                 const url = `/delivery/evidence/${encodeURIComponent(s.shipment.trackingId)}/pod?routeId=${bundle.routeId}&stopId=${s.id}`;
@@ -279,6 +345,7 @@
         ensurePill();
         updatePill();
         cacheActiveBundle();
+        prefetchActiveRouteFromHome();
         applyOutboxOverlay();
         if (navigator.onLine) { triggerFlush(); }  // reenvía lo que haya quedado de una sesión previa
     }

@@ -160,4 +160,58 @@ const getActiveUserStats = async () => {
     return { dau, wau, mau };
 };
 
-module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay, getActiveUserStats };
+// IPs que aparecen en intentos fallidos de 2+ cuentas DISTINTAS, ambas
+// actualmente bloqueadas — señal fuerte de ataque coordinado desde un mismo origen.
+const getSharedAttackIps = async ({ hours = 2 } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const rows = await sequelize.query(
+        `SELECT ll.ip, COUNT(DISTINCT ll.user_id)::int AS accounts
+         FROM logitrack.login_log ll
+         JOIN logitrack."user" u ON u.id = ll.user_id
+         WHERE u.locked_until > NOW()
+           AND ll.action = 'LOGIN_FAILED'
+           AND ll.ip IS NOT NULL
+           AND ll.created_at >= :since
+         GROUP BY ll.ip
+         HAVING COUNT(DISTINCT ll.user_id) >= 2
+         ORDER BY accounts DESC`,
+        { type: QueryTypes.SELECT, replacements: { since } }
+    );
+    return rows;
+};
+
+// Último LOGIN exitoso de cada usuario — para la columna "Último ingreso" en la
+// lista de usuarios y para el reporte general. Devuelve { [userId]: Date }.
+const getLastLoginMap = async () => {
+    const { QueryTypes } = require('sequelize');
+    const rows = await sequelize.query(
+        `SELECT user_id, MAX(created_at) AS last_login
+         FROM logitrack.login_log
+         WHERE action = 'LOGIN' AND user_id IS NOT NULL
+         GROUP BY user_id`,
+        { type: QueryTypes.SELECT }
+    );
+    const map = {};
+    for (const row of rows) { map[row.user_id] = row.last_login; }
+    return map;
+};
+
+// Cantidad de logins exitosos por usuario en un rango de fechas — para el
+// Reporte de usuarios. Devuelve { [userId]: count }.
+const getLoginCountsByUser = async ({ from, to } = {}) => {
+    const { QueryTypes } = require('sequelize');
+    let where = `action = 'LOGIN' AND user_id IS NOT NULL`;
+    const replacements = {};
+    if (from) { where += ' AND created_at >= :from'; replacements.from = new Date(from); }
+    if (to)   { where += ' AND created_at <= :to';   replacements.to = new Date(to + 'T23:59:59'); }
+    const rows = await sequelize.query(
+        `SELECT user_id, COUNT(*)::int AS total FROM logitrack.login_log WHERE ${where} GROUP BY user_id`,
+        { type: QueryTypes.SELECT, replacements }
+    );
+    const map = {};
+    for (const row of rows) { map[row.user_id] = row.total; }
+    return map;
+};
+
+module.exports = { LoginLog, record, getAll, getActiveUsers, getFailedByAccount, getActivityByDay, getActiveUserStats, getSharedAttackIps, getLastLoginMap, getLoginCountsByUser };

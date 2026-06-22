@@ -53,6 +53,7 @@
                         </button>
                         <div class="nav-group-items">
                             <a href="/auditoria"><ul><span class="material-symbols-outlined">dashboard</span>Resumen</ul></a>
+                            <a href="/auditoria/seguridad"><ul><span class="material-symbols-outlined">gpp_bad</span>Seguridad</ul></a>
                             <a href="/auditoria/usuarios-activos"><ul><span class="material-symbols-outlined">group</span>Usuarios activos</ul></a>
                             <a href="/auditoria/sesiones"><ul><span class="material-symbols-outlined">login</span>Log de sesiones</ul></a>
                             <a href="/auditoria/acciones"><ul><span class="material-symbols-outlined">edit_note</span>Acciones internas</ul></a>
@@ -74,6 +75,9 @@
                             <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
                             <a href="/report/incidents-by-period"><ul><span class="material-symbols-outlined">warning</span>Fallas</ul></a>
                             <a href="/report/satisfaction"><ul><span class="material-symbols-outlined">sentiment_satisfied</span>Satisfacción</ul></a>
+                            <% if (currentUser.roleId === 4) { %>
+                            <a href="/report/users"><ul><span class="material-symbols-outlined">groups</span>Usuarios</ul></a>
+                            <% } %>
                         </div>
                     </div>
                     <div class="nav-group" id="nav-group-dashboard">

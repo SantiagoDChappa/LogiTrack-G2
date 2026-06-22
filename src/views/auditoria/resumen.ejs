@@ -13,56 +13,15 @@
 
         <%- include('_header', { active: 'resumen', pageTitle: 'Auditoría y trazabilidad', pageDesc: 'Registro de quién hizo qué, cuándo y desde dónde.' }) %>
 
+        <div style="display:flex;justify-content:flex-end;margin:-1.4rem 0 1.2rem">
+            <a href="/auditoria/resumen/export-csv" class="btn-filter">
+                <span class="material-symbols-outlined">download</span> Exportar resumen (CSV)
+            </a>
+        </div>
+
         <%
             const _maxActivity = Math.max(1, ...(activity||[]).map(a => a.total));
         %>
-
-        <!-- Alerta de seguridad -->
-        <% if (failedAccounts && failedAccounts.length > 0) { %>
-        <div class="security-alert" style="flex-direction:column;align-items:stretch;gap:.6rem">
-            <div style="display:flex;align-items:center;gap:.6rem">
-                <span class="material-symbols-outlined">gpp_bad</span>
-                <strong>Alerta de seguridad — intentos de acceso repetidos en las últimas 24 h</strong>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:.5rem;padding-left:2rem">
-                <% const _seenEmails = new Set(); %>
-                <% failedAccounts.forEach((a) => { %>
-                <%
-                    // El campo lockedUntil es el estado ACTUAL de la cuenta (no por episodio);
-                    // solo lo mostramos en el episodio más reciente de cada cuenta para no repetirlo.
-                    const _isLatestEpisode = !_seenEmails.has(a.email);
-                    _seenEmails.add(a.email);
-                    const _isLockedNow = _isLatestEpisode && a.lockedUntil && new Date(a.lockedUntil) > new Date();
-                    const _sameDay = new Date(a.firstAttempt).toDateString() === new Date(a.lastAttempt).toDateString();
-                    const _timeFmt = (d) => new Date(d).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
-                    const _range = a.attempts > 1 && _sameDay
-                        ? `${_timeFmt(a.firstAttempt)} - ${_timeFmt(a.lastAttempt)}`
-                        : _timeFmt(a.lastAttempt);
-                %>
-                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;font-size:.8rem;color:#7a5000">
-                    <strong style="color:#92600a"><%= a.userId ? a.fullName : a.email %></strong>
-                    <% if (a.userId) { %>
-                        <span>(<%= a.email %>)</span>
-                        <% if (a.roleId) { %><span class="badge-role" style="background:#92600a22;color:#92600a"><%= roleLabels[a.roleId] || '—' %></span><% } %>
-                        <% if (a.branchName) { %><span>· <%= a.branchName %></span><% } %>
-                    <% } else { %>
-                        <span class="badge-action" style="background:#92600a22;color:#92600a">cuenta no registrada</span>
-                    <% } %>
-                    <span>— <%= a.attempts %> intento<%= a.attempts === 1 ? '' : 's' %> fallido<%= a.attempts === 1 ? '' : 's' %> (<%= _range %>)</span>
-                    <% if (_isLockedNow) { %>
-                        <span class="badge-action" style="background:#dc262622;color:#dc2626">
-                            <span class="material-symbols-outlined" style="font-size:.8rem">lock</span>
-                            bloqueada hasta las <%= new Date(a.lockedUntil).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}) %>
-                        </span>
-                    <% } %>
-                    <% if (a.userId && a.lastLogin) { %>
-                        <span style="color:#9a7b3a">· último login OK: <%= new Date(a.lastLogin).toLocaleString('es-AR') %></span>
-                    <% } %>
-                </div>
-                <% }) %>
-            </div>
-        </div>
-        <% } %>
 
         <!-- Stats -->
         <div class="audit-stats">

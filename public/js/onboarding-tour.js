@@ -320,6 +320,8 @@
     }
 
     function markComplete() {
+        // Evitar que el tour vuelva a dispararse en esta misma carga aunque el POST
+        // tarde o falle (el refresco real de onboarded viene del server en la próxima carga).
         if (window.__LGT) window.__LGT.onboarded = true;
         try { sessionStorage.setItem(TOUR_DISMISSED_KEY, '1'); } catch (_) { /* ignore */ }
         clearTourRedirectFlag();

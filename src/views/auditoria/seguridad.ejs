@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría · Seguridad - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <%- include('_header', { active: 'seguridad', pageTitle: 'Seguridad', pageDesc: 'Cuentas bloqueadas por intentos fallidos e IPs con actividad sospechosa.' }) %>
+
+        <!-- Alerta de seguridad -->
+        <% if (failedAccounts && failedAccounts.length > 0) { %>
+        <div class="audit-card" style="margin-bottom:1.5rem;border-color:#f6c200">
+            <div class="audit-card-head" style="background:#fff3cd">
+                <span class="material-symbols-outlined" style="color:#92600a">gpp_bad</span>
+                <h2 style="color:#92600a">Intentos de acceso repetidos en las últimas 24 h</h2>
+                <span class="badge-count" style="background:#92600a22;color:#92600a"><%= failedAccounts.length %> episodio<%= failedAccounts.length === 1 ? '' : 's' %></span>
+            </div>
+            <div class="audit-card-body">
+                <form class="audit-filters" data-tools-for="seguridad-table" onsubmit="return false" style="margin-bottom:1rem">
+                    <div class="filter-group">
+                        <label>Usuario</label>
+                        <input type="text" data-col="0" placeholder="Nombre...">
+                    </div>
+                    <div class="filter-group">
+                        <label>Email</label>
+                        <input type="text" data-col="1" placeholder="Email...">
+                    </div>
+                    <div class="filter-group">
+                        <label>Rol</label>
+                        <select data-col="2">
+                            <option value="">Todos</option>
+                            <% Object.values(roleLabels).forEach(r => { %>
+                            <option value="<%= r %>"><%= r %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Sucursal</label>
+                        <select data-col="3">
+                            <option value="">Todas</option>
+                            <% (branches || []).forEach(b => { %>
+                            <option value="<%= b.name %>"><%= b.name %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </form>
+                <div class="audit-table-wrap table-wrapper">
+                    <table class="audit-table" data-tools="seguridad-table">
+                        <thead>
+                            <tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Sucursal</th><th>Intentos</th><th>Estado</th><th>Último login OK</th><th class="col-actions" data-nosort></th></tr>
+                        </thead>
+                        <tbody>
+                            <% const _seenEmails = new Set(); %>
+                            <% failedAccounts.forEach((a) => { %>
+                            <%
+                                // El campo lockedUntil es el estado ACTUAL de la cuenta (no por episodio);
+                                // solo lo mostramos en el episodio más reciente de cada cuenta para no repetirlo.
+                                const _isLatestEpisode = !_seenEmails.has(a.email);
+                                _seenEmails.add(a.email);
+                                const _isLockedNow = _isLatestEpisode && a.lockedUntil && new Date(a.lockedUntil) > new Date();
+                                const _sameDay = new Date(a.firstAttempt).toDateString() === new Date(a.lastAttempt).toDateString();
+                                const _timeFmt = (d) => new Date(d).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+                                const _range = a.attempts > 1 && _sameDay
+                                    ? `${_timeFmt(a.firstAttempt)} - ${_timeFmt(a.lastAttempt)}`
+                                    : _timeFmt(a.lastAttempt);
+                                const _displayName = a.userId ? a.fullName : a.email;
+                            %>
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= avatarColor(_displayName) %>"><%= initials(_displayName) %></span>
+                                        <strong><%= _displayName %></strong>
+                                    </div>
+                                </td>
+                                <td><%= a.userId ? a.email : 'cuenta no registrada' %></td>
+                                <td><% if (a.roleId) { %><span class="badge-role"><%= roleLabels[a.roleId] || '—' %></span><% } else { %>—<% } %></td>
+                                <td><%= a.branchName || '—' %></td>
+                                <td style="white-space:nowrap">
+                                    <strong><%= a.attempts %></strong> fallido<%= a.attempts === 1 ? '' : 's' %>
+                                    <div class="user-cell-sub" style="white-space:nowrap"><%= _range %></div>
+                                </td>
+                                <td>
+                                    <% if (_isLockedNow) { %>
+                                    <span class="badge-action" style="background:#dc262622;color:#dc2626">
+                                        <span class="material-symbols-outlined" style="font-size:.8rem">lock</span>
+                                        bloqueada hasta las <%= new Date(a.lockedUntil).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}) %>
+                                    </span>
+                                    <% } else if (_isLatestEpisode) { %>
+                                    <span class="badge-action" style="background:var(--color-success-bg);color:var(--color-success)">
+                                        <span class="material-symbols-outlined" style="font-size:.8rem">check_circle</span>
+                                        Acceso restablecido
+                                    </span>
+                                    <% } else { %>—<% } %>
+                                </td>
+                                <td class="user-cell-sub" style="white-space:nowrap"><%= a.userId && a.lastLogin ? new Date(a.lastLogin).toLocaleString('es-AR') : '—' %></td>
+                                <td class="col-actions">
+                                    <% if (_isLockedNow && a.userId) { %>
+                                    <form action="/user/<%= a.userId %>/unlock" method="POST" class="js-confirm"
+                                          data-confirm-title="¿Desbloquear esta cuenta ahora?"
+                                          data-confirm-text="<%= a.fullName %> va a poder volver a intentar ingresar de inmediato."
+                                          data-confirm-btn="Sí, desbloquear">
+                                        <input type="hidden" name="returnTo" value="/auditoria/seguridad">
+                                        <button type="submit" class="btn-filter" style="padding:.3rem .6rem;font-size:.75rem;white-space:nowrap">
+                                            <span class="material-symbols-outlined" style="font-size:.85rem">lock_open</span> Desbloquear
+                                        </button>
+                                    </form>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <% } else { %>
+        <div class="audit-card" style="margin-bottom:1.5rem">
+            <div class="audit-card-body">
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">verified_user</span>
+                    No hay intentos de acceso fallidos registrados en las últimas 24 h.
+                </div>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- IPs bloqueadas automáticamente -->
+        <% if (blockedIps && blockedIps.length > 0) { %>
+        <div class="audit-card" style="margin-bottom:1.5rem;border-color:#dc2626">
+            <div class="audit-card-head" style="background:#dc262611">
+                <span class="material-symbols-outlined" style="color:#dc2626">block</span>
+                <h2>IPs bloqueadas automáticamente</h2>
+                <span class="badge-count" style="background:#dc262622;color:#dc2626"><%= blockedIps.length %> activa<%= blockedIps.length === 1 ? '' : 's' %></span>
+            </div>
+            <div class="audit-card-body">
+                <% blockedIps.forEach((b) => { %>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--color-border)">
+                    <code style="font-size:.85rem;background:var(--color-bg);padding:.2rem .5rem;border-radius:5px"><%= b.ip %></code>
+                    <span style="font-size:.8rem;color:var(--color-text-secondary)"><%= b.reason || 'Patrón de ataque detectado' %></span>
+                    <span style="font-size:.78rem;color:var(--color-text-secondary)">· bloqueada hasta las <%= new Date(b.blockedUntil).toLocaleString('es-AR') %></span>
+                    <form action="/auditoria/blocked-ip/<%= b.id %>/unblock" method="POST" class="js-confirm" style="margin-left:auto"
+                          data-confirm-title="¿Desbloquear esta IP ahora?"
+                          data-confirm-text="<%= b.ip %> va a poder volver a intentar ingresar de inmediato."
+                          data-confirm-btn="Sí, desbloquear">
+                        <button type="submit" class="btn-filter">
+                            <span class="material-symbols-outlined">lock_open</span> Desbloquear
+                        </button>
+                    </form>
+                </div>
+                <% }) %>
+            </div>
+        </div>
+        <% } else { %>
+        <div class="audit-card">
+            <div class="audit-card-body">
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">shield</span>
+                    No hay ninguna IP bloqueada en este momento.
+                </div>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- IPs de confianza (nunca se bloquean automáticamente) -->
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">verified_user</span>
+                <h2>IPs de confianza</h2>
+                <span class="badge-count"><%= (whitelistedIps || []).length %></span>
+            </div>
+            <div class="audit-card-body">
+                <p style="font-size:.8rem;color:var(--color-text-secondary);margin:0 0 1rem">
+                    Estas IPs nunca se bloquean automáticamente, aunque disparen el patrón de "misma IP en varias cuentas" (ej. la red de la oficina).
+                </p>
+                <form action="/auditoria/whitelist-ip" method="POST" class="audit-filters" style="margin-bottom:1rem">
+                    <div class="filter-group">
+                        <label>IP</label>
+                        <input type="text" name="ip" placeholder="Ej: 190.105.115.246" required>
+                    </div>
+                    <div class="filter-group" style="flex:1;min-width:180px">
+                        <label>Nota (opcional)</label>
+                        <input type="text" name="note" placeholder="Ej: Oficina Corrientes" style="width:100%">
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn-filter primary">
+                            <span class="material-symbols-outlined">add</span> Agregar
+                        </button>
+                    </div>
+                </form>
+                <% if (whitelistedIps && whitelistedIps.length > 0) { %>
+                <% whitelistedIps.forEach((w) => { %>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--color-border)">
+                    <code style="font-size:.85rem;background:var(--color-bg);padding:.2rem .5rem;border-radius:5px"><%= w.ip %></code>
+                    <% if (w.note) { %><span style="font-size:.8rem;color:var(--color-text-secondary)"><%= w.note %></span><% } %>
+                    <form action="/auditoria/whitelist-ip/<%= w.id %>/remove" method="POST" class="js-confirm" style="margin-left:auto"
+                          data-confirm-title="¿Quitar esta IP de la lista de confianza?"
+                          data-confirm-text="<%= w.ip %> va a poder volver a bloquearse automáticamente si dispara el patrón de ataque."
+                          data-confirm-btn="Sí, quitar">
+                        <button type="submit" class="btn-filter ghost">
+                            <span class="material-symbols-outlined">delete</span> Quitar
+                        </button>
+                    </form>
+                </div>
+                <% }) %>
+                <% } else { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">verified_user</span>
+                    No hay ninguna IP en la lista de confianza.
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('form.js-confirm').forEach((form) => {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+                    Swal.fire({
+                        icon: 'question',
+                        title: form.dataset.confirmTitle || '¿Confirmás esta acción?',
+                        text: form.dataset.confirmText || '',
+                        showCancelButton: true,
+                        confirmButtonText: form.dataset.confirmBtn || 'Sí, continuar',
+                        cancelButtonText: 'Cancelar',
+                        confirmButtonColor: '#dc2626',
+                        cancelButtonColor: isDark ? '#475569' : '#6b7280',
+                        background: isDark ? '#1e293b' : '#ffffff',
+                        color: isDark ? '#f1f5f9' : '#1e293b',
+                    }).then((result) => {
+                        if (result.isConfirmed) { form.submit(); }
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>

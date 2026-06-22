@@ -33,26 +33,24 @@
 
             document.getElementById('btn-revert-route')?.addEventListener('click', async () => {
                 const shipCount = <%= (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId).length %>;
-                const msg = `¿Deshabilitar el ruteo de la Ruta #<%= route.id %>?\n\n` +
-                    `- Se cancelara la ruta (estado: Cancelada).\n` +
-                    `- Los ${shipCount} envio(s) Asignados volveran a su estado anterior (Pendiente / En Sucursal / En Preparacion).\n` +
-                    `- El transporte y conductor quedan libres para otra ruta.\n\n` +
-                    `Solo procede si NINGUN envio salio aun (todos en estado Asignado).`;
-                if (!confirm(msg)) { return; }
+                const msg = `Se cancelará la ruta (estado: Cancelada). ` +
+                    `Los ${shipCount} envío(s) Asignados volverán a su estado anterior (Pendiente / En Sucursal / En Preparación) ` +
+                    `y el transporte y conductor quedan libres. Solo procede si NINGÚN envío salió aún (todos en estado Asignado).`;
+                if (!(await window.ltConfirm({ title: '¿Deshabilitar el ruteo de la Ruta #<%= route.id %>?', text: msg, confirmButtonText: 'Sí, deshabilitar', confirmButtonColor: '#dc2626' }))) { return; }
                 const btn = document.getElementById('btn-revert-route');
                 btn.disabled = true; btn.textContent = '⏳ Revirtiendo...';
                 try {
                     const res = await fetch('/route/<%= route.id %>/revert', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
                     const data = await res.json();
                     if (!res.ok) {
-                        alert('No se pudo revertir:\n\n' + (data.error || 'Error desconocido'));
+                        await window.ltAlert({ icon: 'error', title: 'No se pudo revertir', text: data.error || 'Error desconocido' });
                         btn.disabled = false; btn.textContent = '↩️ Deshabilitar ruteo';
                         return;
                     }
-                    alert(`✓ Ruta revertida. ${data.revertedShipments} envio(s) devueltos a su estado anterior.`);
+                    await window.ltAlert({ icon: 'success', title: 'Ruta revertida', text: `${data.revertedShipments} envío(s) devueltos a su estado anterior.` });
                     window.location.href = '/route';
                 } catch (e) {
-                    alert('Error de red al revertir: ' + e.message);
+                    await window.ltAlert({ icon: 'error', title: 'Error de red al revertir', text: e.message });
                     btn.disabled = false; btn.textContent = '↩️ Deshabilitar ruteo';
                 }
             });
