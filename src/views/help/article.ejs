@@ -17,11 +17,15 @@
 
             <article class="help-article">
                 <header class="help-article__header">
-                    <div class="help-article__icon">
-                        <span class="material-symbols-outlined"><%= article.icon %></span>
+                    <div class="help-article__header-row">
+                        <div class="help-article__icon">
+                            <span class="material-symbols-outlined"><%= article.icon %></span>
+                        </div>
+                        <div class="help-article__titles">
+                            <h1><%= article.title %></h1>
+                            <p class="help-article__lead"><%= article.summary %></p>
+                        </div>
                     </div>
-                    <h1><%= article.title %></h1>
-                    <p class="help-article__lead"><%= article.summary %></p>
                 </header>
 
                 <div class="help-article__content">
@@ -37,5 +41,7 @@
             </article>
         </div>
     </main>
+    <script src="/js/theme.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/ui.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

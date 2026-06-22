@@ -24,7 +24,7 @@
 
             <div class="help-search">
                 <span class="material-symbols-outlined help-search__icon" aria-hidden="true">search</span>
-                <input type="search" id="help-search-input" class="help-search__input"
+                <input type="text" id="help-search-input" class="help-search__input"
                        placeholder="Buscar en el manual…" autocomplete="off"
                        aria-label="Buscar artículos de ayuda">
             </div>
@@ -58,6 +58,8 @@
             <% }); %>
         </div>
     </main>
+    <script src="/js/theme.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/ui.js?v=<%= assetVersion %>" defer></script>
     <script src="/js/help.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

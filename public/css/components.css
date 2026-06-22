@@ -322,3 +322,41 @@
 }
 .data-table tbody tr:last-child { border-bottom: none; }
 .data-table tbody tr:hover { background-color: var(--color-primary-light); }
+
+/* Botones de ayuda contextual en page-header */
+.page-help-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.page-help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.page-help-btn:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.06);
+}
+
+.page-help-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+button.page-help-btn {
+    padding: 0;
+    font: inherit;
+}

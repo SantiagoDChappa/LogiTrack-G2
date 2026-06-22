@@ -19,6 +19,7 @@ const User = sequelize.define('user', {
     driverUnavailableReason: { type: DataTypes.STRING(120), allowNull: true, field: 'driver_unavailable_reason' },
     driverUnavailableUntil:  { type: DataTypes.DATEONLY,    allowNull: true, field: 'driver_unavailable_until' },
     onboarded: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    helpSeenModules: { type: DataTypes.TEXT, allowNull: false, defaultValue: '{}', field: 'help_seen_modules' },
     // #1 Primer ingreso — contraseña temporal pendiente de cambio + fecha del último cambio.
     mustChangePassword: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'must_change_password' },
     passwordChangedAt:  { type: DataTypes.DATE,    allowNull: true,  field: 'password_changed_at' },
@@ -193,4 +194,24 @@ const updateProfile = (id, { fullName, avatar }) => {
     return User.update(data, { where: { id } });
 };
 
-module.exports = { User, getAll, getById, create, update, deleteById, search, existsByDocument, existsByEmail, existsByDocumentExcluding, existsByEmailExcluding, findByEmail, findByDocument, setPassword, setTwoFactorPending, enableTwoFactor, disableTwoFactor, setBackupCodes, updateProfile, isLocked, registerFailedLogin, resetFailedLogin, unlockAccount, countCurrentlyLocked, getActiveAdmins };
+const parseHelpSeenModules = (raw) => {
+    if (!raw) return {};
+    if (typeof raw === 'object') return raw;
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const markHelpModuleSeen = async (id, moduleKey) => {
+    const user = await getById(id);
+    if (!user) return null;
+    const seen = parseHelpSeenModules(user.helpSeenModules);
+    seen[moduleKey] = true;
+    await User.update({ helpSeenModules: JSON.stringify(seen) }, { where: { id } });
+    return seen;
+};
+
+module.exports = { User, getAll, getById, create, update, deleteById, search, existsByDocument, existsByEmail, existsByDocumentExcluding, existsByEmailExcluding, findByEmail, findByDocument, setPassword, setTwoFactorPending, enableTwoFactor, disableTwoFactor, setBackupCodes, updateProfile, isLocked, registerFailedLogin, resetFailedLogin, unlockAccount, countCurrentlyLocked, getActiveAdmins, parseHelpSeenModules, markHelpModuleSeen };

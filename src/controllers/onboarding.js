@@ -1,4 +1,5 @@
-const { User } = require('../models/user');
+const { User, markHelpModuleSeen } = require('../models/user');
+const { isValidModule } = require('../data/contextualTours');
 
 const complete = async (req, res) => {
     try {
@@ -24,4 +25,22 @@ const replay = async (req, res) => {
     }
 };
 
-module.exports = { complete, replay };
+const moduleComplete = async (req, res) => {
+    try {
+        const userId = res.locals.currentUser?.id;
+        if (!userId) return res.status(401).json({ error: 'No autenticado' });
+
+        const moduleKey = String(req.body?.module || '').trim();
+        if (!isValidModule(moduleKey)) {
+            return res.status(400).json({ error: 'Módulo inválido' });
+        }
+
+        const helpSeen = await markHelpModuleSeen(userId, moduleKey);
+        return res.json({ ok: true, helpSeen });
+    } catch (err) {
+        console.error('[onboarding] error al marcar tour contextual:', err.message);
+        return res.status(500).json({ error: 'Error interno' });
+    }
+};
+
+module.exports = { complete, replay, moduleComplete };

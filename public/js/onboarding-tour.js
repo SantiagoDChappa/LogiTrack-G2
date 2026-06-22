@@ -351,26 +351,18 @@
             showProgress: true,
             progressText: '{{current}} de {{total}}',
             allowClose: false,
+            popoverClass: 'lgt-tour-popover',
             stagePadding: 6,
             stageRadius: 10,
             nextBtnText: 'Siguiente →',
             prevBtnText: '← Anterior',
             doneBtnText: '¡Listo!',
             onPopoverRender: function (popover) {
-                if (popover.footer.querySelector('.lgt-tour-skip')) return;
-                var skipBtn = document.createElement('button');
-                skipBtn.textContent = 'Saltar tour';
-                skipBtn.className = 'lgt-tour-skip';
-                skipBtn.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    completeTourOnce(driverObj);
-                });
-                var navBtns = popover.footer.querySelector('.driver-popover-navigation-btns');
-                if (navBtns) {
-                    popover.footer.insertBefore(skipBtn, navBtns);
-                } else {
-                    popover.footer.appendChild(skipBtn);
+                if (window.lgtTourPopover && window.lgtTourPopover.enhanceFooter) {
+                    window.lgtTourPopover.enhanceFooter(popover, {
+                        skipLabel: 'Saltar tour',
+                        onSkip: function () { completeTourOnce(driverObj); },
+                    });
                 }
             },
             onDestroyStarted: function () {
