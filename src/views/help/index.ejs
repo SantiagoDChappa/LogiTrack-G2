@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Centro de ayuda - LogiTrack</title>
+    <link rel="stylesheet" href="/css/help.css?v=<%= assetVersion %>">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="help-wrap">
+            <div class="help-hero">
+                <div class="help-hero__text">
+                    <h1>Centro de ayuda</h1>
+                    <p>Manual de usuario y guías para tu rol. Encontrá cómo usar cada módulo de LogiTrack.</p>
+                </div>
+                <div class="help-hero__actions">
+                    <a href="#" id="btn-replay-tour-help" class="help-btn help-btn--outline">
+                        <span class="material-symbols-outlined">tour</span>
+                        Ver tour de nuevo
+                    </a>
+                </div>
+            </div>
+
+            <div class="help-search">
+                <span class="material-symbols-outlined help-search__icon" aria-hidden="true">search</span>
+                <input type="search" id="help-search-input" class="help-search__input"
+                       placeholder="Buscar en el manual…" autocomplete="off"
+                       aria-label="Buscar artículos de ayuda">
+            </div>
+
+            <p id="help-search-empty" class="help-search-empty" hidden>No hay artículos que coincidan con tu búsqueda.</p>
+
+            <% categories.forEach(function (cat) { %>
+            <% const items = articles.filter(function (a) { return a.category === cat.id; }); %>
+            <% if (!items.length) return; %>
+            <section class="help-section" data-category="<%= cat.id %>">
+                <h2 class="help-section__title"><%= cat.label %></h2>
+                <div class="help-grid">
+                    <% items.forEach(function (article) { %>
+                    <a href="/help/<%= article.slug %>"
+                       class="help-card"
+                       data-title="<%= article.title %>"
+                       data-summary="<%= article.summary %>"
+                       data-keywords="<%= article.keywords %>">
+                        <div class="help-card__icon">
+                            <span class="material-symbols-outlined"><%= article.icon %></span>
+                        </div>
+                        <div class="help-card__body">
+                            <h3 class="help-card__title"><%= article.title %></h3>
+                            <p class="help-card__summary"><%= article.summary %></p>
+                        </div>
+                        <span class="material-symbols-outlined help-card__arrow">chevron_right</span>
+                    </a>
+                    <% }); %>
+                </div>
+            </section>
+            <% }); %>
+        </div>
+    </main>
+    <script src="/js/help.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>

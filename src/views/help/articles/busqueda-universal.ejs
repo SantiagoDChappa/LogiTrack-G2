@@ -1,0 +1,22 @@
+<h2>Dónde está</h2>
+<p>La barra de búsqueda está en el header superior, junto a las notificaciones. Escribí al menos <strong>2 caracteres</strong> para ver resultados.</p>
+
+<h2>Qué podés buscar</h2>
+<ul>
+    <li><strong>Envíos</strong> — por código de tracking, nombre del destinatario o remitente.</li>
+    <li><strong>Incidencias</strong> — por número o código de envío asociado.</li>
+    <% if (roleId === 1 || roleId === 4) { %>
+    <li><strong>Rutas</strong> — por número de ruta o nombre del repartidor.</li>
+    <li><strong>Devoluciones</strong> — incidencias tipo devolución vinculadas a envíos.</li>
+    <% } %>
+    <% if (roleId === 3) { %>
+    <li><strong>Tus rutas</strong> — solo las asignadas a vos.</li>
+    <% } %>
+    <% if (roleId === 4) { %>
+    <li><strong>Usuarios</strong> — por nombre o documento.</li>
+    <% } %>
+</ul>
+
+<p>Los resultados se agrupan por categoría. Hacé click en cualquier ítem para ir al detalle.</p>
+
+<div class="help-tip">Los resultados respetan tu rol: un repartidor solo ve sus envíos, rutas e incidencias asignadas.</div>
