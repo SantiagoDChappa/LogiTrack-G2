@@ -9,6 +9,7 @@ const Zone = sequelize.define('zone', {
     surchargePerKg:     { type: DataTypes.DECIMAL(8, 2),  allowNull: false, defaultValue: 0, field: 'surcharge_per_kg' },
     surchargePerM3:     { type: DataTypes.DECIMAL(8, 2),  allowNull: false, defaultValue: 0, field: 'surcharge_per_m3' },
     postalCodePrefixes: { type: DataTypes.JSONB, allowNull: true, field: 'postal_code_prefixes' },
+    departamentoIds:    { type: DataTypes.JSONB, allowNull: true, field: 'departamento_ids' },
     enabled:            { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
 }, { tableName: 'zone', timestamps: false });
 

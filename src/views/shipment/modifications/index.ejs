@@ -39,12 +39,12 @@
         </div>
 
         <% if (flash === 'approved') { %>
-        <div class="alert alert-success">Solicitud aprobada y aplicada.</div>
+        <div class="alert alert-success" role="status">Solicitud aprobada y aplicada.</div>
         <% } else if (flash === 'rejected') { %>
-        <div class="alert alert-success">Solicitud rechazada.</div>
+        <div class="alert alert-success" role="status">Solicitud rechazada.</div>
         <% } %>
         <% if (error) { %>
-        <div class="alert alert-error"><%= error %></div>
+        <div class="alert alert-error" role="alert"><%= error %></div>
         <% } %>
 
         <form method="GET" action="/shipment/modifications" class="incident-filters modifications-filters">

@@ -185,11 +185,12 @@
                                     <a href="<%= _isFinalS ? '#' : '/shipment/update/' + shipment.id %>"
                                        class="action-btn modificar<%= _isFinalS ? ' action-btn--disabled' : '' %>"
                                        data-tooltip="<%= _isFinalS ? 'No modificable' : 'Modificar' %>"
+                                       aria-label="<%= _isFinalS ? 'Envío no modificable' : 'Modificar envío ' + shipment.trackingId %>"
                                        <%= _isFinalS ? 'aria-disabled="true" tabindex="-1"' : '' %>>
-                                        <span class="material-symbols-outlined">edit</span>
+                                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                                     </a>
-                                    <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
-                                        <span class="material-symbols-outlined">info</span>
+                                    <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle" aria-label="Ver detalle del envío <%= shipment.trackingId %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">info</span>
                                     </a>
                                     <button type="button" class="action-btn eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia"
                                             data-incident-open
@@ -197,11 +198,12 @@
                                             data-tracking-id="<%= shipment.trackingId %>"
                                             data-branch-id="<%= shipment.currentBranchId || '' %>"
                                             data-branch-name="<%= shipment.currentBranch ? shipment.currentBranch.name : 'Sin sucursal' %>">
-                                        <span class="material-symbols-outlined">report</span>
+                                        <span class="material-symbols-outlined" aria-hidden="true">report</span>
                                     </button>
                                     <button type="button" class="action-btn" data-tooltip="Ver QR"
+                                            aria-label="Ver código QR del envío <%= shipment.trackingId %>"
                                             onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
-                                        <span class="material-symbols-outlined">qr_code</span>
+                                        <span class="material-symbols-outlined" aria-hidden="true">qr_code</span>
                                     </button>
                                 </td>
                             </tr>
@@ -241,22 +243,32 @@
         }
 
         // --- Table sort ---
+        // LGT-217 (Esc.3) — encabezados ordenables operables por teclado (Enter/Espacio)
+        // y con estado anunciado vía aria-sort. La flecha es decorativa (aria-hidden).
         document.querySelectorAll('.th-sortable').forEach(function(th) {
-            th.addEventListener('click', function() {
-                const col    = parseInt(this.dataset.col);
+            th.setAttribute('tabindex', '0');
+            th.setAttribute('role', 'button');
+            if (!th.hasAttribute('aria-sort')) { th.setAttribute('aria-sort', 'none'); }
+            const icon = th.querySelector('.sort-icon');
+            if (icon) { icon.setAttribute('aria-hidden', 'true'); }
+
+            function doSort() {
+                const col    = parseInt(th.dataset.col);
                 const tbody  = document.querySelector('#shipments-table tbody');
                 const rows   = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.querySelector('.empty-row'));
                 if (rows.length === 0) return;
 
-                const isAsc = this.dataset.sort !== 'asc';
+                const isAsc = th.dataset.sort !== 'asc';
 
                 document.querySelectorAll('.th-sortable').forEach(function(t) {
                     t.dataset.sort = '';
+                    t.setAttribute('aria-sort', 'none');
                     t.querySelector('.sort-icon').textContent = 'unfold_more';
                 });
 
-                this.dataset.sort = isAsc ? 'asc' : 'desc';
-                this.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
+                th.dataset.sort = isAsc ? 'asc' : 'desc';
+                th.setAttribute('aria-sort', isAsc ? 'ascending' : 'descending');
+                th.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
 
                 rows.sort(function(a, b) {
                     const aVal = (a.cells[col]?.textContent || '').trim();
@@ -265,6 +277,11 @@
                 });
 
                 rows.forEach(function(r) { tbody.appendChild(r); });
+            }
+
+            th.addEventListener('click', doSort);
+            th.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); doSort(); }
             });
         });
 

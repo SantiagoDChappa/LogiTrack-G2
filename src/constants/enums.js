@@ -140,6 +140,9 @@ const NotificationEvent = Object.freeze({
     FATIGUE_RECHECK_OMITTED:   'FATIGUE_RECHECK_OMITTED',   // re-chequeo en ruta no realizado a tiempo
     FATIGUE_CONSENT_REJECTED:  'FATIGUE_CONSENT_REJECTED',  // rechazó el consentimiento (cada vez, antes del límite)
     FATIGUE_PATTERN_RECURRENT: 'FATIGUE_PATTERN_RECURRENT', // patrón de fatiga recurrente
+    // Mail al remitente con el link de pago simulado de la factura. Transaccional:
+    // siempre se envía. Plantilla editable desde Ajustes → Comunicaciones.
+    INVOICE_PAYMENT_LINK:      'INVOICE_PAYMENT_LINK',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)

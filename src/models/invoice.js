@@ -19,6 +19,12 @@ const Invoice = sequelize.define('Invoice', {
     senderDocument:  { type: DataTypes.STRING(30) },
     createdByUserId: { type: DataTypes.INTEGER },
     createdAt:       { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
+    // [prototype] Pago simulado: estado del cobro + link público al checkout.
+    payStatus:       { type: DataTypes.STRING(12), allowNull: false, defaultValue: 'PENDIENTE', field: 'payStatus' },
+    payMethod:       { type: DataTypes.STRING(20), allowNull: true,  field: 'payMethod' },
+    payRef:          { type: DataTypes.STRING(40), allowNull: true,  field: 'payRef' },
+    paidAt:          { type: DataTypes.DATE,       allowNull: true,  field: 'paidAt' },
+    payToken:        { type: DataTypes.STRING(60), allowNull: true,  field: 'payToken' },
 }, {
     tableName: 'invoice',
     schema: 'logitrack',
