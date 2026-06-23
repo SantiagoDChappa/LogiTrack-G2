@@ -582,6 +582,12 @@
                             <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
                         </div>
 
+                        <div class="field">
+                            <label for="recargo_zona_peligrosa_pct">Recargo zona peligrosa (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_zona_peligrosa_pct" name="recargo_zona_peligrosa_pct" min="0" max="500" step="0.01" value="<%= params.recargo_zona_peligrosa_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el destino cae en una zona marcada como peligrosa (y llegable). Se valida por coordenadas/CP del destino. 0 = sin recargo. Las zonas se marcan en el mapa de Zonas.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/css/zones.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.3/dist/leaflet-geoman.css" />
 </head>
 <body>
     <%- include('../partials/header') %>
@@ -106,18 +107,17 @@
 
         <div id="zone-map-view">
             <div id="zone-map-error" hidden></div>
-            <div class="zone-map-layout">
-                <div id="zone-map" aria-label="Mapa de zonas por provincia"></div>
-                <div class="zone-map-aside">
-                    <div id="zone-map-panel"></div>
-                    <div id="zone-map-legend" aria-label="Referencia de colores"></div>
-                </div>
-            </div>
+            <div id="zone-map" aria-label="Mapa de zonas por provincia"></div>
+            <div id="zone-map-panel" class="zmp"></div>
+        </div>
+        <div class="zone-map-below">
+            <div id="zone-map-legend" aria-label="Referencia de colores"></div>
         </div>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.3/dist/leaflet-geoman.min.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
