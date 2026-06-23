@@ -16,6 +16,7 @@
     var COLOR_DANGER = '#dc2626'; // peligrosa (llegable: recarga el envío)
     var COLOR_BLOCKED = '#7f1d1d';// no llegable (no se entrega)
     var DANGER_API = '/api/danger-areas';
+    var DEPT_OVERRIDE_API = '/api/dept-overrides';
 
     var map = null;
     var provLayer = null;
@@ -27,6 +28,8 @@
     var deptPinned = false;        // partido fijado por click (no se pierde al sacar el cursor)
     var pinnedDeptLayer = null;    // capa del partido fijado, para mantener su resaltado
     var deptIndex = {};            // códigoINDEC partido -> zona (de la provincia activa)
+    var deptOverride = {};         // códigoINDEC partido -> geometría editada (override estético)
+    var currentProvGeoId = null;   // id georef de la provincia activa (para redibujar partidos)
     var cpIndex = {};              // código postal -> localidad (para mostrar nombres, no solo números)
     var dangerLayer = null;        // capa de áreas peligrosas / no llegables (overlay rojo)
     var pendingDraw = null;        // polígono recién dibujado, a la espera de guardarse
@@ -175,11 +178,15 @@
             html += '<p class="zmp-hint">Partido sin zona asignada. Asigná partidos desde el formulario de la zona.</p>';
         }
         if (isPinned) {
+            html += '<div class="zmp-dept-actions"><button type="button" class="zmp-edit-dept" id="zmp-edit-dept">' +
+                '<span class="material-symbols-outlined">edit</span> Editar límites</button></div>';
             html += '<p class="zmp-hint zmp-hint--foot">Partido fijado. Pasá por otro partido para previsualizarlo, o tocá «Volver».</p>';
         }
         panel.innerHTML = html;
         var back = panel.querySelector('.zmp-back');
         if (back) { back.addEventListener('click', clearDeptPinned); }
+        var editBtn = panel.querySelector('#zmp-edit-dept');
+        if (editBtn) { editBtn.addEventListener('click', function () { startDeptEdit(pinnedDeptLayer); }); }
         bindPanelInteractions();
     }
     function clearDeptPinned() {
@@ -321,8 +328,13 @@
     var allDeptsGeo = null;   // cache del geojson nacional de partidos
 
     function drawDepartamentos(provGeoId) {
+        currentProvGeoId = provGeoId;
         var feats = (allDeptsGeo.features || []).filter(function (f) {
             return f.properties && f.properties.provincia && f.properties.provincia.id === provGeoId;
+        }).map(function (f) {
+            // Override estético: si el partido tiene una delimitación editada, se usa esa.
+            var ov = deptOverride[f.properties.id];
+            return ov ? { type: 'Feature', properties: f.properties, geometry: ov } : f;
         });
         deptLayer = L.geoJSON({ type: 'FeatureCollection', features: feats },
             // pmIgnore: el editor de Geoman no debe tocar el choropleth de partidos,
@@ -366,6 +378,15 @@
         }).catch(function () {
             showError('No se pudo cargar el mapa. Usá la vista de tabla.');
         });
+
+        // Overrides estéticos de delimitación de partidos (best-effort: si falla, se usan
+        // los límites oficiales). Se cargan acá para tenerlos listos al drillear.
+        fetch(DEPT_OVERRIDE_API)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                (data && data.overrides || []).forEach(function (o) { if (o.code && o.geom) { deptOverride[o.code] = o.geom; } });
+            })
+            .catch(function () { /* sin overrides: límites oficiales */ });
 
         loadDangerAreas();   // overlay rojo de zonas peligrosas / no llegables
         setupDangerDraw();   // herramienta para dibujar nuevas (si Geoman está disponible)
@@ -524,6 +545,71 @@
                 showError('No se pudo eliminar el área. Recargando…');
                 loadDangerAreas();
             });
+    }
+
+    // ── Edición estética de la delimitación de un partido ──
+    // Edita un clon Geoman encima del partido fijado (el choropleth queda intacto vía
+    // pmIgnore). Al guardar, persiste el override y redibuja la capa con la nueva forma.
+    function startDeptEdit(layer) {
+        if (!layer || !layer.feature) { return; }
+        if (!map.pm) { showError('El editor de límites no está disponible.'); return; }
+        if (document.getElementById('zone-dept-edit-form')) { return; }  // ya editando
+        drawing = true;  // evita que los clicks fijen partido/provincia mientras se edita
+        var code = layer.feature.properties.id;
+        var name = layer.feature.properties.nombre || ('Partido ' + code);
+        var clone = L.geoJSON(layer.feature, {
+            style: { color: '#1a3566', weight: 2, fillOpacity: 0.12, dashArray: '4,3' },
+        }).addTo(map);
+        var target = null;
+        clone.eachLayer(function (l) { target = l; });
+        if (!target || !target.pm) { map.removeLayer(clone); drawing = false; showError('No se pudo editar este partido.'); return; }
+        target.pm.enable({ allowSelfIntersection: false });
+        try { map.fitBounds(target.getBounds(), { padding: [30, 30] }); } catch (e) { /* */ }
+        openDeptEditForm(code, name, target, clone);
+    }
+
+    function openDeptEditForm(code, name, target, clone) {
+        var box = document.createElement('div');
+        box.id = 'zone-dept-edit-form';
+        box.className = 'zone-danger-form';
+        box.innerHTML =
+            '<h4>Editar límites — ' + name + '</h4>' +
+            '<p style="font-size:.85rem;margin:.2rem 0 .6rem">Arrastrá los vértices para reformar la línea. Es solo visual: no cambia zonas ni costos.</p>' +
+            '<div class="zdf-actions">' +
+                '<button type="button" class="btn-secondary" id="zde-cancel">Cancelar</button>' +
+                '<button type="button" class="btn-primary" id="zde-save">Guardar</button>' +
+            '</div>' +
+            '<p class="zdf-err" id="zde-err" hidden></p>';
+        document.getElementById('zone-map-view').appendChild(box);
+
+        function cleanup() {
+            try { target.pm.disable(); } catch (e) { /* */ }
+            if (clone) { map.removeLayer(clone); }
+            box.remove();
+            drawing = false;
+        }
+        document.getElementById('zde-cancel').addEventListener('click', cleanup);
+        document.getElementById('zde-save').addEventListener('click', function () {
+            var err = document.getElementById('zde-err');
+            var btn = document.getElementById('zde-save');
+            var geom = target.toGeoJSON().geometry;
+            btn.disabled = true;
+            fetch(DEPT_OVERRIDE_API + '/' + encodeURIComponent(code), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ geom: geom }),
+            }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+              .then(function (res) {
+                  if (!res.ok || !res.j.ok) { throw new Error(res.j && res.j.error || 'Error'); }
+                  deptOverride[code] = geom;
+                  cleanup();
+                  // Redibuja partidos con la nueva forma; limpia el fijado (capa vieja inválida).
+                  deptPinned = false; pinnedDeptLayer = null;
+                  if (currentProvGeoId) { loadDepartamentos(currentProvGeoId); }
+                  renderProvincePanel(currentProvince, true);
+              })
+              .catch(function (e2) { err.textContent = e2.message || 'No se pudo guardar.'; err.hidden = false; btn.disabled = false; });
+        });
     }
 
     function renderLegend() {

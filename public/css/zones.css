@@ -222,6 +222,25 @@ html[data-theme="dark"] {
 
 .btn-secondary:hover { background: var(--zn-surface-alt); border-color: var(--zn-blue); }
 
+/* Acción "Editar límites" del partido fijado (override estético de delimitación). */
+.zmp-dept-actions { margin: .5rem 0 .25rem; }
+.zmp-edit-dept {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .45rem .9rem;
+    background: var(--zn-surface);
+    color: var(--zn-text-strong);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+.zmp-edit-dept:hover { background: var(--zn-surface-alt); border-color: var(--zn-blue); }
+.zmp-edit-dept .material-symbols-outlined { font-size: 1.05rem; }
+
 /* ============================================================
    Vista mapa (admin de zonas) — aditivo sobre el listado
    ============================================================ */
