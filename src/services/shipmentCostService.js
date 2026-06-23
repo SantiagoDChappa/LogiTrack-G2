@@ -14,9 +14,18 @@ const destinationOf = (shipment) => {
     };
 };
 
-// Recargo por destino peligroso. Devuelve 0 si no hay áreas, el % global es 0 o
-// no hay datos de destino -> totalmente retrocompatible.
-const computeDangerSurcharge = async (shipment, subtotal) => {
+// Recargo por destino peligroso. Se CONGELA al alta del envío (igual que el seguro):
+// si el shipment ya trae `dangerSurcharge`, se usa ese valor y no se recalcula. El
+// cálculo en vivo (consultando las áreas peligrosas) solo corre cuando se pide
+// explícitamente con liveDanger=true (alta + preview de costo), para que el ruteo y
+// el detalle/NC tomen siempre el total congelado y no dependan de las áreas actuales.
+const computeDangerSurcharge = async (shipment, subtotal, liveDanger) => {
+    const frozen = shipment.dangerSurcharge;
+    if (frozen !== null && frozen !== undefined) {
+        const v = Number(frozen);
+        return { surcharge: v, dangerous: v > 0, reachable: true };
+    }
+    if (!liveDanger) { return { surcharge: 0, dangerous: false, reachable: true }; }
     const pct = await dangerSvc.getDangerPct();
     if (pct <= 0) { return { surcharge: 0, dangerous: false, reachable: true }; }
     const ev = await dangerSvc.evaluate(destinationOf(shipment));
@@ -38,7 +47,10 @@ const computeInsurance = async (shipment) => {
     return Number((declaredValue * (seguroPct / 100)).toFixed(2));
 };
 
-const computeCost = async (shipment, { penaltyPct = 0 } = {}) => {
+// liveDanger: true solo al alta y en el preview de costo, para CALCULAR el recargo
+// por zona peligrosa consultando las áreas. En el resto (detalle/NC/ruteo) se usa el
+// valor congelado en el envío; si no hay, el recargo es 0.
+const computeCost = async (shipment, { penaltyPct = 0, liveDanger = false } = {}) => {
     if (!shipment) { return null; }
     const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
     const insurance = await computeInsurance(shipment);
@@ -47,7 +59,7 @@ const computeCost = async (shipment, { penaltyPct = 0 } = {}) => {
 
     if (!shipment.zone) {
         const base = costoBase + insurance;
-        const dng = await computeDangerSurcharge(shipment, base);
+        const dng = await computeDangerSurcharge(shipment, base, liveDanger);
         const subtotal = base + dng.surcharge;
         if (subtotal <= 0) { return null; }
         return {
@@ -62,7 +74,7 @@ const computeCost = async (shipment, { penaltyPct = 0 } = {}) => {
     const wSurcharge = Number(zone.surchargePerKg || 0) * w;
     const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
     const base = costoBase + zoneBase + wSurcharge + vSurcharge + insurance;
-    const dng = await computeDangerSurcharge(shipment, base);
+    const dng = await computeDangerSurcharge(shipment, base, liveDanger);
     const subtotal = base + dng.surcharge;
     const penalty = penaltyPct ? subtotal * (penaltyPct / 100) : 0;
     return {

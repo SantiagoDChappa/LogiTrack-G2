@@ -512,12 +512,16 @@ const createShipment = async (req, res) => {
         // [prototype] El desglose ya incluye el seguro de mercadería; persistimos también
         // insuranceAmount aparte para itemizarlo en factura/NC sin recalcularlo después.
         const costSvc = require('../services/shipmentCostService');
-        const breakdown = await costSvc.computeCost(freshShipment);
+        // liveDanger: evaluar la zona peligrosa AHORA (al alta) y congelar el recargo.
+        // Después el ruteo/detalle/NC usan el total ya persistido, sin recalcular.
+        const breakdown = await costSvc.computeCost(freshShipment, { liveDanger: true });
         const costTotal = breakdown ? breakdown.final : 0;
         const insuranceAmount = breakdown ? breakdown.insurance : 0;
+        const dangerSurcharge = breakdown ? (breakdown.dangerSurcharge || 0) : 0;
         const costUpdates = {};
         if (costTotal > 0)        { costUpdates.costTotal = costTotal;             freshShipment.costTotal = costTotal; }
         if (insuranceAmount > 0)  { costUpdates.insuranceAmount = insuranceAmount; freshShipment.insuranceAmount = insuranceAmount; }
+        if (dangerSurcharge > 0)  { costUpdates.dangerSurcharge = dangerSurcharge; freshShipment.dangerSurcharge = dangerSurcharge; }
         if (Object.keys(costUpdates).length) {
             await shipmentModel.Shipment.update(costUpdates, { where: { id: freshShipment.id } });
         }

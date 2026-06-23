@@ -57,6 +57,8 @@ const Shipment = sequelize.define('shipment', {
     // [prototype] Seguro de mercadería: valor declarado en el alta y seguro calculado/"congelado".
     declaredValue:   { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'declaredValue' },
     insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
+    // Recargo por zona peligrosa, congelado al alta. El ruteo no lo recalcula.
+    dangerSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'dangerSurcharge' },
 },
 { timestamps: true, tableName: 'shipment' });
 

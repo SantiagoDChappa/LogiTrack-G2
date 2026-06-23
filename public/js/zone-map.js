@@ -260,7 +260,11 @@
     }
 
     var DEPT_HL = { weight: 2.5, color: '#1a3566', fillOpacity: 0.95 };
-    var DEPT_PIN = { weight: 3, color: '#0f172a', fillOpacity: 1 };
+    // Partido fijado: relleno casi transparente para ver el mapa abajo, y solo el
+    // contorno marcado con el color de su zona (o gris si no tiene zona).
+    function deptPinStyle(z) {
+        return { weight: 3.5, color: z ? z.color : '#475569', opacity: 1, fillOpacity: 0.05, dashArray: null };
+    }
     function onEachDept(feature, layer) {
         var z = deptIndex[feature.properties.id];
         layer.bindTooltip(feature.properties.nombre + ' · ' + (z ? z.name : 'sin zona'), { sticky: true });
@@ -286,7 +290,8 @@
                 if (pinnedDeptLayer && deptLayer) { deptLayer.resetStyle(pinnedDeptLayer); }
                 deptPinned = true;
                 pinnedDeptLayer = layer;
-                layer.setStyle(DEPT_PIN);
+                layer.setStyle(deptPinStyle(z));
+                layer.bringToFront();   // que el contorno no quede tapado por vecinos
                 layer.closeTooltip();
                 renderDeptPanel(feature.properties.nombre, z, true);
                 map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 11 });
@@ -367,7 +372,9 @@
         return {
             color: blocked ? COLOR_BLOCKED : COLOR_DANGER,
             weight: 2, fillColor: blocked ? COLOR_BLOCKED : COLOR_DANGER,
-            fillOpacity: blocked ? 0.5 : 0.3, dashArray: blocked ? null : '5,4',
+            // Relleno rojo de baja opacidad: se ve el mapa abajo, solo se distingue
+            // la mancha de la zona peligrosa. La no llegable va un poco más marcada.
+            fillOpacity: blocked ? 0.28 : 0.15, dashArray: blocked ? null : '5,4',
         };
     }
     function dangerTooltip(area) {

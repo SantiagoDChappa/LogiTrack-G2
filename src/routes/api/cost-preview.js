@@ -24,7 +24,8 @@ router.post('/', async (req, res) => {
             destLat: lat !== null && lat !== undefined && lat !== '' ? Number(lat) : null,
             destLng: lng !== null && lng !== undefined && lng !== '' ? Number(lng) : null,
         };
-        const breakdown = await costSvc.computeCost(pseudoShipment);
+        // liveDanger: el preview sí evalúa la zona peligrosa para mostrar el recargo.
+        const breakdown = await costSvc.computeCost(pseudoShipment, { liveDanger: true });
         if (!breakdown) { return res.json({ ok: false }); }
         res.json({
             ok: true,
