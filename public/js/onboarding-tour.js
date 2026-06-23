@@ -4,8 +4,25 @@
     var MIN_TOUR_STEPS = 2;
     var TOUR_REDIRECT_KEY = 'lgt_tour_redirected';
     var TOUR_DISMISSED_KEY = 'lgt_tour_dismissed';
+    var TOUR_PENDING_KEY = 'lgt_tour_pending';
     var START_DELAY_MS = 450;
     var MOBILE_BP = '(max-width: 1024px)';
+
+    function scopedKey(base) {
+        var uid = window.__LGT && window.__LGT.userId != null ? String(window.__LGT.userId) : '0';
+        return base + '_' + uid;
+    }
+
+    function dismissedStorageKey() { return scopedKey(TOUR_DISMISSED_KEY); }
+    function redirectStorageKey() { return scopedKey(TOUR_REDIRECT_KEY); }
+    function pendingStorageKey() { return scopedKey(TOUR_PENDING_KEY); }
+
+    function isInterimAuthPage() {
+        var path = window.location.pathname;
+        return path === '/login/2fa/setup'
+            || path === '/login/2fa'
+            || path === '/account/password/forced';
+    }
 
     function asRole(roleId) {
         return Number(roleId);
@@ -106,7 +123,7 @@
 
     function helpCenterStep() {
         return {
-            element: '#help-header-btn',
+            element: '#help-header-btn, .help-header-btn',
             popover: {
                 title: 'Centro de ayuda',
                 description: '¿Necesitás más detalle? El manual completo está en el ícono ? del header. En pantallas complejas también tenés un tour contextual (ícono bandera) y enlaces al manual.',
@@ -307,22 +324,31 @@
     }
 
     function clearTourRedirectFlag() {
-        try { sessionStorage.removeItem(TOUR_REDIRECT_KEY); } catch (_) { /* ignore */ }
+        try { sessionStorage.removeItem(redirectStorageKey()); } catch (_) { /* ignore */ }
     }
 
     function clearTourDismissedFlag() {
-        try { sessionStorage.removeItem(TOUR_DISMISSED_KEY); } catch (_) { /* ignore */ }
+        try { sessionStorage.removeItem(dismissedStorageKey()); } catch (_) { /* ignore */ }
+    }
+
+    function markTourPending() {
+        try { sessionStorage.setItem(pendingStorageKey(), '1'); } catch (_) { /* ignore */ }
+    }
+
+    function clearTourPending() {
+        try { sessionStorage.removeItem(pendingStorageKey()); } catch (_) { /* ignore */ }
     }
 
     function isTourDismissed() {
         if (window.__LGT && window.__LGT.onboarded) return true;
-        try { return sessionStorage.getItem(TOUR_DISMISSED_KEY) === '1'; } catch (_) { return false; }
+        try { return sessionStorage.getItem(dismissedStorageKey()) === '1'; } catch (_) { return false; }
     }
 
     function markComplete() {
         if (window.__LGT) window.__LGT.onboarded = true;
-        try { sessionStorage.setItem(TOUR_DISMISSED_KEY, '1'); } catch (_) { /* ignore */ }
+        try { sessionStorage.setItem(dismissedStorageKey(), '1'); } catch (_) { /* ignore */ }
         clearTourRedirectFlag();
+        clearTourPending();
         fetch('/api/onboarding/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -338,19 +364,31 @@
 
     function ensureTourLanding(roleId) {
         if (isTourDismissed()) return true;
+        if (isInterimAuthPage()) {
+            markTourPending();
+            return false;
+        }
         var home = getTourHome(roleId);
         if (window.location.pathname === home) return true;
-        if (sessionStorage.getItem(TOUR_REDIRECT_KEY)) return true;
-        try { sessionStorage.setItem(TOUR_REDIRECT_KEY, '1'); } catch (_) { /* ignore */ }
+        try {
+            if (sessionStorage.getItem(redirectStorageKey()) === '1') return true;
+        } catch (_) { /* ignore */ }
+        try { sessionStorage.setItem(redirectStorageKey(), '1'); } catch (_) { /* ignore */ }
         window.location.replace(home);
         return false;
     }
 
     function startTour() {
         if (!window.__LGT || isTourDismissed()) return;
+        if (isInterimAuthPage()) {
+            markTourPending();
+            return;
+        }
 
         var roleId = asRole(window.__LGT.roleId);
         if (!ensureTourLanding(roleId)) return;
+
+        clearTourPending();
 
         var steps = filterSteps(getSteps(roleId).map(withNavHooks));
         if (steps.length < MIN_TOUR_STEPS) return;
@@ -417,7 +455,7 @@
     // Si saltó el tour en la página anterior pero la DB aún no se actualizó, no relanzar.
     if (window.__LGT && !window.__LGT.onboarded) {
         try {
-            if (sessionStorage.getItem(TOUR_DISMISSED_KEY) === '1') {
+            if (sessionStorage.getItem(dismissedStorageKey()) === '1') {
                 window.__LGT.onboarded = true;
                 markComplete();
             }
@@ -425,6 +463,11 @@
     }
 
     if (!window.__LGT || isTourDismissed()) return;
+
+    if (isInterimAuthPage()) {
+        markTourPending();
+        return;
+    }
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', scheduleTour);
