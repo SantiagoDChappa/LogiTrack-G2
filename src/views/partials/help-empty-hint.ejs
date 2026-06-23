@@ -1,0 +1,10 @@
+<%# message (required), helpSlug?, actionHref?, actionLabel? %>
+<div class="help-empty-hint">
+    <span><%= message %></span>
+    <% if (typeof helpSlug !== 'undefined' && helpSlug) { %>
+        <a href="/help/<%= helpSlug %>">Ver guía</a>
+    <% } %>
+    <% if (typeof actionHref !== 'undefined' && actionHref && typeof actionLabel !== 'undefined' && actionLabel) { %>
+        <a href="<%= actionHref %>"><%= actionLabel %></a>
+    <% } %>
+</div>

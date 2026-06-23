@@ -39,6 +39,7 @@
                 <p class="kanban-subtitle">Vista operativa de envíos activos</p>
             </div>
             <div style="display:flex;gap:var(--space-3);align-items:center;">
+                <%- include('../partials/page-help-btn', { helpModule: 'kanban' }) %>
                 <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
                 <form method="GET" action="/shipment/kanban" style="margin:0;">
                     <select name="branchId" class="search-input" onchange="this.form.submit()">

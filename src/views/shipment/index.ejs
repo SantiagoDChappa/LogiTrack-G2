@@ -9,15 +9,16 @@
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header shipment-page-header">
             <h1>Administrador de envios</h1>
             <div class="page-header__actions">
+                <%- include('../partials/page-help-btn', { helpModule: 'envios' }) %>
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
                     <a href="/shipment/export" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV" download>
                         <span class="material-symbols-outlined">download</span>
                     </a>
                 <% } %>
-                <a href="/shipment/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Alta de envío" aria-label="Alta de envío">
+                <a href="/shipment/new" class="action-btn action-btn--lg action-btn--tip-bottom crear shipment-new-btn" data-tooltip="Alta de envío" aria-label="Alta de envío">
                     <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
@@ -116,7 +117,7 @@
             </div>
         </form>
 
-        <div class="table-wrapper">
+        <div class="table-wrapper shipments-table-wrap">
             <table id="shipments-table" data-paginate="shipments">
                 <thead>
                     <tr>
@@ -147,7 +148,7 @@
                         <tr>
                             <td colspan="<%= isAdmin ? 8 : 7 %>" class="empty-row">
                                 <span class="material-symbols-outlined">search</span>
-                                No se encontraron resultados para esa búsqueda
+                                <%- include('../partials/help-empty-hint', { message: 'No se encontraron resultados para esa búsqueda.', helpSlug: 'envios', actionHref: '/shipment/new', actionLabel: 'Crear envío' }) %>
                             </td>
                         </tr>
                     <% } else { %>

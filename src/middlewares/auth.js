@@ -20,6 +20,7 @@ const requireAuth = async (req, res, next) => {
                 const fresh = await userModel.getById(decoded.id);
                 if (fresh) {
                     decoded.onboarded = fresh.onboarded;
+                    decoded.helpSeen = userModel.parseHelpSeenModules(fresh.helpSeenModules);
                     if (!decoded.branchId && fresh.branchId) {
                         decoded.branchId = fresh.branchId;
                         const branchModel = require('../models/branch');

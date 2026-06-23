@@ -1,0 +1,44 @@
+<h2>Listado y detalle</h2>
+<p>En <a href="/shipment">Envíos</a> ves todos los envíos de tu alcance. Cada fila muestra <a href="/help/glosario">tracking</a>, destinatario, estado y sucursal.</p>
+<p>El <strong>detalle</strong> de un envío incluye historial de estados, datos del paquete, dirección, incidencias asociadas y acciones según el estado actual.</p>
+
+<h2>Crear un envío</h2>
+<ol>
+    <li>Ir a <a href="/shipment/new">Crear envío</a>.</li>
+    <li>Completar remitente, destinatario y dirección (el sistema sugiere CP y valida la dirección).</li>
+    <li>Elegir tipo de envío, prioridad y sucursal de origen.</li>
+    <li>Guardar — se genera un código de tracking único.</li>
+</ol>
+
+<h2>Estados</h2>
+<p>Los envíos avanzan por estados (Pendiente → En preparación → Asignado → En tránsito → Entregado, etc.). Solo ciertas transiciones están permitidas según el rol y el contexto operativo.</p>
+
+<h2>Tour contextual</h2>
+<p>En la pantalla de Envíos verás un ícono <strong>tour</strong> en la barra superior. Usalo para un recorrido guiado por el listado, filtros y acciones principales.</p>
+
+<h2>Paso a paso</h2>
+<ol>
+    <li>Entrá a <a href="/shipment">Envíos</a> desde el menú lateral.</li>
+    <li>Filtrá por estado, sucursal o fecha si necesitás acotar la lista.</li>
+    <li>Hacé click en una fila para abrir el detalle con historial e incidencias vinculadas.</li>
+    <li>Para alta individual, usá <a href="/shipment/new">Crear envío</a>; para carga masiva, consultá <a href="/help/import-csv">Importar CSV</a>.</li>
+    <li>Cuando el envío esté listo, pasalo a ruteo desde <a href="/help/ruteo">Ruteo</a> o visualizalo en el <a href="/help/kanban">Kanban</a>.</li>
+</ol>
+
+<h2>Errores frecuentes</h2>
+<ul>
+    <li><strong>No puedo cambiar el estado:</strong> la transición puede no estar permitida para tu rol o el estado actual del envío (ej. ya Entregado).</li>
+    <li><strong>La dirección no valida:</strong> completá calle, altura y código postal; el sistema sugiere normalización pero requiere datos mínimos.</li>
+    <li><strong>No encuentro un envío antiguo:</strong> los envíos finalizados pueden identificarse con prefijo <a href="/help/glosario">HIST-</a>; los activos con <a href="/help/glosario">IENV-</a>. Usá la búsqueda del header.</li>
+</ul>
+
+<div class="help-tip">Usá la búsqueda del header si conocés el código de tracking o el nombre del destinatario.</div>
+
+<h2>Artículos relacionados</h2>
+<ul>
+    <li><a href="/help/kanban">Tablero Kanban</a></li>
+    <li><a href="/help/ruteo">Ruteo y optimización</a></li>
+    <li><a href="/help/import-csv">Importar envíos por CSV</a></li>
+    <li><a href="/help/incidencias">Incidencias operativas</a></li>
+    <li><a href="/help/glosario">Glosario</a></li>
+</ul>

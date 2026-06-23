@@ -9,16 +9,17 @@
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header incident-page-header">
             <h1>Incidencias</h1>
             <div class="page-header__actions">
+                <%- include('../partials/page-help-btn', { helpModule: 'incidencias' }) %>
                 <% const _role = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.roleId : null; %>
                 <% if (_role === 1 || _role === 4) { %>
                     <a href="/incident/config/templates" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Checklist por tipo" aria-label="Checklist por tipo">
                         <span class="material-symbols-outlined">checklist</span>
                     </a>
                 <% } %>
-                <a href="/incident/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva incidencia" aria-label="Nueva incidencia">
+                <a href="/incident/new" class="action-btn action-btn--lg action-btn--tip-bottom crear incident-new-btn" data-tooltip="Nueva incidencia" aria-label="Nueva incidencia">
                     <span class="material-symbols-outlined">add</span>
                 </a>
             </div>
@@ -122,7 +123,9 @@
                 </thead>
                 <tbody>
                     <% if (incidents.length === 0) { %>
-                        <tr><td colspan="11" class="incident-empty">No hay incidencias para mostrar.</td></tr>
+                        <tr><td colspan="11" class="incident-empty">
+                            <%- include('../partials/help-empty-hint', { message: 'No hay incidencias para mostrar.', helpSlug: 'incidencias' }) %>
+                        </td></tr>
                     <% } %>
                     <% incidents.forEach(i => {
                         const isExterno = i.openedChannel === 'PORTAL';

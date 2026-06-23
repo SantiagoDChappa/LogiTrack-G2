@@ -7,21 +7,46 @@ const {
     Incident, IncidentType,
 } = require('../models/index');
 const incidentModel = require('../models/incident');
+const modificationModel = require('../models/shipmentModificationRequest');
 
 const RouteStatus = Object.freeze({
     PLANNED: 1, IN_ROUTE: 2, FINISHED: 3, CANCELLED: 4,
     INTERRUPTED: 5, BLOCKED_FATIGUE: 6, PAUSED_FATIGUE: 7,
 });
-const { RoleType } = require('../constants/enums');
+const { RoleType, ModificationRequestStatus } = require('../constants/enums');
 
-const LIMIT = 4;
+const LIMIT = 6;
+const FETCH_LIMIT = LIMIT + 1;
 const isNum = (s) => /^\d{1,9}$/.test(s.trim());
-const asRole  = (roleId) => Number(roleId);
+const asRole = (roleId) => Number(roleId);
+
+const EMPTY_META = Object.freeze({
+    shipments: { hasMore: false },
+    incidents: { hasMore: false },
+    routes: { hasMore: false },
+    returns: { hasMore: false },
+    users: { hasMore: false },
+    modifications: { hasMore: false },
+    portalClients: { hasMore: false },
+});
+
+const sliceWithMeta = (items) => {
+    const list = items || [];
+    return {
+        items: list.slice(0, LIMIT),
+        hasMore: list.length > LIMIT,
+    };
+};
+
+const isStaffReviewer = (role) =>
+    role === RoleType.SUPERVISOR.id
+    || role === RoleType.OPERATOR.id
+    || role === RoleType.ADMIN.id;
 
 /** Filtros de incidencias alineados con incidentModel.list / incidentVisibleTo. */
 const buildIncidentFilters = (roleId, userId, branchId, q, numeric) => {
     const role = asRole(roleId);
-    const filters = { limit: LIMIT };
+    const filters = { limit: FETCH_LIMIT };
     if (numeric) {
         filters.id = parseInt(q, 10);
     } else {
@@ -39,8 +64,13 @@ const buildIncidentFilters = (roleId, userId, branchId, q, numeric) => {
 };
 
 const INCIDENT_STATUS_LABEL = { OPEN: 'Abierta', IN_REVIEW: 'En revisión', CLOSED: 'Cerrada' };
-const ROLE_LABEL             = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' };
-const ROUTE_STATUS_LABEL     = {
+const ROLE_LABEL = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' };
+const MOD_STATUS_LABEL = {
+    [ModificationRequestStatus.PENDING_REVIEW]: 'Pendiente',
+    [ModificationRequestStatus.APPLIED]: 'Aplicada',
+    [ModificationRequestStatus.REJECTED]: 'Rechazada',
+};
+const ROUTE_STATUS_LABEL = {
     [RouteStatus.PLANNED]:         'Planificada',
     [RouteStatus.IN_ROUTE]:        'En curso',
     [RouteStatus.FINISHED]:        'Finalizada',
@@ -50,14 +80,13 @@ const ROUTE_STATUS_LABEL     = {
     [RouteStatus.PAUSED_FATIGUE]:  'Pausada (fatiga)',
 };
 
-/** Misma fuente que /delivery — filtra en memoria las rutas del repartidor. */
 const matchDriverRoute = (route, q, numeric) => {
     const qLower = q.toLowerCase();
     const routeId = Number(route.id);
-    if (numeric && routeId === parseInt(q, 10)) return true;
-    if (String(routeId).includes(q)) return true;
+    if (numeric && routeId === parseInt(q, 10)) { return true; }
+    if (String(routeId).includes(q)) { return true; }
     const transportName = route.transport?.name || '';
-    const branchName    = route.originBranch?.name || '';
+    const branchName = route.originBranch?.name || '';
     return transportName.toLowerCase().includes(qLower)
         || branchName.toLowerCase().includes(qLower);
 };
@@ -76,108 +105,259 @@ const fetchDriverRoutes = (userId) => Route.findAll({
     limit: 100,
 });
 
+const buildShipmentScope = (role, uid, branchId) => {
+    const scopeFilter = {};
+    if (role === RoleType.DELIVERY.id) {
+        scopeFilter.deliveryUserId = uid;
+    } else if ((role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) && branchId) {
+        scopeFilter.currentBranchId = branchId;
+    }
+    return scopeFilter;
+};
+
+const buildRouteScope = (role, branchId) => {
+    if (role === RoleType.ADMIN.id) { return {}; }
+    if (branchId) { return { originBranchId: branchId }; }
+    return {};
+};
+
+/** Incidencias cuyo tipo coincide con la descripción (además de tracking/id). */
+const searchIncidentsByType = (role, uid, branchId, q) => {
+    const like = { [Op.iLike]: `%${q}%` };
+    const where = {};
+    const shipmentInclude = {
+        model: Shipment, as: 'shipment', required: true,
+        attributes: ['id', 'trackingId', 'deliveryUserId', 'currentBranchId'],
+    };
+
+    if (role === RoleType.DELIVERY.id) {
+        shipmentInclude.where = { deliveryUserId: uid };
+        shipmentInclude.required = true;
+    } else if (role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) {
+        const orClauses = [];
+        if (branchId) {
+            orClauses.push({ '$shipment.currentBranchId$': branchId });
+            orClauses.push({ '$assignedTo.branchId$': branchId });
+        }
+        orClauses.push({ assignedToUserId: uid }, { openedByUserId: uid });
+        if (orClauses.length > 0) {
+            where[Op.and] = [{ [Op.or]: orClauses }];
+        } else {
+            where.id = -1;
+        }
+    } else if (role !== RoleType.ADMIN.id) {
+        where.id = -1;
+    }
+
+    return Incident.findAll({
+        where,
+        include: [
+            shipmentInclude,
+            {
+                model: IncidentType, as: 'type', required: true,
+                where: { description: like },
+                attributes: ['code', 'description'],
+            },
+            { model: User, as: 'assignedTo', attributes: ['id', 'branchId'], required: false },
+        ],
+        attributes: ['id', 'status', 'shipmentId'],
+        order: [['id', 'DESC']],
+        limit: FETCH_LIMIT,
+        subQuery: false,
+    }).catch(() => []);
+};
+
+const mergeIncidents = (fromList, fromType) => {
+    const seen = new Set();
+    const merged = [];
+    for (const i of [...fromList, ...fromType]) {
+        if (!i || seen.has(i.id)) { continue; }
+        if (i.type?.code === 'RETURN') { continue; }
+        seen.add(i.id);
+        merged.push(i);
+    }
+    return merged;
+};
+
+const personMatchWhere = (q, like, numeric) => {
+    const orClauses = [{ fullName: like }, { email: like }];
+    if (numeric) { orClauses.push({ document: parseInt(q, 10) }); }
+    return { [Op.or]: orClauses };
+};
+
+const portalClientKey = (document, email) =>
+    `${document}:${String(email || '').trim().toLowerCase()}`;
+
+const aggregatePortalClients = (senderRows, recipientRows) => {
+    const map = new Map();
+    const add = (person, matchAs) => {
+        if (!person?.document) { return; }
+        const key = portalClientKey(person.document, person.email);
+        if (!map.has(key)) {
+            map.set(key, {
+                document: person.document,
+                email: person.email || '',
+                fullName: person.fullName || '',
+                shipmentCount: 0,
+                matchAs,
+            });
+        }
+        const entry = map.get(key);
+        entry.shipmentCount += 1;
+    };
+    for (const row of senderRows) { add(row.sender, 'sender'); }
+    for (const row of recipientRows) { add(row.recipient, 'recipient'); }
+    return Array.from(map.values());
+};
+
+const searchPortalClients = (scopeFilter, q, like, numeric) => {
+    const personWhere = personMatchWhere(q, like, numeric);
+    const attrs = ['id'];
+    const personAttrs = ['document', 'email', 'fullName'];
+
+    const bySender = Shipment.findAll({
+        where: scopeFilter,
+        attributes: attrs,
+        include: [{
+            model: Person, as: 'sender', required: true,
+            where: personWhere, attributes: personAttrs,
+        }],
+        limit: FETCH_LIMIT * 3,
+    }).catch(() => []);
+
+    const byRecipient = Shipment.findAll({
+        where: scopeFilter,
+        attributes: attrs,
+        include: [{
+            model: Person, as: 'recipient', required: true,
+            where: personWhere, attributes: personAttrs,
+        }],
+        limit: FETCH_LIMIT * 3,
+    }).catch(() => []);
+
+    return Promise.all([bySender, byRecipient]).then(([senders, recipients]) =>
+        aggregatePortalClients(senders, recipients)
+    );
+};
+
+const searchStaffRoutes = (routeScope, like, numeric, q) => {
+    const routeIncludes = [
+        {
+            model: Transport, as: 'transport', required: false,
+            include: [{ model: User, as: 'driver', required: false, attributes: ['id', 'fullName'] }],
+        },
+        { model: Status, as: 'status', required: false, attributes: ['description'] },
+    ];
+    const byDriverIncludes = [
+        {
+            model: Transport, as: 'transport', required: true,
+            include: [{ model: User, as: 'driver', required: true, where: { fullName: like }, attributes: ['id', 'fullName'] }],
+        },
+        { model: Status, as: 'status', required: false, attributes: ['description'] },
+    ];
+
+    const rByDriver = Route.findAll({
+        where: routeScope,
+        include: byDriverIncludes,
+        attributes: ['id', 'statusId'],
+        order: [['id', 'DESC']],
+        limit: FETCH_LIMIT,
+    }).catch(() => []);
+
+    const rById = numeric
+        ? Route.findOne({
+            where: { ...routeScope, id: parseInt(q, 10) },
+            include: routeIncludes,
+            attributes: ['id', 'statusId'],
+        }).catch(() => null)
+        : Promise.resolve(null);
+
+    return Promise.all([rById, rByDriver]).then(([byId, byDriver]) => {
+        const merged = [...byDriver];
+        if (byId && !merged.find(r => r.id === byId.id)) { merged.unshift(byId); }
+        return merged;
+    });
+};
+
 const search = async (req, res) => {
     try {
         const q = (req.query.q || '').trim();
         if (q.length < 2) {
-            return res.json({ shipments: [], incidents: [], routes: [], returns: [], users: [] });
+            return res.json({
+                shipments: [], incidents: [], routes: [], returns: [], users: [],
+                modifications: [], portalClients: [],
+                meta: { ...EMPTY_META },
+            });
         }
 
         const { roleId, id: userId, branchId } = res.locals.currentUser;
         const role = asRole(roleId);
-        const uid  = Number(userId);
+        const uid = Number(userId);
         const like = { [Op.iLike]: `%${q}%` };
         const numeric = isNum(q);
-
-        // ── Shipments (todos los roles) ──────────────────────────────────────
-        const scopeFilter = {};
-        if (role === RoleType.DELIVERY.id) {
-            scopeFilter.deliveryUserId = uid;
-        } else if ((role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) && branchId) {
-            scopeFilter.currentBranchId = branchId;
-        }
+        const scopeFilter = buildShipmentScope(role, uid, branchId);
 
         const shipIncludes = (senderReq, recipientReq) => [
-            { model: Person, as: 'sender',    required: senderReq,    attributes: ['fullName'], ...(senderReq    ? { where: { fullName: like } } : {}) },
+            { model: Person, as: 'sender', required: senderReq, attributes: ['fullName'], ...(senderReq ? { where: { fullName: like } } : {}) },
             { model: Person, as: 'recipient', required: recipientReq, attributes: ['fullName'], ...(recipientReq ? { where: { fullName: like } } : {}) },
-            { model: Status, as: 'status',    required: false,         attributes: ['description'] },
+            { model: Status, as: 'status', required: false, attributes: ['description'] },
         ];
 
         const shipOpts = (inc) => ({
             include: inc,
-            attributes: ['id', 'trackingId'],
+            attributes: ['id', 'trackingId', 'legacyTrackingId'],
             order: [['id', 'DESC']],
-            limit: LIMIT,
+            limit: FETCH_LIMIT,
         });
 
-        const shipByTrackingP  = Shipment.findAll({ where: { ...scopeFilter, trackingId: like }, ...shipOpts(shipIncludes(false, false)) }).catch(() => []);
-        const shipBySenderP    = Shipment.findAll({ where: scopeFilter, ...shipOpts(shipIncludes(true,  false)) }).catch(() => []);
-        const shipByRecipientP = Shipment.findAll({ where: scopeFilter, ...shipOpts(shipIncludes(false, true))  }).catch(() => []);
+        const shipByTrackingP = Shipment.findAll({ where: { ...scopeFilter, trackingId: like }, ...shipOpts(shipIncludes(false, false)) }).catch(() => []);
+        const shipByLegacyP = Shipment.findAll({ where: { ...scopeFilter, legacyTrackingId: like }, ...shipOpts(shipIncludes(false, false)) }).catch(() => []);
+        const shipBySenderP = Shipment.findAll({ where: scopeFilter, ...shipOpts(shipIncludes(true, false)) }).catch(() => []);
+        const shipByRecipientP = Shipment.findAll({ where: scopeFilter, ...shipOpts(shipIncludes(false, true)) }).catch(() => []);
 
-        const shipmentsPromise = Promise.all([shipByTrackingP, shipBySenderP, shipByRecipientP]).then(([byT, byS, byR]) => {
-            const seen = new Set();
-            const merged = [];
-            for (const s of [...byT, ...byS, ...byR]) {
-                if (!seen.has(s.id)) { seen.add(s.id); merged.push(s); }
-            }
-            return merged.slice(0, LIMIT);
-        });
+        const shipmentsPromise = Promise.all([shipByTrackingP, shipByLegacyP, shipBySenderP, shipByRecipientP])
+            .then(([byT, byL, byS, byR]) => {
+                const legacyIds = new Set(byL.map(s => s.id));
+                const seen = new Set();
+                const merged = [];
+                for (const s of [...byT, ...byL, ...byS, ...byR]) {
+                    if (!seen.has(s.id)) {
+                        seen.add(s.id);
+                        merged.push({ row: s, matchedBy: legacyIds.has(s.id) ? 'legacy' : 'default' });
+                    }
+                }
+                return merged;
+            });
 
-        // ── Incidents (RBAC vía incidentModel.list, igual que el listado) ────
-        const incidentsPromise = incidentModel.list(
+        const incidentsFromListP = incidentModel.list(
             buildIncidentFilters(role, uid, branchId, q, numeric)
         ).catch(() => []);
 
-        // ── Routes (Repartidor: propias; Supervisor + Admin: sucursal/global) ──
+        const incidentsFromTypeP = (!numeric)
+            ? searchIncidentsByType(role, uid, branchId, q)
+            : Promise.resolve([]);
+
+        const incidentsPromise = Promise.all([incidentsFromListP, incidentsFromTypeP])
+            .then(([fromList, fromType]) => mergeIncidents(fromList, fromType));
+
         let routesPromise = Promise.resolve([]);
         if (role === RoleType.DELIVERY.id) {
             routesPromise = fetchDriverRoutes(uid)
-                .then(routes => routes.filter(r => matchDriverRoute(r, q, numeric)).slice(0, LIMIT))
+                .then(routes => routes.filter(r => matchDriverRoute(r, q, numeric)))
                 .catch((err) => {
                     console.error('[search] delivery routes:', err.message);
                     return [];
                 });
-        } else if (role === RoleType.SUPERVISOR.id || role === RoleType.ADMIN.id) {
-            const routeScope = (role === RoleType.SUPERVISOR.id && branchId) ? { originBranchId: branchId } : {};
-            const routeIncludes = [
-                {
-                    model: Transport, as: 'transport', required: false,
-                    include: [{ model: User, as: 'driver', required: false, attributes: ['id', 'fullName'] }],
-                },
-                { model: Status, as: 'status', required: false, attributes: ['description'] },
-            ];
-            const byDriverIncludes = [
-                {
-                    model: Transport, as: 'transport', required: true,
-                    include: [{ model: User, as: 'driver', required: true, where: { fullName: like }, attributes: ['id', 'fullName'] }],
-                },
-                { model: Status, as: 'status', required: false, attributes: ['description'] },
-            ];
-
-            const rByDriver = Route.findAll({
-                where: routeScope,
-                include: byDriverIncludes,
-                attributes: ['id', 'statusId'],
-                order: [['id', 'DESC']],
-                limit: LIMIT,
-            }).catch(() => []);
-
-            const rById = numeric
-                ? Route.findOne({ where: { ...routeScope, id: parseInt(q) }, include: routeIncludes, attributes: ['id', 'statusId'] }).catch(() => null)
-                : Promise.resolve(null);
-
-            routesPromise = Promise.all([rById, rByDriver]).then(([byId, byDriver]) => {
-                const merged = [...byDriver];
-                if (byId && !merged.find(r => r.id === byId.id)) merged.unshift(byId);
-                return merged.slice(0, LIMIT);
-            });
+        } else if (role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id || role === RoleType.ADMIN.id) {
+            routesPromise = searchStaffRoutes(buildRouteScope(role, branchId), like, numeric, q);
         }
 
-        // ── Returns (Supervisor + Admin) — incidencias tipo RETURN ───────────
         let returnsPromise = Promise.resolve([]);
         if (role === RoleType.SUPERVISOR.id || role === RoleType.ADMIN.id) {
             const retShipmentWhere = { trackingId: like };
-            if (role === RoleType.SUPERVISOR.id && branchId) retShipmentWhere.currentBranchId = branchId;
+            if (role === RoleType.SUPERVISOR.id && branchId) {
+                retShipmentWhere.currentBranchId = branchId;
+            }
             returnsPromise = Incident.findAll({
                 include: [
                     {
@@ -191,61 +371,117 @@ const search = async (req, res) => {
                 ],
                 attributes: ['id', 'status', 'shipmentId'],
                 order: [['id', 'DESC']],
-                limit: LIMIT,
+                limit: FETCH_LIMIT,
             }).catch(() => []);
         }
 
-        // ── Users (solo Admin) ────────────────────────────────────────────────
         let usersPromise = Promise.resolve([]);
         if (role === RoleType.ADMIN.id) {
             const userWhere = { active: true };
             if (numeric) {
-                userWhere[Op.or] = [{ fullName: like }, { document: parseInt(q) }];
+                userWhere[Op.or] = [{ fullName: like }, { document: parseInt(q, 10) }, { email: like }];
             } else {
-                userWhere.fullName = like;
+                userWhere[Op.or] = [{ fullName: like }, { email: like }];
             }
             usersPromise = User.findAll({
                 where: userWhere,
-                attributes: ['id', 'fullName', 'roleId'],
+                attributes: ['id', 'fullName', 'roleId', 'email'],
                 order: [['fullName', 'ASC']],
-                limit: LIMIT,
+                limit: FETCH_LIMIT,
             }).catch(() => []);
         }
 
-        const [shipmentsRaw, incidentsRaw, routesRaw, returnsRaw, usersRaw] = await Promise.all([
+        let modificationsPromise = Promise.resolve([]);
+        let portalClientsPromise = Promise.resolve([]);
+        if (isStaffReviewer(role)) {
+            const modBranchId = role === RoleType.ADMIN.id ? null : (branchId || null);
+            modificationsPromise = modificationModel.searchForUniversal({
+                q, branchId: modBranchId, fetchLimit: FETCH_LIMIT,
+            }).catch(() => []);
+
+            portalClientsPromise = searchPortalClients(scopeFilter, q, like, numeric);
+        }
+
+        const [
+            shipmentsMerged, incidentsRaw, routesRaw, returnsRaw, usersRaw,
+            modificationsRaw, portalClientsRaw,
+        ] = await Promise.all([
             shipmentsPromise, incidentsPromise, routesPromise, returnsPromise, usersPromise,
+            modificationsPromise, portalClientsPromise,
         ]);
 
+        const shipmentsSlice = sliceWithMeta(shipmentsMerged);
+        const incidentsSlice = sliceWithMeta(incidentsRaw);
+        const routesSlice = sliceWithMeta(routesRaw);
+        const returnsSlice = sliceWithMeta(returnsRaw);
+        const usersSlice = sliceWithMeta(usersRaw);
+        const modificationsSlice = sliceWithMeta(modificationsRaw);
+        const portalClientsSlice = sliceWithMeta(portalClientsRaw);
+
         return res.json({
-            shipments: shipmentsRaw.map(s => ({
-                id:            s.id,
-                trackingId:    s.trackingId,
-                recipientName: s.recipient?.fullName || s.sender?.fullName || null,
-                status:        s.status?.description || null,
-            })),
-            incidents: incidentsRaw.filter(Boolean).map(i => ({
-                id:        i.id,
+            shipments: shipmentsSlice.items.map(({ row: s, matchedBy }) => {
+                const secondary = [
+                    s.recipient?.fullName || s.sender?.fullName || null,
+                    s.status?.description || null,
+                    matchedBy === 'legacy' ? `Legacy: ${s.legacyTrackingId}` : null,
+                ].filter(Boolean).join(' · ');
+                return {
+                    id: s.id,
+                    trackingId: s.trackingId,
+                    recipientName: s.recipient?.fullName || s.sender?.fullName || null,
+                    status: s.status?.description || null,
+                    matchedBy,
+                    secondary,
+                };
+            }),
+            incidents: incidentsSlice.items.filter(Boolean).map(i => ({
+                id: i.id,
                 trackingId: i.shipment?.trackingId || null,
-                type:      i.type?.description || null,
-                status:    INCIDENT_STATUS_LABEL[i.status] || i.status,
+                type: i.type?.description || null,
+                status: INCIDENT_STATUS_LABEL[i.status] || i.status,
             })),
-            routes: routesRaw.filter(Boolean).map(r => ({
-                id:            r.id,
-                driverName:    r.transport?.driver?.fullName || null,
+            routes: routesSlice.items.filter(Boolean).map(r => ({
+                id: r.id,
+                driverName: r.transport?.driver?.fullName || null,
                 transportName: r.transport?.name || null,
-                branchName:    r.originBranch?.name || null,
-                status:        ROUTE_STATUS_LABEL[r.statusId] || null,
+                branchName: r.originBranch?.name || null,
+                status: ROUTE_STATUS_LABEL[r.statusId] || null,
             })),
-            returns: returnsRaw.filter(Boolean).map(r => ({
-                id:        r.id,
+            returns: returnsSlice.items.filter(Boolean).map(r => ({
+                id: r.id,
                 trackingId: r.shipment?.trackingId || null,
-                status:    INCIDENT_STATUS_LABEL[r.status] || r.status,
+                status: INCIDENT_STATUS_LABEL[r.status] || r.status,
             })),
-            users: usersRaw.filter(Boolean).map(u => ({
-                id:       u.id,
+            users: usersSlice.items.filter(Boolean).map(u => ({
+                id: u.id,
                 fullName: u.fullName,
-                role:     ROLE_LABEL[u.roleId] || 'Desconocido',
+                role: ROLE_LABEL[u.roleId] || 'Desconocido',
+                email: u.email || null,
             })),
+            modifications: modificationsSlice.items.filter(Boolean).map(m => ({
+                id: m.id,
+                shipmentId: m.shipmentId,
+                trackingId: m.shipment?.trackingId || null,
+                changeType: m.changeType,
+                status: MOD_STATUS_LABEL[m.status] || m.status,
+                recipientName: m.shipment?.recipient?.fullName || null,
+            })),
+            portalClients: portalClientsSlice.items.map(c => ({
+                document: c.document,
+                email: c.email,
+                fullName: c.fullName,
+                shipmentCount: c.shipmentCount,
+                matchAs: c.matchAs,
+            })),
+            meta: {
+                shipments: { hasMore: shipmentsSlice.hasMore },
+                incidents: { hasMore: incidentsSlice.hasMore },
+                routes: { hasMore: routesSlice.hasMore },
+                returns: { hasMore: returnsSlice.hasMore },
+                users: { hasMore: usersSlice.hasMore },
+                modifications: { hasMore: modificationsSlice.hasMore },
+                portalClients: { hasMore: portalClientsSlice.hasMore },
+            },
         });
     } catch (err) {
         console.error('[search] error:', err.message);

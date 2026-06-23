@@ -3,6 +3,7 @@
 
     var MIN_TOUR_STEPS = 2;
     var TOUR_REDIRECT_KEY = 'lgt_tour_redirected';
+    var TOUR_DISMISSED_KEY = 'lgt_tour_dismissed';
     var START_DELAY_MS = 450;
     var MOBILE_BP = '(max-width: 1024px)';
 
@@ -97,6 +98,18 @@
             popover: {
                 title: 'Notificaciones',
                 description: 'Acá ves alertas importantes de la operación: demoras, incidencias, fatiga y más. El badge rojo indica pendientes de leer.',
+                side: 'bottom',
+                align: 'end',
+            },
+        };
+    }
+
+    function helpCenterStep() {
+        return {
+            element: '#help-header-btn',
+            popover: {
+                title: 'Centro de ayuda',
+                description: '¿Necesitás más detalle? El manual completo está en el ícono ? del header. En pantallas complejas también tenés un tour contextual (ícono bandera) y enlaces al manual.',
                 side: 'bottom',
                 align: 'end',
             },
@@ -275,6 +288,7 @@
             },
         });
 
+        steps.push(helpCenterStep());
         steps.push(notificationBellStep());
 
         return steps;
@@ -282,29 +296,50 @@
 
     function getSteps(roleId) {
         var role = asRole(roleId);
-        if (role === 4) return STEPS_SUPERVISOR_ADMIN.concat(STEPS_ADMIN_EXTRA);
-        if (role === 1) return STEPS_SUPERVISOR_ADMIN;
-        if (role === 2) return STEPS_OPERATOR;
-        if (role === 3) return buildDeliverySteps();
-        return [];
+        var steps;
+        if (role === 4) steps = STEPS_SUPERVISOR_ADMIN.concat(STEPS_ADMIN_EXTRA);
+        else if (role === 1) steps = STEPS_SUPERVISOR_ADMIN.slice();
+        else if (role === 2) steps = STEPS_OPERATOR.slice();
+        else if (role === 3) return buildDeliverySteps();
+        else return [];
+        steps.push(helpCenterStep());
+        return steps;
     }
 
     function clearTourRedirectFlag() {
         try { sessionStorage.removeItem(TOUR_REDIRECT_KEY); } catch (_) { /* ignore */ }
     }
 
+    function clearTourDismissedFlag() {
+        try { sessionStorage.removeItem(TOUR_DISMISSED_KEY); } catch (_) { /* ignore */ }
+    }
+
+    function isTourDismissed() {
+        if (window.__LGT && window.__LGT.onboarded) return true;
+        try { return sessionStorage.getItem(TOUR_DISMISSED_KEY) === '1'; } catch (_) { return false; }
+    }
+
     function markComplete() {
         // Evitar que el tour vuelva a dispararse en esta misma carga aunque el POST
         // tarde o falle (el refresco real de onboarded viene del server en la próxima carga).
         if (window.__LGT) window.__LGT.onboarded = true;
+        try { sessionStorage.setItem(TOUR_DISMISSED_KEY, '1'); } catch (_) { /* ignore */ }
         clearTourRedirectFlag();
         fetch('/api/onboarding/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
         }).catch(function () {});
     }
 
+    function finishTour(driverObj) {
+        markComplete();
+        closeMobileNav();
+        if (driverObj) driverObj.destroy(false);
+    }
+
     function ensureTourLanding(roleId) {
+        if (isTourDismissed()) return true;
         var home = getTourHome(roleId);
         if (window.location.pathname === home) return true;
         if (sessionStorage.getItem(TOUR_REDIRECT_KEY)) return true;
@@ -314,7 +349,7 @@
     }
 
     function startTour() {
-        if (!window.__LGT || window.__LGT.onboarded) return;
+        if (!window.__LGT || isTourDismissed()) return;
 
         var roleId = asRole(window.__LGT.roleId);
         if (!ensureTourLanding(roleId)) return;
@@ -322,46 +357,38 @@
         var steps = filterSteps(getSteps(roleId).map(withNavHooks));
         if (steps.length < MIN_TOUR_STEPS) return;
 
-        var tourStarted = false;
+        var tourFinished = false;
+
+        function completeTourOnce(driverObj) {
+            if (tourFinished) return;
+            tourFinished = true;
+            finishTour(driverObj);
+        }
 
         var driverObj = window.driver.js.driver({
             showProgress: true,
             progressText: '{{current}} de {{total}}',
             allowClose: false,
+            popoverClass: 'lgt-tour-popover',
             stagePadding: 6,
             stageRadius: 10,
             nextBtnText: 'Siguiente →',
             prevBtnText: '← Anterior',
             doneBtnText: '¡Listo!',
             onPopoverRender: function (popover) {
-                if (popover.footer.querySelector('.lgt-tour-skip')) return;
-                var skipBtn = document.createElement('button');
-                skipBtn.textContent = 'Saltar tour';
-                skipBtn.className = 'lgt-tour-skip';
-                skipBtn.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    // destroy() público hace teardown directo SIN disparar onDestroyStarted,
-                    // así que marcamos completado acá para que el tour no vuelva a aparecer.
-                    markComplete();
-                    closeMobileNav();
-                    driverObj.destroy();
-                });
-                var navBtns = popover.footer.querySelector('.driver-popover-navigation-btns');
-                if (navBtns) {
-                    popover.footer.insertBefore(skipBtn, navBtns);
-                } else {
-                    popover.footer.appendChild(skipBtn);
+                if (window.lgtTourPopover && window.lgtTourPopover.enhanceFooter) {
+                    window.lgtTourPopover.enhanceFooter(popover, {
+                        skipLabel: 'Saltar tour',
+                        onSkip: function () { completeTourOnce(driverObj); },
+                    });
                 }
             },
             onDestroyStarted: function () {
-                if (tourStarted) markComplete();
-                closeMobileNav();
-                driverObj.destroy();
+                completeTourOnce(driverObj);
             },
             steps: steps,
         });
 
-        tourStarted = true;
         driverObj.drive();
     }
 
@@ -381,13 +408,25 @@
             })
                 .then(function () {
                     clearTourRedirectFlag();
+                    clearTourDismissedFlag();
+                    if (window.__LGT) window.__LGT.onboarded = false;
                     window.location.href = getTourHome(roleId);
                 })
                 .catch(function () {});
         });
     }
 
-    if (!window.__LGT || window.__LGT.onboarded) return;
+    // Si saltó el tour en la página anterior pero la DB aún no se actualizó, no relanzar.
+    if (window.__LGT && !window.__LGT.onboarded) {
+        try {
+            if (sessionStorage.getItem(TOUR_DISMISSED_KEY) === '1') {
+                window.__LGT.onboarded = true;
+                markComplete();
+            }
+        } catch (_) { /* ignore */ }
+    }
+
+    if (!window.__LGT || isTourDismissed()) return;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', scheduleTour);

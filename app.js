@@ -47,6 +47,7 @@ const transportRoutes  = require('./src/routes/transport');
 const zoneRoutes       = require('./src/routes/zone');
 const incidentRoutes   = require('./src/routes/incident');
 const reportRoutes     = require('./src/routes/report');
+const dashboardRoutes  = require('./src/routes/dashboard');
 const notificationRoutes = require('./src/routes/notification');
 const returnRoutes = require('./src/routes/return');
 const creditNoteRoutes = require('./src/routes/creditNote');
@@ -55,6 +56,7 @@ const notificationInAppRoutes = require('./src/routes/notificationInApp');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
 const onboardingRoutes = require('./src/routes/onboarding');
+const helpRoutes       = require('./src/routes/help');
 const apiSearchRoutes  = require('./src/routes/api/search');
 const accountRoutes    = require('./src/routes/account');
 const passwordResetRoutes = require('./src/routes/passwordReset');
@@ -134,6 +136,7 @@ app.use('/brand', require('./src/routes/brand'));
 
 // Rutas Protegidas
 app.use('/home', requireAuth, homeRoutes);
+app.use('/help', requireAuth, helpRoutes);
 // Cuenta del usuario (cambio de contraseña forzado en primer ingreso / reset).
 app.use('/account', requireAuth, accountRoutes);
 app.use('/user',          requireAuth, requireSupervisor, userRoutes);
@@ -164,7 +167,8 @@ app.use('/zone',      requireAuth, requireSupervisor, zoneRoutes);
 app.use('/branch',    requireAuth, branchRoutes);
 app.use('/incident',  requireAuth, incidentRoutes);
 app.use('/shipment/modifications', requireAuth, requireSupervisorOrOperator, shipmentModificationRoutes);
-app.use('/report',    requireAuth, requireSupervisor, reportRoutes);
+app.use('/report',     requireAuth, requireSupervisor, reportRoutes);
+app.use('/dashboard',  requireAuth, requireSupervisor, dashboardRoutes);
 app.use('/notification', requireAuth, requireSupervisor, notificationRoutes);
 // Devoluciones como incidencias (tipo RETURN): el RBAC fino lo aplica cada ruta
 // (alta interna = staff; tomar/resolver = supervisor/admin).

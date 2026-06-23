@@ -231,8 +231,11 @@
     <main class="main-content">
         <div class="dlv-wrap">
 
-            <div class="page-header" style="padding:0;margin-bottom:8px">
+            <div class="page-header delivery-home-header" style="padding:0;margin-bottom:8px">
                 <h1>Mi Ruteo</h1>
+                <div class="page-header__actions">
+                    <%- include('../partials/page-help-btn', { helpModule: 'mi-ruteo' }) %>
+                </div>
             </div>
 
             <% if (typeof fatigueBlocked !== 'undefined' && fatigueBlocked) { %>
@@ -356,7 +359,7 @@
                 <div class="empty-routes">
                     <span class="material-symbols-outlined">local_shipping</span>
                     <div style="margin-top:10px;font-weight:700">No tenés una ruta activa</div>
-                    <div style="font-size:.85rem;margin-top:4px">Cuando un operador te asigne una ruta, aparecerá acá.</div>
+                    <%- include('../partials/help-empty-hint', { message: 'Cuando un operador te asigne una ruta, aparecerá acá.', helpSlug: 'mi-ruteo' }) %>
                 </div>
             <% } %>
 
