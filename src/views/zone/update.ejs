@@ -17,6 +17,10 @@
             </a>
         </div>
 
+        <% if (locals.error) { %>
+            <div class="form-error" role="alert"><%= error %></div>
+        <% } %>
+
         <div class="form-new">
             <form method="POST" action="/zone/update/<%= zone.id %>">
                 <div class="usuario">
