@@ -243,6 +243,9 @@ header {
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 500;
+  /* Mismo interlineado que .nav-group-toggle (1.2): así los items normales y los
+     grupos desplegables quedan exactamente del mismo alto y estilo. */
+  line-height: 1.2;
   color: rgba(255, 255, 255, 0.6);
   list-style: none;
   transition: background-color var(--transition), color var(--transition);

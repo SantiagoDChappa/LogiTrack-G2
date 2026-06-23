@@ -13,6 +13,15 @@
     .dashboard-wrapper { max-width: 2100px; }
 }
 
+/* Mapa Leaflet: crea su propio contexto de apilado (z-index:0) para que sus
+   capas internas (panes z~400, controles z~1000) NO tapen el header fijo
+   (z-index:50) al scrollear. Sin esto el mapa "pisaba" la barra superior. */
+#dashboard-heatmap {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+}
+
 .page-header {
     display: flex;
     align-items: center;

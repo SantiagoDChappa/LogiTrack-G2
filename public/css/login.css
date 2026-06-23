@@ -2,6 +2,7 @@
 
 body {
   min-height: 100vh;
+  min-height: 100dvh; /* iPhone Safari: centra la card en el alto real, sin barra */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,7 +39,7 @@ body::before {
 
 .login-back-btn {
   position: fixed;
-  bottom: 1.25rem;
+  top: 1.25rem;
   left: 1.25rem;
   z-index: 100;
   display: flex;
@@ -74,7 +75,7 @@ body::before {
 .login-theme-btn {
   position: fixed;
   top: 1.25rem;
-  left: 1.25rem;
+  right: 1.25rem;
   z-index: 100;
   display: flex;
   align-items: center;
@@ -103,13 +104,16 @@ body::before {
   outline-offset: 2px;
 }
 
+/* Fondo sólido (como el botón Volver): el rgba casi transparente anterior
+   se perdía sobre el fondo oscuro y no se leía. */
 [data-theme="dark"] .login-theme-btn {
-  background-color: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
 }
 
 [data-theme="dark"] .login-theme-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--color-surface-alt);
 }
 
 .login-theme-btn .material-symbols-outlined {
