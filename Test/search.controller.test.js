@@ -216,6 +216,34 @@ describe('Universal search enhancements', () => {
         expect(res.body.shipments).toHaveLength(1);
         expect(res.body.shipments[0].matchedBy).toBe('legacy');
         expect(res.body.shipments[0].secondary).toContain('Legacy: OLD-99');
+        expect(res.body.shipments[0].matchLabel).toBe('Tracking legacy');
+    });
+
+    test('shipments: indica coincidencia por remitente', async () => {
+        Shipment.findAll.mockImplementation((opts) => {
+            if (opts.include?.some((i) => i.as === 'sender' && i.required)) {
+                return Promise.resolve([{
+                    id: 8,
+                    trackingId: 'ENV-008',
+                    legacyTrackingId: null,
+                    sender: { fullName: 'Juan Remitente' },
+                    recipient: { fullName: 'María Destino' },
+                    status: { description: 'En tránsito' },
+                }]);
+            }
+            return Promise.resolve([]);
+        });
+
+        const res = await request(buildApp({ id: 1, roleId: 4, branchId: null }))
+            .get('/api/search?q=Juan')
+            .expect(200);
+
+        expect(res.body.shipments).toHaveLength(1);
+        expect(res.body.shipments[0].matchedBy).toBe('sender');
+        expect(res.body.shipments[0].matchLabel).toBe('Remitente');
+        expect(res.body.shipments[0].matchValue).toBe('Juan Remitente');
+        expect(res.body.shipments[0].senderName).toBe('Juan Remitente');
+        expect(res.body.shipments[0].statusSlug).toBe('en_transito');
     });
 
     test('incidents: excluye RETURN del listado de incidencias', async () => {
@@ -263,6 +291,8 @@ describe('Universal search enhancements', () => {
         expect(Incident.findAll).toHaveBeenCalled();
         expect(res.body.incidents).toHaveLength(1);
         expect(res.body.incidents[0].type).toBe('Paquete dañado');
+        expect(res.body.incidents[0].matchedBy).toBe('type');
+        expect(res.body.incidents[0].matchLabel).toBe('Tipo de incidencia');
     });
 
     test('modifications: devuelve solicitudes para staff', async () => {

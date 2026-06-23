@@ -45,6 +45,16 @@
           urlFn: function (r) { return '/shipment/detail/' + r.id; },
           moreUrlFn: moreUrlShipments,
           primaryFn: function (r) { return r.trackingId || 'Envío #' + r.id; },
+          statusFn: function (r) {
+              return r.status ? { label: r.status, slug: r.statusSlug, kind: 'shipment' } : null;
+          },
+          detailFn: function (r) {
+              var parts = [];
+              if (r.senderName) parts.push({ label: 'Rem.', value: r.senderName });
+              if (r.recipientName) parts.push({ label: 'Dest.', value: r.recipientName });
+              return parts;
+          },
+          matchFn: function (r) { return matchMeta(r); },
           secondaryFn: function (r) {
               if (r.secondary) return r.secondary;
               return [r.recipientName, r.status].filter(Boolean).join(' · ');
@@ -56,6 +66,13 @@
           primaryFn: function (r) {
               return 'Incidencia #' + r.id + (r.trackingId ? ' · ' + r.trackingId : '');
           },
+          statusFn: function (r) {
+              return r.status ? { label: r.status, slug: r.statusCode, kind: 'incident' } : null;
+          },
+          detailFn: function (r) {
+              return r.type ? [{ label: 'Tipo', value: r.type }] : [];
+          },
+          matchFn: function (r) { return matchMeta(r); },
           secondaryFn: function (r) { return [r.type, r.status].filter(Boolean).join(' · '); }
         },
         { key: 'routes', label: 'Rutas', icon: 'route',
@@ -64,6 +81,21 @@
           },
           moreUrlFn: function (q) { return '/route?q=' + encodeURIComponent(q); },
           primaryFn: function (r) { return 'Ruta #' + r.id; },
+          statusFn: function (r) {
+              return r.status ? { label: r.status, slug: r.statusSlug, kind: 'route' } : null;
+          },
+          detailFn: function (r, roleId) {
+              if (roleId === 3) {
+                  return [
+                      r.transportName ? { label: 'Transporte', value: r.transportName } : null,
+                      r.branchName ? { label: 'Sucursal', value: r.branchName } : null,
+                  ].filter(Boolean);
+              }
+              return [
+                  r.driverName ? { label: 'Repartidor', value: r.driverName } : null,
+                  r.transportName ? { label: 'Transporte', value: r.transportName } : null,
+              ].filter(Boolean);
+          },
           secondaryFn: function (r, roleId) {
               if (roleId === 3) {
                   return [r.transportName || r.branchName, r.status].filter(Boolean).join(' · ');
@@ -77,6 +109,10 @@
           primaryFn: function (r) {
               return 'Devolución #' + r.id + (r.trackingId ? ' · ' + r.trackingId : '');
           },
+          statusFn: function (r) {
+              return r.status ? { label: r.status, slug: r.statusCode, kind: 'incident' } : null;
+          },
+          matchFn: function (r) { return matchMeta(r); },
           secondaryFn: function (r) { return r.status || ''; }
         },
         { key: 'modifications', label: 'Modificaciones portal', icon: 'edit_note',
@@ -85,6 +121,16 @@
           primaryFn: function (r) {
               return 'Solicitud #' + r.id + (r.trackingId ? ' · ' + r.trackingId : '');
           },
+          statusFn: function (r) {
+              return r.status ? { label: r.status, slug: r.statusSlug, kind: 'mod' } : null;
+          },
+          detailFn: function (r) {
+              var parts = [];
+              if (r.changeType) parts.push({ label: 'Cambio', value: r.changeType });
+              if (r.recipientName) parts.push({ label: 'Dest.', value: r.recipientName });
+              return parts;
+          },
+          matchFn: function (r) { return matchMeta(r); },
           secondaryFn: function (r) {
               return [r.recipientName, r.status, r.changeType].filter(Boolean).join(' · ');
           }
@@ -101,6 +147,14 @@
               return '/shipment/search?name=' + encodeURIComponent(q);
           },
           primaryFn: function (r) { return r.fullName || 'Doc. ' + r.document; },
+          detailFn: function (r) {
+              var parts = [];
+              if (r.email) parts.push({ label: 'Email', value: r.email });
+              if (r.document) parts.push({ label: 'Doc.', value: String(r.document) });
+              if (r.shipmentCount > 1) parts.push({ label: 'Envíos', value: String(r.shipmentCount) });
+              return parts;
+          },
+          matchFn: function (r) { return matchMeta(r); },
           secondaryFn: function (r) {
               var parts = [];
               if (r.email) parts.push(r.email);
@@ -112,11 +166,52 @@
           urlFn: function (r) { return '/user/update/' + r.id; },
           moreUrlFn: function (q) { return '/user/search?fullName=' + encodeURIComponent(q); },
           primaryFn: function (r) { return r.fullName; },
+          statusFn: function (r) {
+              return r.role ? { label: r.role, slug: 'role', kind: 'role' } : null;
+          },
+          detailFn: function (r) {
+              return r.email ? [{ label: 'Email', value: r.email }] : [];
+          },
           secondaryFn: function (r) {
               return [r.role, r.email].filter(Boolean).join(' · ');
           }
         },
     ];
+
+    function matchMeta(r) {
+        if (!r.matchLabel) return null;
+        return { label: r.matchLabel, value: r.matchValue || '' };
+    }
+
+    function statusBadgeHtml(status) {
+        if (!status || !status.label) return '';
+        var cls = 'univ-search__badge';
+        if (status.kind === 'incident') {
+            cls += ' incident-badge incident-badge--' + escHtml(status.slug || 'open');
+        } else if (status.kind === 'role') {
+            cls += ' univ-search__badge--role';
+        } else {
+            cls += ' status-badge status-badge--sm';
+            if (status.slug) cls += ' ' + escHtml(status.slug);
+        }
+        return '<span class="univ-search__status"><span class="' + cls + '">' + escHtml(status.label) + '</span></span>';
+    }
+
+    function matchHintHtml(meta) {
+        if (!meta || !meta.label) return '';
+        var value = meta.value ? ' «' + escHtml(meta.value) + '»' : '';
+        return '<div class="univ-search__match">Coincide en <strong>' + escHtml(meta.label) + '</strong>' + value + '</div>';
+    }
+
+    function detailRowsHtml(parts) {
+        if (!parts || !parts.length) return '';
+        return '<div class="univ-search__details">' + parts.map(function (p) {
+            return '<span class="univ-search__detail">'
+                + '<span class="univ-search__detail-label">' + escHtml(p.label) + '</span> '
+                + escHtml(p.value)
+                + '</span>';
+        }).join('<span class="univ-search__detail-sep">·</span>') + '</div>';
+    }
 
     function resolveRoleId() {
         var rid = parseInt(wrapper.getAttribute('data-role-id'), 10) || 0;
@@ -295,7 +390,9 @@
             items.forEach(function (r) {
                 var url = cat.urlFn(r, roleId);
                 var primary = cat.primaryFn(r, roleId);
-                var secondary = cat.secondaryFn(r, roleId);
+                var status = cat.statusFn ? cat.statusFn(r, roleId) : null;
+                var details = cat.detailFn ? cat.detailFn(r, roleId) : [];
+                var match = cat.matchFn ? cat.matchFn(r, roleId) : null;
 
                 html += '<a href="' + escHtml(url) + '" class="univ-search__item">'
                       + '<div class="univ-search__item-icon">'
@@ -303,8 +400,10 @@
                       + '</div>'
                       + '<div class="univ-search__item-text">'
                       + '<div class="univ-search__item-primary">' + escHtml(primary) + '</div>'
-                      + (secondary ? '<div class="univ-search__item-secondary">' + escHtml(secondary) + '</div>' : '')
+                      + detailRowsHtml(details)
+                      + matchHintHtml(match)
                       + '</div>'
+                      + statusBadgeHtml(status)
                       + '</a>';
             });
 

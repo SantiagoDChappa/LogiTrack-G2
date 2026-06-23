@@ -101,7 +101,7 @@ const searchForUniversal = ({ q, branchId, fetchLimit }) => {
             attributes: ['id', 'trackingId'],
             include: [{ model: Person, as: 'recipient', attributes: ['fullName'] }],
         }],
-        attributes: ['id', 'shipmentId', 'changeType', 'status'],
+        attributes: ['id', 'shipmentId', 'changeType', 'status', 'requestedByEmail', 'requestedByDocument'],
         order: [['id', 'DESC']],
         limit: fetchLimit,
         subQuery: false,

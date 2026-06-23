@@ -155,9 +155,9 @@
 
 .univ-search__item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.75rem;
-    padding: 0.55rem 1rem;
+    padding: 0.6rem 1rem;
     text-decoration: none;
     color: var(--color-text);
     transition: background var(--transition);
@@ -221,9 +221,101 @@
 .univ-search__item-primary {
     font-size: 0.875rem;
     font-weight: 600;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.univ-search__details {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem 0.35rem;
+    margin-top: 0.15rem;
+    font-size: 0.775rem;
+    color: var(--color-text-secondary);
+    line-height: 1.35;
+}
+
+.univ-search__detail-label {
+    font-weight: 700;
+    color: var(--color-text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.univ-search__detail-sep {
+    opacity: 0.45;
+    user-select: none;
+}
+
+.univ-search__match {
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    color: var(--color-primary);
+    line-height: 1.35;
+}
+
+.univ-search__match strong {
+    font-weight: 700;
+}
+
+.univ-search__status {
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 0.05rem;
+}
+
+.univ-search__badge,
+.univ-search__status .status-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.25;
+}
+
+.univ-search__status .status-badge.inicial,
+.univ-search__status .status-badge.pendiente    { background: #e2e8f0; color: #475569; }
+.univ-search__status .status-badge.en_sucursal  { background: #dbeafe; color: #1e40af; }
+.univ-search__status .status-badge.en_transito  { background: #fef3c7; color: #92400e; }
+.univ-search__status .status-badge.entregado    { background: #d1fae5; color: #065f46; }
+.univ-search__status .status-badge.asignado     { background: #ede9fe; color: #5b21b6; }
+.univ-search__status .status-badge.en_preparacion { background: #cffafe; color: #155e75; }
+.univ-search__status .status-badge.intento_fallido,
+.univ-search__status .status-badge.paquete_fallido,
+.univ-search__status .status-badge.cancelado    { background: #fee2e2; color: #b91c1c; }
+.univ-search__status .status-badge.aplicada,
+.univ-search__status .status-badge.rechazada { background: #e2e8f0; color: #475569; }
+.univ-search__status .status-badge.aplicada { background: #d1fae5; color: #065f46; }
+.univ-search__status .status-badge.rechazada { background: #fee2e2; color: #b91c1c; }
+.univ-search__status .status-badge.planificada   { background: #e2e8f0; color: #475569; }
+.univ-search__status .status-badge.en_curso      { background: #fef3c7; color: #92400e; }
+.univ-search__status .status-badge.finalizada    { background: #d1fae5; color: #065f46; }
+.univ-search__status .status-badge.cancelada     { background: #fee2e2; color: #b91c1c; }
+.univ-search__status .status-badge.interrumpida  { background: #ffedd5; color: #9a3412; }
+
+.univ-search__status .incident-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.univ-search__status .incident-badge--open      { background: #dbeafe; color: #1e40af; border-color: rgba(30, 64, 175, .15); }
+.univ-search__status .incident-badge--in_review { background: #fef3c7; color: #92400e; border-color: rgba(146, 64, 14, .15); }
+.univ-search__status .incident-badge--closed    { background: #d1fae5; color: #065f46; border-color: rgba(6, 95, 70, .15); }
+
+.univ-search__badge--role {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-color: rgba(37, 99, 235, 0.15);
 }
 
 .univ-search__item-secondary {
