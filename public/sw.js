@@ -6,11 +6,11 @@
  */
 importScripts('/js/offline-db.js');
 
-const CACHE = 'lt-delivery-v5';
+const CACHE = 'lt-delivery-v6';
 const SHELL = [
     '/css/style.css', '/css/components.css', '/css/shipments.css', '/css/delivery.css',
     '/js/theme.js', '/js/ui.js', '/js/offline-db.js', '/js/delivery-offline.js',
-    '/images/logo_app.png', '/manifest.webmanifest',
+    '/images/logo_app.png', '/images/icon-192.png', '/images/icon-512.png', '/manifest.webmanifest',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
     'https://cdn.jsdelivr.net/npm/sweetalert2@11',

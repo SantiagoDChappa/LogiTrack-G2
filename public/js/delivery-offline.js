@@ -15,7 +15,7 @@
     if (!/^\/delivery(\/|$)/.test(location.pathname)) { return; }
 
     const origFetch = window.fetch.bind(window);
-    const CACHE_NAME = 'lt-delivery-v5';  // debe coincidir con CACHE en sw.js
+    const CACHE_NAME = 'lt-delivery-v6';  // debe coincidir con CACHE en sw.js
 
     // [sync-debug] Manda eventos del flush (que corre en navegador/SW) a Render, vía origFetch
     // para no encolarse a sí mismo. Best-effort: si no hay red, se pierde y no rompe nada.
