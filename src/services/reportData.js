@@ -825,21 +825,22 @@ const getDashboardDesempenoData = async (query = {}, deps = { sequelize, QueryTy
     );
     viewModel.cycleTime = (cycleRow && cycleRow.total > 0) ? cycleRow : null;
 
-    // Por destino (zona) — incluye conductores distintos con demora para detectar patrones estructurales
+    // Por destino (zona) — incluye "Sin zona" para que el total reconcilie con el KPI global.
+    // Conductores distintos con demora para detectar patrones estructurales.
     viewModel.zonePvr = await deps.sequelize.query(
         `${pvrCte}
-         SELECT zone_id, zone_name,
+         SELECT zone_id, COALESCE(zone_name, 'Sin zona') AS zone_name,
                 COUNT(*)::int AS total,
                 COUNT(CASE WHEN was_delayed IS TRUE THEN 1 END)::int AS total_delayed,
                 ROUND(COUNT(CASE WHEN was_delayed IS TRUE THEN 1 END)*100.0/NULLIF(COUNT(*),0),0)::int AS delay_rate,
                 COUNT(DISTINCT CASE WHEN was_delayed IS TRUE THEN driver_id END)::int AS distinct_drivers_delayed,
                 ROUND(AVG(predicted_days),1)::float AS avg_predicted,
-                ROUND(AVG(actual_days)::numeric,1)::float    AS avg_actual,
-                ROUND(AVG(delta)::numeric,1)::float           AS avg_delta,
+                ROUND(AVG(actual_days)::numeric,1)::float AS avg_actual,
+                ROUND(AVG(delta)::numeric,1)::float        AS avg_delta,
                 ROUND(COUNT(CASE WHEN delivered_at::date <= expected_delivery_date THEN 1 END)*100.0
                       /NULLIF(COUNT(CASE WHEN expected_delivery_date IS NOT NULL THEN 1 END),0),1)::float AS otif_pct
-         FROM pvr WHERE zone_id IS NOT NULL
-         GROUP BY zone_id, zone_name ORDER BY delay_rate DESC NULLS LAST, total DESC`,
+         FROM pvr
+         GROUP BY zone_id, zone_name ORDER BY (zone_id IS NULL), delay_rate DESC NULLS LAST, total DESC`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 

@@ -197,12 +197,32 @@ router.get('/route/:id/offline-bundle', requireDelivery, async (req, res) => {
             address: s.shipment.address ? { street: s.shipment.address.street, number: s.shipment.address.number } : null,
         } : null,
     }));
+    // Control de fatiga para operar offline: se cachea junto al ruteo "cuando carga
+    // los datos". Lleva si está habilitado + los parámetros para PUNTUAR la prueba de
+    // REACCIÓN y decidir el bloqueo del lado del cliente con el MISMO criterio del
+    // server (sin red). Offline solo se usa REACCIÓN (la voz necesita STT en el server).
+    let fatigue = { enabled: false };
+    try {
+        const cfg = await require('../services/fatigue/config').getConfig(route.originBranchId);
+        fatigue = {
+            enabled: cfg.enabled,
+            method: 'REACCION',            // offline forzamos reacción
+            methodRecheck: cfg.methodRecheck,
+            consentVersion: cfg.consentVersion,
+            reactionAttempts: cfg.reactionAttempts,
+            reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+            reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+            thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
+        };
+    } catch (e) { console.warn('[offline-bundle] fatigue cfg:', e.message); }
+
     res.json({
         routeId: route.id, statusId: route.statusId,
         totalDistanceKm: route.totalDistanceKm,
         transportName: route.transport ? route.transport.name : '',
         originBranch: route.originBranch ? route.originBranch.name : '',
         cachedAt: new Date().toISOString(),
+        fatigue,
         stops,
     });
 });
@@ -234,6 +254,24 @@ router.get('/', requireDelivery, async (req, res) => {
 
         const activeRoute = inRoute || planned[0] || null;
         const upcomingRoutes = planned.filter(r => !activeRoute || r.id !== activeRoute.id);
+
+        // Ojo de Patrón: si la ruta activa está PLANIFICADA pero el control de fatiga de
+        // inicio quedó BLOQUEADO (no pasó la prueba de reacción/voz, con autoBlock según
+        // config), el card se muestra en rojo y sin accionable — no puede iniciar ni entrar.
+        // Una ruta que sólo "necesita hacer la prueba" (FATIGUE_REQUIRED/PENDING) NO se
+        // bloquea: el repartidor debe entrar para realizar el control.
+        let startBlocked = null;
+        if (activeRoute && activeRoute.statusId === RouteStatus.PLANNED && !driverDisabled) {
+            try {
+                const cfg = await require('../services/fatigue/config').getConfig(activeRoute.originBranchId);
+                if (cfg.enabled) {
+                    const gate = await require('../services/fatigue').canStart(activeRoute.id);
+                    if (!gate.ok && gate.reason === 'BLOCKED') {
+                        startBlocked = { id: activeRoute.id, score: gate.score || null };
+                    }
+                }
+            } catch (e) { console.warn('[fatigue] startBlocked check:', e.message); }
+        }
 
         // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
         const fatigueRoute = routes.find(r =>
@@ -290,6 +328,7 @@ router.get('/', requireDelivery, async (req, res) => {
             finishedRoutes: finished.map(summarizeRoute),
             fatigueBlocked,
             driverDisabled,
+            startBlocked,
         });
     } catch (err) {
         console.error(err);
@@ -362,6 +401,20 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
         // Redirige al inicio, donde se muestra el aviso para consultar al supervisor.
         if (route.statusId === RouteStatus.BLOCKED_FATIGUE || route.statusId === RouteStatus.PAUSED_FATIGUE) {
             return res.redirect('/delivery?fatigue=1');
+        }
+        // Ojo de Patrón: ruta PLANIFICADA cuyo control de inicio quedó BLOQUEADO (no pasó
+        // la prueba de reacción/voz) → no puede entrar ni por URL directa. Vuelve al home
+        // con el aviso. Las rutas que sólo necesitan hacer la prueba sí pueden entrar.
+        if (route.statusId === RouteStatus.PLANNED) {
+            try {
+                const cfg = await fatigueCfg.getConfig(route.originBranchId);
+                if (cfg.enabled) {
+                    const gate = await fatigueSvc.canStart(route.id);
+                    if (!gate.ok && gate.reason === 'BLOCKED') {
+                        return res.redirect('/delivery?fatiga=bloqueado&ruta=' + route.id);
+                    }
+                }
+            } catch (e) { console.warn('[fatigue] route gate:', e.message); }
         }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
         // Para el POD offline en la misma página: saber si el envío exige código clave.
@@ -920,8 +973,13 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     const cfg = await fatigueCfg.getConfig(route.originBranchId);
     res.json({
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
+        methodRecheck: cfg.methodRecheck,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
         reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        // Parámetros que permiten PUNTUAR y decidir el bloqueo del lado del cliente
+        // (mismo criterio que el server) cuando no hay conexión. Modo offline = REACCION.
+        reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+        thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
         voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
         voiceAcousticEnabled: cfg.voiceAcousticEnabled,
         voiceMaxAttempts: cfg.voiceMaxAttempts, reactionAttempts: cfg.reactionAttempts,

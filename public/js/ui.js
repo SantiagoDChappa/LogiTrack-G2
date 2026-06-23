@@ -27,16 +27,33 @@ function toggleNavGroup(id) {
 const userSection  = document.querySelector('.top-header .user');
 const userDropdown = document.getElementById('user-dropdown');
 
+// LGT-217 (Esc.3) — el menú de usuario es operable por teclado (Enter/Espacio para
+// abrir/cerrar, Escape para cerrar) y refleja su estado con aria-expanded.
+// Guard de null (de upstream): si la página no tiene el menú, no rompe.
 if (userSection && userDropdown) {
+    const setUserMenu = (open) => {
+        userDropdown.classList.toggle('open', open);
+        userSection.classList.toggle('open', open);
+        userSection.setAttribute('aria-expanded', String(open));
+    };
+
     userSection.addEventListener('click', () => {
-        const isOpen = userDropdown.classList.toggle('open');
-        userSection.classList.toggle('open', isOpen);
+        setUserMenu(!userDropdown.classList.contains('open'));
+    });
+
+    userSection.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            setUserMenu(!userDropdown.classList.contains('open'));
+        } else if (e.key === 'Escape' && userDropdown.classList.contains('open')) {
+            setUserMenu(false);
+            userSection.focus();
+        }
     });
 
     document.addEventListener('click', (e) => {
         if (!userSection.contains(e.target) && !userDropdown.contains(e.target)) {
-            userDropdown.classList.remove('open');
-            userSection.classList.remove('open');
+            setUserMenu(false);
         }
     });
 }

@@ -1,0 +1,45 @@
+/* Tema de SweetAlert acorde al modo claro/oscuro de la app.
+   Por defecto swal2 deja el popup blanco y el texto hereda el color del body:
+   en modo oscuro eso da texto claro sobre fondo blanco → ilegible. Lo atamos a
+   las variables del tema para que el popup sea claro en claro y oscuro en oscuro,
+   siempre con buen contraste. Se carga global (head.ejs), aplica a TODOS los popups.
+   !important para ganarle al <style> que swal2 inyecta en runtime. */
+.swal2-popup {
+    background: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+}
+.swal2-title { color: var(--color-text) !important; }
+.swal2-html-container,
+.swal2-html-container p { color: var(--color-text) !important; }
+/* Texto secundario opcional dentro del html del popup. */
+.swal2-html-container .swal-muted { color: var(--color-text-secondary) !important; }
+
+/* Inputs dentro del popup (prompt, etc.). */
+.swal2-input,
+.swal2-textarea,
+.swal2-select,
+.swal2-file {
+    background: var(--color-surface-alt) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+}
+.swal2-input::placeholder,
+.swal2-textarea::placeholder { color: var(--color-text-muted) !important; }
+
+/* Validación / footer / botón cerrar. */
+.swal2-validation-message {
+    background: var(--color-surface-alt) !important;
+    color: var(--color-text) !important;
+}
+.swal2-footer { border-top-color: var(--color-border) !important; color: var(--color-text-secondary) !important; }
+.swal2-close { color: var(--color-text-secondary) !important; }
+.swal2-close:hover { color: var(--color-text) !important; }
+
+/* Botón de cancelar por defecto (cuando no se le pasa color inline). */
+.swal2-cancel.swal2-styled:not([style*="background"]) {
+    background: var(--color-surface-alt) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+}

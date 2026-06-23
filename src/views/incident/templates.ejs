@@ -19,10 +19,10 @@
         </div>
 
         <% if (saved) { %>
-            <div class="alert alert-success">Cambios guardados.</div>
+            <div class="alert alert-success" role="status">Cambios guardados.</div>
         <% } %>
         <% if (error) { %>
-            <div class="alert alert-error"><%= error %></div>
+            <div class="alert alert-error" role="alert"><%= error %></div>
         <% } %>
 
         <div class="tpl-intro">

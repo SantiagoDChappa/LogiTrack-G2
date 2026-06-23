@@ -120,6 +120,8 @@ const getSettings = async (req, res) => {
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
             costo_base_envio:         settings.costo_base_envio         || '500',
             seguro_pct:               settings.seguro_pct               || '0',
+            recargo_zona_peligrosa_pct: settings.recargo_zona_peligrosa_pct || '0',
+            dias_retencion_sucursal:    settings.dias_retencion_sucursal    || '10',
             nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
             logo_empresa:             settings.logo_empresa             || '',
             telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
@@ -729,6 +731,8 @@ const saveParams = async (req, res) => {
             'cantidad_maxima_paquetes',
             'costo_base_envio',
             'seguro_pct',
+            'recargo_zona_peligrosa_pct',
+            'dias_retencion_sucursal',
             // 'nombre_empresa' se gestiona en la tarjeta "Identidad visual" (/setting/identity) — LGT-172
             'telefono_soporte',
             'email_soporte',
@@ -776,6 +780,18 @@ const saveParams = async (req, res) => {
         const seguroPct = parseFloat(req.body.seguro_pct);
         if (isNaN(seguroPct) || seguroPct < 0 || seguroPct > 100) {
             return res.redirect(settingBack(req, '?error=seguro_pct'));
+        }
+
+        // % de recargo por destino peligroso (llegable): entre 0 y 500. 0 = sin recargo.
+        const dangerPct = parseFloat(req.body.recargo_zona_peligrosa_pct);
+        if (isNaN(dangerPct) || dangerPct < 0 || dangerPct > 500) {
+            return res.redirect(settingBack(req, '?error=recargo_zona_peligrosa'));
+        }
+
+        // Días hábiles que el paquete queda disponible para retiro en sucursal.
+        const retencion = parseInt(req.body.dias_retencion_sucursal);
+        if (isNaN(retencion) || retencion < 1 || retencion > 90) {
+            return res.redirect(settingBack(req, '?error=dias_retencion_sucursal'));
         }
 
         const horaInicio = req.body.horario_entrega_inicio;

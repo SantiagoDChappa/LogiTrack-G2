@@ -3,10 +3,15 @@
 const { Invoice } = require('../models/invoice');
 const shipmentModel = require('../models/shipment');
 const costSvc = require('./shipmentCostService');
+const { generatePortalToken } = require('../utils/shipmentTokens');
 
 const buildNumber = (id) => `FAC-0001-${String(id).padStart(8, '0')}`;
 
+// Id de transacción simulado (estilo Mercado Pago) para el comprobante de pago.
+const buildPayRef = () => `MP-${require('crypto').randomBytes(4).toString('hex').toUpperCase()}`;
+
 const findByShipment = (shipmentId) => Invoice.findOne({ where: { shipmentId } });
+const getByToken = (payToken) => (payToken ? Invoice.findOne({ where: { payToken } }) : Promise.resolve(null));
 
 // Genera (o devuelve la existente) la factura de un envío con su desglose de costo.
 const generate = async ({ shipmentId, userId = null }) => {
@@ -34,6 +39,8 @@ const generate = async ({ shipmentId, userId = null }) => {
             senderDocument:  shipment.sender?.document || null,
             createdByUserId: userId,
             createdAt:       new Date(),
+            payStatus:       'PENDIENTE',
+            payToken:        generatePortalToken(),
         });
         await created.update({ number: buildNumber(created.id) });
         return { ok: true, invoice: created };
@@ -48,4 +55,18 @@ const generate = async ({ shipmentId, userId = null }) => {
 const getById = (id) => Invoice.findByPk(id);
 const getByShipment = (shipmentId) => findByShipment(shipmentId);
 
-module.exports = { generate, getById, getByShipment, buildNumber };
+// Marca la factura como PAGADA (pago simulado). Idempotente: si ya está pagada,
+// devuelve la existente sin re-escribir el comprobante.
+const markPaid = async (invoice, { method = 'mercadopago' } = {}) => {
+    if (!invoice) { return { ok: false, message: 'Factura no encontrada' }; }
+    if (invoice.payStatus === 'PAGADA') { return { ok: true, invoice, duplicated: true }; }
+    await invoice.update({
+        payStatus: 'PAGADA',
+        payMethod: method,
+        payRef:    buildPayRef(),
+        paidAt:    new Date(),
+    });
+    return { ok: true, invoice };
+};
+
+module.exports = { generate, getById, getByShipment, getByToken, markPaid, buildNumber };

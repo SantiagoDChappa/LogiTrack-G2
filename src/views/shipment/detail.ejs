@@ -457,7 +457,7 @@
                         <% } %>
 
                         <% if (typeof returnError !== 'undefined' && returnError) { %>
-                            <div class="alert alert-error" style="margin-top:.6rem;"><%= returnError %></div>
+                            <div class="alert alert-error" role="alert" style="margin-top:.6rem;"><%= returnError %></div>
                         <% } %>
                         <% if (typeof canCreateReturn !== 'undefined' && canCreateReturn) { %>
                             <a href="/returns/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg modificar" style="margin-top:.6rem;display:inline-flex;align-items:center;gap:.4rem;width:fit-content;" data-tooltip="Crear devolución" aria-label="Crear devolución">

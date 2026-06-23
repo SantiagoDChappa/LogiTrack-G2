@@ -20,9 +20,17 @@
 <script src="/js/search.js?v=<%= assetVersion %>" defer></script>
 <%# Diálogos in-page (SweetAlert) — reemplazan confirm()/alert() del navegador en todo el sistema %>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="/css/swal-theme.css?v=<%= assetVersion %>">
+<%# tema swal claro/oscuro %>
 <script src="/js/dialogs.js?v=<%= assetVersion %>" defer></script>
 <%# [prototype] PWA / modo offline del repartidor (los scripts se autolimitan a /delivery) %>
 <link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LogiTrack">
+<link rel="apple-touch-icon" href="/images/icon-192.png">
 <script src="/js/offline-db.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/delivery-offline.js?v=<%= assetVersion %>" defer></script>
 <% if (typeof currentUser !== 'undefined' && currentUser) { %>

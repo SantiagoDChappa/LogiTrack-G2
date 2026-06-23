@@ -65,6 +65,26 @@
 .shipment-chip.dragging { opacity: .4; }
 .shipment-chip .chip-priority { font-size: .6rem; padding: 0 .3rem; border-radius: 4px; color: #fff; font-weight: 700; }
 .priority-1 { background: #94a3b8; } .priority-2 { background: #0284c7; } .priority-3 { background: #dc2626; }
+.chip-move {
+    border: none; background: transparent; color: var(--color-text-muted);
+    cursor: pointer; font-size: .85rem; line-height: 1; padding: 0 .1rem; margin-left: .1rem;
+    border-radius: 4px; transition: color .12s, background .12s;
+}
+.chip-move:hover { color: var(--color-primary); background: var(--color-primary-light); }
+#move-menu {
+    position: fixed; z-index: 10000; min-width: 200px; max-width: 280px;
+    background: var(--color-surface); color: var(--color-text);
+    border: 1px solid var(--color-border); border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0,0,0,.2), 0 2px 6px rgba(0,0,0,.08);
+    padding: .35rem; overflow: hidden;
+}
+#move-menu .mm-title { font-size: .72rem; font-weight: 700; color: var(--color-text-secondary); padding: .3rem .5rem .35rem; }
+#move-menu .mm-item {
+    display: block; width: 100%; text-align: left; border: none; background: transparent;
+    color: var(--color-text); font-size: .82rem; padding: .45rem .55rem; border-radius: 6px; cursor: pointer;
+}
+#move-menu .mm-item:hover { background: var(--color-primary-light); color: var(--color-primary); }
+#move-menu .mm-empty { font-size: .8rem; color: var(--color-text-muted); padding: .45rem .55rem; }
 
 .proposal-reasoning { margin: .65rem 0; }
 .proposal-reasoning summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--color-primary); padding: .3rem 0; }
@@ -128,7 +148,7 @@
 <div id="chip-popover" role="tooltip"></div>
 <section id="results" style="margin-top: 1.5rem; display: none;">
     <h2 style="margin-bottom:.5rem">Propuestas</h2>
-    <div class="help-banner">💡 <strong>Tip:</strong> Arrastrá los <em>chips</em> de envíos entre propuestas para reasignar. Soltá en "Sin asignar" para sacar de la ruta. El cálculo se actualiza automáticamente.</div>
+    <div class="help-banner">💡 <strong>Tip:</strong> Arrastrá los <em>chips</em> de envíos entre propuestas, o tocá el botón <strong>⇄</strong> del envío para <strong>enviarlo a otro repartidor</strong>. Soltá en "Sin asignar" para sacar de la ruta. El cálculo se actualiza automáticamente.</div>
     <div id="proposals-summary" class="proposal-meta"></div>
     <div id="proposals" class="proposals-grid"></div>
     <div id="unassigned-pool"></div>
@@ -151,6 +171,64 @@
             transportId: p.transportId,
             shipmentIds: p.shipmentIds,
         }));
+    };
+
+    // Mueve un envío de un transporte (o "unassigned") a otro y recalcula.
+    // Lo usan tanto el drag&drop como el menú "enviar a otro repartidor".
+    const moveShipment = (sid, fromTx, toTx) => {
+        sid = Number(sid);
+        if (String(fromTx) === String(toTx)) { return; }
+        if (toTx !== 'unassigned' && appliedTxIds.has(Number(toTx))) {
+            window.rtAlert('No se puede modificar una ruta ya aplicada.', 'warning'); return;
+        }
+        if (fromTx !== 'unassigned' && appliedTxIds.has(Number(fromTx))) {
+            window.rtAlert('No se puede sacar de una ruta ya aplicada.', 'warning'); return;
+        }
+        if (fromTx !== 'unassigned') {
+            const fromP = currentState.proposals.find(p => p.transportId === Number(fromTx));
+            if (fromP) { fromP.shipmentIds = fromP.shipmentIds.filter(x => x !== sid); }
+        } else {
+            currentState.unassigned = (currentState.unassigned || []).filter(u => (u.id || u.shipmentId) !== sid);
+        }
+        if (toTx !== 'unassigned') {
+            const toP = currentState.proposals.find(p => p.transportId === Number(toTx));
+            if (toP && !toP.shipmentIds.includes(sid)) { toP.shipmentIds.push(sid); }
+        } else {
+            currentState.unassigned = currentState.unassigned || [];
+            currentState.unassigned.push({ id: sid, code: 'manual', reason: 'Removido manualmente de la ruta' });
+        }
+        recalc();
+    };
+
+    // Menú flotante con los repartidores destino posibles para un envío.
+    const openMoveMenu = (chip) => {
+        const existing = document.getElementById('move-menu');
+        if (existing) { existing.remove(); }
+        const fromTx = chip.closest('[data-transport-id]')?.dataset.transportId;
+        const sid = chip.dataset.shipmentId;
+        const targets = (currentState.proposals || [])
+            .filter(p => String(p.transportId) !== String(fromTx) && !appliedTxIds.has(p.transportId))
+            .map(p => ({ tx: String(p.transportId), label: `${p.transport.name}${p.transport.driver ? ' · ' + p.transport.driver.fullName : ''}` }));
+        if (fromTx !== 'unassigned') { targets.push({ tx: 'unassigned', label: '⚠️ Sin asignar (sacar de la ruta)' }); }
+
+        const menu = document.createElement('div');
+        menu.id = 'move-menu';
+        menu.innerHTML = `<div class="mm-title">Enviar a…</div>` + (targets.length
+            ? targets.map(t => `<button type="button" class="mm-item" data-to="${t.tx}">${escapeHtml(t.label)}</button>`).join('')
+            : `<div class="mm-empty">No hay otro repartidor disponible</div>`);
+        document.body.appendChild(menu);
+        const rect = chip.getBoundingClientRect();
+        let x = rect.left, y = rect.bottom + 6;
+        const mw = menu.offsetWidth, mh = menu.offsetHeight;
+        if (x + mw > window.innerWidth - 8) { x = window.innerWidth - mw - 8; }
+        if (y + mh > window.innerHeight - 8) { y = rect.top - mh - 6; }
+        menu.style.left = Math.max(8, x) + 'px';
+        menu.style.top = Math.max(8, y) + 'px';
+        menu.querySelectorAll('.mm-item').forEach(b => {
+            b.addEventListener('click', () => { const to = b.dataset.to; menu.remove(); moveShipment(sid, fromTx, to); });
+        });
+        const closer = (ev) => { if (!menu.contains(ev.target) && ev.target !== chip) { menu.remove(); document.removeEventListener('mousedown', closer); } };
+        setTimeout(() => document.addEventListener('mousedown', closer), 0);
     };
 
     const recalc = async () => {
@@ -329,9 +407,10 @@
                 const pri = r.priority === 'urgent' ? 3 : (r.priority === 'express' ? 2 : 1);
                 const meta = encodeURIComponent(JSON.stringify(r));
                 const oppMark = r.opportunistic ? `<span style="background:#0d9488;color:#fff;font-size:.6rem;padding:1px 4px;border-radius:3px;margin-left:2px" title="${escapeHtml(r.why || '')}">+EXTRA</span>` : '';
+                const moveBtn = appliedTxIds.has(p.transportId) ? '' : `<button type="button" class="chip-move" title="Enviar a otro repartidor" aria-label="Enviar a otro repartidor">⇄</button>`;
                 return `<span class="shipment-chip" draggable="${appliedTxIds.has(p.transportId) ? 'false' : 'true'}" data-shipment-id="${r.shipmentId}" data-tracking="${escapeHtml(r.trackingId)}" data-priority="${pri}" data-meta="${meta}">
                     <span class="chip-priority priority-${pri}">${(r.priority || 'normal').toUpperCase().slice(0,3)}</span>
-                    ${escapeHtml(r.trackingId)}${oppMark}
+                    ${escapeHtml(r.trackingId)}${oppMark}${moveBtn}
                 </span>`;
             }).join('');
 
@@ -483,6 +562,7 @@
                     <span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" style="flex-shrink:0">
                         <span class="chip-priority priority-1">UN</span>
                         ${escapeHtml(tracking)}
+                        <button type="button" class="chip-move" title="Enviar a un repartidor" aria-label="Enviar a un repartidor">⇄</button>
                     </span>
                     <span style="font-size:.78rem;color:var(--color-text-secondary);line-height:1.35">${escapeHtml(reason)}</span>
                 </div>`;
@@ -586,6 +666,16 @@
             chip.tabIndex = 0;
         });
 
+        // Botón "enviar a otro repartidor" (alternativa al drag&drop, útil en touch)
+        document.querySelectorAll('.chip-move').forEach(btn => {
+            btn.setAttribute('draggable', 'false');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                openMoveMenu(btn.closest('.shipment-chip'));
+            });
+        });
+
         // Wire DnD
         const allChips = document.querySelectorAll('.shipment-chip[draggable="true"]');
         allChips.forEach(chip => {
@@ -610,34 +700,7 @@
                 const sid = Number(e.dataTransfer.getData('text/plain'));
                 const fromTx = e.dataTransfer.getData('text/from');
                 const toTx = zone.dataset.transportId;
-                if (fromTx === toTx) return;
-
-                // Bloquear si la propuesta destino está aplicada
-                if (toTx !== 'unassigned' && appliedTxIds.has(Number(toTx))) {
-                    window.rtAlert('No se puede modificar una ruta ya aplicada.', 'warning');
-                    return;
-                }
-                if (fromTx !== 'unassigned' && appliedTxIds.has(Number(fromTx))) {
-                    window.rtAlert('No se puede sacar de una ruta ya aplicada.', 'warning');
-                    return;
-                }
-
-                // Actualizar estado local
-                if (fromTx !== 'unassigned') {
-                    const fromP = currentState.proposals.find(p => p.transportId === Number(fromTx));
-                    if (fromP) fromP.shipmentIds = fromP.shipmentIds.filter(x => x !== sid);
-                } else {
-                    currentState.unassigned = currentState.unassigned.filter(u => (u.id || u.shipmentId) !== sid);
-                }
-                if (toTx !== 'unassigned') {
-                    const toP = currentState.proposals.find(p => p.transportId === Number(toTx));
-                    if (toP && !toP.shipmentIds.includes(sid)) toP.shipmentIds.push(sid);
-                } else {
-                    currentState.unassigned = currentState.unassigned || [];
-                    currentState.unassigned.push({ id: sid, code: 'manual', reason: 'Removido manualmente de la ruta' });
-                }
-                // Recalcular si hubo cambio en una propuesta no aplicada
-                recalc();
+                moveShipment(sid, fromTx, toTx);
             });
         });
     };
