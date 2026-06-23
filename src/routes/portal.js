@@ -13,6 +13,7 @@ const {
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { getReturnForm, postReturn, listReturns, returnDetail, postEditModality, returnCreditNote } = require('../controllers/portalReturn');
+const { getCheckout, postPay } = require('../controllers/payment');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
 
@@ -54,6 +55,10 @@ router.get('/portal/self-saved/:trackingId',  getSelfServiceSaved);
 // CP-ENCS03 — Encuesta de satisfacción accesible desde el email sin login (token firmado)
 router.get('/portal/encuesta/:token',  getPublicSurveyForm);
 router.post('/portal/encuesta/:token', postPublicSurvey);
+
+// [prototype] Pago simulado de la factura (link del mail al remitente, sin login)
+router.get('/pago/:token',  getCheckout);
+router.post('/pago/:token', postPay);
 
 // Portal — Mis envíos del cliente (HU 1)
 router.get('/portal/mis-envios',              optionalPortalClient, getIdentifyForm);

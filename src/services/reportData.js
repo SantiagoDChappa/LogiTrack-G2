@@ -796,17 +796,19 @@ const getDashboardDesempenoData = async (query = {}, deps = { sequelize, QueryTy
         ? Math.round(otifKpi.on_time / otifKpi.delivered * 1000) / 10
         : null;
 
-    // Por zona
+    // Por zona — incluye las entregas sin zona en un bucket "Sin zona" para que el total
+    // por zona reconcilie con el KPI "Entregas analizadas" (antes se excluían con
+    // WHERE zone_id IS NOT NULL y la suma daba menos que el total).
     viewModel.zonePvr = await deps.sequelize.query(
         `${pvrCte}
-         SELECT zone_id, zone_name,
+         SELECT zone_id, COALESCE(zone_name, 'Sin zona') AS zone_name,
                 COUNT(*)::int AS total,
                 ROUND(AVG(predicted_days),1)::float AS avg_predicted,
                 ROUND(AVG(actual_days),1)::float    AS avg_actual,
                 ROUND(AVG(delta),1)::float           AS avg_delta,
                 ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
-         FROM pvr WHERE zone_id IS NOT NULL
-         GROUP BY zone_id, zone_name ORDER BY avg_delta DESC NULLS LAST`,
+         FROM pvr
+         GROUP BY zone_id, zone_name ORDER BY (zone_id IS NULL), avg_delta DESC NULLS LAST`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 

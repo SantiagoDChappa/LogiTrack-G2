@@ -101,16 +101,17 @@
                                     <%= _lastLogin ? new Date(_lastLogin).toLocaleString('es-AR') : 'Nunca ingresó' %>
                                 </td>
                                 <td class="col-actions">
-                                    <a href="/user/<%= user.id %>/historial" class="action-btn" data-tooltip="Ver historial">
-                                        <span class="material-symbols-outlined">history</span>
+                                    <a href="/user/<%= user.id %>/historial" class="action-btn" data-tooltip="Ver historial" aria-label="Ver historial de <%= user.fullName %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">history</span>
                                     </a>
-                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
-                                        <span class="material-symbols-outlined">edit</span>
+                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar" aria-label="Modificar usuario <%= user.fullName %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                                     </a>
                                     <% if (user.active) { %>
                                     <button type="button" class="action-btn eliminar" data-tooltip="Dar de baja"
+                                        aria-label="Dar de baja al usuario <%= user.fullName %>"
                                         onclick="confirmarBaja('<%= user.id %>', '<%= user.fullName %>')">
-                                        <span class="material-symbols-outlined">person_off</span>
+                                        <span class="material-symbols-outlined" aria-hidden="true">person_off</span>
                                     </button>
                                     <% } %>
                                 </td>

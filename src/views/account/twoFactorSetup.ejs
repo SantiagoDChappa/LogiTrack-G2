@@ -30,7 +30,7 @@
                     <input id="token" name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required
                            style="width:100%;padding:.55rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:1.1rem;letter-spacing:.25em">
                 </div>
-                <% if (locals.error) { %><div class="alert alert-error" style="margin:.5rem 0"><%= error %></div><% } %>
+                <% if (locals.error) { %><div class="alert alert-error" role="alert" style="margin:.5rem 0"><%= error %></div><% } %>
                 <div class="form-actions" style="margin-top:1rem">
                     <a href="/account/2fa" class="action-btn action-btn--lg volver" data-tooltip="Cancelar" aria-label="Cancelar"><span class="material-symbols-outlined">arrow_back</span></a>
                     <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Activar 2FA" aria-label="Activar 2FA"><span class="material-symbols-outlined">verified_user</span></button>

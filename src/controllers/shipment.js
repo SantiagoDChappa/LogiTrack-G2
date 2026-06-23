@@ -524,11 +524,18 @@ const createShipment = async (req, res) => {
 
         // Factura del envío (comprobante al remitente) con el desglose de costo.
         // Best-effort: un fallo de facturación no debe tumbar el alta del envío.
+        // [prototype] Tras generarla, mandamos al remitente el link de pago simulado.
         try {
-            await require('../services/invoiceService').generate({
+            const { invoice } = await require('../services/invoiceService').generate({
                 shipmentId: freshShipment.id,
                 userId: res.locals.currentUser?.id || null,
             });
+            if (invoice && invoice.payStatus !== 'PAGADA') {
+                const empresa = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
+                require('../services/invoicePaymentEmail')
+                    .sendPaymentLink({ invoice, shipment: freshShipment, empresa })
+                    .catch((e) => console.error('[createShipment] mail de pago:', e.message));
+            }
         } catch (e) {
             console.error('[createShipment] factura:', e.message);
         }

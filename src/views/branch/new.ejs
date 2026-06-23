@@ -34,7 +34,7 @@
                     <div class="field"><label for="phone">Teléfono</label><input id="phone" name="phone" value="<%= f.phone || '' %>" maxlength="20"></div>
                     <div class="field"><label><input type="checkbox" name="pickupEnabled" <%= f.pickupEnabled ? 'checked' : '' %>> Habilitada para retiro en sucursal</label></div>
                 </div>
-                <% if (locals.error) { %><div class="alert alert-error" style="margin:.5rem 0"><%= error %></div><% } %>
+                <% if (locals.error) { %><div class="alert alert-error" role="alert" style="margin:.5rem 0"><%= error %></div><% } %>
                 <div class="form-actions">
                     <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar sucursal" aria-label="Guardar sucursal"><span class="material-symbols-outlined">save</span></button>
                 </div>

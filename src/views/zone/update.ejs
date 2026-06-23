@@ -48,6 +48,12 @@
                                value="<%= zone.postalCodePrefixes ? zone.postalCodePrefixes.join(',') : '' %>"
                                placeholder="Ej: 1425,1426,1900">
                     </div>
+                    <div class="field">
+                        <label>Partidos cubiertos <span style="font-weight:400;color:var(--color-text-secondary)">(capa visual del mapa, no afecta el costeo)</span></label>
+                        <div id="partido-picker" class="partido-picker" data-selected="<%= JSON.stringify(zone.departamentoIds || []) %>">
+                            <p class="partido-picker__msg">Elegí una provincia para asignar partidos.</p>
+                        </div>
+                    </div>
                     <div class="field" style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem">
                         <input type="checkbox" id="enabled" name="enabled" <%= zone.enabled ? 'checked' : '' %> style="width:auto">
                         <label for="enabled" style="margin:0;text-transform:none;font-size:var(--font-size-sm)">Habilitada</label>
@@ -68,5 +74,6 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/zone-form.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

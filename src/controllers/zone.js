@@ -11,13 +11,20 @@ const isDuplicateError = (err) =>
     err && (err.name === 'SequelizeUniqueConstraintError'
         || (err.original && err.original.code === '23505'));
 
+// Los checkboxes de partidos llegan como array, string único o undefined.
+const parseDepartamentos = (raw) => {
+    if (!raw) { return null; }
+    const arr = (Array.isArray(raw) ? raw : [raw]).map(s => String(s).trim()).filter(Boolean);
+    return arr.length ? arr : null;
+};
+
 const newForm = async (req, res) => {
     const provinces = await provinceModel.getAll();
     res.render('zone/new', { provinces, zone: null, error: null, values: {} });
 };
 
 const create = async (req, res) => {
-    const { name, provinceId, baseCost, postalCodePrefixes, enabled } = req.body;
+    const { name, provinceId, baseCost, postalCodePrefixes, enabled, departamentoIds } = req.body;
     const prefixes = postalCodePrefixes
         ? postalCodePrefixes.split(',').map(s => s.trim()).filter(Boolean)
         : null;
@@ -27,6 +34,7 @@ const create = async (req, res) => {
             provinceId: provinceId || null,
             baseCost: baseCost || 0,
             postalCodePrefixes: prefixes,
+            departamentoIds: parseDepartamentos(departamentoIds),
             enabled: enabled === 'on' || enabled === 'true' || enabled === true,
         });
     } catch (err) {
@@ -52,7 +60,7 @@ const updateForm = async (req, res) => {
 };
 
 const update = async (req, res) => {
-    const { name, provinceId, baseCost, postalCodePrefixes, enabled } = req.body;
+    const { name, provinceId, baseCost, postalCodePrefixes, enabled, departamentoIds } = req.body;
     const prefixes = postalCodePrefixes
         ? postalCodePrefixes.split(',').map(s => s.trim()).filter(Boolean)
         : null;
@@ -62,6 +70,7 @@ const update = async (req, res) => {
             provinceId: provinceId || null,
             baseCost: baseCost || 0,
             postalCodePrefixes: prefixes,
+            departamentoIds: parseDepartamentos(departamentoIds),
             enabled: enabled === 'on' || enabled === 'true' || enabled === true,
         }, { where: { id: req.params.id } });
     } catch (err) {

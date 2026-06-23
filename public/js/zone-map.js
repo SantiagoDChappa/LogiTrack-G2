@@ -18,6 +18,7 @@
     var byKey = {};                // provinceKey normalizado -> provincia
     var initialized = false;
     var currentProvince = null;
+    var deptIndex = {};            // códigoINDEC partido -> zona (de la provincia activa)
 
     function norm(s) {
         return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -74,6 +75,17 @@
         var close = panel.querySelector('.zmp-close');
         if (close) { close.addEventListener('click', clearPinned); }
     }
+    function renderDeptPanel(partidoName, z) {
+        if (!panel) { return; }
+        var html = '<div class="zmp-head"><h3>' + partidoName + '</h3></div>' +
+            '<p class="zmp-sub">' + (currentProvince ? currentProvince.provinceName : '') + '</p>';
+        if (z) {
+            html += zoneCard(z);
+        } else {
+            html += '<p class="zmp-hint">Partido sin zona asignada. Asigná partidos desde el formulario de la zona.</p>';
+        }
+        panel.innerHTML = html;
+    }
     function clearPinned() {
         pinned = false;
         currentProvince = null;
@@ -91,10 +103,12 @@
             weight: 1, color: '#ffffff', fillOpacity: p ? 0.78 : 0.35,
         };
     }
-    function deptStyle() {
-        var p = currentProvince;
-        var fill = (p && p.zoneCount === 1) ? p.zones[0].color : (p && p.zoneCount > 1 ? COLOR_MULTI : COLOR_NONE);
-        return { fillColor: fill, weight: 1, color: '#ffffff', fillOpacity: 0.7 };
+    function deptStyle(feature) {
+        var z = feature ? deptIndex[feature.properties.id] : null;
+        return {
+            fillColor: z ? z.color : COLOR_NONE,
+            weight: 1, color: '#ffffff', fillOpacity: z ? 0.8 : 0.4,
+        };
     }
 
     /* ---------- interacción provincias ---------- */
@@ -126,10 +140,17 @@
     }
 
     function onEachDept(feature, layer) {
-        layer.bindTooltip(feature.properties.nombre, { sticky: true });
+        var z = deptIndex[feature.properties.id];
+        layer.bindTooltip(feature.properties.nombre + ' · ' + (z ? z.name : 'sin zona'), { sticky: true });
         layer.on({
-            mouseover: function () { layer.setStyle({ weight: 2.5, color: '#1a3566' }); },
-            mouseout: function () { deptLayer.resetStyle(layer); },
+            mouseover: function () {
+                layer.setStyle({ weight: 2.5, color: '#1a3566', fillOpacity: 0.95 });
+                renderDeptPanel(feature.properties.nombre, z);
+            },
+            mouseout: function () {
+                deptLayer.resetStyle(layer);
+                renderProvincePanel(currentProvince, true);
+            },
         });
     }
 
@@ -139,8 +160,19 @@
         if (box) { box.textContent = msg; box.hidden = false; }
     }
 
+    function buildDeptIndex(p) {
+        deptIndex = {};
+        if (!p) { return; }
+        (p.zones || []).forEach(function (z) {
+            (z.departamentoIds || []).forEach(function (d) {
+                if (!deptIndex[d]) { deptIndex[d] = z; }  // primera zona gana en caso de solapamiento
+            });
+        });
+    }
+
     function loadDepartamentos(provGeoId) {
         if (deptLayer) { map.removeLayer(deptLayer); deptLayer = null; }
+        buildDeptIndex(currentProvince);
         fetch(GEOREF + '/departamentos?provincia=' + encodeURIComponent(provGeoId) + '&campos=id,nombre&max=200&formato=geojson')
             .then(function (r) { return r.json(); })
             .then(function (geo) {

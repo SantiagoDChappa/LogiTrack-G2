@@ -52,18 +52,20 @@ const getProvinceSummary = async () => {
         const ship = shipByZone.get(z.id) || 0;
         const trans = transByZone.get(z.id) || 0;
         const prefixes = Array.isArray(z.postalCodePrefixes) ? z.postalCodePrefixes : [];
+        const departamentos = Array.isArray(z.departamentoIds) ? z.departamentoIds : [];
         const g = groups.get(key);
         if (!g) {
             groups.set(key, {
                 pid, repId: z.id, name: z.name, enabled: z.enabled,
                 baseCost: Number(z.baseCost), surchargePerKg: Number(z.surchargePerKg),
                 surchargePerM3: Number(z.surchargePerM3),
-                prefixes: new Set(prefixes), copies: 1,
+                prefixes: new Set(prefixes), departamentos: new Set(departamentos), copies: 1,
                 shipmentCount: ship, transportCount: trans,
             });
         } else {
             if (z.id < g.repId) { g.repId = z.id; g.enabled = z.enabled; }
             prefixes.forEach(p => g.prefixes.add(p));
+            departamentos.forEach(d => g.departamentos.add(d));
             g.copies += 1;
             g.shipmentCount += ship;
             g.transportCount += trans;
@@ -93,6 +95,7 @@ const getProvinceSummary = async () => {
             surchargePerKg: g.surchargePerKg,
             surchargePerM3: g.surchargePerM3,
             prefixes:       Array.from(g.prefixes),
+            departamentoIds: Array.from(g.departamentos),
             shipmentCount:  g.shipmentCount,
             transportCount: g.transportCount,
             duplicates:     g.copies - 1,
