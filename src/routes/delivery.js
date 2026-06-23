@@ -197,12 +197,32 @@ router.get('/route/:id/offline-bundle', requireDelivery, async (req, res) => {
             address: s.shipment.address ? { street: s.shipment.address.street, number: s.shipment.address.number } : null,
         } : null,
     }));
+    // Control de fatiga para operar offline: se cachea junto al ruteo "cuando carga
+    // los datos". Lleva si está habilitado + los parámetros para PUNTUAR la prueba de
+    // REACCIÓN y decidir el bloqueo del lado del cliente con el MISMO criterio del
+    // server (sin red). Offline solo se usa REACCIÓN (la voz necesita STT en el server).
+    let fatigue = { enabled: false };
+    try {
+        const cfg = await require('../services/fatigue/config').getConfig(route.originBranchId);
+        fatigue = {
+            enabled: cfg.enabled,
+            method: 'REACCION',            // offline forzamos reacción
+            methodRecheck: cfg.methodRecheck,
+            consentVersion: cfg.consentVersion,
+            reactionAttempts: cfg.reactionAttempts,
+            reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+            reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+            thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
+        };
+    } catch (e) { console.warn('[offline-bundle] fatigue cfg:', e.message); }
+
     res.json({
         routeId: route.id, statusId: route.statusId,
         totalDistanceKm: route.totalDistanceKm,
         transportName: route.transport ? route.transport.name : '',
         originBranch: route.originBranch ? route.originBranch.name : '',
         cachedAt: new Date().toISOString(),
+        fatigue,
         stops,
     });
 });
@@ -953,8 +973,13 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     const cfg = await fatigueCfg.getConfig(route.originBranchId);
     res.json({
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
+        methodRecheck: cfg.methodRecheck,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
         reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        // Parámetros que permiten PUNTUAR y decidir el bloqueo del lado del cliente
+        // (mismo criterio que el server) cuando no hay conexión. Modo offline = REACCION.
+        reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+        thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
         voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
         voiceAcousticEnabled: cfg.voiceAcousticEnabled,
         voiceMaxAttempts: cfg.voiceMaxAttempts, reactionAttempts: cfg.reactionAttempts,
