@@ -6,55 +6,144 @@
     <link rel="stylesheet" href="/css/report.css">
     <style>
         .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; }
-        .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); letter-spacing:.04em; margin-bottom:.4rem; }
+        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; cursor:default; }
+        .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
         .dash-kpi__value { font-size:2rem; font-weight:700; line-height:1; }
-        .dash-kpi__value--warn { color:#e07b00; }
-        .dash-kpi__value--ok { color:var(--color-success,#2e7d32); }
+        .dash-kpi__sub     { font-size:.75rem; color:var(--color-text-muted); margin-top:.35rem; }
+        .dash-kpi__context { font-size:.72rem; color:var(--color-text-muted); margin-top:.3rem; display:flex; align-items:center; gap:.25rem; }
+        .dash-kpi__context .material-symbols-outlined { font-size:.9rem; opacity:.6; }
+        .kpi-tip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%;
+                   background:var(--color-border,#e2e8f0); color:var(--color-text-muted,#64748b); font-size:.62rem; font-weight:700;
+                   cursor:help; margin-left:.35rem; vertical-align:middle; position:relative; flex-shrink:0; }
+        .kpi-tip::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+                          background:#1e293b; color:#f1f5f9; font-size:.72rem; font-weight:400; text-transform:none; letter-spacing:0;
+                          padding:.55rem .75rem; border-radius:6px; width:230px; white-space:normal; line-height:1.45;
+                          opacity:0; pointer-events:none; transition:opacity .15s; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+        .kpi-tip:hover::after { opacity:1; }
+        .kpi-tip::before { content:''; position:absolute; bottom:calc(100% + 2px); left:50%; transform:translateX(-50%);
+                           border:5px solid transparent; border-top-color:#1e293b; opacity:0; pointer-events:none; transition:opacity .15s; }
+        .kpi-tip:hover::before { opacity:1; }
+        .dash-kpi__value--warn   { color:#e07b00; }
+        .dash-kpi__value--ok     { color:var(--color-success,#2e7d32); }
         .dash-kpi__value--danger { color:var(--color-danger,#c62828); }
-        .dash-tabs { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
-        .dash-tab { padding:.4rem 1rem; border-radius:6px; border:1px solid var(--color-border);
-                    background:var(--color-surface); cursor:pointer; font-size:.88rem; }
-        .dash-tab.active { background:var(--color-primary,#1565c0); color:#fff; border-color:var(--color-primary,#1565c0); }
-        .dash-tab-panel { display:none; }
-        .dash-tab-panel.active { display:block; }
 
-        /* ── Tooltip informativo inline ── */
-        .info-tip {
-            display: inline-flex;
-            align-items: center;
-            position: relative;
-            cursor: help;
-            color: var(--color-text-muted);
-            font-size: .85rem;
-            vertical-align: middle;
-            margin-left: .3rem;
-        }
-        .info-tip::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: calc(100% + 7px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--color-surface-elevated, #1e293b);
-            color: var(--color-text, #f1f5f9);
-            font-size: .77rem;
-            font-weight: 400;
-            line-height: 1.45;
-            padding: .5rem .7rem;
-            border-radius: 6px;
-            white-space: normal;
-            width: 230px;
-            text-align: left;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity .15s;
-            z-index: 30;
-            box-shadow: 0 4px 14px rgba(0,0,0,.22);
-        }
-        .info-tip:hover::after { opacity: 1; }
-        .report-table th { text-transform: none; }
-        .info-tip::after { text-transform: none; letter-spacing: 0; }
+        /* OTIF ring */
+        .otif-ring { position:relative; width:88px; height:88px; border-radius:50%;
+                     background:conic-gradient(var(--ring-fill,#dc2626) calc(var(--pct,0)*1%), var(--color-border,#e2e8f0) 0);
+                     display:flex; align-items:center; justify-content:center; margin:.5rem auto .2rem; }
+        .otif-ring__inner { width:70px; height:70px; border-radius:50%; background:var(--color-surface);
+                             display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+        /* Delta arrow */
+        .delta-arrow { display:inline-flex; align-items:center; gap:.25rem; font-size:.78rem; font-weight:600; margin-top:.4rem; }
+        .delta-arrow--up   { color:#dc2626; }
+        .delta-arrow--ok   { color:#16a34a; }
+        .delta-arrow--warn { color:#d97706; }
+
+        /* Section divider */
+        .dash-section-divider { display:flex; align-items:center; gap:.75rem; margin:1.75rem 0 .8rem; }
+        .dash-section-divider::before { content:''; flex:1; height:1px; background:var(--color-border); }
+        .dash-section-divider__label { font-size:.76rem; font-weight:700; text-transform:uppercase;
+                                        letter-spacing:.06em; color:var(--color-text-muted); white-space:nowrap; }
+
+        /* Ciclo del envío */
+        .cycle-bar-wrap { height:28px; border-radius:8px; overflow:hidden; display:flex; margin:1rem 0 .6rem; }
+        .cycle-bar-prep    { background:#6366f1; display:flex; align-items:center; justify-content:center; transition:width .4s; }
+        .cycle-bar-transit { background:#22c55e; display:flex; align-items:center; justify-content:center; flex:1; }
+        .cycle-bar-label   { color:#fff; font-size:.72rem; font-weight:700; white-space:nowrap; padding:0 .4rem; }
+        .cycle-legend { display:flex; gap:1.5rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+        .cycle-legend-item { display:flex; align-items:center; gap:.4rem; font-size:.8rem; color:var(--rp-muted); }
+        .cycle-legend-dot  { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+        .cycle-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; padding-top:1rem; border-top:1px solid var(--rp-border); }
+        @media(max-width:700px){ .cycle-stats { grid-template-columns:1fr 1fr; } }
+        .cycle-stat__label { font-size:.72rem; color:var(--rp-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.3rem; }
+        .cycle-stat__value { font-size:1.6rem; font-weight:700; line-height:1; }
+        .cycle-stat__sub   { font-size:.7rem; color:var(--rp-muted); margin-top:.25rem; }
+        .cycle-alert { display:flex; align-items:flex-start; gap:.5rem; padding:.65rem .9rem; border-radius:8px; font-size:.82rem;
+                       background:rgba(99,102,241,.07); border:1px solid rgba(99,102,241,.2); color:#4f46e5; margin-top:1rem; line-height:1.45; }
+        .cycle-alert .material-symbols-outlined { font-size:1.1rem; flex-shrink:0; margin-top:.05rem; }
+        /* Delay rate badge */
+        .delay-chip { display:inline-flex; align-items:center; gap:.25rem; padding:.15rem .5rem; border-radius:99px;
+                      font-size:.78rem; font-weight:600; font-variant-numeric:tabular-nums; }
+        .delay-chip--low  { background:rgba(34,197,94,.12); color:#16a34a; }
+        .delay-chip--mid  { background:rgba(245,158,11,.12); color:#d97706; }
+        .delay-chip--high { background:rgba(239,68,68,.12);  color:#dc2626; }
+        /* Tooltip informativo inline */
+        .info-tip { display:inline-flex; align-items:center; position:relative; cursor:help;
+                    color:var(--color-text-muted); font-size:.85rem; vertical-align:middle; margin-left:.3rem; }
+        .info-tip::after { content:attr(data-tooltip); position:absolute; bottom:calc(100% + 7px); left:50%;
+                           transform:translateX(-50%); background:#1e293b;
+                           color:#f1f5f9; font-size:.77rem; font-weight:400; line-height:1.45;
+                           padding:.5rem .7rem; border-radius:6px; white-space:normal; width:230px; text-align:left;
+                           pointer-events:none; opacity:0; transition:opacity .15s; z-index:30;
+                           box-shadow:0 4px 14px rgba(0,0,0,.22); text-transform:none; letter-spacing:0; }
+        .info-tip:hover::after { opacity:1; }
+        .report-table th { text-transform:none; }
+
+        /* ── Patrones detectados ── */
+        .insight-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:.85rem; margin-bottom:.25rem; }
+        .insight-card { display:flex; gap:.85rem; align-items:flex-start; padding:1rem 1.15rem; border-radius:10px; border:1.5px solid; }
+        .insight-card--danger { border-color:rgba(220,38,38,.28); background:rgba(220,38,38,.04); }
+        .insight-card--warn   { border-color:rgba(217,119,6,.28);  background:rgba(217,119,6,.04); }
+        .insight-card--ok     { border-color:rgba(22,163,74,.28);  background:rgba(22,163,74,.04); }
+        .insight-card__icon   { font-size:1.55rem; line-height:1; flex-shrink:0; margin-top:.1rem; }
+        .insight-card--danger .insight-card__icon { color:#dc2626; }
+        .insight-card--warn   .insight-card__icon { color:#d97706; }
+        .insight-card--ok     .insight-card__icon { color:#16a34a; }
+        .insight-card__label  { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--color-text-muted); margin-bottom:.2rem; }
+        .insight-card__zone   { font-size:.97rem; font-weight:700; line-height:1.25; margin-bottom:.25rem; }
+        .insight-card--danger .insight-card__zone { color:#dc2626; }
+        .insight-card--warn   .insight-card__zone { color:#b45309; }
+        .insight-card--ok     .insight-card__zone { color:#16a34a; }
+        .insight-card__detail { font-size:.78rem; color:var(--color-text-muted); line-height:1.5; }
+        .insight-card__detail strong { color:inherit; font-weight:700; }
+
+        /* ── Diagnóstico en tabla de destinos ── */
+        .diag-badge { display:inline-flex; align-items:center; gap:.3rem; padding:.22rem .6rem; border-radius:99px; font-size:.74rem; font-weight:600; white-space:nowrap; }
+        .diag-badge .material-symbols-outlined { font-size:.8rem; }
+        .diag-badge--structural { background:rgba(220,38,38,.1);   color:#dc2626; }
+        .diag-badge--watch      { background:rgba(217,119,6,.1);    color:#d97706; }
+        .diag-badge--low-sample { background:rgba(148,163,184,.15); color:var(--color-text-muted); }
+        @media(max-width:760px){ .col-diag { display:none; } }
+
+        /* ── Contexto de zona en tabla de repartidores ── */
+        .driver-zone-ctx { display:flex; align-items:center; gap:.22rem; font-size:.72rem; color:var(--color-text-muted); margin-top:.18rem; line-height:1.35; }
+        .driver-zone-ctx .material-symbols-outlined { font-size:.8rem; flex-shrink:0; }
+        .driver-zone-ctx--structural { color:#b45309; font-weight:600; }
+
+        /* ── Refinements visuales (sin cambios estructurales) ── */
+
+        /* Section divider: línea simétrica a ambos lados del label */
+        .dash-section-divider::after { content:''; flex:1; height:1px; background:var(--color-border); }
+
+        /* KPI cards: top accent por estado */
+        .dash-kpi--neutral { border-top: 3px solid var(--color-primary, #1565c0); }
+        .dash-kpi--ok      { border-top: 3px solid #16a34a; }
+        .dash-kpi--warn    { border-top: 3px solid #d97706; }
+        .dash-kpi--danger  { border-top: 3px solid #dc2626; }
+
+        /* KPI cards: hover lift */
+        .dash-kpi { transition: box-shadow .15s, transform .15s; }
+        .dash-kpi:hover { box-shadow: 0 6px 20px rgba(0,0,0,.1); transform: translateY(-2px); }
+
+        /* h2 de secciones: acento izquierdo */
+        .report-card h2 { border-left: 3px solid var(--color-primary, #1565c0); padding-left: .75rem; }
+
+        /* Tabla: hover por fila */
+        .report-table tbody tr { transition: background .1s; }
+        .report-table tbody tr:hover td { background: rgba(15,23,42,.025); }
+        html[data-theme="dark"] .report-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+
+        /* Insight cards: sombra + hover lift */
+        .insight-card { box-shadow: 0 2px 8px rgba(0,0,0,.05); transition: transform .15s, box-shadow .15s; }
+        .insight-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.1); }
+
+        /* Tabs: hover con tinte + glow en activo */
+        .dash-tab:hover:not(.active) { background: rgba(99,102,241,.06); border-color: rgba(99,102,241,.3); color: var(--color-primary, #1565c0); }
+        .dash-tab.active { box-shadow: 0 2px 10px rgba(21,101,192,.22); }
+
+        /* Barra de ciclo: levemente más alta */
+        .cycle-bar-wrap { height: 32px; }
     </style>
 </head>
 <body>
@@ -64,7 +153,7 @@
 
             <div class="page-header">
                 <h1>Análisis de Desempeño</h1>
-                <p class="dash-hint" style="margin-top:.25rem;">Compara los tiempos estimados vs. reales de entrega, segmentado por zona, repartidor, sucursal y período. Permite identificar dónde se generan los mayores desvíos.</p>
+                <p class="dash-hint" style="margin-top:.25rem;">Compará lo estimado contra lo real, identificá qué rutas tienen demoras estructurales y seguí la evolución semanal del servicio.</p>
             </div>
 
             <!-- Filtro -->
@@ -100,351 +189,302 @@
             </div>
 
             <% if (!error) { %>
+            <%
+                const otifPct    = kpis.otif_pct !== null ? kpis.otif_pct : null;
+                const ringColor  = otifPct === null ? '#94a3b8' : otifPct >= 85 ? '#16a34a' : otifPct >= 70 ? '#d97706' : '#dc2626';
+                const ringPct    = otifPct !== null ? otifPct : 0;
+                const otifValCls = otifPct !== null && otifPct >= 85 ? 'dash-kpi__value--ok' : otifPct !== null && otifPct >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger';
+                const avgDelta   = kpis.avg_delta !== null ? kpis.avg_delta : null;
+                const deltaCls   = avgDelta === null ? '' : avgDelta <= 0.3 ? 'delta-arrow--ok' : avgDelta <= 1 ? 'delta-arrow--warn' : 'delta-arrow--up';
+                const deltaIcon  = avgDelta === null ? '' : avgDelta <= 0.3 ? '↓' : '↑';
+
+                function fmtDate(str) {
+                    if (!str) return '—';
+                    const parts = String(str).slice(0, 10).split('-');
+                    return parts[2] + '/' + parts[1];
+                }
+                function fmtDateFull(str) {
+                    if (!str) return '—';
+                    const parts = String(str).slice(0, 10).split('-');
+                    return parts[2] + '/' + parts[1] + '/' + parts[0];
+                }
+            %>
 
             <!-- KPIs -->
             <div class="dash-kpi-grid">
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">
+                <div class="dash-kpi dash-kpi--neutral">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;">
                         Entregas analizadas
-                        <span class="info-tip" data-tooltip="Total de envíos entregados en el período que cuentan con datos de predicción completados. Solo estos entran en el cálculo de OTIF y delta.">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">info</span>
-                        </span>
+                        <span class="kpi-tip" data-tip="Total de envíos entregados en el período que cuentan con datos de predicción completados. Solo estos entran en el cálculo de OTIF y delta.">?</span>
                     </div>
                     <div class="dash-kpi__value"><%= kpis.total || 0 %></div>
+                    <div class="dash-kpi__context"><span class="material-symbols-outlined">model_training</span>con predicción ML</div>
+                    <div class="dash-kpi__sub"><%= fmtDateFull(dateFrom) %> — <%= fmtDateFull(dateTo) %></div>
                 </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">
+
+                <div class="dash-kpi <%= otifPct === null ? 'dash-kpi--neutral' : otifPct >= 85 ? 'dash-kpi--ok' : otifPct >= 70 ? 'dash-kpi--warn' : 'dash-kpi--danger' %>" style="text-align:center;">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;justify-content:center;">
                         OTIF
-                        <span class="info-tip" data-tooltip="On Time In Full: % de entregas realizadas en o antes de la fecha prometida al cliente. Verde ≥ 85%, amarillo ≥ 70%, rojo < 70%.">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">info</span>
-                        </span>
+                        <span class="kpi-tip" data-tip="On Time In Full: % de entregas realizadas en o antes de la fecha prometida al cliente. Verde ≥ 85%, amarillo ≥ 70%, rojo < 70%.">?</span>
                     </div>
-                    <div class="dash-kpi__value <%= (kpis.otif_pct||0) >= 85 ? 'dash-kpi__value--ok' : (kpis.otif_pct||0) >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
-                        <%= kpis.otif_pct !== null ? kpis.otif_pct + '%' : '—' %>
+                    <div class="otif-ring" style="--pct:<%= ringPct %>;--ring-fill:<%= ringColor %>;">
+                        <div class="otif-ring__inner">
+                            <span class="<%= otifValCls %>" style="font-size:1.45rem;font-weight:700;line-height:1;">
+                                <%= otifPct !== null ? otifPct + '%' : '—' %>
+                            </span>
+                        </div>
                     </div>
+                    <% if (otifPct !== null && kpis.otif_base > 0) { %>
+                    <div class="dash-kpi__context" style="justify-content:center;">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        <%= kpis.otif_on_time %>/<%= kpis.otif_base %> a tiempo
+                    </div>
+                    <% } %>
                 </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">
+
+                <div class="dash-kpi dash-kpi--neutral">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;">
                         Días estimados prom.
-                        <span class="info-tip" data-tooltip="Promedio de días que el modelo de predicción estimó para completar cada entrega, desde la creación del envío.">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">info</span>
-                        </span>
+                        <span class="kpi-tip" data-tip="Promedio de días que el modelo de predicción estimó para completar cada entrega, desde la creación del envío.">?</span>
                     </div>
                     <div class="dash-kpi__value"><%= kpis.avg_predicted !== null ? kpis.avg_predicted + 'd' : '—' %></div>
+                    <div class="dash-kpi__context"><span class="material-symbols-outlined">psychology</span>estimado por modelo ML</div>
                 </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">
+
+                <div class="dash-kpi dash-kpi--neutral">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;">
                         Días reales prom.
-                        <span class="info-tip" data-tooltip="Promedio de días que tardaron realmente las entregas, medido desde la creación del envío hasta la confirmación de entrega.">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">info</span>
-                        </span>
+                        <span class="kpi-tip" data-tip="Promedio de días que tardaron realmente las entregas, medido desde la creación del envío hasta la confirmación de entrega.">?</span>
                     </div>
                     <div class="dash-kpi__value"><%= kpis.avg_actual !== null ? kpis.avg_actual + 'd' : '—' %></div>
+                    <div class="dash-kpi__context"><span class="material-symbols-outlined">local_shipping</span>creación → entrega</div>
                 </div>
-                <div class="dash-kpi">
-                    <div class="dash-kpi__label">
+
+                <div class="dash-kpi <%= avgDelta === null ? 'dash-kpi--neutral' : avgDelta <= 0.3 ? 'dash-kpi--ok' : avgDelta <= 1 ? 'dash-kpi--warn' : 'dash-kpi--danger' %>">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;">
                         Delta prom. (desvío)
-                        <span class="info-tip" data-tooltip="Diferencia promedio entre días reales y días estimados. Positivo = tardó más de lo previsto. Verde ≤ 0.3d, amarillo ≤ 1d, rojo > 1d.">
-                            <span class="material-symbols-outlined" style="font-size:1rem;">info</span>
-                        </span>
+                        <span class="kpi-tip" data-tip="Diferencia promedio entre días reales y días estimados. Positivo = tardó más de lo previsto. Verde ≤ 0.3d, amarillo ≤ 1d, rojo > 1d.">?</span>
                     </div>
-                    <div class="dash-kpi__value <%= (kpis.avg_delta||0) <= 0.3 ? 'dash-kpi__value--ok' : (kpis.avg_delta||0) <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
-                        <%= kpis.avg_delta !== null ? ((kpis.avg_delta > 0 ? '+' : '') + kpis.avg_delta + 'd') : '—' %>
+                    <div class="dash-kpi__context" style="margin-bottom:.3rem;"><span class="material-symbols-outlined">function</span>real − estimado</div>
+                    <div class="dash-kpi__value <%= avgDelta !== null && avgDelta <= 0.3 ? 'dash-kpi__value--ok' : avgDelta !== null && avgDelta <= 1 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger' %>">
+                        <%= avgDelta !== null ? ((avgDelta > 0 ? '+' : '') + avgDelta + 'd') : '—' %>
                     </div>
+                    <% if (avgDelta !== null) { %>
+                    <div class="delta-arrow <%= deltaCls %>">
+                        <%= deltaIcon %> <%= avgDelta <= 0.3 ? 'dentro del objetivo' : avgDelta <= 1 ? 'desvío moderado' : 'desvío alto' %>
+                    </div>
+                    <% } %>
                 </div>
             </div>
 
-            <!-- Tabs de segmentación -->
-            <div class="dash-tabs">
-                <button class="dash-tab active" onclick="switchTab(this,'tab-zone')" title="Ver desvíos agrupados por zona geográfica de entrega">Por Zona</button>
-                <button class="dash-tab" onclick="switchTab(this,'tab-driver')" title="Ver desvíos por repartidor, considerando el viaje completo desde creación hasta entrega">Por Repartidor</button>
-<button class="dash-tab" onclick="switchTab(this,'tab-branch')" title="Ver desvíos agrupados por sucursal (derivada del repartidor asignado)">Por Sucursal</button>
-                <button class="dash-tab" onclick="switchTab(this,'tab-weekday')" title="Detectar qué días de la semana concentran más demoras">Por Día de la semana</button>
-                <button class="dash-tab" onclick="switchTab(this,'tab-evolution')" title="Ver cómo evolucionó la eficiencia semana a semana dentro del período">Evolución semanal</button>
+            <!-- Patrones detectados -->
+            <% if (patterns) { %>
+            <%
+                const hasAnyPattern = patterns.structuralZones.length > 0 || patterns.prepDominant;
+            %>
+            <div class="dash-section-divider">
+                <span class="dash-section-divider__label">Patrones detectados</span>
+            </div>
+            <div class="report-card">
+                <div class="insight-grid">
+                <% if (!hasAnyPattern) { %>
+                <div class="insight-card insight-card--ok">
+                    <span class="material-symbols-outlined insight-card__icon">check_circle</span>
+                    <div>
+                        <div class="insight-card__label">Sin alertas</div>
+                        <div class="insight-card__zone">Todo dentro de lo normal</div>
+                        <div class="insight-card__detail">Las demoras del período no se concentran en ninguna ruta o zona particular.</div>
+                    </div>
+                </div>
+                <% } %>
+                <% patterns.structuralZones.forEach(z => { %>
+                <div class="insight-card insight-card--danger">
+                    <span class="material-symbols-outlined insight-card__icon">route</span>
+                    <div>
+                        <div class="insight-card__label">Patrón de ruta</div>
+                        <div class="insight-card__zone"><%= z.zone_name %></div>
+                        <div class="insight-card__detail">
+                            <strong><%= z.total_delayed %> demoras</strong> con <strong><%= z.distinct_drivers_delayed %> conductores distintos</strong> —
+                            el problema no es del repartidor, es de la ruta o zona.
+                        </div>
+                    </div>
+                </div>
+                <% }) %>
+                <% if (patterns.prepDominant) { %>
+                <div class="insight-card insight-card--warn">
+                    <span class="material-symbols-outlined insight-card__icon">warehouse</span>
+                    <div>
+                        <div class="insight-card__label">Demora en origen</div>
+                        <div class="insight-card__zone">Etapa de preparación</div>
+                        <div class="insight-card__detail">
+                            La mayor parte del tiempo se pierde <strong>antes de salir a ruta</strong>. El repartidor no tiene incidencia en esta porción — revisá el ciclo del envío a continuación.
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Ciclo del envío -->
+            <div class="dash-section-divider"><span class="dash-section-divider__label">Ciclo del envío</span></div>
+            <div class="report-card" style="margin-bottom:.25rem;">
+                <h2>
+                    ¿Dónde se pierde el tiempo?
+                    <span class="info-tip" data-tooltip="Divide el tiempo total del envío en dos etapas: preparación (desde que se crea el pedido hasta que sale a ruta) y tránsito (desde que sale hasta que se entrega). Si la preparación es la etapa más larga, el repartidor no tiene incidencia en la demora.">
+                        <span class="material-symbols-outlined" style="font-size:1.1rem;">info</span>
+                    </span>
+                </h2>
+                <% if (cycleTime) { %>
+                <%
+                    const prepPct    = cycleTime.avg_total_days > 0 ? Math.round(cycleTime.avg_prep_days / cycleTime.avg_total_days * 100) : 0;
+                    const transitPct = 100 - prepPct;
+                    const prepDomina = prepPct > 50;
+                %>
+                <div class="cycle-bar-wrap">
+                    <div class="cycle-bar-prep" style="width:<%= prepPct %>%">
+                        <% if (prepPct > 12) { %><span class="cycle-bar-label"><%= cycleTime.avg_prep_days %>d</span><% } %>
+                    </div>
+                    <div class="cycle-bar-transit">
+                        <% if (transitPct > 12) { %><span class="cycle-bar-label"><%= cycleTime.avg_transit_days %>d</span><% } %>
+                    </div>
+                </div>
+                <div class="cycle-legend">
+                    <div class="cycle-legend-item">
+                        <span class="cycle-legend-dot" style="background:#6366f1"></span>
+                        Preparación (<%= prepPct %>%) — creación hasta salida a ruta
+                    </div>
+                    <div class="cycle-legend-item">
+                        <span class="cycle-legend-dot" style="background:#22c55e"></span>
+                        Tránsito (<%= transitPct %>%) — salida a ruta hasta entrega
+                    </div>
+                </div>
+                <div class="cycle-stats">
+                    <div>
+                        <div class="cycle-stat__label">Preparación prom.</div>
+                        <div class="cycle-stat__value" style="color:#6366f1"><%= cycleTime.avg_prep_days %>d</div>
+                        <div class="cycle-stat__sub">creación → tránsito</div>
+                    </div>
+                    <div>
+                        <div class="cycle-stat__label">Tránsito prom.</div>
+                        <div class="cycle-stat__value" style="color:#22c55e"><%= cycleTime.avg_transit_days %>d</div>
+                        <div class="cycle-stat__sub">salida → entrega</div>
+                    </div>
+                    <div>
+                        <div class="cycle-stat__label">Total real prom.</div>
+                        <div class="cycle-stat__value"><%= cycleTime.avg_total_days %>d</div>
+                        <div class="cycle-stat__sub">tiempo total medido</div>
+                    </div>
+                    <div>
+                        <div class="cycle-stat__label">Estimado por modelo</div>
+                        <div class="cycle-stat__value" style="color:var(--rp-muted)"><%= cycleTime.avg_predicted_days ? cycleTime.avg_predicted_days + 'd' : '—' %></div>
+                        <div class="cycle-stat__sub">predicción ML</div>
+                    </div>
+                </div>
+                <% if (prepDomina) { %>
+                <div class="cycle-alert">
+                    <span class="material-symbols-outlined">info</span>
+                    Más de la mitad del tiempo total ocurre en preparación — antes de que el envío salga a ruta. El repartidor de última milla no tiene incidencia en esta porción de la demora.
+                </div>
+                <% } %>
+                <% } else { %>
+                <div class="report-empty-state" style="padding:1.5rem 1rem;">
+                    <span class="material-symbols-outlined">schedule</span>
+                    <p>Sin datos suficientes para calcular el ciclo de entrega en el período seleccionado.</p>
+                </div>
+                <% } %>
             </div>
 
-            <!-- Por zona -->
-            <div id="tab-zone" class="dash-tab-panel active report-card">
-                <h2>Predicción vs. Realidad — por zona</h2>
+            <!-- Análisis de rutas -->
+            <div class="dash-section-divider"><span class="dash-section-divider__label">Análisis de rutas</span></div>
+            <div class="report-card">
+                <h2>Desvíos por destino</h2>
+                <p class="dash-hint">Ordenado por % de envíos demorados. Si un destino tiene alta tasa de demora con distintos repartidores, el problema es estructural de la ruta — no del conductor.</p>
                 <% if (zonePvr.length === 0) { %>
                     <div class="report-empty-state"><span class="material-symbols-outlined">map</span><p>Sin datos en el período seleccionado.</p></div>
                 <% } else { %>
                 <table class="report-table" id="adm-zone-table">
                     <thead>
                         <tr>
-                            <th class="sortable" data-col="zone_name">Zona <span class="sort-icon">↕</span></th>
+                            <th class="sortable" data-col="zone_name">Destino <span class="sort-icon">↕</span></th>
                             <th class="sortable text-right" data-col="total">
-                                Entregas <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Cantidad de entregas completadas en esa zona dentro del período.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
+                                Envíos <span class="sort-icon">↕</span>
+                                <span class="info-tip" data-tooltip="Total de envíos entregados en ese destino en el período."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span>
                             </th>
-                            <th class="sortable text-right" data-col="avg_predicted">
-                                Estimado <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Promedio de días que el modelo predijo para entregas en esta zona.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="sortable text-right" data-col="avg_actual">
-                                Real <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Promedio de días que tardaron realmente las entregas en esta zona.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
+                            <th class="sortable text-right" data-col="delay_rate">
+                                % Demorados <span class="sort-icon">↕</span>
+                                <span class="info-tip" data-tooltip="Porcentaje de envíos demorados. Si múltiples conductores distintos comparten la demora en un mismo destino, el problema es estructural de la ruta — no del repartidor."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span>
                             </th>
                             <th class="sortable text-right" data-col="avg_delta">
-                                Delta <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Desvío promedio (real − estimado). Verde ≤ 0.2d, amarillo ≤ 0.8d, rojo > 0.8d.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
+                                Delta prom. <span class="sort-icon">↕</span>
+                                <span class="info-tip" data-tooltip="Desvío promedio (días reales − días estimados). Positivo = el destino tarda más de lo que predice el modelo."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span>
                             </th>
-                            <th class="sortable text-right" data-col="otif_pct">
-                                OTIF <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="% de entregas en esta zona realizadas en o antes de la fecha prometida. Verde ≥ 85%, amarillo ≥ 70%, rojo < 70%.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
+                            <th class="text-right col-diag">
+                                Diagnóstico
+                                <span class="info-tip" data-tooltip="Si un destino tiene alta tasa de demora con varios conductores distintos, el problema es estructural (ruta o zona), no individual. 'En observación' indica señales moderadas que conviene monitorear."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span>
                             </th>
                         </tr>
                     </thead>
                     <tbody id="adm-zone-tbody">
                         <% zonePvr.forEach(z => { %>
                         <%
-                            const d = z.avg_delta || 0;
-                            const dClass = d <= 0.2 ? 'ot-badge--green' : d <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                            const dr         = z.delay_rate || 0;
+                            const drCls      = dr <= 20 ? 'delay-chip--low' : dr <= 50 ? 'delay-chip--mid' : 'delay-chip--high';
+                            const delta      = z.avg_delta || 0;
+                            const dClass     = delta <= 0.3 ? 'ot-badge--green' : delta <= 1 ? 'ot-badge--amber' : 'ot-badge--red';
+                            const dDistinct  = z.distinct_drivers_delayed || 0;
+                            const isStructural = z.total >= 3 && dr >= 40 && dDistinct >= 3;
+                            const isWatch      = !isStructural && z.total >= 2 && dr >= 30 && dDistinct >= 2;
+                            const isLowSample  = !isStructural && !isWatch && z.total >= 2 && dr >= 30;
                         %>
                         <tr data-zone_name="<%= z.zone_name %>" data-total="<%= z.total %>"
-                            data-avg_predicted="<%= z.avg_predicted %>" data-avg_actual="<%= z.avg_actual %>"
-                            data-avg_delta="<%= z.avg_delta %>" data-otif_pct="<%= z.otif_pct %>">
-                            <td><%= z.zone_name || '—' %></td>
+                            data-delay_rate="<%= dr %>" data-avg_delta="<%= z.avg_delta %>" data-otif_pct="<%= z.otif_pct %>">
+                            <td><strong><%= z.zone_name || '—' %></strong></td>
                             <td class="text-right count-cell"><%= z.total %></td>
-                            <td class="text-right"><%= z.avg_predicted %>d</td>
-                            <td class="text-right"><%= z.avg_actual %>d</td>
-                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= d > 0 ? '+' : '' %><%= d %>d</span></td>
                             <td class="text-right">
-                                <div class="dp-pct-cell">
-                                    <div class="dp-pct-bar-track">
-                                        <div class="dp-pct-bar-fill <%= (z.otif_pct||0) >= 85 ? 'fill--green' : (z.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
-                                             style="width:<%= z.otif_pct || 0 %>%"></div>
-                                    </div>
-                                    <span class="dp-pct-label"><%= z.otif_pct || 0 %>%</span>
+                                <span class="delay-chip <%= drCls %>">
+                                    <%= dr %>%
+                                    <% if (dr > 50) { %><span class="material-symbols-outlined" style="font-size:.85rem;">warning</span><% } %>
+                                </span>
+                                <div style="font-size:.7rem;color:var(--rp-muted);margin-top:.2rem"><%= z.total_delayed %> de <%= z.total %></div>
+                                <% if (dDistinct >= 2) { %>
+                                <div style="font-size:.68rem;color:var(--rp-muted);margin-top:.1rem">
+                                    <span class="material-symbols-outlined" style="font-size:.75rem;vertical-align:middle;">group</span>
+                                    <%= dDistinct %> conductor<%= dDistinct !== 1 ? 'es' : '' %> distintos
                                 </div>
+                                <% } %>
                             </td>
-                        </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-                <% } %>
-            </div>
-
-            <!-- Por repartidor -->
-            <div id="tab-driver" class="dash-tab-panel report-card">
-                <h2>Desvío por repartidor — viaje completo</h2>
-                <p class="dash-hint">El delta refleja el viaje total (creación → entrega), no solo la última milla.</p>
-                <% if (driverPvr.length === 0) { %>
-                    <div class="report-empty-state"><span class="material-symbols-outlined">person_off</span><p>Sin datos en el período seleccionado.</p></div>
-                <% } else { %>
-                <table class="report-table" id="adm-driver-table">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-col="driver_name">Repartidor <span class="sort-icon">↕</span></th>
-                            <th class="sortable text-right" data-col="total">
-                                Entregas <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Cantidad de entregas completadas por este repartidor en el período.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="sortable text-right" data-col="avg_predicted">
-                                Estimado <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Promedio de días estimados por el modelo para los envíos asignados a este repartidor.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="sortable text-right" data-col="avg_actual">
-                                Real <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Promedio de días reales que tardaron las entregas de este repartidor.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="sortable text-right" data-col="avg_delta">
-                                Delta <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="Desvío promedio (real − estimado) del repartidor. Un delta alto indica que este repartidor tarda más de lo previsto. Verde ≤ 0.2d, amarillo ≤ 0.8d, rojo > 0.8d.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="sortable text-right" data-col="otif_pct">
-                                OTIF <span class="sort-icon">↕</span>
-                                <span class="info-tip" data-tooltip="% de entregas de este repartidor realizadas en o antes de la fecha prometida.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="adm-driver-tbody">
-                        <% driverPvr.forEach(d => { %>
-                        <%
-                            const delta = d.avg_delta || 0;
-                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
-                        %>
-                        <tr data-driver_name="<%= d.driver_name %>" data-total="<%= d.total %>"
-                            data-avg_predicted="<%= d.avg_predicted %>" data-avg_actual="<%= d.avg_actual %>"
-                            data-avg_delta="<%= d.avg_delta %>" data-otif_pct="<%= d.otif_pct %>">
-                            <td>
-                                <div class="dp-driver-cell">
-                                    <div class="dp-avatar"><%= (d.driver_name || '?').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
-                                    <%= d.driver_name || '—' %>
-                                </div>
-                            </td>
-                            <td class="text-right count-cell"><%= d.total %></td>
-                            <td class="text-right"><%= d.avg_predicted %>d</td>
-                            <td class="text-right"><%= d.avg_actual %>d</td>
                             <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
-                            <td class="text-right">
-                                <div class="dp-pct-cell">
-                                    <div class="dp-pct-bar-track">
-                                        <div class="dp-pct-bar-fill <%= (d.otif_pct||0) >= 85 ? 'fill--green' : (d.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
-                                             style="width:<%= d.otif_pct || 0 %>%"></div>
-                                    </div>
-                                    <span class="dp-pct-label"><%= d.otif_pct || 0 %>%</span>
-                                </div>
+                            <td class="text-right col-diag">
+                                <% if (isStructural) { %>
+                                    <span class="diag-badge diag-badge--structural">
+                                        <span class="material-symbols-outlined">route</span>Estructural
+                                    </span>
+                                <% } else if (isWatch) { %>
+                                    <span class="diag-badge diag-badge--watch">
+                                        <span class="material-symbols-outlined">visibility</span>En observación
+                                    </span>
+                                <% } else if (isLowSample) { %>
+                                    <span class="diag-badge diag-badge--low-sample">Muestra baja</span>
+                                <% } else { %>
+                                    <span style="color:var(--color-text-muted);font-size:.82rem;">—</span>
+                                <% } %>
                             </td>
                         </tr>
                         <% }) %>
                     </tbody>
                 </table>
-                <% } %>
-            </div>
-
-            <!-- Por sucursal -->
-            <div id="tab-branch" class="dash-tab-panel report-card">
-                <h2>Predicción vs. Realidad — por sucursal</h2>
-                <p class="dash-hint">Sucursal derivada del repartidor asignado al envío.</p>
-                <% if (branchPvr.length === 0) { %>
-                    <div class="report-empty-state"><span class="material-symbols-outlined">store</span><p>Sin datos en el período seleccionado.</p></div>
-                <% } else { %>
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Sucursal</th>
-                            <th class="text-right">
-                                Entregas
-                                <span class="info-tip" data-tooltip="Cantidad de entregas completadas por repartidores de esta sucursal en el período.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                Estimado
-                                <span class="info-tip" data-tooltip="Promedio de días estimados por el modelo para los envíos de esta sucursal.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                Real
-                                <span class="info-tip" data-tooltip="Promedio de días reales que tardaron las entregas de esta sucursal.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                Delta
-                                <span class="info-tip" data-tooltip="Desvío promedio (real − estimado) para esta sucursal. Verde ≤ 0.2d, amarillo ≤ 0.8d, rojo > 0.8d.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                OTIF
-                                <span class="info-tip" data-tooltip="% de entregas de esta sucursal realizadas en o antes de la fecha prometida.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% branchPvr.forEach(b => { %>
-                        <%
-                            const delta = b.avg_delta || 0;
-                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
-                        %>
-                        <tr>
-                            <td><%= b.branch_name || '—' %></td>
-                            <td class="text-right"><%= b.total %></td>
-                            <td class="text-right"><%= b.avg_predicted %>d</td>
-                            <td class="text-right"><%= b.avg_actual %>d</td>
-                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
-                            <td class="text-right">
-                                <div class="dp-pct-cell">
-                                    <div class="dp-pct-bar-track">
-                                        <div class="dp-pct-bar-fill <%= (b.otif_pct||0) >= 85 ? 'fill--green' : (b.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
-                                             style="width:<%= b.otif_pct || 0 %>%"></div>
-                                    </div>
-                                    <span class="dp-pct-label"><%= b.otif_pct || 0 %>%</span>
-                                </div>
-                            </td>
-                        </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-                <% } %>
-            </div>
-
-            <!-- Por día de la semana -->
-            <div id="tab-weekday" class="dash-tab-panel report-card">
-                <h2>
-                    Desvío por día de la semana
-                    <span class="info-tip" data-tooltip="Agrupa todas las entregas del período según el día de la semana en que se completaron. Útil para detectar patrones: por ejemplo, si los lunes tienen más demoras por acumulación del fin de semana.">
-                        <span class="material-symbols-outlined" style="font-size:1.1rem;">info</span>
-                    </span>
-                </h2>
-                <% if (byDayOfWeek.length === 0) { %>
-                    <div class="report-empty-state"><span class="material-symbols-outlined">calendar_month</span><p>Sin datos en el período seleccionado.</p></div>
-                <% } else { %>
-                <div style="position:relative;height:240px;margin-bottom:1.5rem;">
-                    <canvas id="weekday-chart"></canvas>
-                </div>
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Día</th>
-                            <th class="text-right">
-                                Entregas
-                                <span class="info-tip" data-tooltip="Cantidad de entregas completadas en ese día de la semana dentro del período.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                Delta prom.
-                                <span class="info-tip" data-tooltip="Desvío promedio (real − estimado) para las entregas de ese día. Verde ≤ 0.2d, amarillo ≤ 0.8d, rojo > 0.8d.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                OTIF
-                                <span class="info-tip" data-tooltip="% de entregas completadas ese día de la semana que cumplieron la fecha prometida.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% byDayOfWeek.forEach(d => { %>
-                        <%
-                            const delta = d.avg_delta || 0;
-                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
-                        %>
-                        <tr>
-                            <td><strong><%= d.day_label %></strong></td>
-                            <td class="text-right"><%= d.total %></td>
-                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
-                            <td class="text-right"><%= d.otif_pct || 0 %>%</td>
-                        </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
+                <% const zoneTabTotal = zonePvr.reduce((s, z) => s + z.total, 0); %>
+                <p class="dash-hint" style="margin-top:.75rem;">Se muestran <%= zoneTabTotal %> de <%= kpis.total %> envíos analizados.<% if (kpis.total - zoneTabTotal > 0) { %> <%= kpis.total - zoneTabTotal %> no tienen zona asignada y no aparecen.<% } %></p>
                 <% } %>
             </div>
 
             <!-- Evolución semanal -->
-            <div id="tab-evolution" class="dash-tab-panel report-card">
+            <div class="dash-section-divider"><span class="dash-section-divider__label">Evolución semanal</span></div>
+            <div class="report-card">
                 <h2>
                     Evolución semanal de eficiencia
-                    <span class="info-tip" data-tooltip="Muestra cómo cambió el delta y el OTIF semana a semana dentro del período seleccionado. Permite detectar tendencias de mejora o deterioro.">
+                    <span class="info-tip" data-tooltip="Muestra cómo evolucionó el desvío promedio (delta) semana a semana. Las barras indican el volumen de entregas; semanas con pocas entregas (gris) tienen menor confiabilidad estadística.">
                         <span class="material-symbols-outlined" style="font-size:1.1rem;">info</span>
                     </span>
                 </h2>
@@ -457,51 +497,22 @@
                 <table class="report-table">
                     <thead>
                         <tr>
-                            <th>
-                                Semana
-                                <span class="info-tip" data-tooltip="Fecha de inicio de la semana (lunes). Cada fila agrupa todas las entregas confirmadas en esa semana.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                Entregas
-                                <span class="info-tip" data-tooltip="Cantidad de entregas completadas en esa semana.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                Delta prom.
-                                <span class="info-tip" data-tooltip="Desvío promedio (real − estimado) de esa semana. Verde ≤ 0.2d, amarillo ≤ 0.8d, rojo > 0.8d.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
-                            <th class="text-right">
-                                OTIF
-                                <span class="info-tip" data-tooltip="% de entregas de esa semana realizadas en o antes de la fecha prometida.">
-                                    <span class="material-symbols-outlined" style="font-size:.9rem;">info</span>
-                                </span>
-                            </th>
+                            <th>Semana <span class="info-tip" data-tooltip="Fecha de inicio de la semana (lunes). Cada fila agrupa todas las entregas confirmadas en esa semana."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span></th>
+                            <th class="text-right">Entregas <span class="info-tip" data-tooltip="Cantidad de entregas completadas en esa semana."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span></th>
+                            <th class="text-right">Delta prom. <span class="info-tip" data-tooltip="Desvío promedio (real − estimado) de esa semana. Verde = dentro del objetivo, rojo = demora significativa."><span class="material-symbols-outlined" style="font-size:.9rem;">info</span></span></th>
                         </tr>
                     </thead>
                     <tbody>
                         <% weeklyEvolution.forEach(w => { %>
                         <%
-                            const delta = w.avg_delta || 0;
-                            const dClass = delta <= 0.2 ? 'ot-badge--green' : delta <= 0.8 ? 'ot-badge--amber' : 'ot-badge--red';
+                            const wDelta    = w.avg_delta !== null ? w.avg_delta : null;
+                            const wDClass   = wDelta === null ? '' : wDelta <= 0.3 ? 'ot-badge--green' : wDelta <= 1 ? 'ot-badge--amber' : 'ot-badge--red';
+                            const lowSample = w.total < 3;
                         %>
                         <tr>
-                            <td><%= w.week_start %></td>
+                            <td><%= fmtDate(w.week_start) %><% if (lowSample) { %><span class="ot-badge" style="background:rgba(148,163,184,.15);color:var(--rp-muted);font-size:.65rem;margin-left:.4rem">muestra baja</span><% } %></td>
                             <td class="text-right"><%= w.total %></td>
-                            <td class="text-right"><span class="ot-badge <%= dClass %>"><%= delta > 0 ? '+' : '' %><%= delta %>d</span></td>
-                            <td class="text-right">
-                                <div class="dp-pct-cell">
-                                    <div class="dp-pct-bar-track">
-                                        <div class="dp-pct-bar-fill <%= (w.otif_pct||0) >= 85 ? 'fill--green' : (w.otif_pct||0) >= 70 ? 'fill--amber' : 'fill--red' %>"
-                                             style="width:<%= w.otif_pct || 0 %>%"></div>
-                                    </div>
-                                    <span class="dp-pct-label"><%= w.otif_pct || 0 %>%</span>
-                                </div>
-                            </td>
+                            <td class="text-right"><% if (wDelta !== null) { %><span class="ot-badge <%= wDClass %>"><%= wDelta > 0 ? '+' : '' %><%= wDelta %>d</span><% } else { %><span style="color:var(--rp-muted)">—</span><% } %></td>
                         </tr>
                         <% }) %>
                     </tbody>
@@ -518,128 +529,62 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <script>
         (function () {
-            const isDark = document.documentElement.dataset.theme === 'dark' || document.body.classList.contains('dark');
+            const isDark    = document.documentElement.dataset.theme === 'dark' || document.body.classList.contains('dark');
             const textColor = isDark ? '#94a3b8' : '#64748b';
             const gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
-
-            // ── Gráfico: delta por día de la semana ──
-            const weekdayCanvas = document.getElementById('weekday-chart');
-            if (weekdayCanvas) {
-                const raw = <%- JSON.stringify(byDayOfWeek) %>;
-                new Chart(weekdayCanvas, {
-                    data: {
-                        labels: raw.map(r => r.day_label),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: 'Delta prom. (días)',
-                                data: raw.map(r => r.avg_delta || 0),
-                                backgroundColor: raw.map(r => {
-                                    const d = r.avg_delta || 0;
-                                    return d <= 0.2 ? 'rgba(34,197,94,.55)' : d <= 0.8 ? 'rgba(251,146,60,.55)' : 'rgba(239,68,68,.55)';
-                                }),
-                                borderColor: raw.map(r => {
-                                    const d = r.avg_delta || 0;
-                                    return d <= 0.2 ? 'rgba(34,197,94,.9)' : d <= 0.8 ? 'rgba(251,146,60,.9)' : 'rgba(239,68,68,.9)';
-                                }),
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                yAxisID: 'yDelta',
-                                order: 2,
-                            },
-                            {
-                                type: 'line',
-                                label: 'OTIF %',
-                                data: raw.map(r => r.otif_pct || 0),
-                                borderColor: 'rgba(99,102,241,.9)',
-                                backgroundColor: 'transparent',
-                                borderWidth: 2,
-                                pointRadius: 4,
-                                tension: 0.3,
-                                yAxisID: 'yPct',
-                                order: 1,
-                            },
-                        ],
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { mode: 'index', intersect: false },
-                        plugins: {
-                            legend: { position: 'top', labels: { color: textColor, font: { size: 12 }, padding: 16 } },
-                            tooltip: {
-                                callbacks: {
-                                    label: ctx => ctx.dataset.yAxisID === 'yDelta'
-                                        ? ` Delta: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y}d`
-                                        : ` OTIF: ${ctx.parsed.y}%`,
-                                },
-                            },
-                        },
-                        scales: {
-                            x: { ticks: { color: textColor }, grid: { color: gridColor } },
-                            yDelta: {
-                                type: 'linear', position: 'left',
-                                ticks: { color: textColor, callback: v => v + 'd' },
-                                grid: { color: gridColor },
-                                title: { display: true, text: 'Desvío (días)', color: textColor, font: { size: 11 } },
-                            },
-                            yPct: {
-                                type: 'linear', position: 'right',
-                                min: 0, max: 100,
-                                ticks: { color: textColor, callback: v => v + '%' },
-                                grid: { display: false },
-                                title: { display: true, text: 'OTIF %', color: textColor, font: { size: 11 } },
-                            },
-                        },
-                    },
-                });
-            }
 
             // ── Gráfico: evolución semanal ──
             const evolutionCanvas = document.getElementById('evolution-chart');
             if (evolutionCanvas) {
                 const raw = <%- JSON.stringify(weeklyEvolution) %>;
+                const fmtWeek = str => {
+                    if (!str) return str;
+                    const p = String(str).slice(0,10).split('-');
+                    return p[2] + '/' + p[1];
+                };
                 new Chart(evolutionCanvas, {
                     data: {
-                        labels: raw.map(r => r.week_start),
+                        labels: raw.map(r => fmtWeek(r.week_start)),
                         datasets: [
                             {
                                 type: 'bar',
                                 label: 'Entregas',
                                 data: raw.map(r => r.total),
-                                backgroundColor: 'rgba(99,102,241,.25)',
-                                borderColor: 'rgba(99,102,241,.6)',
+                                backgroundColor: raw.map(r => r.total < 3 ? 'rgba(148,163,184,.18)' : 'rgba(99,102,241,.2)'),
+                                borderColor:     raw.map(r => r.total < 3 ? 'rgba(148,163,184,.35)' : 'rgba(99,102,241,.5)'),
                                 borderWidth: 1,
-                                borderRadius: 4,
+                                borderRadius: 6,
+                                maxBarThickness: 48,
                                 yAxisID: 'yVol',
                                 order: 2,
                             },
                             {
                                 type: 'line',
-                                label: 'OTIF %',
-                                data: raw.map(r => r.otif_pct || 0),
-                                borderColor: 'rgba(34,197,94,.9)',
-                                backgroundColor: 'rgba(34,197,94,.1)',
+                                label: 'Delta prom. (días)',
+                                data: raw.map(r => r.avg_delta !== null ? r.avg_delta : null),
+                                borderColor: 'rgba(239,68,68,.85)',
+                                backgroundColor: 'rgba(239,68,68,.06)',
                                 borderWidth: 2,
-                                pointRadius: 4,
-                                tension: 0.3,
-                                fill: false,
-                                yAxisID: 'yPct',
-                                order: 1,
-                            },
-                            {
-                                type: 'line',
-                                label: 'Delta prom.',
-                                data: raw.map(r => r.avg_delta || 0),
-                                borderColor: 'rgba(251,146,60,.9)',
-                                backgroundColor: 'transparent',
-                                borderWidth: 2,
-                                borderDash: [5, 4],
-                                pointRadius: 3,
+                                pointRadius:          raw.map(r => r.total < 3 ? 4 : 5),
+                                pointBackgroundColor: raw.map(r => r.total < 3 ? 'rgba(148,163,184,.6)' : 'rgba(239,68,68,.85)'),
+                                pointBorderColor:     raw.map(r => r.total < 3 ? 'rgba(148,163,184,.6)' : 'rgba(239,68,68,.85)'),
                                 tension: 0.3,
                                 fill: false,
                                 yAxisID: 'yDelta',
                                 order: 1,
+                                spanGaps: false,
+                            },
+                            {
+                                type: 'line',
+                                label: 'Objetivo delta (0d)',
+                                data: raw.map(() => 0),
+                                borderColor: 'rgba(34,197,94,.35)',
+                                backgroundColor: 'transparent',
+                                borderWidth: 1.5,
+                                borderDash: [5, 4],
+                                pointRadius: 0,
+                                yAxisID: 'yDelta',
+                                order: 3,
                             },
                         ],
                     },
@@ -648,13 +593,22 @@
                         maintainAspectRatio: false,
                         interaction: { mode: 'index', intersect: false },
                         plugins: {
-                            legend: { position: 'top', labels: { color: textColor, font: { size: 12 }, padding: 16 } },
+                            legend: {
+                                position: 'top',
+                                labels: { color: textColor, font: { size: 12 }, padding: 16,
+                                    filter: item => item.text !== 'Objetivo delta (0d)' },
+                            },
                             tooltip: {
                                 callbacks: {
+                                    title: ctx => {
+                                        const d = raw[ctx[0].dataIndex];
+                                        return `Semana del ${fmtWeek(d.week_start)}${d.total < 3 ? ' — muestra baja' : ''}`;
+                                    },
                                     label: ctx => {
-                                        if (ctx.dataset.yAxisID === 'yVol') return ` Entregas: ${ctx.parsed.y}`;
-                                        if (ctx.dataset.yAxisID === 'yDelta') return ` Delta: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y}d`;
-                                        return ` OTIF: ${ctx.parsed.y}%`;
+                                        if (ctx.dataset.label === 'Objetivo delta (0d)') return '';
+                                        if (ctx.dataset.label === 'Entregas') return ` Entregas: ${ctx.parsed.y}`;
+                                        const v = ctx.parsed.y;
+                                        return ` Delta: ${v !== null ? (v > 0 ? '+' : '') + v + 'd' : '—'}`;
                                     },
                                 },
                             },
@@ -663,22 +617,16 @@
                             x: { ticks: { color: textColor, maxRotation: 45 }, grid: { color: gridColor } },
                             yVol: {
                                 type: 'linear', position: 'left',
+                                min: 0,
                                 ticks: { color: textColor, stepSize: 1 },
                                 grid: { color: gridColor },
                                 title: { display: true, text: 'Entregas', color: textColor, font: { size: 11 } },
                             },
-                            yPct: {
-                                type: 'linear', position: 'right',
-                                min: 0, max: 100,
-                                ticks: { color: textColor, callback: v => v + '%' },
-                                grid: { display: false },
-                                title: { display: true, text: 'OTIF %', color: textColor, font: { size: 11 } },
-                            },
                             yDelta: {
                                 type: 'linear', position: 'right',
-                                ticks: { color: textColor, callback: v => v + 'd' },
+                                ticks: { color: textColor, callback: v => (v > 0 ? '+' : '') + v + 'd' },
                                 grid: { display: false },
-                                display: false,
+                                title: { display: true, text: 'Delta (días)', color: textColor, font: { size: 11 } },
                             },
                         },
                     },
@@ -700,58 +648,30 @@
             }
         });
 
-        function switchTab(btn, panelId) {
-            document.querySelectorAll('.dash-tab').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.dash-tab-panel').forEach(p => p.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(panelId).classList.add('active');
+        function makeSortable(tableId, tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            let lastCol = null, asc = true;
+            document.querySelectorAll('#' + tableId + ' th.sortable').forEach(th => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', () => {
+                    const col = th.dataset.col;
+                    if (lastCol === col) { asc = !asc; } else { asc = col.includes('name'); }
+                    lastCol = col;
+                    document.querySelectorAll('#' + tableId + ' .sort-icon').forEach(i => i.textContent = '↕');
+                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        const va = a.dataset[col], vb = b.dataset[col];
+                        const cmp = col.includes('name') ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
+                        return asc ? cmp : -cmp;
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
         }
 
-        (function makeSortable(tableId, tbodyId) {
-            const tbody = document.getElementById(tbodyId);
-            if (!tbody) return;
-            let lastCol = null, asc = true;
-            document.querySelectorAll('#' + tableId + ' th.sortable').forEach(th => {
-                th.style.cursor = 'pointer';
-                th.addEventListener('click', () => {
-                    const col = th.dataset.col;
-                    if (lastCol === col) { asc = !asc; } else { asc = col.includes('name'); }
-                    lastCol = col;
-                    document.querySelectorAll('#' + tableId + ' .sort-icon').forEach(i => i.textContent = '↕');
-                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    rows.sort((a, b) => {
-                        const va = a.dataset[col], vb = b.dataset[col];
-                        const cmp = col.includes('name') ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
-                        return asc ? cmp : -cmp;
-                    });
-                    rows.forEach(r => tbody.appendChild(r));
-                });
-            });
-        })('adm-zone-table', 'adm-zone-tbody');
-
-        (function makeSortable(tableId, tbodyId) {
-            const tbody = document.getElementById(tbodyId);
-            if (!tbody) return;
-            let lastCol = null, asc = true;
-            document.querySelectorAll('#' + tableId + ' th.sortable').forEach(th => {
-                th.style.cursor = 'pointer';
-                th.addEventListener('click', () => {
-                    const col = th.dataset.col;
-                    if (lastCol === col) { asc = !asc; } else { asc = col.includes('name'); }
-                    lastCol = col;
-                    document.querySelectorAll('#' + tableId + ' .sort-icon').forEach(i => i.textContent = '↕');
-                    th.querySelector('.sort-icon').textContent = asc ? '↑' : '↓';
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    rows.sort((a, b) => {
-                        const va = a.dataset[col], vb = b.dataset[col];
-                        const cmp = col.includes('name') ? va.localeCompare(vb,'es') : Number(va) - Number(vb);
-                        return asc ? cmp : -cmp;
-                    });
-                    rows.forEach(r => tbody.appendChild(r));
-                });
-            });
-        })('adm-driver-table', 'adm-driver-tbody');
+        makeSortable('adm-zone-table', 'adm-zone-tbody');
     </script>
 </body>
 </html>

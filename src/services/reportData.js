@@ -530,7 +530,7 @@ const buildPvrBaseCte = (branchFilter = '') => `
         ORDER BY "shipmentId", "changedAt" ASC
     ),
     latest_pred AS (
-        SELECT DISTINCT ON ("shipmentId") "shipmentId", "predictedDays", "actualDays", "wasDelayed", "delayProbability"
+        SELECT DISTINCT ON ("shipmentId") "shipmentId", "predictedDays", "delayProbability"
         FROM logitrack."shipmentPrediction"
         WHERE "actualDays" IS NOT NULL
         ORDER BY "shipmentId", "createdAt" DESC
@@ -546,11 +546,13 @@ const buildPvrBaseCte = (branchFilter = '') => `
             s."transportId"     AS transport_id,
             t.name              AS transport_name,
             t.plate             AS transport_plate,
+            s."expectedDeliveryDate" AS expected_delivery_date,
             lp."predictedDays"  AS predicted_days,
-            lp."actualDays"     AS actual_days,
-            lp."wasDelayed"     AS was_delayed,
+            -- actual_days: cast a numeric antes de ROUND porque EXTRACT devuelve double precision
+            GREATEST(1, ROUND((EXTRACT(EPOCH FROM (de.delivered_at - s."createdAt")) / 86400.0)::numeric, 1))::float AS actual_days,
+            (GREATEST(1, ROUND((EXTRACT(EPOCH FROM (de.delivered_at - s."createdAt")) / 86400.0)::numeric, 1)) > lp."predictedDays") AS was_delayed,
             lp."delayProbability" AS delay_probability,
-            (lp."actualDays" - lp."predictedDays") AS delta,
+            (GREATEST(1, ROUND((EXTRACT(EPOCH FROM (de.delivered_at - s."createdAt")) / 86400.0)::numeric, 1)) - lp."predictedDays") AS delta,
             de.delivered_at,
             EXTRACT(DOW FROM de.delivered_at) AS day_of_week
         FROM logitrack.shipment s
@@ -613,7 +615,7 @@ const getDashboardOperacionesData = async (query = {}, branchId = null, deps = {
            AND s."expectedDeliveryDate" IS NOT NULL
            AND s."expectedDeliveryDate" < CURRENT_DATE
            AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
-         ORDER BY days_overdue DESC LIMIT 25`,
+         ORDER BY days_overdue DESC LIMIT 50`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 
@@ -680,7 +682,7 @@ const getDashboardOperacionesData = async (query = {}, branchId = null, deps = {
               AND s."zoneId" IS NOT NULL GROUP BY s."zoneId"
          ),
          zf AS (
-            SELECT s."zoneId", COUNT(DISTINCT h.id) AS fails
+            SELECT s."zoneId", COUNT(DISTINCT h."shipmentId") AS fails
             FROM logitrack.shipment_history h
             JOIN logitrack.shipment s ON s.id = h."shipmentId"
             WHERE h."toStatusId" = 9
@@ -718,14 +720,16 @@ const getDashboardOperacionesData = async (query = {}, branchId = null, deps = {
     );
     viewModel.kpis.delayed_count = delayedCount?.cnt || 0;
 
-    // OTIF basado en historial, anclado a createdAt — coherente con total/delivered/in_transit
+    // OTIF basado en historial — filtra por sucursal del repartidor (branchCond2) para no excluir
+    // entregas ya completadas donde currentBranchId puede ser NULL o incorrecto.
     const [otifKpi] = await deps.sequelize.query(
         `SELECT COUNT(DISTINCT s.id)::int AS delivered,
                 COUNT(DISTINCT CASE WHEN h."changedAt"::date <= s."expectedDeliveryDate" THEN s.id END)::int AS on_time
          FROM logitrack.shipment s
          JOIN logitrack.shipment_history h ON h."shipmentId" = s.id AND h."toStatusId" = 4
+         LEFT JOIN logitrack.user u ON u.id = s."deliveryUserId"
          WHERE s."createdAt"::date >= :from AND s."createdAt"::date <= :to
-           AND s."expectedDeliveryDate" IS NOT NULL ${branchCond}`,
+           AND s."expectedDeliveryDate" IS NOT NULL ${branchCond2}`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
     viewModel.kpis.otif_pct = otifKpi?.delivered > 0
@@ -735,14 +739,14 @@ const getDashboardOperacionesData = async (query = {}, branchId = null, deps = {
     viewModel.kpis.otif_delivered = otifKpi?.delivered || 0;
 
     viewModel.delayedTrend = await deps.sequelize.query(
-        `SELECT TO_CHAR(DATE_TRUNC('week', s."createdAt"::date), 'YYYY-MM-DD') AS week_start,
+        `SELECT TO_CHAR(DATE_TRUNC('week', s."expectedDeliveryDate"), 'YYYY-MM-DD') AS week_start,
                 COUNT(*)::int AS delayed
          FROM logitrack.shipment s
          WHERE s."statusId" IN (2, 6, 7)
            AND s."expectedDeliveryDate" IS NOT NULL
            AND s."expectedDeliveryDate" < CURRENT_DATE
            AND s."createdAt"::date >= :from AND s."createdAt"::date <= :to ${branchCond}
-         GROUP BY DATE_TRUNC('week', s."createdAt"::date)
+         GROUP BY DATE_TRUNC('week', s."expectedDeliveryDate")
          ORDER BY week_start`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
@@ -757,8 +761,10 @@ const getDashboardDesempenoData = async (query = {}, deps = { sequelize, QueryTy
 
     const viewModel = {
         dateFrom, dateTo, error: null, hasQuery,
-        kpis: { total: 0, otif_pct: null, avg_delta: null, avg_predicted: null, avg_actual: null },
-        zonePvr: [], driverPvr: [], transportPvr: [], branchPvr: [], byDayOfWeek: [], weeklyEvolution: [],
+        kpis: { total: 0, otif_pct: null, otif_base: 0, otif_on_time: 0, avg_delta: null, avg_predicted: null, avg_actual: null },
+        zonePvr: [], driverPvr: [], weeklyEvolution: [],
+        cycleTime: null,
+        patterns: null,
         exportQuery: buildExportQuery({ from: dateFrom, to: dateTo }),
     };
 
@@ -775,113 +781,142 @@ const getDashboardDesempenoData = async (query = {}, deps = { sequelize, QueryTy
         `${pvrCte}
          SELECT COUNT(*)::int AS total,
                 ROUND(AVG(predicted_days),1)::float AS avg_predicted,
-                ROUND(AVG(actual_days),1)::float    AS avg_actual,
-                ROUND(AVG(delta),1)::float           AS avg_delta
+                ROUND(AVG(actual_days)::numeric,1)::float    AS avg_actual,
+                ROUND(AVG(delta)::numeric,1)::float           AS avg_delta,
+                COUNT(CASE WHEN expected_delivery_date IS NOT NULL THEN 1 END)::int AS otif_base,
+                COUNT(CASE WHEN delivered_at::date <= expected_delivery_date THEN 1 END)::int AS otif_on_time,
+                ROUND(COUNT(CASE WHEN delivered_at::date <= expected_delivery_date THEN 1 END)*100.0
+                      / NULLIF(COUNT(CASE WHEN expected_delivery_date IS NOT NULL THEN 1 END),0),1)::float AS otif_pct
          FROM pvr`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
     if (kpi) { viewModel.kpis = { ...viewModel.kpis, ...kpi }; }
 
-    // OTIF basado en historial real (misma definición que el dashboard comparativo)
-    const [otifKpi] = await deps.sequelize.query(
-        `SELECT COUNT(DISTINCT s.id)::int AS delivered,
-                COUNT(DISTINCT CASE WHEN h."changedAt"::date <= s."expectedDeliveryDate" THEN s.id END)::int AS on_time
+    // Ciclo del envío: tiempo de preparación (creación→tránsito) vs tránsito (tránsito→entrega)
+    const [cycleRow] = await deps.sequelize.query(
+        `WITH primera_entrega AS (
+             SELECT DISTINCT ON ("shipmentId") "shipmentId", "changedAt" AS delivered_at
+             FROM logitrack.shipment_history WHERE "toStatusId" = 4
+             ORDER BY "shipmentId", "changedAt" ASC
+         ),
+         primer_transito AS (
+             SELECT DISTINCT ON ("shipmentId") "shipmentId", "changedAt" AS transit_at
+             FROM logitrack.shipment_history WHERE "toStatusId" = 2
+             ORDER BY "shipmentId", "changedAt" ASC
+         ),
+         latest_pred AS (
+             SELECT DISTINCT ON ("shipmentId") "shipmentId", "predictedDays"
+             FROM logitrack."shipmentPrediction"
+             WHERE "actualDays" IS NOT NULL
+             ORDER BY "shipmentId", "createdAt" DESC
+         )
+         SELECT COUNT(*)::int AS total,
+                ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (pt.transit_at   - s."createdAt"))   / 86400.0))::numeric, 1)::float AS avg_prep_days,
+                ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (pe.delivered_at - pt.transit_at))   / 86400.0))::numeric, 1)::float AS avg_transit_days,
+                ROUND(AVG(GREATEST(0, EXTRACT(EPOCH FROM (pe.delivered_at - s."createdAt"))   / 86400.0))::numeric, 1)::float AS avg_total_days,
+                ROUND(AVG(lp."predictedDays")::numeric, 1)::float AS avg_predicted_days
          FROM logitrack.shipment s
-         JOIN logitrack.shipment_history h ON h."shipmentId" = s.id AND h."toStatusId" = 4
-         WHERE h."changedAt"::date >= :from AND h."changedAt"::date <= :to
-           AND s."expectedDeliveryDate" IS NOT NULL`,
+         JOIN latest_pred lp    ON lp."shipmentId"  = s.id
+         JOIN primera_entrega pe ON pe."shipmentId" = s.id
+         JOIN primer_transito  pt ON pt."shipmentId" = s.id
+         WHERE pe.delivered_at::date >= :from AND pe.delivered_at::date <= :to
+           AND pt.transit_at <= pe.delivered_at`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
-    viewModel.kpis.otif_pct = otifKpi?.delivered > 0
-        ? Math.round(otifKpi.on_time / otifKpi.delivered * 1000) / 10
-        : null;
+    viewModel.cycleTime = (cycleRow && cycleRow.total > 0) ? cycleRow : null;
 
-    // Por zona
+    // Por destino (zona) — incluye conductores distintos con demora para detectar patrones estructurales
     viewModel.zonePvr = await deps.sequelize.query(
         `${pvrCte}
          SELECT zone_id, zone_name,
                 COUNT(*)::int AS total,
+                COUNT(CASE WHEN was_delayed IS TRUE THEN 1 END)::int AS total_delayed,
+                ROUND(COUNT(CASE WHEN was_delayed IS TRUE THEN 1 END)*100.0/NULLIF(COUNT(*),0),0)::int AS delay_rate,
+                COUNT(DISTINCT CASE WHEN was_delayed IS TRUE THEN driver_id END)::int AS distinct_drivers_delayed,
                 ROUND(AVG(predicted_days),1)::float AS avg_predicted,
-                ROUND(AVG(actual_days),1)::float    AS avg_actual,
-                ROUND(AVG(delta),1)::float           AS avg_delta,
-                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+                ROUND(AVG(actual_days)::numeric,1)::float    AS avg_actual,
+                ROUND(AVG(delta)::numeric,1)::float           AS avg_delta,
+                ROUND(COUNT(CASE WHEN delivered_at::date <= expected_delivery_date THEN 1 END)*100.0
+                      /NULLIF(COUNT(CASE WHEN expected_delivery_date IS NOT NULL THEN 1 END),0),1)::float AS otif_pct
          FROM pvr WHERE zone_id IS NOT NULL
-         GROUP BY zone_id, zone_name ORDER BY avg_delta DESC NULLS LAST`,
+         GROUP BY zone_id, zone_name ORDER BY delay_rate DESC NULLS LAST, total DESC`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 
-    // Desvío por repartidor (viaje completo) — top 15
+    // Por repartidor (viaje completo — último driver asignado)
     viewModel.driverPvr = await deps.sequelize.query(
         `${pvrCte}
          SELECT driver_id, driver_name,
                 COUNT(*)::int AS total,
+                COUNT(CASE WHEN was_delayed IS TRUE THEN 1 END)::int AS total_delayed,
+                ROUND(COUNT(CASE WHEN was_delayed IS TRUE THEN 1 END)*100.0/NULLIF(COUNT(*),0),0)::int AS delay_rate,
                 ROUND(AVG(predicted_days),1)::float AS avg_predicted,
-                ROUND(AVG(actual_days),1)::float    AS avg_actual,
-                ROUND(AVG(delta),1)::float           AS avg_delta,
-                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+                ROUND(AVG(actual_days)::numeric,1)::float    AS avg_actual,
+                ROUND(AVG(delta)::numeric,1)::float           AS avg_delta,
+                ROUND(COUNT(CASE WHEN delivered_at::date <= expected_delivery_date THEN 1 END)*100.0
+                      /NULLIF(COUNT(CASE WHEN expected_delivery_date IS NOT NULL THEN 1 END),0),1)::float AS otif_pct
          FROM pvr WHERE driver_id IS NOT NULL
-         GROUP BY driver_id, driver_name ORDER BY avg_delta DESC NULLS LAST LIMIT 15`,
+         GROUP BY driver_id, driver_name ORDER BY delay_rate DESC NULLS LAST, total DESC`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
 
-    // Por camioneta
-    viewModel.transportPvr = await deps.sequelize.query(
+    // Zona más demorada por repartidor — query separado para evitar CTEs anidados
+    const driverZoneRows = await deps.sequelize.query(
         `${pvrCte}
-         SELECT transport_id, transport_name, transport_plate,
-                COUNT(*)::int AS total,
-                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
-                ROUND(AVG(actual_days),1)::float    AS avg_actual,
-                ROUND(AVG(delta),1)::float           AS avg_delta,
-                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
-         FROM pvr WHERE transport_id IS NOT NULL
-         GROUP BY transport_id, transport_name, transport_plate ORDER BY avg_delta DESC NULLS LAST`,
-        { type: deps.QueryTypes.SELECT, replacements }
-    );
-
-    // Por día de la semana (0=Dom..6=Sáb)
-    const DAY_LABELS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const byDay = await deps.sequelize.query(
-        `${pvrCte}
-         SELECT day_of_week::int AS dow,
-                COUNT(*)::int AS total,
-                ROUND(AVG(delta),1)::float AS avg_delta,
-                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+         SELECT driver_id, zone_id, zone_name, COUNT(*)::int AS cnt
          FROM pvr
-         GROUP BY day_of_week ORDER BY day_of_week`,
+         WHERE was_delayed IS TRUE AND zone_id IS NOT NULL
+         GROUP BY driver_id, zone_id, zone_name
+         ORDER BY driver_id, cnt DESC`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
-    viewModel.byDayOfWeek = byDay.map(r => ({ ...r, day_label: DAY_LABELS[r.dow] || `Día ${r.dow}` }));
 
-    // Por sucursal (derivada del repartidor asignado)
-    viewModel.branchPvr = await deps.sequelize.query(
-        `${pvrCte}
-         SELECT b.id AS branch_id, b.name AS branch_name,
-                COUNT(*)::int AS total,
-                ROUND(AVG(predicted_days),1)::float AS avg_predicted,
-                ROUND(AVG(actual_days),1)::float    AS avg_actual,
-                ROUND(AVG(delta),1)::float           AS avg_delta,
-                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
-         FROM pvr
-         JOIN logitrack.user u ON u.id = driver_id
-         JOIN logitrack.branch b ON b.id = u."branchId"
-         WHERE driver_id IS NOT NULL
-         GROUP BY b.id, b.name ORDER BY avg_delta DESC NULLS LAST`,
-        { type: deps.QueryTypes.SELECT, replacements }
-    );
+    // Mapa zone_id → estadísticas (construido a partir de zonePvr ya calculado)
+    const zoneStatsMap = {};
+    for (const z of viewModel.zonePvr) {
+        if (z.zone_id != null) {
+            zoneStatsMap[z.zone_id] = { delay_rate: z.delay_rate, distinct_drivers: z.distinct_drivers_delayed || 0 };
+        }
+    }
+    // Mapa driver_id → zona principal demorada (primera aparición = mayor cnt por el ORDER BY)
+    const driverTopZone = {};
+    for (const row of driverZoneRows) {
+        if (!driverTopZone[row.driver_id]) { driverTopZone[row.driver_id] = row; }
+    }
+    // Enriquecer driverPvr con contexto de zona
+    viewModel.driverPvr = viewModel.driverPvr.map((d) => {
+        const topZone = driverTopZone[d.driver_id];
+        const stats   = topZone ? (zoneStatsMap[topZone.zone_id] || null) : null;
+        return {
+            ...d,
+            main_delayed_zone:         topZone ? topZone.zone_name : null,
+            main_zone_delay_rate:      stats   ? stats.delay_rate  : null,
+            main_zone_distinct_drivers: stats  ? stats.distinct_drivers : 0,
+        };
+    });
 
     // Evolución semanal
     viewModel.weeklyEvolution = await deps.sequelize.query(
         `${pvrCte}
          SELECT TO_CHAR(delivered_at, 'IYYY-IW') AS week_key,
-                MIN(delivered_at)::date            AS week_start,
+                DATE_TRUNC('week', MIN(delivered_at))::date AS week_start,
                 COUNT(*)::int AS total,
-                ROUND(AVG(delta),1)::float AS avg_delta,
-                ROUND(COUNT(CASE WHEN NOT was_delayed THEN 1 END)*100.0/NULLIF(COUNT(*),0),1)::float AS otif_pct
+                ROUND(AVG(delta)::numeric,1)::float AS avg_delta,
+                ROUND(COUNT(CASE WHEN delivered_at::date <= expected_delivery_date THEN 1 END)*100.0/NULLIF(COUNT(CASE WHEN expected_delivery_date IS NOT NULL THEN 1 END),0),1)::float AS otif_pct
          FROM pvr
          GROUP BY TO_CHAR(delivered_at, 'IYYY-IW')
          ORDER BY week_key`,
         { type: deps.QueryTypes.SELECT, replacements }
     );
+
+    // Patrones detectados — sintetizados a partir de los datos ya calculados
+    const structuralZones = viewModel.zonePvr
+        .filter(z => z.delay_rate >= 40 && (z.distinct_drivers_delayed || 0) >= 3 && z.total >= 3)
+        .slice(0, 3);
+    const prepDominant = Boolean(
+        viewModel.cycleTime && viewModel.cycleTime.avg_prep_days > viewModel.cycleTime.avg_transit_days
+    );
+    viewModel.patterns = { structuralZones, prepDominant };
 
     return viewModel;
 };
