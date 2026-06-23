@@ -72,6 +72,11 @@ const CATALOG = [
     { token: 'ventanaCantidad',      label: 'Cantidad de bloqueos', group: 'Control de fatiga', description: 'Bloqueos por fatiga en la ventana de patrón recurrente.',  resolve: s => (notNil(s._ventanaCantidad) ? String(s._ventanaCantidad) : '') },
     { token: 'ventanaDias',          label: 'Ventana (días)',       group: 'Control de fatiga', description: 'Cantidad de días de la ventana de patrón recurrente.',     resolve: s => (notNil(s._ventanaDias) ? String(s._ventanaDias) : '') },
     { token: 'panelUrl',             label: 'Enlace al panel',      group: 'Control de fatiga', description: '🔗 Link al panel de Ojo de Patrón (/fatigue).',            resolve: s => s._panelUrl || `${baseUrl()}/fatigue` },
+    // Pago de factura — aplican al evento INVOICE_PAYMENT_LINK (se resuelven al emitir la factura).
+    { token: 'invoiceNumber',        label: 'N° de factura',        group: 'Pago de factura', description: 'Número de la factura a pagar.',                            resolve: s => s._invoiceNumber || '' },
+    { token: 'totalAmount',          label: 'Total a pagar',        group: 'Pago de factura', description: 'Importe total con IVA, ya formateado (ej. $ 12.100,00).',   resolve: s => s._totalAmount || '' },
+    { token: 'empresaNombre',        label: 'Nombre de la empresa', group: 'Pago de factura', description: 'Nombre de la empresa (LogiTrack o el configurado).',       resolve: s => s._empresaNombre || 'LogiTrack' },
+    { token: 'payUrl',               label: 'Enlace de pago',       group: 'Pago de factura', description: '🔗 Link al checkout de pago simulado (estilo Mercado Pago).', resolve: s => s._payUrl || `${baseUrl()}/pago/demo` },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
@@ -120,6 +125,10 @@ const sampleShipment = () => ({
     _daysDelayed: '3',
     _incidentId: '1024',
     _incidentEstado: 'En revisión',
+    _invoiceNumber: 'A-0001-00001234',
+    _totalAmount: '$ 12.100,00',
+    _empresaNombre: 'LogiTrack',
+    _payUrl: baseUrl() + '/pago/demo-token',
     recipient: { fullName: 'Juan Pérez', email: 'juan@ejemplo.com', phone: '11-5555-0000', document: 30111222 },
     sender:    { fullName: 'Tienda Online SA' },
     status:    { description: 'En Sucursal' },

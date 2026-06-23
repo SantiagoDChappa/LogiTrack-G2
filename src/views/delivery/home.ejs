@@ -258,14 +258,17 @@
             </div>
             <% } %>
 
-            <% if (driverDisabled && activeSummary) { %>
-                <%# Inhabilitado por fatiga: card en rojo, sin link, click abre popup. %>
+            <% const _startBlocked = (typeof startBlocked !== 'undefined') ? startBlocked : null; %>
+            <% const _blocked = driverDisabled || _startBlocked; %>
+            <% if (_blocked && activeSummary) { %>
+                <%# Bloqueado por fatiga (inhabilitado por consentimiento o no pasó la prueba
+                    de inicio): card en rojo, sin link, click abre popup explicativo. %>
                 <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"
-                     aria-label="Estás inhabilitado. Tocá para ver el detalle.">
+                     aria-label="No habilitado por fatiga. Tocá para ver el detalle.">
                     <div>
                         <div class="badge-status">
                             <span class="dot"></span>
-                            INHABILITADO
+                            <%= driverDisabled ? 'INHABILITADO' : 'NO HABILITADO' %>
                         </div>
                         <h2>Ruta #<%= activeSummary.id %></h2>
                         <div class="sub">
@@ -528,18 +531,25 @@
         (function () {
             const hero = document.getElementById('disabled-hero');
             if (!hero) { return; }
-            <% const _reasonTxt = driverDisabled && driverDisabled.reason === 'CONSENT_REJECTED'
-                ? 'Rechazaste el consentimiento del control de fatiga las veces permitidas.'
-                : (driverDisabled && driverDisabled.reason === 'TEST_NOT_DONE'
-                    ? 'No completaste la prueba del control de fatiga.'
-                    : 'Quedaste inhabilitado por el control de fatiga.'); %>
+            <%
+            let _title = 'Estás inhabilitado';
+            let _reasonTxt = 'Quedaste inhabilitado por el control de fatiga.';
+            let _tail = '<p><b>No podés iniciar ni continuar rutas</b> hasta que tu Supervisor te restablezca.</p><p class="swal-muted" style="font-size:.88rem;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>';
+            if (driverDisabled) {
+                if (driverDisabled.reason === 'CONSENT_REJECTED') { _reasonTxt = 'Rechazaste el consentimiento del control de fatiga las veces permitidas.'; }
+                else if (driverDisabled.reason === 'TEST_NOT_DONE') { _reasonTxt = 'No completaste la prueba del control de fatiga.'; }
+            } else if (_startBlocked) {
+                _title = 'No habilitado por fatiga';
+                _reasonTxt = 'No pasaste el control de fatiga de inicio (prueba de reacción o de voz).';
+                _tail = '<p><b>No podés iniciar esta ruta.</b> Tu Supervisor fue notificado y debe revisarlo.</p><p class="swal-muted" style="font-size:.88rem;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>';
+            }
+            %>
             const showDisabledPopup = () => {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Estás inhabilitado',
+                    title: '<%= _title %>',
                     html: `<p><%= _reasonTxt %></p>
-                           <p><b>No podés iniciar ni continuar rutas</b> hasta que tu Supervisor te restablezca.</p>
-                           <p style="font-size:.88rem;color:#64748b;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>`,
+                           <%- _tail %>`,
                     confirmButtonText: 'Entendido',
                     confirmButtonColor: '#dc2626',
                 });

@@ -6,7 +6,7 @@
     <span>Podés activar la verificación en dos pasos (2FA) para tener más seguridad.</span>
     <a href="/account/2fa/setup" style="background:#fff;color:#1d4ed8;text-decoration:none;border-radius:6px;padding:.2rem .7rem;font-weight:700">Activar</a>
     <button type="button" aria-label="Cerrar aviso"
-            onclick="document.cookie='tfaNudge=off; path=/; samesite=lax'; var n=document.getElementById('tfa-nudge'); if(n){ n.remove(); }"
+            onclick="document.cookie='tfaNudge=off; path=/; samesite=lax'; var n=document.getElementById('tfa-nudge'); if(n){ n.remove(); } var m=document.querySelector('.main-content'); if(m){ m.style.paddingTop=''; }"
             style="background:transparent;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;padding:.1rem">
         <span class="material-symbols-outlined">close</span>
     </button>
@@ -175,4 +175,26 @@
         if (m && !m.id) { m.id = 'main-content'; }
         if (m && !m.hasAttribute('tabindex')) { m.setAttribute('tabindex', '-1'); }
     });
+
+    // Aviso 2FA: es un banner en flujo normal pero el .top-header es position:fixed y lo
+    // tapaba. Lo posicionamos como barra fija JUSTO debajo del header (midiendo su alto y
+    // offset reales para que funcione en desktop y mobile) y empujamos el contenido.
+    (function () {
+        var nudge = document.getElementById('tfa-nudge');
+        if (!nudge) { return; }
+        function place() {
+            var hdr = document.querySelector('.top-header');
+            var top = hdr ? Math.round(hdr.getBoundingClientRect().height) : 0;
+            nudge.style.position = 'fixed';
+            nudge.style.top = top + 'px';
+            nudge.style.left = hdr ? getComputedStyle(hdr).left : '0px';
+            nudge.style.right = '0';
+            nudge.style.zIndex = '49';
+            var main = document.querySelector('.main-content');
+            if (main) { main.style.paddingTop = (top + Math.round(nudge.getBoundingClientRect().height)) + 'px'; }
+        }
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', place); }
+        else { place(); }
+        window.addEventListener('resize', place);
+    })();
 </script>

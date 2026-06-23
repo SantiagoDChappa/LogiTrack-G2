@@ -588,6 +588,12 @@
                             <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el destino cae en una zona marcada como peligrosa (y llegable). Se valida por coordenadas/CP del destino. 0 = sin recargo. Las zonas se marcan en el mapa de Zonas.</small>
                         </div>
 
+                        <div class="field">
+                            <label for="dias_retencion_sucursal">Retención en sucursal (días hábiles) <span class="req">*</span></label>
+                            <input type="number" id="dias_retencion_sucursal" name="dias_retencion_sucursal" min="1" max="90" step="1" value="<%= params.dias_retencion_sucursal %>" required>
+                            <small style="color:var(--color-text-secondary)">Días hábiles que el paquete queda disponible para retiro en la sucursal antes de volver al circuito de devolución. Se usa para estimar la ventana de retiro en el alta de envío.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
@@ -845,6 +851,36 @@
                 <p style="color:var(--color-text-secondary)">
                     La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
                     mientras tanto se usa el texto por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Mail de pago de factura (link de pago simulado) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">payments</span>
+                    Mail de pago de factura
+                </h2>
+                <p class="settings-subtitle">
+                    Mail que recibe el remitente con el link de pago simulado al generarse la factura del envío.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar).
+                    Placeholders: <code>{{empresaNombre}}</code> <code>{{invoiceNumber}}</code> <code>{{senderName}}</code>
+                    <code>{{trackingCode}}</code> <code>{{totalAmount}}</code> <code>{{payUrl}}</code>.
+                </p>
+                <% if (templatesByEvent['INVOICE_PAYMENT_LINK']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla del mail de pago</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="INVOICE_PAYMENT_LINK"
+                        data-description="Mail de pago de factura (link de pago simulado)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>086</code> y <code>087</code> para poder editarla;
+                    mientras tanto se usa el HTML por defecto del sistema.
                 </p>
                 <% } %>
             </div>

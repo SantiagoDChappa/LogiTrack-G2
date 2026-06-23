@@ -280,23 +280,25 @@ const getDetail = async (req, res) => {
 };
 
 const getNewShipmentForm = async (req, res) => {
-    const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
+    const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
         provinceModel.getAll(),
         typeShipmentModel.getAll(),
         branchModel.getPickupEnabled(),
         settingModel.get('seguro_pct'),
+        settingModel.get('dias_retencion_sucursal'),
     ]);
-    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches, seguroPct: parseFloat(seguroPct) || 0 });
+    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches, seguroPct: parseFloat(seguroPct) || 0, retentionDays: parseInt(retentionDays) || 10 });
 };
 
 const createShipment = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
             settingModel.get('seguro_pct'),
+            settingModel.get('dias_retencion_sucursal'),
         ]);
         return res.render('shipment/new', {
             errors: errors.array().map(e => e.msg),
@@ -304,7 +306,8 @@ const createShipment = async (req, res) => {
             provinces,
             typesShipment,
             pickupBranches,
-            seguroPct: parseFloat(seguroPct) || 0
+            seguroPct: parseFloat(seguroPct) || 0,
+            retentionDays: parseInt(retentionDays) || 10
         });
     }
 
@@ -550,11 +553,12 @@ const createShipment = async (req, res) => {
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
-        const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
             settingModel.get('seguro_pct'),
+            settingModel.get('dias_retencion_sucursal'),
         ]);
         res.render('shipment/new', {
             errors: [err.message],
@@ -562,7 +566,8 @@ const createShipment = async (req, res) => {
             provinces,
             typesShipment,
             pickupBranches,
-            seguroPct: parseFloat(seguroPct) || 0
+            seguroPct: parseFloat(seguroPct) || 0,
+            retentionDays: parseInt(retentionDays) || 10
         });
     }
 };

@@ -1772,6 +1772,11 @@
 .addr-validation-box--invalid { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
 [data-theme="dark"] .addr-validation-box--valid   { background:#064e3b; color:#6ee7b7; border-color:#065f46; }
 [data-theme="dark"] .addr-validation-box--invalid { background:#450a0a; color:#fca5a5; border-color:#991b1b; }
+/* Zona peligrosa (llegable, recargo) y no llegable (bloqueada). */
+.addr-validation-box--warning { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+.addr-validation-box--danger  { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+[data-theme="dark"] .addr-validation-box--warning { background:#451a03; color:#fcd34d; border-color:#92400e; }
+[data-theme="dark"] .addr-validation-box--danger  { background:#450a0a; color:#fca5a5; border-color:#991b1b; }
 
 /* ── Predicción ML ──────────────────────────────────────────── */
 .pred-card {

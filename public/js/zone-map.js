@@ -30,6 +30,7 @@
     var cpIndex = {};              // código postal -> localidad (para mostrar nombres, no solo números)
     var dangerLayer = null;        // capa de áreas peligrosas / no llegables (overlay rojo)
     var pendingDraw = null;        // polígono recién dibujado, a la espera de guardarse
+    var drawing = false;           // true mientras se dibuja una zona (no rutear clicks al mapa de zonas)
 
     function norm(s) {
         return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -244,6 +245,7 @@
                 renderProvincePanel(null, false);
             },
             click: function () {
+                if (drawing) { return; }   // dibujando una zona: no fijar provincia ni mover el mapa
                 pinned = true;
                 deptPinned = false;        // entrar a otra provincia descarta el partido fijado
                 pinnedDeptLayer = null;
@@ -286,6 +288,7 @@
                 }
             },
             click: function () {
+                if (drawing) { return; }   // dibujando una zona: no fijar partido ni mover el mapa
                 // Fija el partido: su info queda en el panel aunque saques el cursor.
                 if (pinnedDeptLayer && deptLayer) { deptLayer.resetStyle(pinnedDeptLayer); }
                 deptPinned = true;
@@ -322,7 +325,9 @@
             return f.properties && f.properties.provincia && f.properties.provincia.id === provGeoId;
         });
         deptLayer = L.geoJSON({ type: 'FeatureCollection', features: feats },
-            { style: deptStyle, onEachFeature: onEachDept }).addTo(map);
+            // pmIgnore: el editor de Geoman no debe tocar el choropleth de partidos,
+            // solo las áreas peligrosas dibujadas.
+            { style: deptStyle, onEachFeature: onEachDept, pmIgnore: true }).addTo(map);
     }
 
     function loadDepartamentos(provGeoId) {
@@ -355,7 +360,7 @@
             summary = res[0];
             var geo = res[1];
             (summary.provinces || []).forEach(function (p) { if (p.provinceKey) { byKey[p.provinceKey] = p; } });
-            provLayer = L.geoJSON(geo, { style: provStyle, onEachFeature: onEachProvince }).addTo(map);
+            provLayer = L.geoJSON(geo, { style: provStyle, onEachFeature: onEachProvince, pmIgnore: true }).addTo(map);
             renderLegend();
             renderProvincePanel(null, false);
         }).catch(function () {
@@ -395,6 +400,14 @@
                     style: function (f) { return dangerStyle(f.properties); },
                     onEachFeature: function (f, layer) {
                         layer.bindTooltip(dangerTooltip(f.properties), { sticky: true });
+                        // Editar la delimitación: al mover/agregar vértices con Geoman,
+                        // persistimos la nueva geometría en el área correspondiente.
+                        layer.on('pm:update', function (e) {
+                            var gj = e.layer.toGeoJSON();
+                            updateDangerGeom(f.properties.id, gj.geometry, e.layer);
+                        });
+                        // Borrar el área desde el mapa (modo eliminar de Geoman).
+                        layer.on('pm:remove', function () { deleteDangerArea(f.properties.id); });
                     },
                 }).addTo(map);
             })
@@ -409,10 +422,17 @@
             position: 'topright',
             drawMarker: false, drawPolyline: false, drawCircle: false, drawCircleMarker: false,
             drawText: false, drawRectangle: true, drawPolygon: true,
-            editMode: false, dragMode: false, cutPolygon: false, rotateMode: false, removalMode: false,
+            // editMode/removalMode: reformar o borrar áreas peligrosas ya cargadas.
+            // El choropleth de provincias/partidos queda excluido vía pmIgnore.
+            editMode: true, dragMode: false, cutPolygon: false, rotateMode: false, removalMode: true,
         });
         map.pm.setLang('es');
+        // Mientras se dibuja, no dejamos que el click llegue a la capa de zonas
+        // (evita que se fije provincia/partido y el mapa haga zoom en cada vértice).
+        map.on('pm:drawstart', function () { drawing = true; });
+        map.on('pm:drawend', function () { drawing = false; });
         map.on('pm:create', function (e) {
+            drawing = false;
             pendingDraw = e.layer;
             var gj = e.layer.toGeoJSON();
             openDangerForm(gj.geometry);
@@ -472,6 +492,38 @@
               loadDangerAreas();          // y lo re-dibuja desde el server con su estilo
           })
           .catch(function (e2) { err.textContent = e2.message || 'No se pudo guardar.'; err.hidden = false; btn.disabled = false; });
+    }
+
+    // Persiste la delimitación editada de un área. Si falla, recarga el overlay
+    // desde el server para que el mapa no quede mostrando una forma no guardada.
+    function updateDangerGeom(id, geom, layer) {
+        if (!id) { return; }
+        fetch(DANGER_API + '/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ geom: geom }),
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (res) {
+              if (!res.ok || !res.j.ok) { throw new Error(res.j && res.j.error || 'Error'); }
+          })
+          .catch(function () {
+              showError('No se pudo guardar la nueva delimitación. Recargando áreas…');
+              loadDangerAreas();
+          });
+    }
+
+    // Borra el área tras quitarla con la herramienta de eliminación de Geoman.
+    function deleteDangerArea(id) {
+        if (!id) { return; }
+        fetch(DANGER_API + '/' + id, { method: 'DELETE' })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok || !res.j.ok) { throw new Error('Error'); }
+            })
+            .catch(function () {
+                showError('No se pudo eliminar el área. Recargando…');
+                loadDangerAreas();
+            });
     }
 
     function renderLegend() {

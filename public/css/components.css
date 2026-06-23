@@ -378,3 +378,20 @@ button.page-help-btn {
     padding: 0;
     font: inherit;
 }
+
+/* ============================================================
+   Mapas Leaflet — siempre por debajo del header/menú fijos.
+   Los panes y controles de Leaflet usan z-index 400–1000, que sin un
+   contexto de apilado propio compiten en la raíz y se sobreponen al
+   header fijo (z-index 50). Aislamos el contexto para contenerlos.
+   Aplica a TODOS los mapas (dashboard, zonas, etc.).
+   ============================================================ */
+.leaflet-container {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+}
+/* El navegador dibuja un focus-outline rectangular (= bounding-box) sobre el
+   <path> SVG al hacer click en una provincia/partido. Lo sacamos para click/touch
+   pero lo mantenemos para navegación por teclado (focus-visible) por a11y. */
+.leaflet-interactive:focus:not(:focus-visible) { outline: none; }

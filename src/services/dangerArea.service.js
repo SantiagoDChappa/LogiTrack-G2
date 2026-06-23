@@ -74,10 +74,25 @@ const create = async (data) => {
     return row;
 };
 
+// Edición de un área: solo los campos enviados. Sirve para reformar la delimitación
+// (geom) desde el mapa sin tener que borrar y volver a dibujar el área.
+const update = async (id, data = {}) => {
+    const patch = {};
+    if (data.name !== undefined)      { patch.name = String(data.name).trim(); }
+    if (data.reachable !== undefined) { patch.reachable = data.reachable !== false && data.reachable !== 'false'; }
+    if (data.note !== undefined)      { patch.note = data.note || null; }
+    if (data.geom !== undefined)      { patch.geom = data.geom || null; }
+    if (data.scope !== undefined)     { patch.scope = data.scope || 'POLYGON'; }
+    if (data.code !== undefined)      { patch.code = data.code || null; }
+    const [n] = await DangerArea.update(patch, { where: { id } });
+    invalidateCache();
+    return n;
+};
+
 const remove = async (id) => {
     const n = await DangerArea.destroy({ where: { id } });
     invalidateCache();
     return n;
 };
 
-module.exports = { evaluate, getDangerPct, list, create, remove, invalidateCache };
+module.exports = { evaluate, getDangerPct, list, create, update, remove, invalidateCache };

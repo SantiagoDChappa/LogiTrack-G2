@@ -1,9 +1,13 @@
 // [prototype] Mail al remitente con el link de pago simulado de la factura.
-// Autocontenido: arma el HTML acá y lo encola con queueEmail, sin depender de que
-// el toggle de notificaciones configurables esté activo. El link lleva al checkout
-// público /pago/:payToken (estilo Mercado Pago, sin login).
+// Se encola con queueEmail (mismo mailer que el resto). El cuerpo sale de la
+// plantilla editable INVOICE_PAYMENT_LINK (Ajustes → Comunicaciones); si no está
+// cargada, cae al HTML por defecto de acá. Transaccional: siempre se envía, no
+// depende del toggle de notificaciones. El link lleva al checkout público
+// /pago/:payToken (estilo Mercado Pago, sin login).
 const { queueEmail } = require('./notification/notificationEmailService');
-const { baseUrl } = require('./notificationPlaceholders');
+const { baseUrl, render } = require('./notificationPlaceholders');
+const { NotificationEvent } = require('../constants/enums');
+const emailTemplateModel = require('../models/emailTemplate');
 
 const fmt = (n) => Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -46,12 +50,36 @@ const sendPaymentLink = async ({ invoice, shipment, empresa = 'LogiTrack' }) => 
     if (invoice.payStatus === 'PAGADA') { return { ok: false, message: 'Factura ya pagada' }; }
 
     const payUrl = `${baseUrl()}/pago/${invoice.payToken}`;
-    await queueEmail({
-        recipient: to,
-        subject:   `Factura ${invoice.number} · Pagá tu envío ${shipment?.trackingId || ''}`.trim(),
-        body:      buildBody({ invoice, shipment, payUrl, empresa }),
-        format:    'html',
-    });
+    const sender = invoice.senderName || shipment?.sender?.fullName || 'Cliente';
+    const tracking = shipment?.trackingId || '';
+
+    // Variables para la plantilla editable. {{senderName}} y {{trackingCode}} ya
+    // existen en el catálogo; el resto son del grupo "Pago de factura".
+    const vars = {
+        empresaNombre: empresa,
+        invoiceNumber: invoice.number,
+        senderName:    sender,
+        trackingCode:  tracking,
+        totalAmount:   `$ ${fmt(totalConIva(invoice))}`,
+        payUrl,
+    };
+
+    // Plantilla editable; fallback al HTML por defecto si no está cargada.
+    let subject = `Factura ${invoice.number} · Pagá tu envío ${tracking}`.trim();
+    let body = buildBody({ invoice, shipment, payUrl, empresa });
+    let format = 'html';
+    try {
+        const tpl = await emailTemplateModel.getDefaultByEventCode(NotificationEvent.INVOICE_PAYMENT_LINK);
+        if (tpl) {
+            subject = render(tpl.subject, vars) || subject;
+            body    = render(tpl.body, vars)    || body;
+            format  = tpl.format === 'html' ? 'html' : 'text';
+        }
+    } catch (err) {
+        console.warn('[invoicePaymentEmail] plantilla no disponible, uso HTML por defecto:', err.message);
+    }
+
+    await queueEmail({ recipient: to, subject, body, format });
     return { ok: true };
 };
 
