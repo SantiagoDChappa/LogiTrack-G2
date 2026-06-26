@@ -244,6 +244,12 @@
                         </div>
                     </div>
 
+                    <!-- Última Milla: franja horaria de llegada (se rellena por JS si hay ETA). -->
+                    <div id="portal-eta-<%= s.id %>" class="portal-eta-box" style="display:none;margin-top:.75rem;padding:.85rem 1rem;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;">
+                        <span style="font-size:1.25rem;line-height:1;">🛵</span>
+                        <span class="portal-eta-text" style="margin-left:.5rem;font-weight:600;color:#1e3a8a;"></span>
+                    </div>
+
                     <% if (s.mapStops && s.mapStops.length >= 1) { %>
                     <div class="portal-map-section">
                         <span class="portal-history-title">Recorrido</span>
@@ -450,6 +456,28 @@
     (function(){
         const data = <%- JSON.stringify(shipments.map(s => ({ id: s.id, stops: s.mapStops || [], activeRouteId: s.activeRouteId || null }))) %>;
         data.forEach(item => {
+            // Última Milla: box de franja horaria. Vive aunque no haya mapa; se oculta si no
+            // hay ETA (envío sin ruta activa). Se recalcula solo: si el repartidor se atrasa,
+            // el texto cambia a disculpa + nuevo tope.
+            const etaBox = document.getElementById('portal-eta-' + item.id);
+            if (etaBox) {
+                const etaText = etaBox.querySelector('.portal-eta-text');
+                const updateEta = () => {
+                    fetch('/delivery/eta/shipment/' + item.id)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(e => {
+                            if (!e || !e.text) { etaBox.style.display = 'none'; return; }
+                            etaText.textContent = e.text;
+                            etaBox.style.display = 'block';
+                            etaBox.style.background = e.delayed ? '#fef3c7' : '#eff6ff';
+                            etaBox.style.borderColor = e.delayed ? '#fcd34d' : '#bfdbfe';
+                            etaText.style.color = e.delayed ? '#92400e' : '#1e3a8a';
+                        }).catch(() => {});
+                };
+                updateEta();
+                setInterval(updateEta, 20000);
+            }
+
             if (!item.stops.length) return;
             const el = document.getElementById('portal-map-' + item.id);
             if (!el) return;

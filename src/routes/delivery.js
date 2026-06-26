@@ -648,6 +648,14 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
     } catch (e) {
         console.error('start route history/notify err:', e.message);
     }
+    // Última Milla: guarda la "promesa" de ETA por parada (tope contra el que se mide el
+    // atraso) ya con la ruta iniciada. No bloquea la respuesta.
+    try {
+        const etaWindow = require('../services/etaWindow.service');
+        const freshRoute = await routeModel.getById(req.params.id);
+        etaWindow.persistPromisedEtas(freshRoute)
+            .catch(e => console.error('[eta] persistPromisedEtas:', e.message));
+    } catch (e) { console.error('[eta] start:', e.message); }
     res.json({ ok: true });
 });
 
@@ -1172,6 +1180,12 @@ router.post('/heartbeat', requireDelivery, async (req, res) => {
         `INSERT INTO logitrack.driver_position (user_id, route_id, latitude, longitude, speed_kmh) VALUES (:uid, :rid, :lat, :lng, :sp)`,
         { replacements: { uid: res.locals.currentUser.id, rid: routeId || null, lat: Number(latitude), lng: Number(longitude), sp: speedKmh || null } }
     );
+    // Última Milla: con la posición fresca, evalúa si el repartidor ya está a < N min de
+    // la entrega en mano y, si corresponde, avisa al destinatario del envío siguiente.
+    if (routeId) {
+        require('../services/etaWindow.service').maybeNotifyNextDelivery(Number(routeId))
+            .catch(e => console.error('[eta] maybeNotifyNextDelivery:', e.message));
+    }
     res.json({ ok: true });
 });
 
@@ -1179,15 +1193,29 @@ router.post('/heartbeat', requireDelivery, async (req, res) => {
 router.get('/position/route/:routeId', async (req, res) => {
     const sequelize = require('../database/connection');
     const { QueryTypes } = require('sequelize');
+    // driver_position.route_id lo puebla el heartbeat (route.ejs manda routeId). El JOIN
+    // previo a transport usaba r."transportId" (camelCase) — columna inexistente en el
+    // esquema snake_case → siempre tiraba y el camión nunca aparecía en el portal.
     const rows = await sequelize.query(
-        `SELECT dp.latitude::float lat, dp.longitude::float lng, dp.speed_kmh::float speed, dp.recorded_at AS at
-           FROM logitrack.driver_position dp
-           JOIN logitrack.route r ON r."transportId" IN (SELECT id FROM logitrack.transport WHERE driver_user_id=dp.user_id)
-          WHERE r.id=:rid
-          ORDER BY dp.recorded_at DESC LIMIT 1`,
+        `SELECT latitude::float lat, longitude::float lng, speed_kmh::float speed, recorded_at AS at
+           FROM logitrack.driver_position
+          WHERE route_id = :rid
+          ORDER BY recorded_at DESC LIMIT 1`,
         { replacements: { rid: Number(req.params.routeId) }, type: QueryTypes.SELECT }
     );
     res.json(rows[0] || null);
+});
+
+// Última Milla: franja horaria de llegada de un envío (público, para el box del portal).
+// Devuelve null si el envío no está en una ruta activa con ETA calculable.
+router.get('/eta/shipment/:shipmentId', async (req, res) => {
+    try {
+        const eta = await require('../services/etaWindow.service').etaForShipment(req.params.shipmentId);
+        res.json(eta || null);
+    } catch (e) {
+        console.error('[eta] endpoint:', e.message);
+        res.json(null);
+    }
 });
 
 // Reprogramar fallidos: marca como en sucursal el dia siguiente para nuevo ruteo
