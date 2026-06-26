@@ -159,7 +159,7 @@
     .btn-back:hover, .btn-menu:hover { transform: scale(1.05); }
     .btn-back .material-symbols-outlined, .btn-menu .material-symbols-outlined { font-size: 22px; }
 
-    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic {
+    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic, .btn-voice {
         background: var(--glass-bg);
         backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--glass-brdr);
@@ -169,10 +169,35 @@
         color: var(--lt-blue); transition: transform .15s ease;
         font-family: inherit;
     }
-    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover { transform: scale(1.05); }
+    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover, .btn-voice:hover { transform: scale(1.05); }
     .btn-gmaps    { color: var(--lt-green); }
     .btn-pause    { color: var(--lt-amber); }
     .btn-incident { color: var(--lt-purple); }
+
+    /* === Copiloto de voz (CV-01) === */
+    .btn-voice { color: var(--lt-blue); position: relative; }
+    .btn-voice.listening {
+        background: linear-gradient(135deg,#2563eb,#3b82f6); color: #fff;
+        border-color: rgba(255,255,255,.3);
+        animation: voice-pulse 1.3s infinite;
+    }
+    .btn-voice.processing { background: linear-gradient(135deg,#7c3aed,#a855f7); color: #fff; }
+    .btn-voice.speaking   { background: linear-gradient(135deg,#0ea5e9,#22d3ee); color: #fff; }
+    .btn-voice.unavailable { opacity: .55; }
+    @keyframes voice-pulse {
+        0%,100% { box-shadow: 0 8px 24px rgba(37,99,235,.45); }
+        50%     { box-shadow: 0 8px 30px rgba(37,99,235,.85); }
+    }
+    .btn-voice .material-symbols-outlined { font-size: 22px; }
+    #voice-bubble {
+        position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+        max-width: min(86vw, 420px); z-index: 10001;
+        background: #0e1730; color: #fff; padding: 12px 16px; border-radius: 12px;
+        font-family: Inter, system-ui, sans-serif; font-size: .92rem; line-height: 1.35;
+        box-shadow: 0 10px 30px rgba(0,0,0,.35); text-align: center;
+    }
+    #voice-bubble[data-kind="error"] { background: #7f1d1d; }
+    #voice-bubble[data-kind="state"] { background: #1e293b; font-weight: 600; }
     .btn-panic    {
         background: linear-gradient(135deg,#dc2626,#ef4444); color: #fff;
         border-color: rgba(255,255,255,.3);
@@ -589,6 +614,9 @@
                     <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)" aria-label="Pausar ruta (almuerzo / combustible)">
                         <span class="material-symbols-outlined">pause_circle</span>
                     </button>
+                    <button class="btn-voice"    id="btn-voice"    title="Copiloto de voz: tocá para hablar" aria-label="Copiloto de voz: tocá para hablar" aria-pressed="false">
+                        <span class="material-symbols-outlined">mic</span>
+                    </button>
                 <% } %>
                 <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">
                     <span class="material-symbols-outlined">map</span>
@@ -796,8 +824,24 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/voice-copilot.js" defer></script>
     <%# [prototype] Offline del repartidor: globals para el script (cargado desde head.ejs) %>
-    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>;</script>
+    <%
+        // Copiloto de voz (CV-01): próxima parada pendiente para responder "¿cuál es mi próxima entrega?".
+        const _pendNext = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipment)
+            .sort((a, b) => a.sequence - b.sequence);
+        const _altNext = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && !s.completed && s.shipment)
+            .sort((a, b) => a.sequence - b.sequence);
+        const _ns = _pendNext[0] || _altNext[0] || null;
+        const _nsData = _ns ? {
+            street:    (_ns.shipment.address && _ns.shipment.address.street)  || null,
+            number:    (_ns.shipment.address && _ns.shipment.address.number)  || null,
+            recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
+        } : null;
+    %>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- JSON.stringify(_nsData) %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {
