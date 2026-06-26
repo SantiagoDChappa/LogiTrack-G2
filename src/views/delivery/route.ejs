@@ -32,8 +32,8 @@
         --row-bg-cur:   rgba(255,255,255,.95);
         --row-bg-locked:rgba(241,245,249,.5);
         --row-bg-skip:  rgba(254, 243, 199, .35);
-        --shadow-md:    0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
-        --shadow-sheet: 0 -12px 40px rgba(15, 23, 42, .12), 0 -2px 6px rgba(15, 23, 42, .04);
+        --shadow-md:    0 2px 8px rgba(15, 23, 42, .06);
+        --shadow-sheet: 0 -8px 28px rgba(15, 23, 42, .08);
         --tile-filter:  saturate(.85) brightness(1.02);
         --lock-chip-bg: rgba(15,23,42,.04);
     }
@@ -264,10 +264,8 @@
     }
     .stop-row.is-current {
         background: var(--row-bg-cur);
-        border: 1.5px solid rgba(37, 99, 235, .45);
-        box-shadow:
-            0 0 0 4px rgba(37, 99, 235, .12),
-            0 8px 24px rgba(37, 99, 235, .18);
+        border: 1px solid rgba(37, 99, 235, .35);
+        box-shadow: 0 2px 10px rgba(37, 99, 235, .12);
         padding: 1.1rem;
     }
 
@@ -292,15 +290,14 @@
         width: 32px; height: 32px; border-radius: 10px;
         font-weight: 700; font-size: .88rem;
         color: #fff; flex-shrink: 0;
-        box-shadow: 0 2px 6px rgba(15,23,42,.12);
     }
-    .stop-bubble.pending  { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
-    .stop-bubble.current  { background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%); }
-    .stop-bubble.delivered{ background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); }
-    .stop-bubble.failed   { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); }
-    .stop-bubble.pickup   { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
-    .stop-bubble.locked   { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); }
-    .stop-bubble.skipped  { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
+    .stop-bubble.pending  { background: #64748b; }
+    .stop-bubble.current  { background: var(--lt-blue); }
+    .stop-bubble.delivered{ background: #16a34a; }
+    .stop-bubble.failed   { background: #dc2626; }
+    .stop-bubble.pickup   { background: #f59e0b; }
+    .stop-bubble.locked   { background: #94a3b8; }
+    .stop-bubble.skipped  { background: #f59e0b; }
 
     .stop-title-wrap { flex: 1; min-width: 0; }
     .stop-tracking {
@@ -343,9 +340,8 @@
         text-transform: uppercase; letter-spacing: .06em;
     }
     .status-badge.amber {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        background: #fef3c7;
         color: #92400e;
-        box-shadow: 0 1px 3px rgba(245, 158, 11, .25);
     }
     html[data-theme="dark"] .status-badge.amber {
         background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(245,158,11,.12));
@@ -356,8 +352,6 @@
     .status-badge.amber::before {
         content: ''; width: 6px; height: 6px; border-radius: 50%;
         background: var(--lt-amber);
-        box-shadow: 0 0 0 2px rgba(245, 158, 11, .25);
-        animation: pulse-dot 1.6s infinite;
     }
     .status-badge.green { background: #dcfce7; color: #166534; }
     .status-badge.gray  { background: #f1f5f9; color: #475569; }
@@ -425,16 +419,16 @@
     .btn-skip-ui, .btn-skip-ui:hover, .btn-skip-ui:focus, .btn-skip-ui:visited { color: #b45309 !important; }
     html[data-theme="dark"] .btn-skip-ui, html[data-theme="dark"] .btn-skip-ui:hover, html[data-theme="dark"] .btn-skip-ui:focus, html[data-theme="dark"] .btn-skip-ui:visited { color: #fcd34d !important; }
     .btn-cta {
-        background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+        background: var(--lt-blue);
         color: #fff; border-color: transparent;
-        box-shadow: 0 4px 14px rgba(37, 99, 235, .35), inset 0 1px 0 rgba(255,255,255,.2);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, .22);
         font-weight: 700;
     }
-    .btn-cta:hover { box-shadow: 0 6px 20px rgba(37,99,235,.45); }
+    .btn-cta:hover { box-shadow: 0 3px 12px rgba(37,99,235,.3); }
     .btn-pickup-cta {
-        background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        background: #f59e0b;
         color: #fff; border-color: transparent;
-        box-shadow: 0 4px 14px rgba(245, 158, 11, .35), inset 0 1px 0 rgba(255,255,255,.2);
+        box-shadow: 0 2px 8px rgba(245, 158, 11, .22);
         font-weight: 700;
     }
     .btn-failed-ui {
@@ -456,11 +450,11 @@
         border-color: rgba(96,165,250,.22);
     }
     .btn-finish-route {
-        background: linear-gradient(135deg, var(--lt-green), #22c55e);
+        background: var(--lt-green);
         color: #fff; border: none; font-weight: 700;
         padding: .85rem 1rem; width: 100%; margin-top: 1rem;
         border-radius: 14px; cursor: pointer;
-        box-shadow: 0 6px 18px rgba(22,163,74,.4);
+        box-shadow: 0 2px 8px rgba(22,163,74,.22);
         font-family: inherit; font-size: 1rem;
         display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     }
@@ -477,12 +471,12 @@
     /* Pause banner */
     .pause-banner {
         position: absolute; top: 70px; left: 12px; right: 12px; z-index: 720;
-        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        background: #f59e0b;
         color: #78350f;
         padding: 12px 16px; border-radius: 14px;
         display: flex; align-items: center; gap: 12px;
         font-weight: 700;
-        box-shadow: 0 8px 24px rgba(245,158,11,.4);
+        box-shadow: 0 3px 12px rgba(245,158,11,.28);
     }
     .pause-banner .material-symbols-outlined { font-size: 22px; }
     .pause-banner button {
@@ -546,10 +540,10 @@
         .stop-row.is-current .secondary-row .btn-ui { flex: 1; min-height: 46px; font-size: .9rem; padding: .65rem; }
         .fab-current {
             position: fixed; right: 16px; bottom: 16px; z-index: 800;
-            background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+            background: var(--lt-blue);
             color: #fff;
             border-radius: 999px; padding: .9rem 1.1rem;
-            box-shadow: 0 8px 24px rgba(37,99,235,.45);
+            box-shadow: 0 3px 12px rgba(37,99,235,.3);
             display: flex; align-items: center; gap: .4rem;
             font-weight: 700; font-size: .9rem; border: none;
             cursor: pointer; font-family: inherit;
