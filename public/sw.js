@@ -6,10 +6,10 @@
  */
 importScripts('/js/offline-db.js');
 
-const CACHE = 'lt-delivery-v1';
+const CACHE = 'lt-delivery-v2';
 const SHELL = [
     '/css/style.css', '/css/components.css', '/css/shipments.css', '/css/delivery.css',
-    '/js/theme.js', '/js/ui.js', '/js/offline-db.js', '/js/delivery-offline.js',
+    '/js/theme.js', '/js/ui.js', '/js/offline-db.js', '/js/delivery-offline.js', '/js/voice-copilot.js',
     '/images/logo_app.png', '/manifest.webmanifest',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
