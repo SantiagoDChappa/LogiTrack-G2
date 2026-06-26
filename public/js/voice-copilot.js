@@ -47,15 +47,17 @@
             .replace(/\s+/g, ' ')
             .trim();
     }
-    // Lectura entendible de direcciones/abreviaturas (CA4).
+    // Lectura entendible de direcciones/abreviaturas (CA4). La negative-lookahead evita
+    // "comerse" palabras completas (ej.: "Avenida" no se transforma) y consume el punto
+    // de la abreviatura para que no quede una pausa rara ("Av. Rivadavia" → "Avenida Rivadavia").
     function speakable(s) {
         return String(s || '')
-            .replace(/\bAv\.?\b/gi, 'Avenida')
-            .replace(/\bAvda\.?\b/gi, 'Avenida')
-            .replace(/\bCalle\b/gi, 'Calle')
-            .replace(/\bdpto\.?\b/gi, 'departamento')
-            .replace(/\bPje\.?\b/gi, 'Pasaje')
-            .replace(/\bGral\.?\b/gi, 'General');
+            .replace(/\bav(?:da)?\.?(?![a-záéíóúñ])/gi, 'Avenida')
+            .replace(/\bpje\.?(?![a-záéíóúñ])/gi, 'Pasaje')
+            .replace(/\bgral\.?(?![a-záéíóúñ])/gi, 'General')
+            .replace(/\bdpto\.?(?![a-záéíóúñ])/gi, 'departamento')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
     }
 
     // ── Registro de comandos ────────────────────────────────────────────────────
@@ -70,17 +72,28 @@
             + 'reportar zona insegura; o entrega fallida. También “ayuda” para repetir esta lista.' }),
     });
 
-    // CV-02 (versión base; CV-02 endurece los casos límite). Lee la próxima parada real.
+    // CV-02 — Consultar la próxima entrega.
+    // Lee LT_NEXT_STOP (la próxima parada, embebida al renderizar → funciona sin señal, CA3).
+    // No tiene applies(): se puede consultar también en pausa (CA5).
     register({
         id: 'next', label: 'Próxima entrega',
-        keywords: ['proxima entrega', 'siguiente entrega', 'proxima parada', 'cual es mi proxima', 'siguiente parada', 'a donde voy'],
+        keywords: ['proxima entrega', 'siguiente entrega', 'proxima parada', 'cual es mi proxima',
+            'mi proxima entrega', 'siguiente parada', 'a donde voy', 'que sigue'],
         run: () => {
             const n = window.LT_NEXT_STOP;
-            if (!n) { return { speak: 'No te quedan entregas pendientes.' }; }
+            if (!n) { return { speak: 'No te quedan entregas pendientes.' }; }              // CA2
             const dir = [n.street, n.number].filter(Boolean).join(' ').trim();
-            const who = n.recipient ? `, para ${n.recipient}` : '';
-            if (!dir) { return { speak: `Tu próxima entrega no tiene dirección cargada${who}.` }; }
-            return { speak: `Tu próxima entrega es en ${speakable(dir)}${who}.` };
+            // CA4: datos faltantes → responder igual, aclarando lo que falta.
+            if (!dir && !n.recipient) {
+                return { speak: 'Tu próxima entrega no tiene dirección ni destinatario cargados.' };
+            }
+            if (!dir) {
+                return { speak: `Tu próxima entrega es para ${n.recipient}, pero no tiene dirección cargada.` };
+            }
+            if (!n.recipient) {
+                return { speak: `Tu próxima entrega es en ${speakable(dir)}. No figura el destinatario.` };
+            }
+            return { speak: `Tu próxima entrega es en ${speakable(dir)}, para ${n.recipient}.` };  // CA1
         },
     });
 
