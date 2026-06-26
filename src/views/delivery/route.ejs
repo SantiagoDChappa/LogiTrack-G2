@@ -1127,6 +1127,9 @@
             () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
         );
         const sendHb = (pos) => {
+            // Modo prueba (?sim=1): mientras está activo, el GPS real no pisa la posición
+            // simulada (el panel de prueba es la única fuente de heartbeats).
+            if (window.__simActive) { return; }
             updateDriverDot(pos.coords.latitude, pos.coords.longitude);
             fetch('/delivery/heartbeat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2544,6 +2547,86 @@
         });
         poll();
         setInterval(poll, 5000);
+    })();
+
+    // ===================== Modo prueba — simular viaje (?sim=1) ===================
+    // Inyecta posiciones GPS falsas (heartbeats) para probar avisos/ETA/mapa sin manejar.
+    // El GPS real se pausa mientras está activo (window.__simActive). Sólo aparece con ?sim=1.
+    (function initSimPanel() {
+        if (new URLSearchParams(location.search).get('sim') !== '1') { return; }
+
+        const pendingDeliveries = () => (stops || [])
+            .filter(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipmentId && Number.isFinite(s.lat) && Number.isFinite(s.lng))
+            .sort((a, b) => a.sequence - b.sequence);
+
+        // Punto a N cuadras (≈100 m c/u) al norte de una parada.
+        const offsetFrom = (stop, cuadras) => ({
+            lat: stop.lat + (cuadras * 100) / 111000,
+            lng: stop.lng,
+        });
+
+        let lastSim = null;
+        const sendSim = (lat, lng) => {
+            lastSim = { lat, lng };
+            if (typeof updateDriverDot === 'function') { updateDriverDot(lat, lng); }
+            fetch('/delivery/heartbeat', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ latitude: lat, longitude: lng, speedKmh: 15, routeId }),
+            }).catch(() => {});
+        };
+
+        const panel = document.createElement('div');
+        panel.style.cssText = 'position:fixed;bottom:18px;left:18px;z-index:1300;width:min(300px,92vw);background:#0f172a;color:#e2e8f0;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.4);font-family:Inter,sans-serif;overflow:hidden;';
+        panel.innerHTML =
+            '<div style="background:#7c3aed;padding:.55rem .9rem;font-weight:700;display:flex;justify-content:space-between;align-items:center;">🧪 Modo prueba<span class="sim-min" style="cursor:pointer;opacity:.8;">—</span></div>' +
+            '<div class="sim-body" style="padding:.7rem .9rem;display:flex;flex-direction:column;gap:.55rem;font-size:.85rem;">' +
+              '<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;"><input type="checkbox" class="sim-toggle"> Simular ubicación (pausa GPS real)</label>' +
+              '<div style="display:flex;align-items:center;gap:.5rem;">A <input type="number" class="sim-cuadras" value="5" min="0" max="50" style="width:64px;padding:.3rem .4rem;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;"> cuadras del próximo</div>' +
+              '<button class="sim-near" style="padding:.5rem;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">📍 Acercarme al próximo destino</button>' +
+              '<button class="sim-door" style="padding:.5rem;border:0;border-radius:8px;background:#16a34a;color:#fff;font-weight:600;cursor:pointer;">🚪 Estoy en la puerta (0 cuadras)</button>' +
+              '<div class="sim-status" style="font-size:.78rem;opacity:.85;line-height:1.3;"></div>' +
+            '</div>';
+        document.body.appendChild(panel);
+
+        const toggle = panel.querySelector('.sim-toggle');
+        const cuadrasEl = panel.querySelector('.sim-cuadras');
+        const statusEl = panel.querySelector('.sim-status');
+        const body = panel.querySelector('.sim-body');
+        panel.querySelector('.sim-min').addEventListener('click', () => {
+            body.style.display = body.style.display === 'none' ? 'flex' : 'none';
+        });
+
+        const setStatus = (msg) => { statusEl.textContent = msg; };
+        const targetInfo = () => {
+            const pend = pendingDeliveries();
+            if (!pend.length) { return null; }
+            return { current: pend[0], next: pend[1] || null };
+        };
+
+        toggle.addEventListener('change', () => {
+            window.__simActive = toggle.checked;
+            setStatus(toggle.checked
+                ? 'Simulación ON: el GPS real está pausado. Usá los botones.'
+                : 'Simulación OFF: vuelve el GPS real.');
+        });
+
+        const jump = (cuadras) => {
+            const info = targetInfo();
+            if (!info) { setStatus('No hay entregas pendientes para simular.'); return; }
+            if (!window.__simActive) { toggle.checked = true; window.__simActive = true; }
+            const p = offsetFrom(info.current, cuadras);
+            sendSim(p.lat, p.lng);
+            const nextTxt = info.next ? ('Debería avisarle al siguiente (' + (info.next.label || ('#' + info.next.shipmentId)) + ').') : 'Es la última entrega: no hay "siguiente" a avisar.';
+            setStatus('A ' + cuadras + ' cuadras de ' + (info.current.label || ('#' + info.current.shipmentId)) + '. ' + nextTxt);
+        };
+
+        panel.querySelector('.sim-near').addEventListener('click', () => jump(parseInt(cuadrasEl.value, 10) || 5));
+        panel.querySelector('.sim-door').addEventListener('click', () => jump(0));
+
+        // Mantiene viva la posición simulada (sigue siendo la "última") cada 12s.
+        setInterval(() => { if (window.__simActive && lastSim) { sendSim(lastSim.lat, lastSim.lng); } }, 12000);
+
+        setStatus('Listo. Tildá "Simular" y tocá un botón.');
     })();
 
     // === POD: navega a la página de evidencia (sirve online y offline) ==============
