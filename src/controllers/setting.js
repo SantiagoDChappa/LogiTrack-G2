@@ -121,6 +121,11 @@ const getSettings = async (req, res) => {
             clock_24h:                         settings.clock_24h !== '0',
             // Toggle de Resend como respaldo (default ON). '0' = solo SendGrid.
             email_resend_enabled:              settings.email_resend_enabled !== '0',
+            // Última Milla — parámetros de ETA / avisos de llegada.
+            eta_proximity_minutes:    settings.eta_proximity_minutes    || '4',
+            eta_range_margin_minutes: settings.eta_range_margin_minutes || '20',
+            eta_avg_speed_kmh:        settings.eta_avg_speed_kmh        || '25',
+            eta_format:               settings.eta_format               || 'range',
         },
         timezones: require('../utils/datetime').TIMEZONES,
         // Estado de cada proveedor de email (configurado o no) para mostrar contexto.
@@ -518,6 +523,37 @@ const saveStatusColors = async (req, res) => {
     } catch (err) {
         console.error('saveStatusColors:', err.message);
         res.status(500).redirect(settingBack(req, '?error=status_colors_save'));
+    }
+};
+
+// Última Milla: guarda los parámetros del cálculo de ETA y los avisos de llegada.
+const saveEtaSettings = async (req, res) => {
+    try {
+        const intIn = (raw, def, min, max) => {
+            const n = parseInt(raw, 10);
+            if (!Number.isFinite(n) || n < min || n > max) { return def; }
+            return n;
+        };
+        const proximity = intIn(req.body.eta_proximity_minutes, 4, 1, 60);
+        const margin    = intIn(req.body.eta_range_margin_minutes, 20, 1, 120);
+        const speed     = intIn(req.body.eta_avg_speed_kmh, 25, 5, 120);
+        const format    = req.body.eta_format === 'exact' ? 'exact' : 'range';
+
+        const pairs = {
+            eta_proximity_minutes:    String(proximity),
+            eta_range_margin_minutes: String(margin),
+            eta_avg_speed_kmh:        String(speed),
+            eta_format:               format,
+        };
+        for (const [key, value] of Object.entries(pairs)) {
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(settingBack(req, '?success=eta_settings'));
+    } catch (err) {
+        console.error('saveEtaSettings:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=eta_settings_save'));
     }
 };
 
@@ -949,4 +985,5 @@ module.exports = {
     triggerDelayDetection,
     saveDateTimeSettings,
     saveEmailProviders,
+    saveEtaSettings,
 };

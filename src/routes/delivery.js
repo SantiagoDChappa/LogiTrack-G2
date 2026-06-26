@@ -720,6 +720,8 @@ router.post('/route/:id/finish', requireDelivery, async (req, res) => {
         { finishedAt: new Date(), statusId: RouteStatus.FINISHED },
         { where: { id: req.params.id } }
     );
+    // Última Milla: la ruta terminó → cerrar cualquier chat que haya quedado abierto.
+    require('../services/deliveryChat.service').closeForRoute(req.params.id).catch(() => {});
     res.json({ ok: true, autoFailedSkipped: autoFailed });
 });
 
@@ -1008,6 +1010,8 @@ router.post('/route/:id/cancel', requireDelivery, async (req, res) => {
             returnedToBranch: true,
         }, { where: { id: route.id }, transaction: t });
     });
+    // Última Milla: ruta cancelada → cerrar chats abiertos de sus envíos.
+    require('../services/deliveryChat.service').closeForRoute(route.id).catch(() => {});
     res.json({ ok: true, returnedShipments: returned });
 });
 
@@ -1049,6 +1053,8 @@ router.post('/route/:id/interrupt', requireDelivery, async (req, res) => {
             }).catch(e => console.error('interrupt shipment transition', s.shipmentId, e.message));
         }
     });
+    // Última Milla: ruta interrumpida → cerrar chats abiertos de sus envíos.
+    require('../services/deliveryChat.service').closeForRoute(req.params.id).catch(() => {});
     res.json({ ok: true, pendingReturned: pending.length });
 });
 

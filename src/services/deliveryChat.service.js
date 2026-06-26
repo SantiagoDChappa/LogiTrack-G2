@@ -64,6 +64,21 @@ async function addMessage(shipmentId, role, rawBody) {
     return { id: msg.id, role: msg.senderRole, body: msg.body, at: msg.createdAt };
 }
 
+// Cierra todos los chats abiertos de los envíos de una ruta (al finalizar/cancelar/
+// interrumpir la ruta — la entrega ya no continúa).
+async function closeForRoute(routeId) {
+    const sequelize = require('../database/connection');
+    await sequelize.query(
+        `UPDATE logitrack.delivery_chat
+            SET "status" = 'CLOSED', "closed_at" = NOW()
+          WHERE "status" = 'OPEN'
+            AND "shipment_id" IN (
+                SELECT "shipment_id" FROM logitrack.route_stop
+                 WHERE "route_id" = :rid AND "shipment_id" IS NOT NULL)`,
+        { replacements: { rid: Number(routeId) } }
+    );
+}
+
 // Resuelve el id de envío a partir del código de seguimiento (lado cliente del portal).
 async function shipmentIdByTracking(trackingId) {
     const { Shipment } = require('../models/shipment');
@@ -72,6 +87,6 @@ async function shipmentIdByTracking(trackingId) {
 }
 
 module.exports = {
-    ensureOpen, close, getOpenByShipment, getThread, addMessage, shipmentIdByTracking,
+    ensureOpen, close, closeForRoute, getOpenByShipment, getThread, addMessage, shipmentIdByTracking,
     SenderRole, MAX_BODY,
 };
