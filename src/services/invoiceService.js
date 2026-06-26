@@ -55,6 +55,10 @@ const generate = async ({ shipmentId, userId = null }) => {
 const getById = (id) => Invoice.findByPk(id);
 const getByShipment = (shipmentId) => findByShipment(shipmentId);
 
+// Guarda el id de preferencia de Mercado Pago creada para esta factura (para
+// no crear una nueva preferencia cada vez que el cliente reabre el link de pago).
+const setMpPreference = (invoice, mpPreferenceId) => invoice.update({ mpPreferenceId });
+
 // Marca la factura como PAGADA (pago simulado). Idempotente: si ya está pagada,
 // devuelve la existente sin re-escribir el comprobante.
 const markPaid = async (invoice, { method = 'mercadopago' } = {}) => {
@@ -69,4 +73,20 @@ const markPaid = async (invoice, { method = 'mercadopago' } = {}) => {
     return { ok: true, invoice };
 };
 
-module.exports = { generate, getById, getByShipment, getByToken, markPaid, buildNumber };
+// Pago aprobado por Mercado Pago vía webhook: marca PAGADA y guarda el payment id real.
+const markPaidByMp = async (invoice, mpPaymentId) => {
+    if (invoice.payStatus === 'PAGADA') { return { ok: true, invoice, duplicated: true }; }
+    await invoice.update({
+        payStatus: 'PAGADA',
+        payMethod: 'mercadopago',
+        payRef:    mpPaymentId,
+        paidAt:    new Date(),
+        mpPaymentId,
+    });
+    return { ok: true, invoice };
+};
+
+module.exports = {
+    generate, getById, getByShipment, getByToken, markPaid, buildNumber,
+    setMpPreference, markPaidByMp,
+};

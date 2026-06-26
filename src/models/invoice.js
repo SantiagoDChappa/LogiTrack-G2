@@ -25,6 +25,9 @@ const Invoice = sequelize.define('Invoice', {
     payRef:          { type: DataTypes.STRING(40), allowNull: true,  field: 'payRef' },
     paidAt:          { type: DataTypes.DATE,       allowNull: true,  field: 'paidAt' },
     payToken:        { type: DataTypes.STRING(60), allowNull: true,  field: 'payToken' },
+    // [prototype] Pago real con Mercado Pago: ids para correlacionar el webhook.
+    mpPreferenceId:  { type: DataTypes.STRING(80), allowNull: true,  field: 'mpPreferenceId' },
+    mpPaymentId:     { type: DataTypes.STRING(80), allowNull: true,  field: 'mpPaymentId' },
 }, {
     tableName: 'invoice',
     schema: 'logitrack',
