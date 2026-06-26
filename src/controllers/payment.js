@@ -10,6 +10,12 @@ const settingModel = require('../models/setting');
 const mercadoPagoService = require('../services/mercadoPagoService');
 const webhookEventModel = require('../models/paymentWebhookEvent');
 const { totalConIva } = require('../services/invoicePaymentEmail');
+const sequelize = require('../database/connection');
+const shipmentHistoryModel = require('../models/shipmentHistory');
+const statusModel = require('../models/status');
+const { Status } = require('../constants/enums');
+const { resolveUserBranchCoords } = require('../utils/eventLocation');
+const { notifyStatusChange } = require('../utils/notifications');
 
 const renderCheckout = async (res, invoice, extra = {}) => {
     const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);
@@ -23,6 +29,36 @@ const renderCheckout = async (res, invoice, extra = {}) => {
         layout: false,
         ...extra,
     });
+};
+
+// Destraba un envío en "Pendiente de Pago" una vez que su factura se confirma pagada,
+// sin importar el canal (cliente desde el link, operador, o webhook de Mercado Pago).
+// No hace nada si el envío no estaba esperando el pago.
+const unlockShipmentIfPendingPayment = async (shipmentId, { method, actorUser } = {}) => {
+    const shipment = await shipmentModel.getById(shipmentId);
+    if (!shipment || shipment.statusId !== Status.PENDING_PAYMENT.id) { return; }
+
+    const actorCoords = await resolveUserBranchCoords(actorUser?.id);
+    await sequelize.transaction(async (t) => {
+        await shipmentHistoryModel.create({
+            shipmentId,
+            fromStatusId: Status.PENDING_PAYMENT.id,
+            toStatusId: Status.PENDING.id,
+            comment: actorUser
+                ? `Cobro registrado (${method}) por ${actorUser.fullName}.`
+                : `Pago confirmado (${method}).`,
+            userId: actorUser?.id || null,
+            eventType: 'STATUS_CHANGE',
+            branchId: actorCoords.branchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
+            transaction: t,
+        });
+        await shipmentModel.updateStatus(shipmentId, Status.PENDING.id, { transaction: t });
+    });
+
+    const newStatus = await statusModel.getById(Status.PENDING.id);
+    if (newStatus) { notifyStatusChange(shipment, newStatus.description); }
 };
 
 // GET /pago/:token — muestra el checkout (o el comprobante si ya está pagada).
@@ -44,6 +80,7 @@ const postPay = async (req, res) => {
     const method = ['mercadopago', 'efectivo', 'transferencia'].includes(req.body.method)
         ? req.body.method : 'mercadopago';
     await invoiceService.markPaid(invoice, { method });
+    await unlockShipmentIfPendingPayment(invoice.shipmentId, { method });
     return renderCheckout(res, invoice, { justPaid: true });
 };
 
@@ -108,6 +145,7 @@ const postWebhook = async (req, res) => {
         }
 
         await invoiceService.markPaidByMp(invoice, String(payment.id));
+        await unlockShipmentIfPendingPayment(invoice.shipmentId, { method: 'mercadopago' });
         return res.json({ status: 'ok' });
     } catch (e) {
         console.error('[payment] error procesando webhook:', e.message);
@@ -115,4 +153,23 @@ const postWebhook = async (req, res) => {
     }
 };
 
-module.exports = { getCheckout, postPay, postPayMp, postWebhook };
+// POST /shipment/:id/registrar-cobro — un operador/supervisor/admin registra el cobro
+// de un envío (efectivo o transferencia) desde el detalle del envío, sin pasar por el
+// link público. Si el envío estaba en "Pendiente de Pago", lo destraba a "Pendiente".
+const postRegisterPayment = async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    const method = ['efectivo', 'transferencia'].includes(req.body.method) ? req.body.method : 'efectivo';
+    const returnUrl = `/shipment/update/${shipmentId}`;
+
+    const invoice = await invoiceService.getByShipment(shipmentId);
+    if (!invoice) { return res.redirect(returnUrl); }
+    if (invoice.payStatus !== 'PAGADA') {
+        await invoiceService.markPaid(invoice, { method });
+    }
+
+    await unlockShipmentIfPendingPayment(shipmentId, { method, actorUser: res.locals.currentUser });
+
+    return res.redirect(returnUrl);
+};
+
+module.exports = { getCheckout, postPay, postPayMp, postWebhook, postRegisterPayment };

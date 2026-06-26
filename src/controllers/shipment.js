@@ -491,6 +491,7 @@ const createShipment = async (req, res) => {
             expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
+            statusId: body.requirePaymentFirst === 'true' ? Status.PENDING_PAYMENT.id : undefined,
         }, { transaction: t });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);

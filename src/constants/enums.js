@@ -9,6 +9,7 @@ const Status = Object.freeze({
     PACKAGE_FAILED: { id: 8, description: 'Paquete Fallido' },
     FAILED_ATTEMPT: { id: 9, description: 'Intento Fallido' },
     RETURNED:       { id: 10, description: 'Devuelto'        },
+    PENDING_PAYMENT: { id: 11, description: 'Pendiente de Pago' },
 });
 
 const PersonType = Object.freeze({

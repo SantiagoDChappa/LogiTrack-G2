@@ -35,10 +35,14 @@ const STATUS_LABELS = {
     [S.PACKAGE_FAILED.id]: 'Paquete fallido',
     [S.FAILED_ATTEMPT.id]: 'Intento fallido',
     [S.RETURNED.id]: 'Devuelto',
+    [S.PENDING_PAYMENT.id]: 'Pendiente de pago',
 };
 
 // Mensajes orientados al cliente (portal publico). Sin info interna: ni actor, ni hora, ni ruta interna.
 const buildAutoComment = ({ fromStatusId, toStatusId }) => {
+    if (fromStatusId === S.PENDING_PAYMENT.id && toStatusId === S.PENDING.id) {
+        return 'Recibimos tu pago. Tu envío entra en preparación.';
+    }
     if (toStatusId === S.ASSIGNED.id) {
         return 'Tu envío fue asignado a un repartidor.';
     }
@@ -71,6 +75,7 @@ const buildAutoComment = ({ fromStatusId, toStatusId }) => {
 };
 
 const TRANSITIONS = {
+    [S.PENDING_PAYMENT.id]: [S.PENDING.id, S.CANCELLED.id],
     [S.PENDING.id]:        [S.ASSIGNED.id, S.CANCELLED.id],
     [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.IN_TRANSIT.id, S.DELIVERED.id, S.CANCELLED.id],
     [S.IN_PREPARATION.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],

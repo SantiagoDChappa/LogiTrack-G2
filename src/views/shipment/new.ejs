@@ -237,6 +237,11 @@
                     <span id="initial-priority" class="priority-badge priority-badge--none">—</span>
                 </div>
 
+                <div class="field" style="display:flex;align-items:center;gap:.5rem;margin:.5rem 0">
+                    <input type="checkbox" id="require-payment-first" name="requirePaymentFirst" value="true" <%= body.requirePaymentFirst ? 'checked' : '' %>>
+                    <label for="require-payment-first" style="margin:0">Pago antes de despachar (el envío queda en "Pendiente de Pago" hasta que se confirme el cobro)</label>
+                </div>
+
                 <div class="form-actions">
                     <a href="/shipment" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver">
                         <span class="material-symbols-outlined">arrow_back</span>
