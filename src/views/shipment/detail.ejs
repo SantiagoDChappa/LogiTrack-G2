@@ -326,10 +326,29 @@
                     <% } %>
 
                     <% if (typeof invoice !== 'undefined' && invoice) { %>
-                        <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
-                            <span class="material-symbols-outlined">receipt_long</span>
-                            Ver factura <%= invoice.number %>
-                        </a>
+                        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                            <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
+                                <span class="material-symbols-outlined">receipt_long</span>
+                                Ver factura <%= invoice.number %>
+                            </a>
+                            <% if (invoice.payStatus === 'PAGADA') { %>
+                                <span class="status-badge entregado">Cobrada (<%= invoice.payMethod || '—' %>)</span>
+                            <% } else { %>
+                                <span class="status-badge retrasado">Pendiente de cobro</span>
+                                <% if ([1, 2, 4].includes(currentUser.roleId)) { %>
+                                    <form method="POST" action="/shipment/<%= shipment.id %>/registrar-cobro" style="display:inline-flex;align-items:center;gap:.35rem;margin:0">
+                                        <select name="method" style="font-size:.85rem">
+                                            <option value="efectivo">Efectivo</option>
+                                            <option value="transferencia">Transferencia</option>
+                                        </select>
+                                        <button type="submit" class="btn btn--ghost" style="font-size:.85rem">
+                                            <span class="material-symbols-outlined" style="font-size:1.1rem">payments</span>
+                                            Registrar cobro
+                                        </button>
+                                    </form>
+                                <% } %>
+                            <% } %>
+                        </div>
                     <% } %>
                 </div>
 
