@@ -236,6 +236,11 @@ async function maybeNotifyNextDelivery(routeId) {
         etaFrom: window.fromLabel,
         etaTo:   window.toLabel,
     });
+
+    // Chat: abrir el canal del envío siguiente ya, así el cliente puede coordinar apenas
+    // recibe el aviso (no esperamos a que el repartidor llegue físicamente).
+    require('./deliveryChat.service').ensureOpen(next.shipmentId, next.id)
+        .catch(e => console.error('[chat] ensureOpen next:', e.message));
 }
 
 module.exports = {

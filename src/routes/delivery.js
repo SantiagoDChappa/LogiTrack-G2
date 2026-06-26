@@ -289,6 +289,9 @@ router.post('/route/:id/stop/:stopId/arrive', requireDelivery, async (req, res) 
         const { NotificationEvent: NE3 } = require('../constants/enums');
         require('../controllers/shipment').notifyShipmentEvent(NE3.SHIPMENT_ARRIVED_DESTINATION, stop.shipmentId)
             .catch(e => console.error('notif ARRIVED_DESTINATION', stop.shipmentId, e.message));
+        // Última Milla: asegura el chat abierto al llegar (por si no se abrió en el aviso).
+        require('../services/deliveryChat.service').ensureOpen(stop.shipmentId, stop.id)
+            .catch(e => console.error('[chat] ensureOpen arrive:', e.message));
     }
     res.json({ ok: true });
 });
@@ -1216,6 +1219,48 @@ router.get('/eta/shipment/:shipmentId', async (req, res) => {
         console.error('[eta] endpoint:', e.message);
         res.json(null);
     }
+});
+
+// ===================== Chat de entrega (Última Milla) =======================
+// Polling HTTP. Lado repartidor (autenticado) y lado cliente (público por tracking).
+const deliveryChat = require('../services/deliveryChat.service');
+
+// Repartidor: leer hilo del envío.
+router.get('/chat/shipment/:shipmentId/messages', requireDelivery, async (req, res) => {
+    try {
+        const thread = await deliveryChat.getThread(Number(req.params.shipmentId), Number(req.query.since) || 0);
+        res.json(thread);
+    } catch (e) { console.error('[chat] driver get:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Repartidor: enviar mensaje.
+router.post('/chat/shipment/:shipmentId/messages', requireDelivery, async (req, res) => {
+    try {
+        const msg = await deliveryChat.addMessage(Number(req.params.shipmentId), deliveryChat.SenderRole.DRIVER, req.body.body);
+        if (!msg) { return res.status(409).json({ error: 'Chat cerrado o mensaje vacío' }); }
+        res.json(msg);
+    } catch (e) { console.error('[chat] driver post:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Cliente (público): leer hilo por código de seguimiento.
+router.get('/chat/track/:trackingId/messages', async (req, res) => {
+    try {
+        const sid = await deliveryChat.shipmentIdByTracking(req.params.trackingId);
+        if (!sid) { return res.json({ status: 'NONE', open: false, chatId: null, messages: [] }); }
+        const thread = await deliveryChat.getThread(sid, Number(req.query.since) || 0);
+        res.json(thread);
+    } catch (e) { console.error('[chat] client get:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Cliente (público): enviar mensaje por código de seguimiento.
+router.post('/chat/track/:trackingId/messages', async (req, res) => {
+    try {
+        const sid = await deliveryChat.shipmentIdByTracking(req.params.trackingId);
+        if (!sid) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        const msg = await deliveryChat.addMessage(sid, deliveryChat.SenderRole.CLIENT, req.body.body);
+        if (!msg) { return res.status(409).json({ error: 'Chat cerrado o mensaje vacío' }); }
+        res.json(msg);
+    } catch (e) { console.error('[chat] client post:', e.message); res.status(500).json({ error: 'chat' }); }
 });
 
 // Reprogramar fallidos: marca como en sucursal el dia siguiente para nuevo ruteo

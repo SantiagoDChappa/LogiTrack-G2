@@ -110,6 +110,8 @@ const saveFailedAttempt = async (req, res) => {
         // accionable (reprogramar / retiro en sucursal), respetando la config del evento.
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_FAILED_ATTEMPT, shipment.id)
             .catch(e => console.error('[delivery] notif SHIPMENT_FAILED_ATTEMPT:', e.message));
+        // Última Milla: la entrega de esta parada terminó (fallida) → cerrar el chat.
+        require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
 
         res.redirect('/delivery?failed=true');
 
@@ -284,6 +286,8 @@ const saveEvidence = async (req, res) => {
 
         // CP-ENCS01: al entregar, enviar email con el link a la encuesta (fire-and-forget).
         require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
+        // Última Milla: cierra el chat de entrega (ya no hay coordinación pendiente).
+        require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
 
         if (routeId) {
             return res.redirect(`/delivery/route/${routeId}?delivered=true`);
