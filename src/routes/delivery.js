@@ -555,8 +555,10 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 if (fr && fr.maxAttemptsOverride) { maxIntentos = fr.maxAttemptsOverride; }
             }
         } catch { /* fallback default */ }
+        let maxAttemptsReached = false;
         const intentosPrevios = await failedAttemptModel.getByShipmentId(stop.shipmentId);
         if (intentosPrevios.length >= maxIntentos) {
+            maxAttemptsReached = true;
             const shipmentHistoryModel = require('../models/shipmentHistory');
             const { Shipment } = require('../models/shipment');
             // Lee estado real antes de cancelar para que el history tenga el fromStatusId correcto.
@@ -638,7 +640,8 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             { completed: true, completedAt: new Date() },
             { where: { id: stop.id, routeId: route.id } }
         );
-        res.json({ ok: true });
+        // maxAttemptsReached: el copiloto de voz lo usa para avisar que el envío ya no admite reintentos (CV-05 CA6).
+        res.json({ ok: true, maxAttemptsReached });
     } catch (e) {
         res.status(422).json({ error: e.message });
     }

@@ -836,6 +836,7 @@
             .sort((a, b) => a.sequence - b.sequence);
         const _ns = _pendNext[0] || _altNext[0] || null;
         const _nsData = _ns ? {
+            id:        _ns.id,
             street:    (_ns.shipment.address && _ns.shipment.address.street)  || null,
             number:    (_ns.shipment.address && _ns.shipment.address.number)  || null,
             recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
@@ -2441,6 +2442,40 @@
         setTimeout(() => window.location.reload(), 200);
     }
     document.getElementById('btn-resume')?.addEventListener('click', resumeHandler);
+
+    // === Hooks para el copiloto de voz (CV-03) ===
+    // Pausar/retomar por voz reutilizando el banner, el timer y el estado (activePauseId).
+    // El flujo por voz no muestra el selector de motivo (manos libres): usa un motivo genérico.
+    window.LT_isPaused = () => !!activePauseId;
+    window.LT_voicePause = async function (reason) {
+        if (activePauseId) { return { ok: false, already: true }; }
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/pause`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason || 'pausa' }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return res.status === 409 ? { ok: false, already: true } : { ok: false, error: true }; }
+            activePauseId = data.pauseId; activePauseStart = data.startedAt;
+            ensurePauseBanner();
+            if (pauseReasonE) { pauseReasonE.textContent = '· ' + (reason || 'pausa'); }
+            if (pauseBanner) { pauseBanner.hidden = false; }
+            startPauseTimer();
+            return { ok: true };
+        } catch (_) { return { ok: false, error: true }; }
+    };
+    window.LT_voiceResume = async function () {
+        if (!activePauseId) { return { ok: false, none: true }; }
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/resume`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return { ok: false, error: true }; }
+            clearPauseUI();
+            return { ok: true, addedSeconds: data.addedSeconds || 0 };
+        } catch (_) { return { ok: false, error: true }; }
+    };
 
     // === Incidente ===
     document.getElementById('btn-incident')?.addEventListener('click', async () => {

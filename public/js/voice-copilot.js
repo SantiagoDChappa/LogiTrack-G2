@@ -21,7 +21,11 @@
         routeId:  window.LT_ROUTE_ID,
         active:   window.LT_ROUTE_ACTIVE === true || window.LT_ROUTE_ACTIVE === 'true',
         readOnly: window.LT_READONLY === true || window.LT_READONLY === 'true',
-        get paused() { return !!document.getElementById('pause-banner'); },
+        get paused() {
+            return typeof window.LT_isPaused === 'function'
+                ? window.LT_isPaused()
+                : !!document.getElementById('pause-banner');
+        },
     };
 
     // En rutas de solo lectura (finalizadas/canceladas) no hay copiloto.
@@ -32,7 +36,9 @@
     let state = SpeechRec ? 'idle' : 'unavailable';
     let recognition = null;
     let noSpeechTimer = null;
-    let pendingChoice = null; // [cmdA, cmdB] cuando hay que desambiguar (CA9)
+    let pendingChoice = null;  // [cmdA, cmdB] cuando hay que desambiguar (CA9)
+    let pendingConfirm = null; // comando esperando "sí/no" antes de ejecutarse (acción sensible)
+    let pendingPrompt = null;  // función que captura la próxima respuesta (flujo multipaso: motivo de fallida)
     let audioCtx = null;
     let speakGen = 0;         // invalida callbacks de locuciones interrumpidas (CA12)
 
@@ -58,6 +64,97 @@
             .replace(/\bdpto\.?(?![a-záéíóúñ])/gi, 'departamento')
             .replace(/\s{2,}/g, ' ')
             .trim();
+    }
+    // Duración hablada para confirmar el tiempo de pausa (CV-03 CA2).
+    function fmtPause(sec) {
+        sec = Math.max(0, Math.round(sec));
+        if (sec < 60) { return `${sec} segundo${sec === 1 ? '' : 's'}`; }
+        const m = Math.round(sec / 60);
+        return `${m} minuto${m === 1 ? '' : 's'}`;
+    }
+    // Ubicación actual al momento de confirmar (CV-04 CA4). Devuelve {} si no se puede obtener.
+    function getGeo() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) { return resolve({}); }
+            navigator.geolocation.getCurrentPosition(
+                (p) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+                () => resolve({}),
+                { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
+            );
+        });
+    }
+    // Interpreta una respuesta de confirmación hablada.
+    function interpretYesNo(text) {
+        const t = normalize(text);
+        if (/^(si|sí|dale|confirmo|confirmar|de una|correcto|afirmativo|ok|oka|okey|obvio|sip)\b/.test(t)) { return 'yes'; }
+        return 'no'; // "no", silencio o respuesta poco clara → cancelar (regla: ante la duda, no ejecutar)
+    }
+
+    // ── CV-05: flujo de "entrega fallida" (dictado de motivo → lectura → confirmación) ──
+    // Saca el disparador inicial del transcript para quedarse solo con el motivo dicho.
+    function extractMotivo(raw) {
+        return String(raw || '').trim()
+            .replace(/^\s*(entrega fallida|marcar (como )?fallida|parada no realizada|no pude entregar|fallida)\b[\s,:.]*/i, '')
+            .replace(/^(porque|por que|el motivo es|motivo|ya que|es que|por)\s+/i, '')
+            .trim();
+    }
+    function cleanMotivo(raw) {
+        return String(raw || '').trim().replace(/^(porque|por que|el motivo es|motivo|ya que|es que|por)\s+/i, '').trim();
+    }
+    function classifyFailedConfirm(text) {
+        const t = normalize(text);
+        if (/^(si|sí|dale|confirmo|confirmar|correcto|afirmativo|ok|okey|de una|obvio|asi es)\b/.test(t)) { return 'yes'; }
+        if (/^(cancelar|cancela|olvidalo|dejalo|nada)\b/.test(t)) { return 'cancel'; }
+        return 'redo'; // "no", "corregir" o poco claro → re-pedir el motivo (CA3)
+    }
+    function failedStart(motivo) {
+        if (!motivo) { return failedAskMotivo(false); } // CA4
+        return failedConfirm(motivo);
+    }
+    function failedAskMotivo(again) {                   // CA3/CA4: pedir (o re-pedir) el motivo
+        pendingPrompt = (text) => {
+            const m = cleanMotivo(text);
+            if (!m) { return failedAskMotivo(true); }
+            return failedConfirm(m);
+        };
+        respond(again
+            ? 'No te entendí el motivo. Decímelo de nuevo, por ejemplo: no había nadie.'
+            : '¿Cuál es el motivo de la entrega fallida?', { relisten: true });
+    }
+    function failedConfirm(motivo) {                    // CA1: lee el motivo y pide confirmar
+        pendingPrompt = (text) => {
+            const c = classifyFailedConfirm(text);
+            if (c === 'yes') { return failedRegister(motivo); }                 // CA2
+            if (c === 'cancel') { return respond('Listo, no registro nada.', {}); }
+            return failedAskMotivo(false);                                      // CA3 (no/corregir)
+        };
+        respond(`Voy a marcar la entrega como fallida por: ${motivo}. ¿Confirmás?`, { relisten: true });
+    }
+    async function failedRegister(motivo) {             // CA2/CA5/CA6/CA7
+        const stop = window.LT_NEXT_STOP;
+        if (!stop || !stop.id) { return respond('No hay una entrega pendiente para marcar.', {}); }
+        const geo = await getGeo();
+        let status, data;
+        try {
+            // window.fetch pasa por la cola offline: sin señal, queda encolado.
+            const res = await fetch(`/delivery/route/${ctx.routeId}/stop/${stop.id}/failed`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reasonText: motivo, comment: motivo, latitude: geo.latitude || null, longitude: geo.longitude || null }),
+            });
+            status = res.status;
+            data = await res.json().catch(() => ({}));
+        } catch (_) { return respond('No pude registrar el intento, probá de nuevo.', { error: true }); }
+
+        if (status === 409) { return respond(data.error || 'No puedo marcar esta parada todavía.', {}); }      // CA5 (orden/pausa)
+        if (!data || (data.ok !== true && !data.queued)) {
+            return respond((data && data.error) || 'No pude registrar el intento, probá de nuevo.', { error: true });
+        }
+        if (data.queued) { return respond('Sin señal: el intento quedó pendiente y lo registro cuando vuelva la conexión.', {}); }
+        if (data.maxAttemptsReached) {                                                                          // CA6
+            return respond('Intento registrado. Este envío alcanzó el máximo de intentos y no admite más reintentos.', {});
+        }
+        // CA7: la voz solo deja el intento con su motivo; foto/firma/código se completan a mano en pantalla.
+        return respond('Listo, marqué la entrega como no realizada.', {});                                      // CA2
     }
 
     // ── Registro de comandos ────────────────────────────────────────────────────
@@ -97,28 +194,83 @@
         },
     });
 
-    // CV-03..05: registrados (reconocimiento + contexto). Handler placeholder hasta su historia.
+    // CV-03 — Registrar y retomar una pausa (acción real vía hooks de la vista).
     register({
         id: 'pause', label: 'registrar pausa',
         keywords: ['registrar pausa', 'tomar pausa', 'pausar ruta', 'pausa', 'pausar'],
-        applies: (c) => c.active ? { ok: true } : { ok: false, reason: 'Esto solo aplica con la ruta en curso.' },
-        run: () => ({ speak: 'Reconocí “registrar pausa”. Esta acción se activa en el próximo paso.' }),
+        applies: (c) => {
+            if (!c.active) { return { ok: false, reason: 'Esto solo aplica con la ruta en curso.' }; }
+            if (c.paused) { return { ok: false, reason: 'Ya hay una pausa en curso.' }; } // CA3
+            return { ok: true };
+        },
+        run: async () => {
+            if (typeof window.LT_voicePause !== 'function') { return { speak: 'No puedo registrar la pausa ahora.', error: true }; }
+            const r = await window.LT_voicePause('pausa');
+            if (r.ok) { return { speak: 'Listo, pausa registrada. Decime retomar ruta cuando arranques de nuevo.' }; } // CA1
+            if (r.already) { return { speak: 'Ya hay una pausa en curso.' }; }                                       // CA3 (carrera)
+            return { speak: 'No pude registrar la pausa, probá de nuevo.', error: true };                            // CA6
+        },
     });
     register({
         id: 'resume', label: 'retomar ruta',
         keywords: ['retomar ruta', 'reanudar ruta', 'continuar ruta', 'retomar', 'reanudar'],
-        applies: (c) => c.paused ? { ok: true } : { ok: false, reason: 'No hay ninguna pausa activa para retomar.' },
-        run: () => ({ speak: 'Reconocí “retomar ruta”. Esta acción se activa en el próximo paso.' }),
+        applies: (c) => c.paused ? { ok: true } : { ok: false, reason: 'No hay ninguna pausa activa para retomar.' }, // CA4
+        run: async () => {
+            if (typeof window.LT_voiceResume !== 'function') { return { speak: 'No puedo retomar la ruta ahora.', error: true }; }
+            const r = await window.LT_voiceResume();
+            if (r.ok) {                                                                                              // CA2
+                const extra = r.addedSeconds ? ` Estuviste en pausa ${fmtPause(r.addedSeconds)}.` : '';
+                return { speak: `Listo, ruta retomada.${extra}` };
+            }
+            if (r.none) { return { speak: 'No hay ninguna pausa activa para retomar.' }; }
+            return { speak: 'No pude retomar la ruta, probá de nuevo.', error: true };                               // CA6
+        },
     });
+    // CV-04 — Reportar una zona insegura (acción sensible: confirma antes de registrar).
     register({
         id: 'unsafe', label: 'reportar zona insegura',
         keywords: ['reportar zona insegura', 'zona insegura', 'lugar inseguro', 'reportar peligro', 'zona peligrosa'],
-        run: () => ({ speak: 'Reconocí “reportar zona insegura”. Esta acción se activa en el próximo paso.' }),
+        applies: (c) => c.paused ? { ok: false, reason: 'Primero tenés que retomar la ruta.' } : { ok: true },
+        confirm: 'Voy a reportar una zona insegura en tu ubicación actual. ¿Confirmás?', // CA1
+        run: async () => {
+            const geo = await getGeo();                                                  // ubicación al confirmar (CA4)
+            const hasGeo = geo.latitude != null && geo.longitude != null;
+            let data;
+            try {
+                // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
+                const res = await fetch(`/delivery/route/${ctx.routeId}/incident`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        incidentType: 'zona_insegura', severity: 'alta',
+                        description: 'Zona insegura reportada por voz',
+                        latitude: geo.latitude || null, longitude: geo.longitude || null,
+                    }),
+                });
+                data = await res.json().catch(() => ({}));
+                if (!res.ok) { return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true }; } // CA6 implícito
+            } catch (_) {
+                return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true };
+            }
+            if (data.queued) {                                                            // CA5 (sin conexión)
+                return { speak: 'Sin señal: el reporte quedó pendiente y lo envío cuando vuelva la conexión.' };
+            }
+            if (!hasGeo) {                                                                // CA4 (sin ubicación)
+                return { speak: 'Reporté la zona insegura, pero sin tu ubicación porque no estaba disponible.' };
+            }
+            return { speak: 'Listo, zona insegura reportada con tu ubicación.' };          // CA2
+        },
     });
+    // CV-05 — Marcar una parada como no realizada (dicta el motivo, lo confirma, y registra).
     register({
         id: 'failed', label: 'entrega fallida',
         keywords: ['entrega fallida', 'parada no realizada', 'no pude entregar', 'marcar fallida', 'fallida'],
-        run: () => ({ speak: 'Reconocí “entrega fallida”. Esta acción se activa en el próximo paso.' }),
+        applies: (c) => {
+            if (c.paused) { return { ok: false, reason: 'Primero tenés que retomar la ruta.' }; }       // CV-03 CA5
+            if (!window.LT_NEXT_STOP || !window.LT_NEXT_STOP.id) { return { ok: false, reason: 'No hay una entrega pendiente para marcar.' }; }
+            return { ok: true };
+        },
+        // Inicia el flujo multipaso usando el transcript completo para extraer el motivo dicho.
+        run: (c, raw) => { failedStart(extractMotivo(raw)); return { handled: true }; },
     });
 
     // Palabras genéricas que no distinguen un comando de otro (no cuentan para el matching).
@@ -180,10 +332,16 @@
     };
 
     // ── Voz (TTS) ───────────────────────────────────────────────────────────────
+    // Prioriza el acento más cercano al argentino: AR → resto de Latinoamérica →
+    // cualquier español que NO sea de España → (último recurso) España.
     function pickVoice() {
         const vs = (TTS && TTS.getVoices && TTS.getVoices()) || [];
-        return vs.find((v) => /^es[-_]AR/i.test(v.lang))
-            || vs.find((v) => /^es/i.test(v.lang)) || null;
+        const byLang = (re) => vs.find((v) => re.test(v.lang));
+        return byLang(/^es[-_]AR/i)
+            || byLang(/^es[-_](419|US|MX|UY|CL|CO|PE|PY)/i)
+            || vs.find((v) => /^es/i.test(v.lang) && !/^es[-_]ES/i.test(v.lang))
+            || byLang(/^es/i)
+            || null;
     }
     function speak(text, onDone) {
         if (!TTS) { if (onDone) { onDone(); } return; }
@@ -271,7 +429,7 @@
         recognition.onerror = (ev) => {
             handled = true;
             clearTimeout(noSpeechTimer);
-            pendingChoice = null; // una escucha fallida abandona cualquier desambiguación pendiente
+            pendingChoice = null; pendingConfirm = null; pendingPrompt = null; // escucha fallida → abandona lo pendiente (silencio = cancelar)
             const err = ev && ev.error;
             if (err === 'no-speech') { respond('No escuché nada, tocá para hablar de nuevo.', { error: true }); return; } // CA5
             if (err === 'not-allowed' || err === 'service-not-allowed') { micBlocked(); return; }                          // CA6
@@ -292,10 +450,25 @@
     function stopListening(userCancel) {
         clearTimeout(noSpeechTimer);
         try { if (recognition) { userCancel ? recognition.abort() : recognition.stop(); } } catch { /* noop */ }
-        if (userCancel) { pendingChoice = null; setState('idle'); showBubble(LABELS.idle, 'state'); }
+        if (userCancel) { pendingChoice = null; pendingConfirm = null; pendingPrompt = null; setState('idle'); showBubble(LABELS.idle, 'state'); }
     }
 
     function handleTranscript(text) {
+        // ¿Estamos en un flujo multipaso esperando una respuesta libre? (CV-05: motivo / confirmación)
+        if (pendingPrompt) {
+            const fn = pendingPrompt;
+            pendingPrompt = null;
+            return fn(text);
+        }
+
+        // ¿Estamos esperando un "sí/no" para una acción sensible? (CV-04 CA2/CA3)
+        if (pendingConfirm) {
+            const cmd = pendingConfirm;
+            pendingConfirm = null;
+            if (interpretYesNo(text) === 'yes') { return executeCommand(cmd); }
+            return respond('Listo, no hago nada.', {}); // CA3
+        }
+
         // ¿Estamos esperando que elija entre dos opciones? (CA9)
         if (pendingChoice) {
             const choice = matchChoice(text, pendingChoice);
@@ -317,7 +490,7 @@
         }
         const applic = top.cmd.applies ? top.cmd.applies(ctx) : { ok: true };
         if (!applic.ok) { return respond(applic.reason, {}); }       // CA10 fuera de contexto
-        return runCommand(top.cmd);
+        return runCommand(top.cmd, text);
     }
 
     function matchChoice(text, options) {
@@ -331,12 +504,24 @@
         return null;
     }
 
-    function runCommand(cmd) {
+    // Acción sensible (cmd.confirm): primero repite qué hará y espera "sí" (CV-04 CA1).
+    function runCommand(cmd, text) {
+        if (cmd.confirm) {
+            pendingConfirm = cmd;
+            const prompt = typeof cmd.confirm === 'function' ? cmd.confirm(ctx) : cmd.confirm;
+            return respond(prompt, { relisten: true });
+        }
+        return executeCommand(cmd, text);
+    }
+    // out puede traer { handled:true } si el comando ya manejó su propia respuesta (flujo multipaso).
+    function executeCommand(cmd, text) {
         let out;
-        try { out = cmd.run(ctx) || {}; }
+        try { out = cmd.run(ctx, text) || {}; }
         catch { return respond('Tuve un problema al procesar ese comando.', { error: true }); }
-        Promise.resolve(out).then((r) => respond((r && r.speak) || 'Listo.', {}))
-            .catch(() => respond('Tuve un problema al procesar ese comando.', { error: true }));
+        Promise.resolve(out).then((r) => {
+            if (r && r.handled) { return; }
+            respond((r && r.speak) || 'Listo.', { error: !!(r && r.error) });
+        }).catch(() => respond('Tuve un problema al procesar ese comando.', { error: true }));
     }
 
     // Muestra + dice una respuesta. opts: { error, relisten }
