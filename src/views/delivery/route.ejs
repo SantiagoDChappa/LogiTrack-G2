@@ -841,8 +841,19 @@
             number:    (_ns.shipment.address && _ns.shipment.address.number)  || null,
             recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
         } : null;
+
+        // Avance de la ruta (CV-06): conteo sobre las entregas.
+        const _deliv = (route.stops || []).filter(s => s.stopType === 'delivery');
+        const _completedN = _deliv.filter(s => s.completed).length;
+        const _postponedN = _deliv.filter(s => s.skipped && !s.completed).length;
+        const _progress = {
+            total:     _deliv.length,
+            completed: _completedN,
+            pending:   _deliv.length - _completedN, // incluye las postergadas (CA4)
+            postponed: _postponedN,
+        };
     %>
-    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- JSON.stringify(_nsData) %>;</script>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- JSON.stringify(_nsData) %>; window.LT_PROGRESS = <%- JSON.stringify(_progress) %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {

@@ -194,6 +194,30 @@
         },
     });
 
+    // CV-06 — Consultar el avance de la ruta. Lee LT_PROGRESS (embebido → funciona sin señal).
+    register({
+        id: 'progress', label: 'avance de la ruta',
+        keywords: ['cuantas paradas me quedan', 'cuantas paradas faltan', 'cuantas entregas me quedan',
+            'cuantas entregas faltan', 'cuanto me falta', 'cuantas me quedan', 'como voy', 'mi avance', 'avance', 'progreso'],
+        run: () => {
+            const p = window.LT_PROGRESS;
+            if (!p || !p.total) { return { speak: 'No tenés entregas en esta ruta.' }; }
+            const post = p.postponed > 0
+                ? ` ${p.postponed === 1 ? 'Una quedó postergada' : p.postponed + ' quedaron postergadas'} para revisar al final.`
+                : '';
+            if (p.completed === 0) { // CA2
+                return { speak: `Tenés ${p.total} entrega${p.total === 1 ? '' : 's'} en total y todavía no completaste ninguna.${post}` };
+            }
+            if (p.pending === 0) {
+                return { speak: 'Completaste todas las entregas. ¡Buen trabajo!' };
+            }
+            if (p.pending === 1) { // CA3
+                return { speak: `Te queda una sola entrega y llevás ${p.completed} completada${p.completed === 1 ? '' : 's'}.${post}` };
+            }
+            return { speak: `Te quedan ${p.pending} entregas y llevás ${p.completed} completada${p.completed === 1 ? '' : 's'}.${post}` }; // CA1
+        },
+    });
+
     // CV-03 — Registrar y retomar una pausa (acción real vía hooks de la vista).
     register({
         id: 'pause', label: 'registrar pausa',
@@ -271,6 +295,43 @@
         },
         // Inicia el flujo multipaso usando el transcript completo para extraer el motivo dicho.
         run: (c, raw) => { failedStart(extractMotivo(raw)); return { handled: true }; },
+    });
+
+    // CV-07 — Pedir ayuda en una emergencia (acción sensible: confirmación breve antes de enviar).
+    // Se puede disparar siempre (no se bloquea por pausa ni requiere ruta en curso).
+    // "ayuda" queda para la lista de comandos; la emergencia usa disparadores inequívocos.
+    register({
+        id: 'panic', label: 'emergencia',
+        keywords: ['emergencia', 'panico', 'pánico', 'socorro', 'auxilio', 'sos', 'ayuda urgente', 'necesito ayuda', 'pedir ayuda'],
+        confirm: '¿Confirmás que querés enviar una alerta de emergencia a la central?', // CA1 (confirmación breve)
+        run: async () => {
+            const geo = await getGeo();
+            const hasGeo = geo.latitude != null && geo.longitude != null;
+            let data;
+            try {
+                // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
+                const res = await fetch('/delivery/panic', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: geo.latitude || null, longitude: geo.longitude || null,
+                        message: 'SOS por voz desde la app del repartidor', routeId: ctx.routeId || null,
+                    }),
+                });
+                data = await res.json().catch(() => ({}));
+                if (!res.ok && !(data && data.queued)) {
+                    return { speak: 'No pude enviar la alerta. Probá de nuevo o usá el botón de pánico.', error: true };
+                }
+            } catch (_) {
+                return { speak: 'No pude enviar la alerta. Probá de nuevo o usá el botón de pánico.', error: true };
+            }
+            if (data.queued) {                                                            // CA5
+                return { speak: 'Sin señal: la alerta de emergencia quedó en cola y se envía apenas vuelva la conexión.' };
+            }
+            if (!hasGeo) {                                                                // CA4
+                return { speak: 'Alerta de emergencia enviada a la central, sin tu ubicación porque no estaba disponible.' };
+            }
+            return { speak: 'Alerta de emergencia enviada a la central con tu ubicación.' }; // CA2
+        },
     });
 
     // Palabras genéricas que no distinguen un comando de otro (no cuentan para el matching).
