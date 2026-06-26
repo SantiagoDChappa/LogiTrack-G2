@@ -14,6 +14,12 @@ const RouteStatus = Object.freeze({
     INTERRUPTED: 5, BLOCKED_FATIGUE: 6, PAUSED_FATIGUE: 7,
 });
 const { RoleType, ModificationRequestStatus } = require('../constants/enums');
+const statusColors = require('../services/statusColors');
+
+const slugOf = statusColors.slugOf;
+
+const normalizeSlug = (text) =>
+    slugOf(text).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const LIMIT = 6;
 const FETCH_LIMIT = LIMIT + 1;
@@ -78,6 +84,99 @@ const ROUTE_STATUS_LABEL = {
     [RouteStatus.INTERRUPTED]:     'Interrumpida',
     [RouteStatus.BLOCKED_FATIGUE]: 'Bloqueada (fatiga)',
     [RouteStatus.PAUSED_FATIGUE]:  'Pausada (fatiga)',
+};
+
+const ROUTE_STATUS_SLUG = {
+    [RouteStatus.PLANNED]:         'planificada',
+    [RouteStatus.IN_ROUTE]:        'en_curso',
+    [RouteStatus.FINISHED]:        'finalizada',
+    [RouteStatus.CANCELLED]:       'cancelada',
+    [RouteStatus.INTERRUPTED]:     'interrumpida',
+    [RouteStatus.BLOCKED_FATIGUE]: 'cancelado',
+    [RouteStatus.PAUSED_FATIGUE]:  'retrasado',
+};
+
+const MOD_STATUS_SLUG = {
+    [ModificationRequestStatus.PENDING_REVIEW]: 'pendiente',
+    [ModificationRequestStatus.APPLIED]: 'aplicada',
+    [ModificationRequestStatus.REJECTED]: 'rechazada',
+};
+
+const SHIPMENT_MATCH_LABELS = {
+    tracking: 'Tracking',
+    legacy: 'Tracking legacy',
+    sender: 'Remitente',
+    recipient: 'Destinatario',
+};
+
+const INCIDENT_MATCH_LABELS = {
+    id: 'Nº incidencia',
+    tracking: 'Tracking del envío',
+    type: 'Tipo de incidencia',
+};
+
+const MOD_MATCH_LABELS = {
+    id: 'Nº solicitud',
+    tracking: 'Tracking',
+    recipient: 'Destinatario',
+    email: 'Email solicitante',
+    document: 'Documento solicitante',
+};
+
+const MOD_CHANGE_LABELS = {
+    ADDRESS_CHANGE: 'Cambio de dirección',
+    RECIPIENT_CHANGE: 'Cambio de destinatario',
+    DELIVERY_DATE_CHANGE: 'Cambio de fecha',
+    CANCEL_REQUEST: 'Cancelación',
+};
+
+const mergeShipments = (byT, byL, byS, byR) => {
+    const trackingIds = new Set(byT.map((s) => s.id));
+    const legacyIds = new Set(byL.map((s) => s.id));
+    const senderIds = new Set(byS.map((s) => s.id));
+    const recipientIds = new Set(byR.map((s) => s.id));
+    const seen = new Set();
+    const merged = [];
+    for (const s of [...byT, ...byL, ...byS, ...byR]) {
+        if (seen.has(s.id)) { continue; }
+        seen.add(s.id);
+        let matchedBy = 'tracking';
+        if (trackingIds.has(s.id)) { matchedBy = 'tracking'; }
+        else if (legacyIds.has(s.id)) { matchedBy = 'legacy'; }
+        else if (senderIds.has(s.id)) { matchedBy = 'sender'; }
+        else if (recipientIds.has(s.id)) { matchedBy = 'recipient'; }
+        merged.push({ row: s, matchedBy });
+    }
+    return merged;
+};
+
+const formatShipmentHit = ({ row: s, matchedBy }) => {
+    const senderName = s.sender?.fullName || null;
+    const recipientName = s.recipient?.fullName || null;
+    const status = s.status?.description || null;
+    let matchValue = null;
+    if (matchedBy === 'tracking') { matchValue = s.trackingId || null; }
+    else if (matchedBy === 'legacy') { matchValue = s.legacyTrackingId || null; }
+    else if (matchedBy === 'sender') { matchValue = senderName; }
+    else if (matchedBy === 'recipient') { matchValue = recipientName; }
+
+    return {
+        id: s.id,
+        trackingId: s.trackingId,
+        legacyTrackingId: s.legacyTrackingId || null,
+        senderName,
+        recipientName,
+        status,
+        statusSlug: status ? normalizeSlug(status) : null,
+        matchedBy,
+        matchLabel: SHIPMENT_MATCH_LABELS[matchedBy] || null,
+        matchValue,
+        secondary: [
+            senderName && recipientName ? `${senderName} → ${recipientName}` : (recipientName || senderName),
+            status,
+            matchedBy === 'legacy' ? `Legacy: ${s.legacyTrackingId}` : null,
+        ].filter(Boolean).join(' · '),
+    };
 };
 
 const matchDriverRoute = (route, q, numeric) => {
@@ -167,16 +266,44 @@ const searchIncidentsByType = (role, uid, branchId, q) => {
     }).catch(() => []);
 };
 
-const mergeIncidents = (fromList, fromType) => {
+const mergeIncidents = (fromList, fromType, numeric) => {
     const seen = new Set();
     const merged = [];
-    for (const i of [...fromList, ...fromType]) {
-        if (!i || seen.has(i.id)) { continue; }
-        if (i.type?.code === 'RETURN') { continue; }
-        seen.add(i.id);
-        merged.push(i);
+    const add = (row, matchedBy, matchValue) => {
+        if (!row || seen.has(row.id)) { return; }
+        if (row.type?.code === 'RETURN') { return; }
+        seen.add(row.id);
+        merged.push({ row, matchedBy, matchValue: matchValue || null });
+    };
+    for (const i of fromList) {
+        add(i, numeric ? 'id' : 'tracking', numeric ? String(i.id) : (i.shipment?.trackingId || null));
+    }
+    for (const i of fromType) {
+        add(i, 'type', i.type?.description || null);
     }
     return merged;
+};
+
+const inferModificationMatch = (m, q) => {
+    const trimmed = String(q).trim();
+    const ql = trimmed.toLowerCase();
+    if (m.shipment?.trackingId && m.shipment.trackingId.toLowerCase().includes(ql)) {
+        return { matchedBy: 'tracking', matchValue: m.shipment.trackingId };
+    }
+    if (m.shipment?.recipient?.fullName && m.shipment.recipient.fullName.toLowerCase().includes(ql)) {
+        return { matchedBy: 'recipient', matchValue: m.shipment.recipient.fullName };
+    }
+    if (m.requestedByEmail && m.requestedByEmail.toLowerCase().includes(ql)) {
+        return { matchedBy: 'email', matchValue: m.requestedByEmail };
+    }
+    if (/^\d{1,9}$/.test(trimmed)) {
+        const n = parseInt(trimmed, 10);
+        if (m.id === n) { return { matchedBy: 'id', matchValue: String(m.id) }; }
+        if (m.requestedByDocument === n) {
+            return { matchedBy: 'document', matchValue: String(m.requestedByDocument) };
+        }
+    }
+    return { matchedBy: null, matchValue: null };
 };
 
 const personMatchWhere = (q, like, numeric) => {
@@ -316,18 +443,7 @@ const search = async (req, res) => {
         const shipByRecipientP = Shipment.findAll({ where: scopeFilter, ...shipOpts(shipIncludes(false, true)) }).catch(() => []);
 
         const shipmentsPromise = Promise.all([shipByTrackingP, shipByLegacyP, shipBySenderP, shipByRecipientP])
-            .then(([byT, byL, byS, byR]) => {
-                const legacyIds = new Set(byL.map(s => s.id));
-                const seen = new Set();
-                const merged = [];
-                for (const s of [...byT, ...byL, ...byS, ...byR]) {
-                    if (!seen.has(s.id)) {
-                        seen.add(s.id);
-                        merged.push({ row: s, matchedBy: legacyIds.has(s.id) ? 'legacy' : 'default' });
-                    }
-                }
-                return merged;
-            });
+            .then(([byT, byL, byS, byR]) => mergeShipments(byT, byL, byS, byR));
 
         const incidentsFromListP = incidentModel.list(
             buildIncidentFilters(role, uid, branchId, q, numeric)
@@ -338,7 +454,7 @@ const search = async (req, res) => {
             : Promise.resolve([]);
 
         const incidentsPromise = Promise.all([incidentsFromListP, incidentsFromTypeP])
-            .then(([fromList, fromType]) => mergeIncidents(fromList, fromType));
+            .then(([fromList, fromType]) => mergeIncidents(fromList, fromType, numeric));
 
         let routesPromise = Promise.resolve([]);
         if (role === RoleType.DELIVERY.id) {
@@ -419,59 +535,74 @@ const search = async (req, res) => {
         const portalClientsSlice = sliceWithMeta(portalClientsRaw);
 
         return res.json({
-            shipments: shipmentsSlice.items.map(({ row: s, matchedBy }) => {
-                const secondary = [
-                    s.recipient?.fullName || s.sender?.fullName || null,
-                    s.status?.description || null,
-                    matchedBy === 'legacy' ? `Legacy: ${s.legacyTrackingId}` : null,
-                ].filter(Boolean).join(' · ');
+            shipments: shipmentsSlice.items.map(formatShipmentHit),
+            incidents: incidentsSlice.items.filter(Boolean).map(({ row: i, matchedBy, matchValue }) => {
+                const statusCode = String(i.status || '').toLowerCase();
+                const status = INCIDENT_STATUS_LABEL[i.status] || i.status;
                 return {
-                    id: s.id,
-                    trackingId: s.trackingId,
-                    recipientName: s.recipient?.fullName || s.sender?.fullName || null,
-                    status: s.status?.description || null,
+                    id: i.id,
+                    trackingId: i.shipment?.trackingId || null,
+                    type: i.type?.description || null,
+                    status,
+                    statusCode,
                     matchedBy,
-                    secondary,
+                    matchLabel: INCIDENT_MATCH_LABELS[matchedBy] || null,
+                    matchValue,
                 };
             }),
-            incidents: incidentsSlice.items.filter(Boolean).map(i => ({
-                id: i.id,
-                trackingId: i.shipment?.trackingId || null,
-                type: i.type?.description || null,
-                status: INCIDENT_STATUS_LABEL[i.status] || i.status,
-            })),
-            routes: routesSlice.items.filter(Boolean).map(r => ({
-                id: r.id,
-                driverName: r.transport?.driver?.fullName || null,
-                transportName: r.transport?.name || null,
-                branchName: r.originBranch?.name || null,
-                status: ROUTE_STATUS_LABEL[r.statusId] || null,
-            })),
-            returns: returnsSlice.items.filter(Boolean).map(r => ({
-                id: r.id,
-                trackingId: r.shipment?.trackingId || null,
-                status: INCIDENT_STATUS_LABEL[r.status] || r.status,
-            })),
-            users: usersSlice.items.filter(Boolean).map(u => ({
+            routes: routesSlice.items.filter(Boolean).map((r) => {
+                const status = ROUTE_STATUS_LABEL[r.statusId] || null;
+                return {
+                    id: r.id,
+                    driverName: r.transport?.driver?.fullName || null,
+                    transportName: r.transport?.name || null,
+                    branchName: r.originBranch?.name || null,
+                    status,
+                    statusSlug: ROUTE_STATUS_SLUG[r.statusId] || null,
+                };
+            }),
+            returns: returnsSlice.items.filter(Boolean).map((r) => {
+                const statusCode = String(r.status || '').toLowerCase();
+                const status = INCIDENT_STATUS_LABEL[r.status] || r.status;
+                return {
+                    id: r.id,
+                    trackingId: r.shipment?.trackingId || null,
+                    status,
+                    statusCode,
+                    matchLabel: 'Tracking del envío',
+                    matchValue: r.shipment?.trackingId || null,
+                };
+            }),
+            users: usersSlice.items.filter(Boolean).map((u) => ({
                 id: u.id,
                 fullName: u.fullName,
                 role: ROLE_LABEL[u.roleId] || 'Desconocido',
                 email: u.email || null,
             })),
-            modifications: modificationsSlice.items.filter(Boolean).map(m => ({
-                id: m.id,
-                shipmentId: m.shipmentId,
-                trackingId: m.shipment?.trackingId || null,
-                changeType: m.changeType,
-                status: MOD_STATUS_LABEL[m.status] || m.status,
-                recipientName: m.shipment?.recipient?.fullName || null,
-            })),
-            portalClients: portalClientsSlice.items.map(c => ({
+            modifications: modificationsSlice.items.filter(Boolean).map((m) => {
+                const modStatus = MOD_STATUS_LABEL[m.status] || m.status;
+                const { matchedBy, matchValue } = inferModificationMatch(m, q);
+                return {
+                    id: m.id,
+                    shipmentId: m.shipmentId,
+                    trackingId: m.shipment?.trackingId || null,
+                    changeType: MOD_CHANGE_LABELS[m.changeType] || m.changeType,
+                    status: modStatus,
+                    statusSlug: MOD_STATUS_SLUG[m.status] || (modStatus ? normalizeSlug(modStatus) : null),
+                    recipientName: m.shipment?.recipient?.fullName || null,
+                    matchedBy,
+                    matchLabel: MOD_MATCH_LABELS[matchedBy] || null,
+                    matchValue,
+                };
+            }),
+            portalClients: portalClientsSlice.items.map((c) => ({
                 document: c.document,
                 email: c.email,
                 fullName: c.fullName,
                 shipmentCount: c.shipmentCount,
                 matchAs: c.matchAs,
+                matchLabel: c.matchAs === 'sender' ? 'Remitente' : 'Destinatario',
+                matchValue: c.fullName || String(c.document),
             })),
             meta: {
                 shipments: { hasMore: shipmentsSlice.hasMore },
