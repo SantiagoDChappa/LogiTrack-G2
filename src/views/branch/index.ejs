@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Sucursales — LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Sucursales</h1>
+            <div class="page-header__actions">
+                <a href="/branch/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva sucursal" aria-label="Nueva sucursal">
+                    <span class="material-symbols-outlined">add</span>
+                </a>
+            </div>
+        </div>
+
+        <% if (ok) { %>
+            <div class="alert" role="status" style="background:rgba(22,163,74,.12);color:#166534;border:1px solid #86efac;padding:.5rem .75rem;border-radius:8px;margin-bottom:1rem">Operación realizada con éxito.</div>
+        <% } %>
+
+        <div class="shipments-wrapper">
+            <form class="search-form" data-tools-for="branches" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-branch-name">Nombre</label>
+                        <input type="text" id="f-branch-name" class="search-input" data-col="0" placeholder="Ej: Sucursal Centro">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-branch-state">Estado</label>
+                        <select id="f-branch-state" class="search-input" data-col="4">
+                            <option value="">Todas</option>
+                            <option value="Activa">Activa</option>
+                            <option value="Cerrada">Cerrada</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="table-wrapper">
+                <table data-tools="branches">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Dirección</th>
+                            <th>Teléfono</th>
+                            <th>Retiro</th>
+                            <th>Estado</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (!branches || branches.length === 0) { %>
+                            <tr>
+                                <td colspan="6" class="empty-row">
+                                    <span class="material-symbols-outlined">store</span>
+                                    Todavía no hay sucursales. Creá la primera con el botón "+".
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% branches.forEach(function (b) { %>
+                                <tr>
+                                    <td><strong><%= b.name %></strong></td>
+                                    <td><%= b.address %></td>
+                                    <td><%= b.phone || '-' %></td>
+                                    <td><%= b.pickupEnabled ? 'Sí' : 'No' %></td>
+                                    <td>
+                                        <% if (b.closed) { %>
+                                            <span class="status-badge cancelado">Cerrada</span>
+                                        <% } else { %>
+                                            <span class="status-badge entregado">Activa</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/branch/<%= b.id %>/edit" class="action-btn modificar" data-tooltip="Editar" aria-label="Editar">
+                                            <span class="material-symbols-outlined">edit</span>
+                                        </a>
+                                        <form method="POST" action="/branch/<%= b.id %>/closed" style="display:inline"
+                                              data-confirm="<%= b.closed ? "¿Reabrir esta sucursal?" : "¿Cerrar esta sucursal? No estará disponible para nuevas asignaciones." %>">
+                                            <input type="hidden" name="closed" value="<%= b.closed ? 'false' : 'true' %>">
+                                            <button type="submit" class="action-btn <%= b.closed ? 'neutro' : 'eliminar' %>" data-tooltip="<%= b.closed ? 'Reabrir' : 'Cerrar' %>" aria-label="<%= b.closed ? 'Reabrir' : 'Cerrar' %>">
+                                                <span class="material-symbols-outlined"><%= b.closed ? 'lock_open' : 'lock' %></span>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pago · LogiTrack</title>
+    <style>
+        :root { --mp:#009ee3; --mp-dark:#0079b8; --ok:#16a34a; --bg:#f0f2f5; --ink:#0f172a; --muted:#64748b; --border:#e2e8f0; }
+        * { box-sizing: border-box; }
+        body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+            font-family:Arial,Helvetica,sans-serif; display:flex; align-items:flex-start; justify-content:center; padding:24px; }
+        .card { width:100%; max-width:460px; background:#fff; border-radius:16px; overflow:hidden;
+            box-shadow:0 8px 30px rgba(15,23,42,.12); }
+        .head { background:var(--mp); color:#fff; padding:20px 24px; }
+        .head .brand { font-size:13px; opacity:.9; }
+        .head .num { font-size:20px; font-weight:800; margin-top:2px; }
+        .body { padding:24px; }
+        .amount-box { text-align:center; background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:20px; }
+        .amount-box .lbl { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+        .amount-box .val { font-size:34px; font-weight:800; margin-top:4px; }
+        .row { display:flex; justify-content:space-between; font-size:14px; padding:6px 0; color:var(--muted); }
+        .row strong { color:var(--ink); }
+        .methods { display:flex; flex-direction:column; gap:10px; margin:18px 0; }
+        .method { display:flex; align-items:center; gap:10px; border:1.5px solid var(--border); border-radius:10px; padding:12px 14px; cursor:pointer; font-size:14px; }
+        .method input { accent-color:var(--mp); }
+        .method.sel { border-color:var(--mp); background:rgba(0,158,227,.06); }
+        .btn { display:block; width:100%; text-align:center; border:none; border-radius:10px; padding:14px;
+            font-size:16px; font-weight:700; cursor:pointer; color:#fff; background:var(--mp); }
+        .btn:hover { background:var(--mp-dark); }
+        .note { margin-top:16px; font-size:12px; color:#94a3b8; text-align:center; }
+        .badge { display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:13px;
+            padding:6px 14px; border-radius:999px; background:#dcfce7; color:#166534; }
+        .paid-icon { width:64px; height:64px; margin:4px auto 12px; border-radius:50%; background:var(--ok);
+            color:#fff; display:flex; align-items:center; justify-content:center; font-size:38px; font-weight:800; }
+        .center { text-align:center; }
+        .sim { display:inline-block; margin-top:4px; font-size:11px; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:6px; padding:2px 8px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+    <% if (!invoice) { %>
+        <div class="head"><div class="num">Link no válido</div></div>
+        <div class="body center">
+            <p>Este enlace de pago no existe o expiró.</p>
+        </div>
+    <% } else { %>
+        <div class="head">
+            <div class="brand"><%= empresa %> · Mercado Pago
+                <% if (!mpConfigured) { %><span class="sim">SIMULADO</span><% } %>
+            </div>
+            <div class="num">Factura <%= invoice.number %></div>
+        </div>
+        <div class="body">
+            <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+            <% if (invoice.payStatus === 'PAGADA') { %>
+                <div class="center">
+                    <div class="paid-icon">✓</div>
+                    <div class="badge">FACTURA PAGADA</div>
+                    <p style="margin:16px 0 4px;font-size:22px;font-weight:800"><%= fmt(total) %></p>
+                    <% if (typeof justPaid !== 'undefined' && justPaid) { %>
+                        <p style="color:var(--muted);margin:0 0 16px">¡Gracias! Registramos tu pago.</p>
+                    <% } %>
+                </div>
+                <div class="row"><span>N° de operación</span><strong><%= invoice.payRef || '—' %></strong></div>
+                <div class="row"><span>Medio</span><strong><%= invoice.payMethod || 'mercadopago' %></strong></div>
+                <div class="row"><span>Fecha</span><strong><%= invoice.paidAt ? new Date(invoice.paidAt).toLocaleString('es-AR') : '—' %></strong></div>
+                <% if (shipment) { %><div class="row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+            <% } else { %>
+                <div class="amount-box">
+                    <div class="lbl">Total a pagar</div>
+                    <div class="val"><%= fmt(total) %></div>
+                </div>
+                <div class="row"><span>Cliente</span><strong><%= invoice.senderName || (shipment && shipment.sender ? shipment.sender.fullName : '—') %></strong></div>
+                <% if (shipment) { %><div class="row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+
+                <% if (typeof mpError !== 'undefined' && mpError) { %>
+                    <p class="note" style="color:#b91c1c;border:1px dashed #fecaca;border-radius:8px;padding:8px"><%= mpError %></p>
+                <% } %>
+
+                <form method="POST" action="/pago/<%= invoice.payToken %><%= mpConfigured ? '/mp' : '' %>" id="checkout-form">
+                    <div class="methods" id="methods">
+                        <label class="method sel">
+                            <input type="radio" name="method" value="mercadopago" data-mp="<%= mpConfigured ? '1' : '0' %>" checked> Dinero en cuenta / Mercado Pago
+                        </label>
+                        <label class="method"><input type="radio" name="method" value="transferencia" data-mp="0"> Transferencia bancaria</label>
+                        <label class="method"><input type="radio" name="method" value="efectivo" data-mp="0"> Efectivo (pago fácil)</label>
+                    </div>
+                    <button type="submit" class="btn">Pagar <%= fmt(total) %></button>
+                </form>
+                <p class="note">
+                    <% if (mpConfigured) { %>
+                        Mercado Pago te redirige a un entorno seguro para completar el pago. Transferencia y efectivo se confirman manualmente.
+                    <% } else { %>
+                        Pago simulado para fines de demostración. No se procesa dinero real.
+                    <% } %>
+                </p>
+            <% } %>
+        </div>
+    <% } %>
+    </div>
+    <script>
+        // Resalta el medio de pago seleccionado y, si es Mercado Pago real, manda
+        // el form al endpoint que crea la preferencia en vez del simulado.
+        const form = document.getElementById('checkout-form');
+        const baseAction = form ? form.getAttribute('action').replace(/\/mp$/, '') : null;
+        document.querySelectorAll('#methods .method').forEach((m) => {
+            m.addEventListener('click', () => {
+                document.querySelectorAll('#methods .method').forEach((x) => x.classList.remove('sel'));
+                m.classList.add('sel');
+                if (!form) { return; }
+                const usesRealMp = m.querySelector('input').dataset.mp === '1';
+                form.setAttribute('action', usesRealMp ? baseAction + '/mp' : baseAction);
+            });
+        });
+    </script>
+</body>
+</html>

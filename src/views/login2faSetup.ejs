@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('partials/head') %>
+    <link rel="stylesheet" href="/css/login.css">
+    <title>Activar verificación en dos pasos — LogiTrack</title>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-brand">
+                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
+                <h1>LogiTrack</h1>
+                <p>Activá la verificación en dos pasos</p>
+            </div>
+
+            <p style="font-size:.85rem;color:var(--color-text-secondary);margin-bottom:1rem">
+                Tu rol requiere un segundo factor para ingresar. Escaneá el QR con tu app de autenticación
+                (Google / Microsoft Authenticator, Authy) e ingresá el código de 6 dígitos.
+            </p>
+
+            <% if (qrDataUrl) { %>
+                <div style="margin:.25rem 0 1rem;text-align:center">
+                    <img src="<%= qrDataUrl %>" alt="Código QR para 2FA" style="display:block;margin:0 auto;width:240px;max-width:100%;height:auto;background:#fff;padding:10px;border-radius:10px">
+                </div>
+            <% } %>
+
+            <details style="margin-bottom:1rem">
+                <summary style="font-size:.78rem;color:var(--color-text-secondary);cursor:pointer">¿No podés escanear? Cargá esta clave</summary>
+                <input type="text" readonly value="<%= secret %>"
+                       style="font-family:monospace;letter-spacing:.08em;width:100%;margin-top:.5rem;padding:.5rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text)">
+            </details>
+
+            <form class="login-form" action="/login/2fa/setup" method="post">
+                <div class="login-field">
+                    <label for="token">Código de 6 dígitos</label>
+                    <input id="token" name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required autofocus>
+                </div>
+                <% if (locals.error) { %>
+                <div class="login-error"><span class="material-symbols-outlined">error</span><%= error %></div>
+                <% } %>
+                <button type="submit" class="login-btn">Activar y entrar</button>
+            </form>
+
+            <div class="login-support"><a href="/logout">Cancelar y salir</a></div>
+        </div>
+    </div>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

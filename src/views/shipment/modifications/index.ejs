@@ -31,20 +31,23 @@
 <body>
     <%- include('../../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header modifications-page-header">
             <h1>Modificaciones desde portal</h1>
+            <div class="page-header__actions">
+                <%- include('../../partials/page-help-btn', { helpModule: 'modificaciones-portal' }) %>
+            </div>
         </div>
 
         <% if (flash === 'approved') { %>
-        <div class="alert alert-success">Solicitud aprobada y aplicada.</div>
+        <div class="alert alert-success" role="status">Solicitud aprobada y aplicada.</div>
         <% } else if (flash === 'rejected') { %>
-        <div class="alert alert-success">Solicitud rechazada.</div>
+        <div class="alert alert-success" role="status">Solicitud rechazada.</div>
         <% } %>
         <% if (error) { %>
-        <div class="alert alert-error"><%= error %></div>
+        <div class="alert alert-error" role="alert"><%= error %></div>
         <% } %>
 
-        <form method="GET" action="/shipment/modifications" class="incident-filters">
+        <form method="GET" action="/shipment/modifications" class="incident-filters modifications-filters">
             <div class="incident-filter">
                 <label for="status"><span class="material-symbols-outlined incident-filter-icon">flag</span> Estado</label>
                 <select id="status" name="status">
@@ -59,7 +62,7 @@
             </button>
         </form>
 
-        <div class="incident-table-wrapper">
+        <div class="incident-table-wrapper modifications-table-wrap">
             <table class="incident-table" data-paginate="modifications">
                 <thead>
                     <tr>
@@ -75,7 +78,9 @@
                 </thead>
                 <tbody>
                     <% if (!requests.length) { %>
-                        <tr><td colspan="8" class="incident-empty">No hay solicitudes para mostrar.</td></tr>
+                        <tr><td colspan="8" class="incident-empty">
+                            <%- include('../../partials/help-empty-hint', { message: 'No hay solicitudes para mostrar.', helpSlug: 'modificaciones-portal' }) %>
+                        </td></tr>
                     <% } %>
                     <% requests.forEach(function(r) {
                         const shipSlug = String(r.shipmentStatus || '').toLowerCase().replace(/[\s-]+/g, '_');

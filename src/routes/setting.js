@@ -55,10 +55,12 @@ router.post('/incident-type/:id',      requireAdmin, settingController.saveIncid
 router.post('/incident-notification',  requireAdmin, settingController.saveIncidentNotifConfig);
 router.post('/fatigue-consent-notification', requireAdmin, settingController.saveFatigueConsentNotifConfig);
 router.post('/test-shipment-notification', requireAdmin, settingController.testShipmentNotification);
+router.post('/trigger-delay-detection',   requireAdmin, settingController.triggerDelayDetection);
 // Envío manual de toda la cola de emails pendientes (sin esperar al cron).
 router.post('/flush-email-queue',          requireAdmin, settingController.flushEmailQueue);
 // Ejecutar manualmente un proceso automático ahora (expirados | notificaciones | demoras).
 router.post('/run-process/:proc',          requireAdmin, settingController.runProcess);
 router.post('/trigger-delay-detection',   requireAdmin, settingController.triggerDelayDetection);
+router.get('/auditoria/export-csv',        requireAdmin, settingController.exportAuditCsv);
 
 module.exports = router;

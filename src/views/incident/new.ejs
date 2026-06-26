@@ -14,7 +14,7 @@
         </div>
 
         <% if (error) { %>
-            <div id="incidentErrorBanner" class="alert alert-error"><%= error %></div>
+            <div id="incidentErrorBanner" class="alert alert-error" role="alert"><%= error %></div>
         <% } %>
 
         <form method="POST" action="/incident" class="incident-form" id="incidentForm" novalidate>

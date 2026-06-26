@@ -8,11 +8,12 @@ const {
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
     getShipmentList, getShipmentDetail, getManageForm, postManageForm,
-    getIncidentList, getIncidentDetail, postIncidentResponse, postDamageChoice, getIncidentAttachment,
+    getIncidentList, getIncidentDetail, postIncidentResponse, postDamageChoice, postDamageDecline, getIncidentAttachment,
     getSurveyList, getSurveyForm, postSurvey, getPublicSurveyForm, postPublicSurvey,
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { getReturnForm, postReturn, listReturns, returnDetail, postEditModality, returnCreditNote } = require('../controllers/portalReturn');
+const { getCheckout, postPay, postPayMp, postWebhook } = require('../controllers/payment');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
 
@@ -55,6 +56,15 @@ router.get('/portal/self-saved/:trackingId',  getSelfServiceSaved);
 router.get('/portal/encuesta/:token',  getPublicSurveyForm);
 router.post('/portal/encuesta/:token', postPublicSurvey);
 
+// [prototype] Pago de la factura (link del mail al remitente, sin login). "mercadopago"
+// crea una preferencia real si MP está configurado; si no, cae al simulado de postPay.
+router.get('/pago/:token',     getCheckout);
+router.post('/pago/:token',    postPay);
+router.post('/pago/:token/mp', postPayMp);
+
+// Webhook de Mercado Pago (servidor a servidor, sin login).
+router.post('/payment/webhook', postWebhook);
+
 // Portal — Mis envíos del cliente (HU 1)
 router.get('/portal/mis-envios',              optionalPortalClient, getIdentifyForm);
 router.post('/portal/mis-envios/acceso',      postRequestAccess);
@@ -78,6 +88,7 @@ router.get('/portal/mis-envios/incidencias',        requirePortalClient, getInci
 router.get('/portal/mis-envios/incidencia/:id',     requirePortalClient, getIncidentDetail);
 router.post('/portal/mis-envios/incidencia/:id/responder', requirePortalClient, portalEvidenceUpload, postIncidentResponse);
 router.post('/portal/mis-envios/incidencia/:id/eleccion',  requirePortalClient, postDamageChoice);
+router.post('/portal/mis-envios/incidencia/:id/no-devolucion', requirePortalClient, postDamageDecline);
 router.get('/portal/mis-envios/incidencia/:id/adjunto/:attId', requirePortalClient, getIncidentAttachment);
 router.get('/portal/mis-envios/encuestas',                    requirePortalClient, getSurveyList);
 router.get('/portal/mis-envios/encuesta/:shipmentId',         requirePortalClient, getSurveyForm);

@@ -170,6 +170,9 @@
         .submit-btn .material-symbols-outlined { font-size: 1.3rem; }
     </style>
     <link rel="stylesheet" href="/css/delivery.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script src="/js/offline-db.js" defer></script>
+    <script src="/js/delivery-offline.js" defer></script>
 </head>
 <body data-flow="failed">
 
@@ -183,7 +186,7 @@
     </div>
 
     <div class="pod-body">
-        <form method="POST" action="/delivery/failed/<%= trackingCode %>">
+        <form method="POST" action="/delivery/failed/<%= trackingCode %>" data-offline-form data-success="/delivery?queued=1">
 
             <!-- Motivo -->
             <div class="pod-section">

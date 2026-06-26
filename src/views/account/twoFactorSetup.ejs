@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <title>Configurar 2FA — LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header"><h1>Verificación en dos pasos (2FA)</h1></div>
+        <div class="update-card" style="max-width:520px">
+            <p style="color:var(--color-text-secondary);font-size:.9rem">
+                Escaneá el código QR con tu app de autenticación (Google Authenticator, Microsoft Authenticator,
+                Authy, etc.) e ingresá el código de 6 dígitos para activar el segundo factor.
+            </p>
+            <% if (qrDataUrl) { %>
+                <div style="text-align:center;margin:1rem 0">
+                    <img src="<%= qrDataUrl %>" alt="Código QR para 2FA" style="display:block;margin:0 auto;width:240px;max-width:100%;height:auto;background:#fff;padding:10px;border-radius:10px">
+                </div>
+            <% } %>
+            <div class="field">
+                <label for="secret">¿No podés escanear? Cargá esta clave manualmente</label>
+                <input id="secret" type="text" readonly value="<%= secret %>"
+                       style="font-family:monospace;letter-spacing:.1em;width:100%;padding:.5rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text)">
+            </div>
+            <form method="POST" action="/account/2fa/setup" style="margin-top:1rem">
+                <div class="field">
+                    <label for="token">Código de 6 dígitos</label>
+                    <input id="token" name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required
+                           style="width:100%;padding:.55rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:1.1rem;letter-spacing:.25em">
+                </div>
+                <% if (locals.error) { %><div class="alert alert-error" role="alert" style="margin:.5rem 0"><%= error %></div><% } %>
+                <div class="form-actions" style="margin-top:1rem">
+                    <a href="/account/2fa" class="action-btn action-btn--lg volver" data-tooltip="Cancelar" aria-label="Cancelar"><span class="material-symbols-outlined">arrow_back</span></a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Activar 2FA" aria-label="Activar 2FA"><span class="material-symbols-outlined">verified_user</span></button>
+                </div>
+            </form>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

@@ -3,6 +3,7 @@
 <head>
     <%- include('../partials/head') %>
     <title>Mis Envíos - LogiTrack</title>
+    <meta name="theme-color" content="#2563eb">
     <link rel="stylesheet" href="/css/shipments.css">
     <style>
     .dlv-wrap { padding: clamp(1rem, 2.5vw, 2rem); max-width: 1200px; margin: 0 auto; }
@@ -230,8 +231,11 @@
     <main class="main-content">
         <div class="dlv-wrap">
 
-            <div class="page-header" style="padding:0;margin-bottom:8px">
+            <div class="page-header delivery-home-header" style="padding:0;margin-bottom:8px">
                 <h1>Mi Ruteo</h1>
+                <div class="page-header__actions">
+                    <%- include('../partials/page-help-btn', { helpModule: 'mi-ruteo' }) %>
+                </div>
             </div>
 
             <% if (typeof fatigueBlocked !== 'undefined' && fatigueBlocked) { %>
@@ -254,14 +258,17 @@
             </div>
             <% } %>
 
-            <% if (driverDisabled && activeSummary) { %>
-                <%# Inhabilitado por fatiga: card en rojo, sin link, click abre popup. %>
+            <% const _startBlocked = (typeof startBlocked !== 'undefined') ? startBlocked : null; %>
+            <% const _blocked = driverDisabled || _startBlocked; %>
+            <% if (_blocked && activeSummary) { %>
+                <%# Bloqueado por fatiga (inhabilitado por consentimiento o no pasó la prueba
+                    de inicio): card en rojo, sin link, click abre popup explicativo. %>
                 <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"
-                     aria-label="Estás inhabilitado. Tocá para ver el detalle.">
+                     aria-label="No habilitado por fatiga. Tocá para ver el detalle.">
                     <div>
                         <div class="badge-status">
                             <span class="dot"></span>
-                            INHABILITADO
+                            <%= driverDisabled ? 'INHABILITADO' : 'NO HABILITADO' %>
                         </div>
                         <h2>Ruta #<%= activeSummary.id %></h2>
                         <div class="sub">
@@ -331,6 +338,9 @@
                         <span class="material-symbols-outlined">arrow_forward</span>
                     </span>
                 </a>
+                <%# [prototype] Offline: si la ruta está EN CURSO, delivery-offline.js la deja lista
+                    para operar sin conexión aunque el repartidor se quede sin señal en el home. %>
+                <script>window.LT_ACTIVE_ROUTE_ID = <%= activeSummary.id %>; window.LT_ACTIVE_ROUTE_INROUTE = <%= activeSummary.statusId === 2 ? 'true' : 'false' %>;</script>
             <% } else if (driverDisabled) { %>
                 <%# Inhabilitado sin ruta activa: card rojo informativo, click abre popup. %>
                 <div class="active-hero is-disabled" id="disabled-hero" role="button" tabindex="0"
@@ -352,7 +362,7 @@
                 <div class="empty-routes">
                     <span class="material-symbols-outlined">local_shipping</span>
                     <div style="margin-top:10px;font-weight:700">No tenés una ruta activa</div>
-                    <div style="font-size:.85rem;margin-top:4px">Cuando un operador te asigne una ruta, aparecerá acá.</div>
+                    <%- include('../partials/help-empty-hint', { message: 'Cuando un operador te asigne una ruta, aparecerá acá.', helpSlug: 'mi-ruteo' }) %>
                 </div>
             <% } %>
 
@@ -484,11 +494,11 @@
     <script>
         document.getElementById('btn-reschedule-failed')?.addEventListener('click', async (ev) => {
             ev.preventDefault();
-            if (!confirm('¿Devolver tus envíos con intento fallido a sucursal para reprogramar?')) return;
+            if (!(await window.ltConfirm({ title: '¿Devolver tus envíos con intento fallido?', text: 'Volverán a sucursal para reprogramar.', confirmButtonText: 'Sí, devolver' }))) return;
             const r = await fetch('/delivery/reschedule-failed', { method: 'POST' });
             const d = await r.json();
-            if (r.ok) { alert('Reprogramados: ' + d.rescheduled); location.reload(); }
-            else { alert(d.error || 'Error'); }
+            if (r.ok) { await window.ltAlert({ icon: 'success', title: 'Listo', text: 'Reprogramados: ' + d.rescheduled }); location.reload(); }
+            else { await window.ltAlert({ icon: 'error', title: 'Error', text: d.error || 'No se pudo procesar.' }); }
         });
 
         function showQR(id, trackingId) {
@@ -521,18 +531,25 @@
         (function () {
             const hero = document.getElementById('disabled-hero');
             if (!hero) { return; }
-            <% const _reasonTxt = driverDisabled && driverDisabled.reason === 'CONSENT_REJECTED'
-                ? 'Rechazaste el consentimiento del control de fatiga las veces permitidas.'
-                : (driverDisabled && driverDisabled.reason === 'TEST_NOT_DONE'
-                    ? 'No completaste la prueba del control de fatiga.'
-                    : 'Quedaste inhabilitado por el control de fatiga.'); %>
+            <%
+            let _title = 'Estás inhabilitado';
+            let _reasonTxt = 'Quedaste inhabilitado por el control de fatiga.';
+            let _tail = '<p><b>No podés iniciar ni continuar rutas</b> hasta que tu Supervisor te restablezca.</p><p class="swal-muted" style="font-size:.88rem;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>';
+            if (driverDisabled) {
+                if (driverDisabled.reason === 'CONSENT_REJECTED') { _reasonTxt = 'Rechazaste el consentimiento del control de fatiga las veces permitidas.'; }
+                else if (driverDisabled.reason === 'TEST_NOT_DONE') { _reasonTxt = 'No completaste la prueba del control de fatiga.'; }
+            } else if (_startBlocked) {
+                _title = 'No habilitado por fatiga';
+                _reasonTxt = 'No pasaste el control de fatiga de inicio (prueba de reacción o de voz).';
+                _tail = '<p><b>No podés iniciar esta ruta.</b> Tu Supervisor fue notificado y debe revisarlo.</p><p class="swal-muted" style="font-size:.88rem;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>';
+            }
+            %>
             const showDisabledPopup = () => {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Estás inhabilitado',
+                    title: '<%= _title %>',
                     html: `<p><%= _reasonTxt %></p>
-                           <p><b>No podés iniciar ni continuar rutas</b> hasta que tu Supervisor te restablezca.</p>
-                           <p style="font-size:.88rem;color:#64748b;margin-top:8px">Comunicate con tu Supervisor para regularizar tu situación.</p>`,
+                           <%- _tail %>`,
                     confirmButtonText: 'Entendido',
                     confirmButtonColor: '#dc2626',
                 });

@@ -576,6 +576,24 @@
                             <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
                         </div>
 
+                        <div class="field">
+                            <label for="seguro_pct">Seguro de mercadería (%) <span class="req">*</span></label>
+                            <input type="number" id="seguro_pct" name="seguro_pct" min="0" max="100" step="0.01" value="<%= params.seguro_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_zona_peligrosa_pct">Recargo zona peligrosa (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_zona_peligrosa_pct" name="recargo_zona_peligrosa_pct" min="0" max="500" step="0.01" value="<%= params.recargo_zona_peligrosa_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el destino cae en una zona marcada como peligrosa (y llegable). Se valida por coordenadas/CP del destino. 0 = sin recargo. Las zonas se marcan en el mapa de Zonas.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="dias_retencion_sucursal">Retención en sucursal (días hábiles) <span class="req">*</span></label>
+                            <input type="number" id="dias_retencion_sucursal" name="dias_retencion_sucursal" min="1" max="90" step="1" value="<%= params.dias_retencion_sucursal %>" required>
+                            <small style="color:var(--color-text-secondary)">Días hábiles que el paquete queda disponible para retiro en la sucursal antes de volver al circuito de devolución. Se usa para estimar la ventana de retiro en el alta de envío.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
@@ -645,22 +663,6 @@
                             <small style="color:var(--color-text-secondary)">Procesa y envía notificaciones acumuladas al cliente.</small>
                         </div>
 
-                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
-                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
-                                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">bolt</span>
-                                Ejecución manual
-                            </label>
-                            <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
-                                Disparar el análisis de demoras ahora, sin esperar al horario programado.
-                            </small>
-                            <form method="POST" action="/setting/trigger-delay-detection" style="margin-top:var(--space-2)">
-                                <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
-                                    <span class="material-symbols-outlined" style="font-size:1.1rem">play_arrow</span>
-                                    Ejecutar detección de demoras ahora
-                                </button>
-                            </form>
-                        </div>
-
                     </div>
 
                     <div class="settings-actions">
@@ -669,6 +671,24 @@
                         </button>
                     </div>
                 </form>
+
+                <%# Ejecución manual: form aparte (NO anidar dentro del form de parámetros,
+                    los forms anidados rompen el botón Guardar). %>
+                <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-4);">
+                    <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">bolt</span>
+                        Ejecución manual
+                    </label>
+                    <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
+                        Disparar el análisis de demoras ahora, sin esperar al horario programado.
+                    </small>
+                    <form method="POST" action="/setting/trigger-delay-detection" style="margin-top:var(--space-2)">
+                        <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem">play_arrow</span>
+                            Ejecutar detección de demoras ahora
+                        </button>
+                    </form>
+                </div>
             </div>
 
             <!-- Card: Ejecutar procesos manualmente (sin esperar al horario programado) -->
@@ -831,6 +851,36 @@
                 <p style="color:var(--color-text-secondary)">
                     La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
                     mientras tanto se usa el texto por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Mail de pago de factura (link de pago simulado) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">payments</span>
+                    Mail de pago de factura
+                </h2>
+                <p class="settings-subtitle">
+                    Mail que recibe el remitente con el link de pago simulado al generarse la factura del envío.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar).
+                    Placeholders: <code>{{empresaNombre}}</code> <code>{{invoiceNumber}}</code> <code>{{senderName}}</code>
+                    <code>{{trackingCode}}</code> <code>{{totalAmount}}</code> <code>{{payUrl}}</code>.
+                </p>
+                <% if (templatesByEvent['INVOICE_PAYMENT_LINK']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla del mail de pago</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="INVOICE_PAYMENT_LINK"
+                        data-description="Mail de pago de factura (link de pago simulado)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>086</code> y <code>087</code> para poder editarla;
+                    mientras tanto se usa el HTML por defecto del sistema.
                 </p>
                 <% } %>
             </div>
@@ -1461,11 +1511,11 @@
                     document.getElementById('tpl-variant-default').addEventListener('click', () => {
                         if (variantSel.value) { postForm('/setting/email-template/default/' + variantSel.value); }
                     });
-                    document.getElementById('tpl-variant-delete').addEventListener('click', () => {
+                    document.getElementById('tpl-variant-delete').addEventListener('click', async () => {
                         const list = TPL[currentEvent] || [];
                         if (!variantSel.value) { return; }
-                        if (list.length <= 1) { alert('No se puede eliminar la única variante del evento.'); return; }
-                        if (confirm('¿Eliminar esta variante?')) { postForm('/setting/email-template/delete/' + variantSel.value); }
+                        if (list.length <= 1) { await window.ltAlert({ icon: 'warning', title: 'No se puede eliminar', text: 'Es la única variante del evento.' }); return; }
+                        if (await window.ltConfirm({ title: '¿Eliminar esta variante?', confirmButtonColor: '#dc2626' })) { postForm('/setting/email-template/delete/' + variantSel.value); }
                     });
 
                     // ---- Abrir modal ----
@@ -1695,7 +1745,7 @@
                                 <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
                                 <td>
                                     <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar este motivo?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1734,7 +1784,7 @@
                                 <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
                                 <td>
                                     <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Desactivar este tipo?" data-confirm-color="#dc2626" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1803,7 +1853,7 @@
                             </label>
                             <div class="tw-actions">
                                 <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar esta franja?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                             </div>
                         </form>
                     <% }) %>
@@ -1949,19 +1999,139 @@
 
             <% if (activeSection === 'auditoria') { %>
             <span class="settings-anchor" id="sec-auditoria"></span>
+            <style>
+                .audit-action-badge { font-size:.75rem;font-weight:600;padding:.15rem .5rem;border-radius:999px;display:inline-block; }
+                .audit-action-login  { background:#d1fae5;color:#065f46; }
+                .audit-action-logout { background:var(--color-surface);color:var(--color-text-secondary);border:1px solid var(--color-border); }
+            </style>
             <section class="settings-category" id="cat-auditoria">
-                <span class="material-symbols-outlined">history</span>
-                <div><h3>Auditoría</h3><p>Registro de cambios de configuración.</p></div>
+                <span class="material-symbols-outlined">manage_search</span>
+                <div><h3>Auditoría y trazabilidad</h3><p>Registro de sesiones, acciones y cambios de configuración.</p></div>
             </section>
 
+            <%
+                const _activeNow = (activeUsers || []).filter(l => {
+                    // Filtra el último login por usuario, descarta los que luego hicieron logout
+                    return true;
+                });
+                const _activeByUser = {};
+                for (const l of _activeNow) {
+                    const uid = l.userId;
+                    if (!_activeByUser[uid]) { _activeByUser[uid] = l; }
+                }
+                const _activeList = Object.values(_activeByUser);
+            %>
+
+            <!-- Usuarios activos -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">group</span>
+                    Usuarios activos (últimas 8 h)
+                </h2>
+                <% if (_activeList.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">Ningún usuario registró actividad reciente.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Usuario</th><th>Email</th><th>Último ingreso</th><th>IP</th></tr></thead>
+                        <tbody>
+                            <% _activeList.forEach(l => { %>
+                            <tr>
+                                <td><%= l.user?.fullName || '—' %></td>
+                                <td><%= l.user?.email || '—' %></td>
+                                <td><%= new Date(l.createdAt).toLocaleString('es-AR') %></td>
+                                <td><code><%= l.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Filtros + Export -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">filter_list</span>
+                    Log de sesiones
+                </h2>
+                <form method="GET" action="/setting/auditoria" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1rem;">
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Usuario</label>
+                        <select name="userId" style="min-width:160px">
+                            <option value="">Todos</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.userId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Acción</label>
+                        <select name="action">
+                            <option value="">Todas</option>
+                            <option value="LOGIN"  <%= auditFilters.action === 'LOGIN'  ? 'selected' : '' %>>Login</option>
+                            <option value="LOGOUT" <%= auditFilters.action === 'LOGOUT' ? 'selected' : '' %>>Logout</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Desde</label>
+                        <input type="date" name="from" value="<%= auditFilters.from || '' %>">
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Hasta</label>
+                        <input type="date" name="to" value="<%= auditFilters.to || '' %>">
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Filtrar</button>
+                    <a href="/setting/auditoria" class="btn btn-ghost">Limpiar</a>
+                    <a href="/setting/auditoria/export-csv?<%= new URLSearchParams(auditFilters).toString() %>" class="btn btn-secondary" style="margin-left:auto">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">download</span>
+                        Exportar CSV
+                    </a>
+                </form>
+
+                <% if (!loginLogs || loginLogs.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay registros para los filtros seleccionados.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Usuario</th>
+                                <th>Acción</th>
+                                <th>IP</th>
+                                <th>Dispositivo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% loginLogs.forEach(log => { %>
+                            <tr>
+                                <td><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= log.user?.fullName || '—' %></td>
+                                <td>
+                                    <span class="audit-action-badge audit-action-<%= log.action.toLowerCase() %>">
+                                        <%= log.action %>
+                                    </span>
+                                </td>
+                                <td><code><%= log.ip || '—' %></code></td>
+                                <td style="font-size:.75rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= log.userAgent || '' %>">
+                                    <%= log.userAgent ? log.userAgent.slice(0, 60) + (log.userAgent.length > 60 ? '…' : '') : '—' %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Historial de cambios de configuración -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">history</span>
                     Historial de cambios de configuración
                 </h2>
-                <p class="settings-subtitle">
-                    Registro de los últimos 50 cambios realizados por administradores.
-                </p>
+                <p class="settings-subtitle">Últimos 50 cambios realizados por administradores.</p>
                 <% if (settingLogs.length === 0) { %>
                     <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay cambios registrados.</p>
                 <% } else { %>
@@ -1982,8 +2152,8 @@
                                 <td><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
                                 <td><%= log.user ? log.user.fullName : 'Sistema' %></td>
                                 <td><code><%= log.key %></code></td>
-                                <td><%= log.oldValue || '-' %></td>
-                                <td><strong><%= log.newValue || '-' %></strong></td>
+                                <td><%= log.oldValue || '—' %></td>
+                                <td><strong><%= log.newValue || '—' %></strong></td>
                             </tr>
                             <% }) %>
                         </tbody>

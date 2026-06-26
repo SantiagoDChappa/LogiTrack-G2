@@ -33,6 +33,7 @@ const isSupOrAdmin = (u) => u?.roleId === RoleType.SUPERVISOR.id || u?.roleId ==
 const isOperator   = (u) => u?.roleId === RoleType.OPERATOR.id;
 
 const { isDamageType } = require('../services/incidentDamageResolution');
+const actionLogModel = require('../models/actionLog');
 
 // LGT-220: el Operador no puede cargar incidencias de paquete roto, así que esos tipos
 // ni se le ofrecen en los selectores (defensa en UI; el backend igual lo rechaza).
@@ -409,6 +410,7 @@ const create = async (req, res) => {
         }
     }
 
+    actionLogModel.record(user.id, 'CREATE', 'INCIDENT', incident.id, { shipmentId: shipment.id, type: type.code }, req);
     if (wantsJson) {
         return res.json({ ok: true, incidentId: incident.id, trackingId: shipment.trackingId });
     }
@@ -821,6 +823,19 @@ const setResolution = async (req, res) => {
                         userId:     user.id,
                     });
                 }
+                // [prototype] Devolución aprobada: el envío pasa a "Devuelto" (igual que el flujo RETURN).
+                const ship = await shipmentModel.getById(incident.shipmentId);
+                if (ship && ship.statusId !== Status.RETURNED.id) {
+                    await shipmentModel.updateStatus(ship.id, Status.RETURNED.id);
+                    await shipmentHistoryModel.create({
+                        shipmentId:   ship.id,
+                        fromStatusId: ship.statusId,
+                        toStatusId:   Status.RETURNED.id,
+                        eventType:    ShipmentHistoryEvent.STATUS_CHANGE,
+                        comment:      `Devolución por paquete dañado (incidencia #${id}) procedente: envío marcado como Devuelto.`,
+                        userId:       user.id,
+                    });
+                }
             } else if (resolution === IncidentResolution.PROCEDENTE && incident.damageChoice === 'REEMPLAZO') {
                 const r = await require('../services/replacementService')
                     .generate({ originalShipmentId: incident.shipmentId });
@@ -836,6 +851,40 @@ const setResolution = async (req, res) => {
         }
     } catch (e) {
         console.error('[incident] resolución de paquete dañado (notif/ejecución):', e.message);
+    }
+
+    // Devolución (incidencia tipo RETURN): mismo flujo de resolución que el resto, pero
+    // el efecto difiere según el caso. PROCEDENTE → reembolso (nota de crédito al
+    // remitente) + envío a "Devuelto". NO_PROCEDENTE → el envío queda en su estado actual.
+    try {
+        const type = await incidentTypeModel.getById(incident.incidentTypeId);
+        if (type && type.code === 'RETURN' && resolution === IncidentResolution.PROCEDENTE) {
+            const r = await require('../services/creditNoteService')
+                .generate({ shipmentId: incident.shipmentId, incidentId: id, userId: user.id });
+            if (r.ok && r.creditNote) {
+                await incidentHistoryModel.create({
+                    incidentId: id,
+                    eventType:  IncidentEventType.COMMENT,
+                    comment:    `Nota de crédito ${r.creditNote.number} generada por reembolso (/credit-note/${r.creditNote.id}).`,
+                    userId:     user.id,
+                    internal:   true,
+                });
+            }
+            const ship = await shipmentModel.getById(incident.shipmentId);
+            if (ship && ship.statusId !== Status.RETURNED.id) {
+                await shipmentModel.updateStatus(ship.id, Status.RETURNED.id);
+                await shipmentHistoryModel.create({
+                    shipmentId:   ship.id,
+                    fromStatusId: ship.statusId,
+                    toStatusId:   Status.RETURNED.id,
+                    eventType:    ShipmentHistoryEvent.STATUS_CHANGE,
+                    comment:      `Devolución (incidencia #${id}) procedente: envío marcado como Devuelto.`,
+                    userId:       user.id,
+                });
+            }
+        }
+    } catch (e) {
+        console.error('[incident] resolución RETURN (NC / Devuelto):', e.message);
     }
 
     res.redirect(`/incident/${id}`);
@@ -873,7 +922,7 @@ const close = async (req, res) => {
     }
 
     const shipment = await shipmentModel.getById(incident.shipmentId);
-    const TERMINAL = [Status.DELIVERED.id, Status.CANCELLED.id];
+    const TERMINAL = [Status.DELIVERED.id, Status.CANCELLED.id, Status.RETURNED.id];
     if (action === 'cancel' && shipment && TERMINAL.includes(shipment.statusId)) {
         return res.status(400).redirect(`/incident/${id}?error=shipment_already_terminal`);
     }
@@ -917,6 +966,7 @@ const close = async (req, res) => {
     }
     // Aviso al cliente: la incidencia se cerró (con comentario explicativo).
     notifyIncidentStatusChange(incident.shipmentId, id, IncidentStatus.CLOSED, String(comment).trim());
+    actionLogModel.record(user.id, 'CLOSE', 'INCIDENT', id, { resolution }, req);
 
     res.redirect(`/incident/${id}`);
 };

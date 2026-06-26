@@ -1,28 +1,86 @@
 // Desglose de costo del envío (cliente). Extraído del detalle de envío para poder
 // reutilizarlo en la nota de crédito (LGT-214). El total es `final`.
 const settingModel = require('../models/setting');
+const dangerSvc = require('./dangerArea.service');
+
+// Destino del envío para evaluar peligrosidad. Tolera distintas formas según de
+// dónde venga el shipment (modelo con `address`, pseudo-shipment del preview, etc.).
+const destinationOf = (shipment) => {
+    const a = shipment.address || {};
+    return {
+        postalCode: shipment.destPostalCode ?? a.postalCode ?? shipment.postalCode ?? null,
+        lat: shipment.destLat ?? a.lat ?? shipment.lat ?? null,
+        lng: shipment.destLng ?? a.lng ?? shipment.lng ?? null,
+    };
+};
+
+// Recargo por destino peligroso. Se CONGELA al alta del envío (igual que el seguro):
+// si el shipment ya trae `dangerSurcharge`, se usa ese valor y no se recalcula. El
+// cálculo en vivo (consultando las áreas peligrosas) solo corre cuando se pide
+// explícitamente con liveDanger=true (alta + preview de costo), para que el ruteo y
+// el detalle/NC tomen siempre el total congelado y no dependan de las áreas actuales.
+const computeDangerSurcharge = async (shipment, subtotal, liveDanger) => {
+    const frozen = shipment.dangerSurcharge;
+    if (frozen !== null && frozen !== undefined) {
+        const v = Number(frozen);
+        return { surcharge: v, dangerous: v > 0, reachable: true };
+    }
+    if (!liveDanger) { return { surcharge: 0, dangerous: false, reachable: true }; }
+    const pct = await dangerSvc.getDangerPct();
+    if (pct <= 0) { return { surcharge: 0, dangerous: false, reachable: true }; }
+    const ev = await dangerSvc.evaluate(destinationOf(shipment));
+    const surcharge = (ev.dangerous && ev.reachable) ? Number((subtotal * (pct / 100)).toFixed(2)) : 0;
+    return { surcharge, dangerous: ev.dangerous, reachable: ev.reachable };
+};
 
 // shipment debe venir con su zona (`shipment.zone`) si se quiere el desglose por zona.
 // penaltyPct opcional (de la SLA): si se pasa, descuenta la penalidad del subtotal.
-const computeCost = async (shipment, { penaltyPct = 0 } = {}) => {
+// Seguro de mercadería ([prototype]): % global (Ajustes → seguro_pct) sobre el valor
+// declarado. Se "congela" al alta en shipment.insuranceAmount; si ya está, se usa ese
+// valor (para no recalcular con un % distinto al vigente cuando se creó el envío).
+const computeInsurance = async (shipment) => {
+    const frozen = shipment.insuranceAmount;
+    if (frozen !== null && frozen !== undefined) { return Number(frozen); }  // valor congelado al alta
+    const declaredValue = Number(shipment.declaredValue || 0);
+    if (declaredValue <= 0) { return 0; }
+    const seguroPct = parseFloat(await settingModel.get('seguro_pct')) || 0;
+    return Number((declaredValue * (seguroPct / 100)).toFixed(2));
+};
+
+// liveDanger: true solo al alta y en el preview de costo, para CALCULAR el recargo
+// por zona peligrosa consultando las áreas. En el resto (detalle/NC/ruteo) se usa el
+// valor congelado en el envío; si no hay, el recargo es 0.
+const computeCost = async (shipment, { penaltyPct = 0, liveDanger = false } = {}) => {
     if (!shipment) { return null; }
     const costoBase = parseFloat(await settingModel.get('costo_base_envio')) || 0;
+    const insurance = await computeInsurance(shipment);
     const w = Number(shipment.weightKg || 0);
     const v = Number(shipment.volumeM3 || 0);
 
     if (!shipment.zone) {
-        if (costoBase <= 0) { return null; }
-        return { costoBase, zoneBase: 0, wSurcharge: 0, vSurcharge: 0, subtotal: costoBase, penalty: 0, final: costoBase };
+        const base = costoBase + insurance;
+        const dng = await computeDangerSurcharge(shipment, base, liveDanger);
+        const subtotal = base + dng.surcharge;
+        if (subtotal <= 0) { return null; }
+        return {
+            costoBase, zoneBase: 0, wSurcharge: 0, vSurcharge: 0, insurance,
+            dangerSurcharge: dng.surcharge, dangerous: dng.dangerous, reachable: dng.reachable,
+            subtotal, penalty: 0, final: subtotal,
+        };
     }
 
     const zone = shipment.zone;
     const zoneBase = Number(zone.baseCost || 0);
     const wSurcharge = Number(zone.surchargePerKg || 0) * w;
     const vSurcharge = Number(zone.surchargePerM3 || 0) * v;
-    const subtotal = costoBase + zoneBase + wSurcharge + vSurcharge;
+    const base = costoBase + zoneBase + wSurcharge + vSurcharge + insurance;
+    const dng = await computeDangerSurcharge(shipment, base, liveDanger);
+    const subtotal = base + dng.surcharge;
     const penalty = penaltyPct ? subtotal * (penaltyPct / 100) : 0;
     return {
-        costoBase, zoneBase, wSurcharge, vSurcharge, subtotal,
+        costoBase, zoneBase, wSurcharge, vSurcharge, insurance,
+        dangerSurcharge: dng.surcharge, dangerous: dng.dangerous, reachable: dng.reachable,
+        subtotal,
         penalty: Number(penalty.toFixed(2)),
         final: Number((subtotal - penalty).toFixed(2)),
     };
@@ -34,4 +92,4 @@ const computeTotal = async (shipment) => {
     return c ? c.final : 0;
 };
 
-module.exports = { computeCost, computeTotal };
+module.exports = { computeCost, computeTotal, computeInsurance };

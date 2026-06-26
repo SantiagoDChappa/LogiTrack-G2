@@ -8,6 +8,8 @@ const Status = Object.freeze({
     IN_PREPARATION: { id: 7, description: 'En Preparacion'  },
     PACKAGE_FAILED: { id: 8, description: 'Paquete Fallido' },
     FAILED_ATTEMPT: { id: 9, description: 'Intento Fallido' },
+    RETURNED:       { id: 10, description: 'Devuelto'        },
+    PENDING_PAYMENT: { id: 11, description: 'Pendiente de Pago' },
 });
 
 const PersonType = Object.freeze({
@@ -139,6 +141,9 @@ const NotificationEvent = Object.freeze({
     FATIGUE_RECHECK_OMITTED:   'FATIGUE_RECHECK_OMITTED',   // re-chequeo en ruta no realizado a tiempo
     FATIGUE_CONSENT_REJECTED:  'FATIGUE_CONSENT_REJECTED',  // rechazó el consentimiento (cada vez, antes del límite)
     FATIGUE_PATTERN_RECURRENT: 'FATIGUE_PATTERN_RECURRENT', // patrón de fatiga recurrente
+    // Mail al remitente con el link de pago simulado de la factura. Transaccional:
+    // siempre se envía. Plantilla editable desde Ajustes → Comunicaciones.
+    INVOICE_PAYMENT_LINK:      'INVOICE_PAYMENT_LINK',
 });
 
 // Tipos de evento en shipment_history (timeline ruteo PDF 2.1)
@@ -186,25 +191,8 @@ const RouteFailureReason = Object.freeze({
     OTHER:               'OTHER',
 });
 
-// LGT-182/183/184/186 — Devoluciones.
-const ReturnStatus = Object.freeze({
-    SOLICITADA:  'SOLICITADA',
-    EN_REVISION: 'EN_REVISION',
-    APROBADA:    'APROBADA',
-    RECHAZADA:   'RECHAZADA',
-    EN_PROCESO:  'EN_PROCESO',
-    FINALIZADA:  'FINALIZADA',
-});
-
-const ReturnStatusLabel = Object.freeze({
-    SOLICITADA:  'Solicitada',
-    EN_REVISION: 'En revisión',
-    APROBADA:    'Aprobada',
-    RECHAZADA:   'Rechazada',
-    EN_PROCESO:  'En proceso',
-    FINALIZADA:  'Finalizada',
-});
-
+// LGT-182/183/184/186 — Devoluciones. Ahora son incidencias de tipo RETURN; se conserva
+// solo el motivo estructurado (el estado/resolución los maneja la incidencia).
 const ReturnReason = Object.freeze({
     DEFECTUOSO:      'DEFECTUOSO',
     INCORRECTO:      'INCORRECTO',
@@ -219,13 +207,6 @@ const ReturnReasonLabel = Object.freeze({
     DANADO:          'Llegó dañado',
     ARREPENTIMIENTO: 'Arrepentimiento (ya no lo quiero)',
     OTRO:            'Otro',
-});
-
-// Resultado que define el Supervisor al aprobar (LGT-183/213). Comparte vocabulario con
-// incident.damageChoice (REEMBOLSO/REEMPLAZO).
-const ReturnResult = Object.freeze({
-    REEMBOLSO: 'REEMBOLSO',
-    REEMPLAZO: 'REEMPLAZO',
 });
 
 const mapperShipmentStatusToEvent = {
@@ -256,5 +237,5 @@ module.exports = {
     NotificationEvent, mapperShipmentStatusToEvent, EmailQueueStatus,
     ShipmentHistoryEvent, RouteFailureReason,
     ModificationRequestStatus, ModificationChangeType, ModificationChannel,
-    ReturnStatus, ReturnStatusLabel, ReturnReason, ReturnReasonLabel, ReturnResult,
+    ReturnReason, ReturnReasonLabel,
 };

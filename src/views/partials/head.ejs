@@ -1,10 +1,11 @@
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=block" rel="stylesheet" />
 <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
 <link rel="stylesheet" href="/css/components.css?v=<%= assetVersion %>">
+<link rel="stylesheet" href="/css/responsive-base.css?v=<%= assetVersion %>">
 <link rel="stylesheet" href="/css/logo.css?v=<%= assetVersion %>">
 <link rel="stylesheet" href="/css/header.css?v=<%= assetVersion %>">
 <link rel="stylesheet" href="/css/menu.css?v=<%= assetVersion %>">
@@ -13,5 +14,31 @@
 <link rel="stylesheet" href="/css/a11y.css?v=<%= assetVersion %>">
 <link rel="shortcut icon" href="/images/favicon.ico?v=<%= assetVersion %>" />
 <% if (typeof statusColorsCss !== 'undefined' && statusColorsCss) { %><style id="status-colors-override"><%- statusColorsCss %></style><% } %>
+<link rel="stylesheet" href="/css/search.css?v=<%= assetVersion %>">
 <script src="/js/table-paginate.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/page-loader.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/search.js?v=<%= assetVersion %>" defer></script>
+<%# Diálogos in-page (SweetAlert) — reemplazan confirm()/alert() del navegador en todo el sistema %>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="/css/swal-theme.css?v=<%= assetVersion %>">
+<%# tema swal claro/oscuro %>
+<script src="/js/dialogs.js?v=<%= assetVersion %>" defer></script>
+<%# [prototype] PWA / modo offline del repartidor (los scripts se autolimitan a /delivery) %>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LogiTrack">
+<link rel="apple-touch-icon" href="/images/icon-192.png">
+<script src="/js/offline-db.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/delivery-offline.js?v=<%= assetVersion %>" defer></script>
+<% if (typeof currentUser !== 'undefined' && currentUser) { %>
+<script>window.__LGT={userId:<%= currentUser.id %>,roleId:<%= currentUser.roleId %>,onboarded:<%= currentUser.onboarded ? 'true' : 'false' %>,helpSeen:<%- JSON.stringify(currentUser.helpSeen || {}) %>};</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.css"/>
+<link rel="stylesheet" href="/css/onboarding-tour.css?v=<%= assetVersion %>">
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.js.iife.js"></script>
+<script src="/js/tour-popover-ui.js?v=<%= assetVersion %>"></script>
+<script src="/js/onboarding-tour.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/contextual-tour.js?v=<%= assetVersion %>" defer></script>
+<% } %>

@@ -19,6 +19,7 @@ const incidentTypeModel = require('../models/incidentType');
 const incidentNotifConfig = require('../services/incidentNotifConfig');
 const statusModel = require('../models/status');
 const statusColors = require('../services/statusColors');
+const loginLogModel = require('../models/loginLog');
 
 // LGT-174: secciones de Ajustes (cada una es su propia página, navegada desde el menú).
 const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'incidencias', 'auditoria'];
@@ -31,9 +32,16 @@ function settingBack(req, suffix = '') {
 }
 
 const getSettings = async (req, res) => {
+    const auditFilters = req.params.section === 'auditoria' ? {
+        userId: req.query.userId || undefined,
+        action: req.query.action || undefined,
+        from:   req.query.from   || undefined,
+        to:     req.query.to     || undefined,
+    } : {};
+
     const [settings, provinces, branches, users, routeOpt, notifConfig, emailTemplates, settingLogs,
            failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
-           customVariables, emailSnippets] = await Promise.all([
+           customVariables, emailSnippets, loginLogs, activeUsers] = await Promise.all([
         settingModel.getAll(),
         provinceModel.getAll(),
         branchModel.getAll(),
@@ -49,6 +57,8 @@ const getSettings = async (req, res) => {
         incidentNotifConfig.get().catch(() => ({ ...incidentNotifConfig.DEFAULTS })),
         notificationVariableModel.getAll().catch(() => []),
         emailSnippetModel.getAll().catch(() => []),
+        loginLogModel.getAll(auditFilters).catch(() => []),
+        loginLogModel.getActiveUsers().catch(() => []),
     ]);
 
     // LGT-173: estados con su color configurado (o vacío) para la tarjeta de colores.
@@ -95,6 +105,7 @@ const getSettings = async (req, res) => {
         failedReasons, stdMessages, timeWindows, incidentTypes, incidentNotif,
         placeholderGroups, customVariables, emailSnippets, sampleVars,
         statusColorList, incidentStatusColorList, activeSection,
+        loginLogs, activeUsers, auditFilters,
         params: {
             // Sprint 3 - 2.5: reglas de reprogramación parametrizables
             reschedule_default_days:  settings.reschedule_default_days  || '1',
@@ -108,6 +119,9 @@ const getSettings = async (req, res) => {
             peso_maximo_envio:        settings.peso_maximo_envio        || '50',
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
             costo_base_envio:         settings.costo_base_envio         || '500',
+            seguro_pct:               settings.seguro_pct               || '0',
+            recargo_zona_peligrosa_pct: settings.recargo_zona_peligrosa_pct || '0',
+            dias_retencion_sucursal:    settings.dias_retencion_sucursal    || '10',
             nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
             logo_empresa:             settings.logo_empresa             || '',
             telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
@@ -752,6 +766,9 @@ const saveParams = async (req, res) => {
             'peso_maximo_envio',
             'cantidad_maxima_paquetes',
             'costo_base_envio',
+            'seguro_pct',
+            'recargo_zona_peligrosa_pct',
+            'dias_retencion_sucursal',
             // 'nombre_empresa' se gestiona en la tarjeta "Identidad visual" (/setting/identity) — LGT-172
             'telefono_soporte',
             'email_soporte',
@@ -793,6 +810,24 @@ const saveParams = async (req, res) => {
         const costoBase = parseFloat(req.body.costo_base_envio);
         if (isNaN(costoBase) || costoBase < 0) {
             return res.redirect(settingBack(req, '?error=costo_base'));
+        }
+
+        // [prototype] % de seguro de mercadería: entre 0 y 100.
+        const seguroPct = parseFloat(req.body.seguro_pct);
+        if (isNaN(seguroPct) || seguroPct < 0 || seguroPct > 100) {
+            return res.redirect(settingBack(req, '?error=seguro_pct'));
+        }
+
+        // % de recargo por destino peligroso (llegable): entre 0 y 500. 0 = sin recargo.
+        const dangerPct = parseFloat(req.body.recargo_zona_peligrosa_pct);
+        if (isNaN(dangerPct) || dangerPct < 0 || dangerPct > 500) {
+            return res.redirect(settingBack(req, '?error=recargo_zona_peligrosa'));
+        }
+
+        // Días hábiles que el paquete queda disponible para retiro en sucursal.
+        const retencion = parseInt(req.body.dias_retencion_sucursal);
+        if (isNaN(retencion) || retencion < 1 || retencion > 90) {
+            return res.redirect(settingBack(req, '?error=dias_retencion_sucursal'));
         }
 
         const horaInicio = req.body.horario_entrega_inicio;
@@ -963,6 +998,7 @@ const saveFatigueConsentNotifConfig = async (req, res) => {
     }
 };
 
+
 const triggerDelayDetection = async (req, res) => {
     try {
         const { processDelayedShipments } = require('../jobs/delayDetectionJob');
@@ -971,6 +1007,56 @@ const triggerDelayDetection = async (req, res) => {
     } catch (err) {
         console.error('triggerDelayDetection:', err.message);
         res.status(500).redirect(settingBack(req, '?error=delay_triggered'));
+    }
+};
+
+const exportAuditCsv = async (req, res) => {
+    try {
+        const filters = {
+            userId: req.query.userId || undefined,
+            action: req.query.action || undefined,
+            from:   req.query.from   || undefined,
+            to:     req.query.to     || undefined,
+        };
+        const [loginLogs, settingLogs] = await Promise.all([
+            loginLogModel.getAll({ ...filters, limit: 5000 }).catch(() => []),
+            settingLogModel.getAll().catch(() => []),
+        ]);
+
+        const rows = [];
+        rows.push(['Tipo', 'Fecha y hora', 'Usuario', 'Acción / Parámetro', 'Detalle', 'IP', 'User-Agent']);
+
+        for (const l of loginLogs) {
+            rows.push([
+                'Sesión',
+                new Date(l.createdAt).toLocaleString('es-AR'),
+                l.user?.fullName || l.userId || 'Desconocido',
+                l.action,
+                '',
+                l.ip || '',
+                l.userAgent || '',
+            ]);
+        }
+        for (const l of settingLogs) {
+            rows.push([
+                'Configuración',
+                new Date(l.changedAt).toLocaleString('es-AR'),
+                l.user?.fullName || 'Sistema',
+                l.key,
+                `${l.oldValue || ''} → ${l.newValue || ''}`,
+                '',
+                '',
+            ]);
+        }
+
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const filename = `auditoria_${new Date().toISOString().slice(0, 10)}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('﻿' + csv);
+    } catch (err) {
+        console.error('exportAuditCsv:', err.message);
+        res.status(500).send('Error al exportar');
     }
 };
 
@@ -986,4 +1072,5 @@ module.exports = {
     saveDateTimeSettings,
     saveEmailProviders,
     saveEtaSettings,
+    exportAuditCsv,
 };

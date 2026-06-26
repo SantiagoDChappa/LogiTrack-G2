@@ -73,7 +73,11 @@ html[data-theme="dark"] {
 
 .left-header .nav { padding: .9rem .55rem !important; }
 
-.left-header .nav ul {
+/* Incluye .nav-group-toggle: antes menu.css solo restyleaba los items normales
+   y los grupos desplegables quedaban con el estilo viejo de header.css (color/ícono
+   distintos). Ahora items y toggles comparten exactamente el mismo tamaño y estilo. */
+.left-header .nav ul,
+.left-header .nav-group-toggle {
     border-radius: var(--mn-radius-md) !important;
     padding: .6rem .8rem !important;
     margin: 1px 0;
@@ -84,7 +88,8 @@ html[data-theme="dark"] {
     position: relative;
 }
 
-.left-header .nav ul:hover {
+.left-header .nav ul:hover,
+.left-header .nav-group-toggle:hover {
     background-color: var(--mn-sidebar-accent) !important;
     color: #fff !important;
     transform: translateX(2px);
@@ -109,7 +114,8 @@ html[data-theme="dark"] {
     box-shadow: 0 0 8px rgba(96, 165, 250, .6);
 }
 
-.left-header .nav ul .material-symbols-outlined {
+.left-header .nav ul .material-symbols-outlined,
+.left-header .nav-group-toggle > .material-symbols-outlined:first-child {
     font-size: 1.15rem;
     opacity: .9;
 }
@@ -119,14 +125,14 @@ html[data-theme="dark"] {
     padding: .9rem .55rem !important;
 }
 
-#btn-theme {
+.left-header #btn-theme {
     padding: .6rem .8rem !important;
     border-radius: var(--mn-radius-md) !important;
     font-weight: 500;
     transition: background-color .18s ease, color .18s ease, transform .12s ease;
 }
 
-#btn-theme:hover {
+.left-header #btn-theme:hover {
     background-color: var(--mn-sidebar-accent) !important;
     color: #fff !important;
     transform: translateX(2px);

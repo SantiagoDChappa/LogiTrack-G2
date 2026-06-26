@@ -72,6 +72,42 @@ const listPending = ({ branchId, status, includeAll = false } = {}) => {
     });
 };
 
+/** Búsqueda universal — tracking, DNI/email del solicitante, destinatario o id. */
+const searchForUniversal = ({ q, branchId, fetchLimit }) => {
+    const { Shipment } = require('./shipment');
+    const { Person } = require('./person');
+    const trimmed = String(q).trim();
+    const like = { [Op.iLike]: `%${trimmed}%` };
+    const numeric = /^\d{1,9}$/.test(trimmed);
+    const shipmentWhere = branchId ? { currentBranchId: branchId } : {};
+
+    const orClauses = [
+        { '$shipment.trackingId$': like },
+        { requestedByEmail: like },
+        { '$shipment.recipient.fullName$': like },
+    ];
+    if (numeric) {
+        orClauses.push({ id: parseInt(trimmed, 10) });
+        orClauses.push({ requestedByDocument: parseInt(trimmed, 10) });
+    }
+
+    return ShipmentModificationRequest.findAll({
+        where: { [Op.or]: orClauses },
+        include: [{
+            model: Shipment,
+            as: 'shipment',
+            required: true,
+            where: Object.keys(shipmentWhere).length ? shipmentWhere : undefined,
+            attributes: ['id', 'trackingId'],
+            include: [{ model: Person, as: 'recipient', attributes: ['fullName'] }],
+        }],
+        attributes: ['id', 'shipmentId', 'changeType', 'status', 'requestedByEmail', 'requestedByDocument'],
+        order: [['id', 'DESC']],
+        limit: fetchLimit,
+        subQuery: false,
+    });
+};
+
 const updateById = (id, data, options = {}) => ShipmentModificationRequest.update(data, {
     where: { id },
     ...options,
@@ -83,5 +119,6 @@ module.exports = {
     findById,
     listByShipmentId,
     listPending,
+    searchForUniversal,
     updateById,
 };

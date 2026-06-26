@@ -13,6 +13,7 @@ const { PROVINCES } = require('../utils/provinces');
 const { calcutaleUpdatePriority } = require('../utils/updatePriorityShipment');
 const { notifyStatusChange } = require('../utils/notifications');
 const { RoleType, Status, ShipmentType, ShipmentPriority, NotificationEvent } = require('../constants/enums');
+const actionLogModel = require('../models/actionLog');
 
 // Default ETA si el operador no carga fecha estimada al crear/modificar.
 // Express → +2 días, Standard → +5, sin tipo → +3. Devuelve 'YYYY-MM-DD' (DATEONLY).
@@ -24,6 +25,17 @@ const computeDefaultExpectedDeliveryDate = (shipmentTypeId) => {
     const d = new Date();
     d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
+};
+
+// La fecha estimada de entrega debe ser posterior a hoy: no se admite una fecha
+// anterior ni igual al día de hoy. Si no viene (se calculará por default), es válida.
+const isValidFutureDeliveryDate = (val) => {
+    if (!val) { return true; }
+    const d = new Date(`${val}T00:00:00`);
+    if (Number.isNaN(d.getTime())) { return false; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d.getTime() > today.getTime();
 };
 const { validationResult } = require('express-validator');
 const csvImport = require('../services/csvImport');
@@ -230,7 +242,7 @@ const getDetail = async (req, res) => {
 
 
     const replacementSvc = require('../services/replacementService');
-    const [incidentsForShipment, replacementShipment, originalShipment] = await Promise.all([
+    const [incidentsForShipment, replacementShipment, originalShipment, invoice, creditNotes] = await Promise.all([
         require('../models/incident').list({ shipmentId: id, limit: 50 }),
         // Este envío generó un reemplazo (es el original).
         replacementSvc.findExistingByOrigin(id),
@@ -238,10 +250,23 @@ const getDetail = async (req, res) => {
         shipment.replacementOfShipmentId
             ? shipmentModel.getById(shipment.replacementOfShipmentId)
             : Promise.resolve(null),
+        // Factura del envío (comprobante al remitente).
+        require('../services/invoiceService').getByShipment(id),
+        // Notas de crédito del envío (reembolsos por devolución / incidencia).
+        require('../services/creditNoteService').getByShipment(id),
     ]);
 
+    // Alta interna de devolución: visible a staff cuando el envío es elegible
+    // (entregado + dentro de ventana + sin devolución previa). El form vuelve a validar igual.
+    const STAFF_ROLE_IDS = [RoleType.SUPERVISOR.id, RoleType.OPERATOR.id, RoleType.ADMIN.id];
+    let canCreateReturn = false;
+    if (viewer && STAFF_ROLE_IDS.includes(viewer.roleId)) {
+        const elig = await require('../services/returnIncidentService').checkEligibility(shipment).catch(() => ({ ok: false }));
+        canCreateReturn = !!elig.ok;
+    }
+
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
@@ -249,32 +274,40 @@ const getDetail = async (req, res) => {
         originalShipment,
         isAdmin: isAdminUser(viewer),
         currentBranch,
+        canCreateReturn,
+        returnError: req.query.returnError || null,
     });
 };
 
 const getNewShipmentForm = async (req, res) => {
-    const [provinces, typesShipment, pickupBranches] = await Promise.all([
+    const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
         provinceModel.getAll(),
         typeShipmentModel.getAll(),
         branchModel.getPickupEnabled(),
+        settingModel.get('seguro_pct'),
+        settingModel.get('dias_retencion_sucursal'),
     ]);
-    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches });
+    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches, seguroPct: parseFloat(seguroPct) || 0, retentionDays: parseInt(retentionDays) || 10 });
 };
 
 const createShipment = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
+            settingModel.get('seguro_pct'),
+            settingModel.get('dias_retencion_sucursal'),
         ]);
         return res.render('shipment/new', {
             errors: errors.array().map(e => e.msg),
             body: req.body,
             provinces,
             typesShipment,
-            pickupBranches
+            pickupBranches,
+            seguroPct: parseFloat(seguroPct) || 0,
+            retentionDays: parseInt(retentionDays) || 10
         });
     }
 
@@ -285,6 +318,9 @@ const createShipment = async (req, res) => {
 
         if (parseFloat(body.weightKg) <= 0) { throw new Error('El peso debe ser mayor a 0'); }
         if (parseInt(body.packageQty) <= 0) { throw new Error('La cantidad de bultos debe ser al menos 1'); }
+        if (!isValidFutureDeliveryDate(body.expectedDeliveryDate)) {
+            throw new Error('La fecha estimada de entrega debe ser posterior a hoy.');
+        }
 
         let pickupBranch = null;
         if (isPickup) {
@@ -447,6 +483,7 @@ const createShipment = async (req, res) => {
             weightKg:        body.weightKg       || null,
             packageQty:      body.packageQty     || null,
             volumeM3:        body.volumeM3       || null,
+            declaredValue:   body.declaredValue ? Math.max(0, parseFloat(body.declaredValue) || 0) : null,
             basePriority:    initialPriority,
             priority:        initialPriority,
             currentBranchId: resolvedCurrentBranchId,
@@ -454,6 +491,7 @@ const createShipment = async (req, res) => {
             expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
+            statusId: body.requirePaymentFirst === 'true' ? Status.PENDING_PAYMENT.id : undefined,
         }, { transaction: t });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
@@ -475,29 +513,62 @@ const createShipment = async (req, res) => {
         const freshShipment = await shipmentModel.getById(shipment.id);
 
         // LGT-214 precondición: persistir costo al momento de creación.
+        // [prototype] El desglose ya incluye el seguro de mercadería; persistimos también
+        // insuranceAmount aparte para itemizarlo en factura/NC sin recalcularlo después.
         const costSvc = require('../services/shipmentCostService');
-        const costTotal = await costSvc.computeTotal(freshShipment);
-        if (costTotal > 0) {
-            await shipmentModel.Shipment.update({ costTotal }, { where: { id: freshShipment.id } });
-            freshShipment.costTotal = costTotal;
+        // liveDanger: evaluar la zona peligrosa AHORA (al alta) y congelar el recargo.
+        // Después el ruteo/detalle/NC usan el total ya persistido, sin recalcular.
+        const breakdown = await costSvc.computeCost(freshShipment, { liveDanger: true });
+        const costTotal = breakdown ? breakdown.final : 0;
+        const insuranceAmount = breakdown ? breakdown.insurance : 0;
+        const dangerSurcharge = breakdown ? (breakdown.dangerSurcharge || 0) : 0;
+        const costUpdates = {};
+        if (costTotal > 0)        { costUpdates.costTotal = costTotal;             freshShipment.costTotal = costTotal; }
+        if (insuranceAmount > 0)  { costUpdates.insuranceAmount = insuranceAmount; freshShipment.insuranceAmount = insuranceAmount; }
+        if (dangerSurcharge > 0)  { costUpdates.dangerSurcharge = dangerSurcharge; freshShipment.dangerSurcharge = dangerSurcharge; }
+        if (Object.keys(costUpdates).length) {
+            await shipmentModel.Shipment.update(costUpdates, { where: { id: freshShipment.id } });
+        }
+
+        // Factura del envío (comprobante al remitente) con el desglose de costo.
+        // Best-effort: un fallo de facturación no debe tumbar el alta del envío.
+        // [prototype] Tras generarla, mandamos al remitente el link de pago simulado.
+        try {
+            const { invoice } = await require('../services/invoiceService').generate({
+                shipmentId: freshShipment.id,
+                userId: res.locals.currentUser?.id || null,
+            });
+            if (invoice && invoice.payStatus !== 'PAGADA') {
+                const empresa = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
+                require('../services/invoicePaymentEmail')
+                    .sendPaymentLink({ invoice, shipment: freshShipment, empresa })
+                    .catch((e) => console.error('[createShipment] mail de pago:', e.message));
+            }
+        } catch (e) {
+            console.error('[createShipment] factura:', e.message);
         }
 
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_PENDING, freshShipment);
 
+        actionLogModel.record(res.locals.currentUser?.id, 'CREATE', 'SHIPMENT', shipment.id, { trackingId: shipment.trackingId }, req);
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
-        const [provinces, typesShipment, pickupBranches] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
+            settingModel.get('seguro_pct'),
+            settingModel.get('dias_retencion_sucursal'),
         ]);
         res.render('shipment/new', {
             errors: [err.message],
             body: req.body,
             provinces,
             typesShipment,
-            pickupBranches
+            pickupBranches,
+            seguroPct: parseFloat(seguroPct) || 0,
+            retentionDays: parseInt(retentionDays) || 10
         });
     }
 };
@@ -726,6 +797,7 @@ const updateShipment = async (req, res) => {
                 await shipmentModel.updatePriority(shipment.id, newPriority, { transaction: t });
             });
         }
+        actionLogModel.record(res.locals.currentUser?.id, 'UPDATE', 'SHIPMENT', shipment.id, null, req);
         res.redirect('/shipment?success=2');
     } catch (err) {
         console.error('ERROR updateShipment:', err.message);
@@ -871,6 +943,7 @@ const cancelShipment = async (req, res) => {
         const shipment = await shipmentModel.getById(id);
         await notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipment);
 */
+        actionLogModel.record(res.locals.currentUser?.id, 'CANCEL', 'SHIPMENT', Number(id), null, req);
         res.redirect(`/shipment/update/${id}?success=5`);
     } catch (err) {
         const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);

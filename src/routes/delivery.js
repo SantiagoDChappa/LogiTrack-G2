@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
 const { requireAuth, requireDelivery } = require('../middlewares/auth');
 const shipmentModel = require('../models/shipment');
 const deliveryController = require('../controllers/delivery');
@@ -85,6 +85,148 @@ function checkStopOrder(route, stopId) {
     return { ok: true, target };
 }
 
+// ── Offline ([prototype]) ────────────────────────────────────────────────
+// Idempotencia + "gana el servidor" para las acciones que el repartidor encoló
+// sin conexión. Se activa SOLO cuando el cliente manda el header Idempotency-Key
+// (es decir, al re-sincronizar la cola); el flujo online normal no se ve afectado.
+async function recordOfflineAction(req, res, statusCode, body, conflict) {
+    try {
+        const ridMatch = (req.path.match(/\/route\/(\d+)/) || [])[1];
+        const rid = ridMatch || (req.body && req.body.routeId) || null;
+        await sequelize.query(
+            `INSERT INTO logitrack.offline_action
+                ("idempotencyKey","userId","routeId","method","path","statusCode","responseBody","conflict","queuedAt","syncedAt")
+             VALUES (:k,:uid,:rid,:method,:path,:code,:body,:conflict,:queuedAt,now())
+             ON CONFLICT ("idempotencyKey") DO NOTHING`,
+            { replacements: {
+                k:        req.get('Idempotency-Key'),
+                uid:      res.locals.currentUser ? res.locals.currentUser.id : null,
+                rid:      rid ? Number(rid) : null,
+                method:   req.method,
+                path:     String(req.originalUrl).slice(0, 255),
+                code:     statusCode,
+                body:     body ? JSON.stringify(body).slice(0, 4000) : null,
+                conflict: !!conflict,
+                queuedAt: req.get('X-Queued-At') ? new Date(Number(req.get('X-Queued-At'))) : null,
+            } }
+        );
+    } catch (e) { console.error('recordOfflineAction:', e.message); }
+}
+
+async function offlineIdempotency(req, res, next) {
+    if (req.method !== 'POST') { return next(); }
+    const key = req.get('Idempotency-Key');
+    // 'undefined'/'null' llegan como string si el cliente setea el header con un valor JS
+    // undefined. Tratarlos como sin-clave evita que TODAS las acciones colisionen en una
+    // única fila y se deduplicen entre sí (bug "encola pero no actualiza").
+    if (!key || key === 'undefined' || key === 'null') { return next(); }
+    // [sync-debug] Toda acción re-sincronizada llega acá (lleva Idempotency-Key). Log visible
+    // en Render para diagnosticar por qué "encola pero no actualiza". Quitar cuando se resuelva.
+    const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
+    console.log(`[sync] recv user=${uid} ${req.method} ${req.originalUrl} key=${key} queuedAt=${req.get('X-Queued-At') || '-'}`);
+    try {
+        const rows = await sequelize.query(
+            'SELECT "statusCode","responseBody" FROM logitrack.offline_action WHERE "idempotencyKey"=:k',
+            { replacements: { k: key }, type: QueryTypes.SELECT }
+        );
+        if (rows.length) {
+            // Ya aplicada: respondemos sin volver a ejecutar el handler (dedupe del reintento).
+            const code = rows[0].statusCode || 200;
+            console.log(`[sync] dedupe key=${key} prevStatus=${code} (NO se re-ejecuta el handler)`);
+            return res.status(code).json({ ok: code < 400, deduped: true });
+        }
+        // Gana el servidor: si la ruta ya está cerrada/cancelada/interrumpida, rechazamos.
+        const m = req.path.match(/^\/route\/(\d+)\//);
+        if (m) {
+            const route = await Route.findByPk(Number(m[1]), { attributes: ['statusId'] }).catch(() => null);
+            if (route && [RouteStatus.FINISHED, RouteStatus.CANCELLED, RouteStatus.INTERRUPTED].includes(route.statusId)) {
+                console.log(`[sync] conflict route=${m[1]} statusId=${route.statusId} key=${key} → 409 (ruta cerrada)`);
+                const body = { ok: false, conflict: true, error: 'La ruta fue cerrada o reasignada mientras estabas sin conexión; esta acción no se aplicó.' };
+                await recordOfflineAction(req, res, 409, body, true);
+                return res.status(409).json(body);
+            }
+        }
+        // Registra la acción al terminar la respuesta (cubre json, redirect y send) para
+        // deduplicar reintentos futuros con la misma clave.
+        res.on('finish', () => {
+            console.log(`[sync] applied key=${key} ${req.method} ${req.originalUrl} → status=${res.statusCode}`);
+            recordOfflineAction(req, res, res.statusCode || 200, null, false);
+        });
+        return next();
+    } catch (e) {
+        console.error('offlineIdempotency:', e.message);
+        return next();
+    }
+}
+router.use(offlineIdempotency);
+
+// [sync-debug] Beacon cliente→Render: el flush de la cola corre en el navegador/SW, así que
+// sus decisiones no se ven en los logs del server. La página postea acá para reflejarlas en
+// Render (igual que /fatigue/voz-log). Best-effort, sin auth estricta. Quitar al resolver.
+router.post('/sync-log', requireDelivery, (req, res) => {
+    const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
+    console.log(`[sync][cliente] user=${uid}`, JSON.stringify(req.body).slice(0, 1000));
+    res.status(204).end();
+});
+
+// Bundle del ruteo activo para operar offline. Solo la ruta IN_ROUTE del propio
+// repartidor, con los datos mínimos necesarios (se cachean CIFRADOS en el dispositivo).
+router.get('/route/:id/offline-bundle', requireDelivery, async (req, res) => {
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+    if (route.statusId !== RouteStatus.IN_ROUTE) {
+        return res.status(409).json({ error: 'La ruta no está en tránsito', code: 'NOT_ACTIVE' });
+    }
+    const stops = (route.stops || []).map((s) => ({
+        id: s.id, sequence: s.sequence, stopType: s.stopType,
+        completed: s.completed, skipped: s.skipped,
+        lat: s.lat, lng: s.lng,
+        distanceFromPrevKm: s.distanceFromPrevKm, estimatedMinutes: s.estimatedMinutes,
+        branch: s.branch ? { name: s.branch.name, address: s.branch.address } : null,
+        shipment: s.shipment ? {
+            id: s.shipment.id, trackingId: s.shipment.trackingId, statusId: s.shipment.statusId,
+            deliverySecretCode: s.shipment.deliverySecretCode || null,
+            codAmount: s.shipment.codAmount, codMethod: s.shipment.codMethod,
+            fragile: s.shipment.fragile, refrigerated: s.shipment.refrigerated, oversized: s.shipment.oversized,
+            weightKg: s.shipment.weightKg, packageQty: s.shipment.packageQty,
+            specialInstructions: s.shipment.specialInstructions,
+            expectedDeliveryFrom: s.shipment.expectedDeliveryFrom, expectedDeliveryTo: s.shipment.expectedDeliveryTo,
+            recipient: s.shipment.recipient ? { fullName: s.shipment.recipient.fullName, phone: s.shipment.recipient.phone } : null,
+            address: s.shipment.address ? { street: s.shipment.address.street, number: s.shipment.address.number } : null,
+        } : null,
+    }));
+    // Control de fatiga para operar offline: se cachea junto al ruteo "cuando carga
+    // los datos". Lleva si está habilitado + los parámetros para PUNTUAR la prueba de
+    // REACCIÓN y decidir el bloqueo del lado del cliente con el MISMO criterio del
+    // server (sin red). Offline solo se usa REACCIÓN (la voz necesita STT en el server).
+    let fatigue = { enabled: false };
+    try {
+        const cfg = await require('../services/fatigue/config').getConfig(route.originBranchId);
+        fatigue = {
+            enabled: cfg.enabled,
+            method: 'REACCION',            // offline forzamos reacción
+            methodRecheck: cfg.methodRecheck,
+            consentVersion: cfg.consentVersion,
+            reactionAttempts: cfg.reactionAttempts,
+            reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+            reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+            thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
+        };
+    } catch (e) { console.warn('[offline-bundle] fatigue cfg:', e.message); }
+
+    res.json({
+        routeId: route.id, statusId: route.statusId,
+        totalDistanceKm: route.totalDistanceKm,
+        transportName: route.transport ? route.transport.name : '',
+        originBranch: route.originBranch ? route.originBranch.name : '',
+        cachedAt: new Date().toISOString(),
+        fatigue,
+        stops,
+    });
+});
+
 router.get('/', requireDelivery, async (req, res) => {
     try {
         const userId = res.locals.currentUser.id;
@@ -112,6 +254,24 @@ router.get('/', requireDelivery, async (req, res) => {
 
         const activeRoute = inRoute || planned[0] || null;
         const upcomingRoutes = planned.filter(r => !activeRoute || r.id !== activeRoute.id);
+
+        // Ojo de Patrón: si la ruta activa está PLANIFICADA pero el control de fatiga de
+        // inicio quedó BLOQUEADO (no pasó la prueba de reacción/voz, con autoBlock según
+        // config), el card se muestra en rojo y sin accionable — no puede iniciar ni entrar.
+        // Una ruta que sólo "necesita hacer la prueba" (FATIGUE_REQUIRED/PENDING) NO se
+        // bloquea: el repartidor debe entrar para realizar el control.
+        let startBlocked = null;
+        if (activeRoute && activeRoute.statusId === RouteStatus.PLANNED && !driverDisabled) {
+            try {
+                const cfg = await require('../services/fatigue/config').getConfig(activeRoute.originBranchId);
+                if (cfg.enabled) {
+                    const gate = await require('../services/fatigue').canStart(activeRoute.id);
+                    if (!gate.ok && gate.reason === 'BLOCKED') {
+                        startBlocked = { id: activeRoute.id, score: gate.score || null };
+                    }
+                }
+            } catch (e) { console.warn('[fatigue] startBlocked check:', e.message); }
+        }
 
         // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
         const fatigueRoute = routes.find(r =>
@@ -168,6 +328,7 @@ router.get('/', requireDelivery, async (req, res) => {
             finishedRoutes: finished.map(summarizeRoute),
             fatigueBlocked,
             driverDisabled,
+            startBlocked,
         });
     } catch (err) {
         console.error(err);
@@ -241,8 +402,26 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
         if (route.statusId === RouteStatus.BLOCKED_FATIGUE || route.statusId === RouteStatus.PAUSED_FATIGUE) {
             return res.redirect('/delivery?fatigue=1');
         }
+        // Ojo de Patrón: ruta PLANIFICADA cuyo control de inicio quedó BLOQUEADO (no pasó
+        // la prueba de reacción/voz) → no puede entrar ni por URL directa. Vuelve al home
+        // con el aviso. Las rutas que sólo necesitan hacer la prueba sí pueden entrar.
+        if (route.statusId === RouteStatus.PLANNED) {
+            try {
+                const cfg = await fatigueCfg.getConfig(route.originBranchId);
+                if (cfg.enabled) {
+                    const gate = await fatigueSvc.canStart(route.id);
+                    if (!gate.ok && gate.reason === 'BLOCKED') {
+                        return res.redirect('/delivery?fatiga=bloqueado&ruta=' + route.id);
+                    }
+                }
+            } catch (e) { console.warn('[fatigue] route gate:', e.message); }
+        }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
-        res.render('delivery/route', { route, readOnly });
+        // Para el POD offline en la misma página: saber si el envío exige código clave.
+        const settingModel = require('../models/setting');
+        const dsSetting = await settingModel.getAll().catch(() => ({}));
+        const deliverySecretEnabled = dsSetting.delivery_secret_enabled !== 'false';
+        res.render('delivery/route', { route, readOnly, deliverySecretEnabled });
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
@@ -807,8 +986,13 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     const cfg = await fatigueCfg.getConfig(route.originBranchId);
     res.json({
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
+        methodRecheck: cfg.methodRecheck,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
         reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        // Parámetros que permiten PUNTUAR y decidir el bloqueo del lado del cliente
+        // (mismo criterio que el server) cuando no hay conexión. Modo offline = REACCION.
+        reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+        thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
         voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
         voiceAcousticEnabled: cfg.voiceAcousticEnabled,
         voiceMaxAttempts: cfg.voiceMaxAttempts, reactionAttempts: cfg.reactionAttempts,

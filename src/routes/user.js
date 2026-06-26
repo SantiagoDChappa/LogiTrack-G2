@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser } = require('../controllers/user.js');
+const { getIndex, searchUsers, getCreateUserForm, createUser, getUpdateUser, updateUser, deleteUser, reset2fa, unlockAccount, getHistorial } = require('../controllers/user.js');
 const { validateUser, handleValidationErrors, validateUpdateUser, handleUpdateValidationErrors } = require('../middlewares/user.js');
 const { requireAdmin } = require('../middlewares/auth.js');
 
@@ -11,5 +11,11 @@ router.post('/new',       requireAdmin, validateUser, handleValidationErrors, cr
 router.get('/update/:id', requireAdmin, getUpdateUser);
 router.post('/update/:id', requireAdmin, validateUpdateUser, handleUpdateValidationErrors, updateUser);
 router.post('/delete/:id', requireAdmin, deleteUser);
+// #2 2FA — reset del segundo factor de un usuario (solo admin).
+router.post('/:id/2fa/reset', requireAdmin, reset2fa);
+// LGT-193 — desbloqueo manual de cuenta bloqueada por intentos fallidos.
+router.post('/:id/unlock', requireAdmin, unlockAccount);
+// Historial del usuario: ingresos y cambios sobre su cuenta.
+router.get('/:id/historial', requireAdmin, getHistorial);
 
 module.exports = router;

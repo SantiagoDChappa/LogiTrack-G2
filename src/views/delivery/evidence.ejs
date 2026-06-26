@@ -7,6 +7,10 @@
     <script>(function () { var t = localStorage.getItem('theme') || 'light'; document.documentElement.setAttribute('data-theme', t); })();</script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#2563eb">
+    <script src="/js/offline-db.js" defer></script>
+    <script src="/js/delivery-offline.js" defer></script>
     <title>Prueba de Entrega</title>
     <style>
         body {
@@ -637,6 +641,28 @@
             params.append(el.name, el.value);
         });
 
+        const routeIdField = form.querySelector('input[name="routeId"]');
+        const routeIdVal = routeIdField ? routeIdField.value : null;
+
+        // [prototype] Offline: si no hay conexión, encolamos el POD (foto+firma incluidas
+        // como base64 en el body) y mostramos éxito optimista. Se sincroniza al volver.
+        async function queueOffline() {
+            if (!window.LTOfflineApp) return false;
+            try {
+                await window.LTOfflineApp.enqueuePOD({ path: form.action, body: params.toString(), routeId: routeIdVal });
+                // Volvemos al ruteo (no al inicio) para seguir con la entrega siguiente; el
+                // overlay de la cola marca esta parada como entregada al recargar la ruta.
+                window.location = routeIdVal
+                    ? `/delivery/route/${routeIdVal}?delivered=true&queued=1`
+                    : '/delivery?delivered=true&queued=1';
+                return true;
+            } catch (_) { return false; }
+        }
+
+        if (window.LTOfflineApp && !navigator.onLine) {
+            if (await queueOffline()) return;
+        }
+
         try {
             const resp = await fetch(form.action, {
                 method: 'POST',
@@ -650,6 +676,7 @@
             const msg = (await resp.text()) || 'Error al confirmar entrega.';
             showValidation(msg);
         } catch (err) {
+            if (await queueOffline()) return;  // se cortó la red en pleno envío
             showValidation('Error de red al confirmar entrega.');
         }
     });

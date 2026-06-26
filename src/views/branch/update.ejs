@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/users.css">
+    <title>Editar sucursal — LogiTrack</title>
+    <style>.bform input,.bform select{width:100%;padding:.55rem .7rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text)}</style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content users-module">
+        <div class="page-header">
+            <h1>Editar sucursal</h1>
+            <a href="/branch" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver"><span class="material-symbols-outlined">arrow_back</span></a>
+        </div>
+        <div class="form-new">
+            <form action="/branch/<%= f.id %>" method="post" class="bform">
+                <div class="usuario">
+                    <h3>Datos de la sucursal</h3>
+                    <sub>La ubicación se recalcula automáticamente desde la dirección.</sub>
+                    <div class="field"><label for="name">Nombre <span style="color:red">*</span></label><input id="name" name="name" value="<%= f.name || '' %>" maxlength="150" required></div>
+                    <div class="field"><label for="street">Calle <span style="color:red">*</span></label><input id="street" name="street" value="<%= f.street || '' %>" maxlength="200" required></div>
+                    <div class="field"><label for="number">Número <span style="color:red">*</span></label><input id="number" name="number" value="<%= f.number || '' %>" maxlength="20" required></div>
+                    <div class="field"><label for="provinceId">Provincia <span style="color:red">*</span></label>
+                        <select id="provinceId" name="provinceId" required>
+                            <option value="">Seleccioná una provincia</option>
+                            <% provinces.forEach(function (p) { %>
+                                <option value="<%= p.id %>" <%= String(f.provinceId) === String(p.id) ? 'selected' : '' %>><%= p.description %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field"><label for="postalCode">Código postal</label><input id="postalCode" name="postalCode" value="<%= f.postalCode || '' %>" maxlength="10"></div>
+                    <div class="field"><label for="phone">Teléfono</label><input id="phone" name="phone" value="<%= f.phone || '' %>" maxlength="20"></div>
+                    <div class="field"><label><input type="checkbox" name="pickupEnabled" <%= f.pickupEnabled ? 'checked' : '' %>> Habilitada para retiro en sucursal</label></div>
+                </div>
+                <% if (locals.error) { %><div class="alert alert-error" role="alert" style="margin:.5rem 0"><%= error %></div><% } %>
+                <div class="form-actions">
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar cambios" aria-label="Guardar cambios"><span class="material-symbols-outlined">save</span></button>
+                </div>
+            </form>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

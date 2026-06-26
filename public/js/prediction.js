@@ -83,7 +83,52 @@
         }
     }
 
+    // ── Fecha estimada de entrega (campo del form de alta) ──────────────────
+    function toISODate(d) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function tomorrowDate() {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 1);
+        return d;
+    }
+
+    function setDateHint(msg) {
+        const hint = document.getElementById('expected-date-hint');
+        if (hint) { hint.textContent = msg; }
+    }
+
+    // Habilita el campo con la fecha del ML como piso (y nunca <= hoy). Autocompleta
+    // si está vacío o si el valor actual es anterior al piso.
+    function applyMlDeliveryDate(mlDate) {
+        const input = document.getElementById('expected-date');
+        if (!input) { return; }
+        const floor = mlDate.getTime() > tomorrowDate().getTime() ? mlDate : tomorrowDate();
+        const floorIso = toISODate(floor);
+        input.min = floorIso;
+        input.disabled = false;
+        if (!input.value || input.value < floorIso) { input.value = floorIso; }
+        setDateHint('Estimada por el modelo. Podés elegir esta fecha o una posterior.');
+    }
+
+    // Sin estimación (datos incompletos o ML caído): el operador puede cargarla a mano,
+    // pero siempre desde mañana en adelante (nunca hoy ni una fecha pasada).
+    function enableManualDeliveryDate(msg) {
+        const input = document.getElementById('expected-date');
+        if (!input) { return; }
+        input.min = toISODate(tomorrowDate());
+        input.disabled = false;
+        if (input.value && input.value < input.min) { input.value = ''; }
+        setDateHint(msg);
+    }
+
     function showPlaceholder() {
+        enableManualDeliveryDate('Completá los datos para estimar la fecha (o elegila desde mañana).');
         const el = document.getElementById('prediction-result');
         if (!el) return;
         // En modo detalle (sin campos de formulario visibles) el mensaje es diferente
@@ -100,6 +145,7 @@
     }
 
     function showError(msg) {
+        enableManualDeliveryDate('No se pudo estimar la fecha; elegila a mano (desde mañana).');
         const el = document.getElementById('prediction-result');
         if (!el) return;
         el.innerHTML = `<span class="pred-error"><span class="material-symbols-outlined">error_outline</span> ${msg}</span>`;
@@ -135,16 +181,10 @@
             weekday: 'long', day: 'numeric', month: 'long'
         });
 
-        // Si estamos en el form de alta, sincronizar la fecha estimada del ML
-        // hacia el campo del form para que se persista en DB junto con el envío.
-        // Solo se autocompleta si el operador no ingresó manualmente una fecha.
-        const dateInput = document.getElementById('expected-date');
-        if (dateInput && !dateInput.value) {
-            const yyyy = fechaEstimada.getFullYear();
-            const mm   = String(fechaEstimada.getMonth() + 1).padStart(2, '0');
-            const dd   = String(fechaEstimada.getDate()).padStart(2, '0');
-            dateInput.value = `${yyyy}-${mm}-${dd}`;
-        }
+        // Fecha estimada del ML → campo del form. Se habilita recién cuando el ML
+        // termina; el piso (min) es la fecha estimada, y nunca anterior ni igual a hoy.
+        // El operador puede elegir esa fecha o una posterior, no antes.
+        applyMlDeliveryDate(fechaEstimada);
 
         // Etiquetas de justificación (factores objetivos; el nivel ya lo dice el semáforo).
         const etiquetas = [];

@@ -40,8 +40,6 @@ const Shipment = sequelize.define('shipment', {
     // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
     portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
     // NFAL07 (LGT-158) — link accionable de un solo uso + vencimiento.
-    // Lo "arma" el envío de un aviso accionable (intento fallido / demora / devolución):
-    // setea expiresAt y limpia usedAt. Al reprogramar desde el link se marca usedAt.
     portalTokenUsedAt:    { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_used_at' },
     portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
     // Sprint 4 - Notificación de demora (LGT-160)
@@ -54,6 +52,13 @@ const Shipment = sequelize.define('shipment', {
     replacementOfShipmentId: { type: DataTypes.INTEGER,    allowNull: true,  field: 'replacement_of_shipment_id' },
     // LGT-214 precondición: costo total persistido al crear el envío (para nota de crédito).
     costTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    // Sprint 5 — dashboard analítico: transporte que realizó el envío (para métricas por camioneta).
+    transportId: { type: DataTypes.INTEGER, allowNull: true },
+    // [prototype] Seguro de mercadería: valor declarado en el alta y seguro calculado/"congelado".
+    declaredValue:   { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'declaredValue' },
+    insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
+    // Recargo por zona peligrosa, congelado al alta. El ruteo no lo recalcula.
+    dangerSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'dangerSurcharge' },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -136,6 +141,7 @@ const create = async (data, options = {}) => {
         weightKg:         data.weightKg       || null,
         volumeM3:         data.volumeM3        || null,
         packageQty:       data.packageQty      || null,
+        declaredValue:    data.declaredValue   || null,
         zoneId:               data.zoneId          || null,
         currentBranchId:      data.currentBranchId || null,
         expectedDeliveryDate: data.expectedDeliveryDate || null,

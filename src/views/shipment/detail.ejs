@@ -150,7 +150,7 @@
             <%
                 const _sdesc = shipment.status && shipment.status.description ? shipment.status.description : '';
                 const _sk  = _sdesc.toLowerCase().replace(/[\s-]+/g, '_');
-                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
+                const _sl  = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido',devuelto:'Devuelto'};
                 const _slLabel = _sl[_sk] || _sdesc || 'Sin estado';
             %>
 
@@ -191,7 +191,7 @@
                     <p class="historial-empty">Sin eventos registrados.</p>
                 <% } else { %>
                     <%
-                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
+                        const _sl2 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido',devuelto:'Devuelto'};
                         function _sk2(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         const _last3 = [...history].reverse().slice(0, 3);
                     %>
@@ -313,12 +313,41 @@
 <% } %>
                             <div style="display:flex;justify-content:space-between"><span>Recargo peso</span><span><%= fmtMoney(costClient.wSurcharge) %></span></div>
                             <div style="display:flex;justify-content:space-between"><span>Recargo volumen</span><span><%= fmtMoney(costClient.vSurcharge) %></span></div>
+                            <% if (costClient.insurance > 0) { %>
+                            <div style="display:flex;justify-content:space-between"><span>Seguro de mercadería</span><span><%= fmtMoney(costClient.insurance) %></span></div>
+                            <% } %>
                             <hr style="margin:.35rem 0;border-color:var(--color-border)">
                             <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span><%= fmtMoney(costClient.subtotal) %></span></div>
                             <% if (costClient.penalty > 0) { %>
                                 <div style="display:flex;justify-content:space-between;color:var(--color-danger)"><span>Penalización SLA</span><span>-<%= fmtMoney(costClient.penalty) %></span></div>
                             <% } %>
                             <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Total a cobrar</span><span><%= fmtMoney(costClient.final) %></span></div>
+                        </div>
+                    <% } %>
+
+                    <% if (typeof invoice !== 'undefined' && invoice) { %>
+                        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                            <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
+                                <span class="material-symbols-outlined">receipt_long</span>
+                                Ver factura <%= invoice.number %>
+                            </a>
+                            <% if (invoice.payStatus === 'PAGADA') { %>
+                                <span class="status-badge entregado">Cobrada (<%= invoice.payMethod || '—' %>)</span>
+                            <% } else { %>
+                                <span class="status-badge retrasado">Pendiente de cobro</span>
+                                <% if ([1, 2, 4].includes(currentUser.roleId)) { %>
+                                    <form method="POST" action="/shipment/<%= shipment.id %>/registrar-cobro" style="display:inline-flex;align-items:center;gap:.35rem;margin:0">
+                                        <select name="method" style="font-size:.85rem">
+                                            <option value="efectivo">Efectivo</option>
+                                            <option value="transferencia">Transferencia</option>
+                                        </select>
+                                        <button type="submit" class="btn btn--ghost" style="font-size:.85rem">
+                                            <span class="material-symbols-outlined" style="font-size:1.1rem">payments</span>
+                                            Registrar cobro
+                                        </button>
+                                    </form>
+                                <% } %>
+                            <% } %>
                         </div>
                     <% } %>
                 </div>
@@ -444,6 +473,16 @@
                                 <span class="material-symbols-outlined">inbox</span>
                                 <p>Sin incidencias registradas para este envío.</p>
                             </div>
+                        <% } %>
+
+                        <% if (typeof returnError !== 'undefined' && returnError) { %>
+                            <div class="alert alert-error" role="alert" style="margin-top:.6rem;"><%= returnError %></div>
+                        <% } %>
+                        <% if (typeof canCreateReturn !== 'undefined' && canCreateReturn) { %>
+                            <a href="/returns/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg modificar" style="margin-top:.6rem;display:inline-flex;align-items:center;gap:.4rem;width:fit-content;" data-tooltip="Crear devolución" aria-label="Crear devolución">
+                                <span class="material-symbols-outlined">assignment_return</span>
+                                Crear devolución
+                            </a>
                         <% } %>
                     </div>
                 </div>
@@ -602,6 +641,33 @@
             </div>
             <!-- ══════════ FIN BOTTOM GRID ══════════ -->
 
+            <%# Facturas y notas de crédito asociadas al envío %>
+            <% const _hasInvoice = typeof invoice !== 'undefined' && invoice; %>
+            <% const _creditNotes = (typeof creditNotes !== 'undefined' && creditNotes) ? creditNotes : []; %>
+            <% if (_hasInvoice || _creditNotes.length) { %>
+            <div class="update-card" style="margin-top:1.5rem;">
+                <h3><span class="material-symbols-outlined">receipt_long</span> Facturas y notas de crédito</h3>
+                <div class="ship-incidents-list" style="margin-top:1rem;">
+                    <% if (_hasInvoice) { %>
+                        <a href="/invoice/<%= invoice.id %>" target="_blank" class="ship-incident-row">
+                            <span class="ship-incident-id"><span class="material-symbols-outlined" style="font-size:1.1rem;">description</span></span>
+                            <span class="ship-incident-type">Factura <%= invoice.number %></span>
+                            <span class="ship-incident-date"><%= fmtMoney(invoice.amount) %></span>
+                            <span class="material-symbols-outlined ship-incident-arrow">open_in_new</span>
+                        </a>
+                    <% } %>
+                    <% _creditNotes.forEach(function(cn) { %>
+                        <a href="/credit-note/<%= cn.id %>" target="_blank" class="ship-incident-row">
+                            <span class="ship-incident-id"><span class="material-symbols-outlined" style="font-size:1.1rem;">request_quote</span></span>
+                            <span class="ship-incident-type">Nota de crédito <%= cn.number %></span>
+                            <span class="ship-incident-date"><%= fmtMoney(cn.amount) %> · <%= new Date(cn.createdAt).toLocaleDateString('es-AR') %></span>
+                            <span class="material-symbols-outlined ship-incident-arrow">open_in_new</span>
+                        </a>
+                    <% }) %>
+                </div>
+            </div>
+            <% } %>
+
             <%# LGT-215 — relación con envío de reposición (en ambas direcciones) %>
             <% if ((typeof replacementShipment !== 'undefined' && replacementShipment) || (typeof originalShipment !== 'undefined' && originalShipment)) { %>
             <div class="update-card" style="margin-top:1.5rem;">
@@ -682,7 +748,7 @@
 
                 <%
                     const _histDesc = [...history].reverse();
-                    const _sl3 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
+                    const _sl3 = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido',devuelto:'Devuelto'};
                     function _sk3(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                     function _sl3L(desc) { const k = _sk3(desc); return _sl3[k] || desc; }
                 %>

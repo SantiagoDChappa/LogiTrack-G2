@@ -35,6 +35,12 @@ const saveFailedAttempt = async (req, res) => {
         });
         if (!shipment) return res.status(404).send('Envío no encontrado');
 
+        // #4 Offline: idempotencia ante replay de la cola (no duplicar el intento fallido).
+        const clientActionId = req.body.clientActionId || null;
+        if (clientActionId && await require('../models/offlineSyncLog').exists(clientActionId)) {
+            return res.redirect('/delivery?failed=true');
+        }
+
         const { reason, observation, latitude, longitude, photoBase64 } = req.body;
         const suggestedDate = getSuggestedDate(reason);
 
@@ -113,6 +119,10 @@ const saveFailedAttempt = async (req, res) => {
         // Última Milla: la entrega de esta parada terminó (fallida) → cerrar el chat.
         require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
 
+        if (clientActionId) {
+            require('../models/offlineSyncLog').create({ clientActionId, userId: res.locals.currentUser?.id || null, actionType: 'FAILED' }).catch(() => {});
+        }
+
         res.redirect('/delivery?failed=true');
 
     } catch (error) {
@@ -178,6 +188,12 @@ const saveEvidence = async (req, res) => {
 
         if (!shipment) {
             return res.status(404).send('Envío no encontrado');
+        }
+
+        // #4 Offline: idempotencia. Si esta entrega ya se aplicó (replay de la cola), no duplicar.
+        const clientActionId = req.body.clientActionId || null;
+        if (clientActionId && await require('../models/offlineSyncLog').exists(clientActionId)) {
+            return res.redirect('/delivery?delivered=true');
         }
 
         const {
@@ -288,6 +304,10 @@ const saveEvidence = async (req, res) => {
         require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
         // Última Milla: cierra el chat de entrega (ya no hay coordinación pendiente).
         require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
+
+        if (clientActionId) {
+            require('../models/offlineSyncLog').create({ clientActionId, userId: res.locals.currentUser?.id || null, actionType: 'POD' }).catch(() => {});
+        }
 
         if (routeId) {
             return res.redirect(`/delivery/route/${routeId}?delivered=true`);

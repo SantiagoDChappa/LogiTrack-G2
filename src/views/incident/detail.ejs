@@ -37,7 +37,7 @@
             resolution_required_before_close: 'Antes de cerrar tenés que marcar la resolución (Procedente / No procedente).'
         }; %>
         <% if (errCode) { %>
-            <div class="alert alert-error"><%= errMessages[errCode] || errCode %></div>
+            <div class="alert alert-error" role="alert"><%= errMessages[errCode] || errCode %></div>
         <% } %>
 
         <section class="incident-detail-grid">
@@ -235,7 +235,9 @@
                     </div>
 
                     <% if (flags.canClose) { %>
-                        <!-- Resolución: marcar procedente / no procedente sin cerrar -->
+                        <!-- Resolución: marcar procedente / no procedente sin cerrar.
+                             Misma estructura para toda incidencia; el efecto por tipo (p. ej. devolución
+                             procedente → nota de crédito + envío a Devuelto) lo aplica el backend. -->
                         <div class="incident-resolution-block">
                             <div class="incident-resolution-block__head">
                                 <span class="material-symbols-outlined">gavel</span>
@@ -269,7 +271,7 @@
                         </div>
                     <% } %>
 
-                    <!-- Cambio de estado: botones tipo "estado siguiente" -->
+                    <!-- Cambio de estado: botones tipo "estado siguiente" (mismo flujo para todas las incidencias, incluida la devolución). -->
                     <div class="incident-status-actions">
                         <span class="incident-status-actions__label">Pasar a estado:</span>
 
@@ -366,7 +368,7 @@
                 <p class="incident-description">Este tipo de incidencia no tiene tareas definidas.</p>
             <% } else { %>
                 <% if (pendingRequired > 0) { %>
-                    <div class="alert alert-warning">
+                    <div class="alert alert-warning" role="alert">
                         Quedan <%= pendingRequired %> tarea<%= pendingRequired === 1 ? '' : 's' %> obligatoria<%= pendingRequired === 1 ? '' : 's' %> pendiente<%= pendingRequired === 1 ? '' : 's' %>. No se podrá cerrar hasta completarlas.
                     </div>
                 <% } %>

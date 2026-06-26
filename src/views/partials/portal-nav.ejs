@@ -12,7 +12,6 @@
             var _cp = (typeof currentPath !== 'undefined' && currentPath) ? currentPath : '';
             var _navEnvios       = _cp.startsWith('/portal/mis-envios/lista') || _cp.startsWith('/portal/mis-envios/envio');
             var _navIncidencias  = _cp.startsWith('/portal/mis-envios/incidenci');
-            var _navDevoluciones = _cp.startsWith('/portal/mis-envios/devolucion');
             var _navEncuestas    = _cp.startsWith('/portal/mis-envios/encuesta') && !_cp.startsWith('/portal/mis-envios/encuesta-incidencia') && !_cp.startsWith('/portal/mis-envios/encuestas-incidencias');
             var _navEncuestasInc = _cp.startsWith('/portal/mis-envios/encuesta-incidencia') || _cp.startsWith('/portal/mis-envios/encuestas-incidencias');
         %>
@@ -23,10 +22,6 @@
         <a href="/portal/mis-envios/incidencias" class="portal-nav-link <%= _navIncidencias ? 'active' : '' %>">
             <span class="material-symbols-outlined">report</span>
             Mis incidencias
-        </a>
-        <a href="/portal/mis-envios/devoluciones" class="portal-nav-link <%= _navDevoluciones ? 'active' : '' %>">
-            <span class="material-symbols-outlined">assignment_return</span>
-            Mis devoluciones
         </a>
         <a href="/portal/mis-envios/encuestas" class="portal-nav-link <%= _navEncuestas ? 'active' : '' %>">
             <span class="material-symbols-outlined">rate_review</span>

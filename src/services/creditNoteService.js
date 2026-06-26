@@ -26,10 +26,18 @@ const generate = async ({ shipmentId, incidentId = null, returnId = null, userId
     const amount = shipment.costTotal != null
         ? Number(shipment.costTotal)
         : await costSvc.computeTotal(shipment);
+    // [prototype] Seguro itemizado: ya está incluido en `amount`; lo guardamos aparte
+    // para mostrarlo desglosado en el comprobante. Usa el valor congelado al alta.
+    const frozenInsurance = shipment.insuranceAmount;
+    const insuranceAmount = (frozenInsurance !== null && frozenInsurance !== undefined) ? Number(frozenInsurance) : 0;
     try {
         const created = await CreditNote.create({
             number: 'TMP', shipmentId, incidentId, returnId,
-            amount, createdByUserId: userId, createdAt: new Date(),
+            amount, insuranceAmount,
+            // La NC de reembolso se emite al remitente: guardamos sus datos fiscales.
+            senderName:     shipment.sender?.fullName || null,
+            senderDocument: shipment.sender?.document || null,
+            createdByUserId: userId, createdAt: new Date(),
         });
         await created.update({ number: buildNumber(created.id) });
         return { ok: true, creditNote: created };

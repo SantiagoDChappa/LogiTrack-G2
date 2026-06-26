@@ -1,5 +1,17 @@
 <!-- LGT-217 — salto al contenido para navegación por teclado/lector de pantalla. -->
 <a href="#main-content" class="skip-to-content">Saltar al contenido</a>
+<% if (typeof showTfaNudge !== 'undefined' && showTfaNudge) { %>
+<div id="tfa-nudge" style="display:flex;align-items:center;gap:.6rem;justify-content:center;flex-wrap:wrap;background:#1d4ed8;color:#fff;padding:.5rem .75rem;font-size:.85rem;font-weight:600">
+    <span class="material-symbols-outlined" style="font-size:1.1rem">shield</span>
+    <span>Podés activar la verificación en dos pasos (2FA) para tener más seguridad.</span>
+    <a href="/account/2fa/setup" style="background:#fff;color:#1d4ed8;text-decoration:none;border-radius:6px;padding:.2rem .7rem;font-weight:700">Activar</a>
+    <button type="button" aria-label="Cerrar aviso"
+            onclick="document.cookie='tfaNudge=off; path=/; samesite=lax'; var n=document.getElementById('tfa-nudge'); if(n){ n.remove(); } var m=document.querySelector('.main-content'); if(m){ m.style.paddingTop=''; }"
+            style="background:transparent;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;padding:.1rem">
+        <span class="material-symbols-outlined">close</span>
+    </button>
+</div>
+<% } %>
 <header>
     <div class="left-header">
         <button class="nav-close-btn" id="btn-nav-close" aria-label="Cerrar menú">
@@ -27,15 +39,28 @@
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                     <a href="/shipment/modifications"><ul><span class="material-symbols-outlined">edit_note</span>Modificaciones portal</ul></a>
                 <% } %>
-                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
-                    <a href="/returns"><ul><span class="material-symbols-outlined">assignment_return</span>Devoluciones</ul></a>
-                <% } %>
                 <% if (currentUser.roleId === 3) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Mis incidencias</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 4) { %>
                     <a href="/shipment/import"><ul><span class="material-symbols-outlined">upload_file</span>Importar CSV</ul></a>
                     <a href="/user"><ul><span class="material-symbols-outlined">contacts_product</span>Usuarios</ul></a>
+                    <div class="nav-group" id="nav-group-auditoria">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-auditoria')" aria-expanded="false">
+                            <span class="material-symbols-outlined">manage_search</span>
+                            Auditoría
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/auditoria"><ul><span class="material-symbols-outlined">dashboard</span>Resumen</ul></a>
+                            <a href="/auditoria/seguridad"><ul><span class="material-symbols-outlined">gpp_bad</span>Seguridad</ul></a>
+                            <a href="/auditoria/usuarios-activos"><ul><span class="material-symbols-outlined">group</span>Usuarios activos</ul></a>
+                            <a href="/auditoria/sesiones"><ul><span class="material-symbols-outlined">login</span>Log de sesiones</ul></a>
+                            <a href="/auditoria/acciones"><ul><span class="material-symbols-outlined">edit_note</span>Acciones internas</ul></a>
+                            <a href="/auditoria/configuracion"><ul><span class="material-symbols-outlined">history</span>Cambios de configuración</ul></a>
+                        </div>
+                    </div>
+                    <a href="/branch"><ul><span class="material-symbols-outlined">store</span>Sucursales</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
                     <div class="nav-group" id="nav-group-reportes">
@@ -50,6 +75,22 @@
                             <a href="/report/delivery-performance"><ul><span class="material-symbols-outlined">leaderboard</span>Rendimiento</ul></a>
                             <a href="/report/incidents-by-period"><ul><span class="material-symbols-outlined">warning</span>Fallas</ul></a>
                             <a href="/report/satisfaction"><ul><span class="material-symbols-outlined">sentiment_satisfied</span>Satisfacción</ul></a>
+                            <% if (currentUser.roleId === 4) { %>
+                            <a href="/report/users"><ul><span class="material-symbols-outlined">groups</span>Usuarios</ul></a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="nav-group" id="nav-group-dashboard">
+                        <button class="nav-group-toggle" onclick="toggleNavGroup('nav-group-dashboard')" aria-expanded="false">
+                            <span class="material-symbols-outlined">dashboard</span>
+                            Dashboard Analítico
+                            <span class="material-symbols-outlined nav-group-arrow">keyboard_arrow_down</span>
+                        </button>
+                        <div class="nav-group-items">
+                            <a href="/dashboard/operaciones"><ul><span class="material-symbols-outlined">manage_accounts</span>Análisis de Demoras</ul></a>
+                            <% if (currentUser.roleId === 4) { %>
+                                <a href="/dashboard/desempeno"><ul><span class="material-symbols-outlined">analytics</span>Análisis de Desempeño</ul></a>
+                            <% } %>
                         </div>
                     </div>
                     <div class="nav-group" id="nav-group-notificaciones">
@@ -78,7 +119,7 @@
                             <a href="/setting/catalogos"><ul><span class="material-symbols-outlined">category</span>Catálogos</ul></a>
                             <a href="/setting/incidencias"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                             <a href="/fatigue/config"><ul><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (config)</ul></a>
-                            <a href="/setting/auditoria"><ul><span class="material-symbols-outlined">history</span>Auditoría</ul></a>
+                            <a href="/account/2fa"><ul><span class="material-symbols-outlined">security</span>Seguridad (2FA)</ul></a>
                         </div>
                     </div>
                 <% } %>
@@ -99,16 +140,27 @@
             <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %>">
             <span><%= nombreEmpresa %></span>
         </a>
+        <%- include('search') %>
+        <a href="/help" id="help-header-btn" class="help-header-btn" aria-label="Centro de ayuda" title="Centro de ayuda">
+            <span class="material-symbols-outlined">help</span>
+        </a>
         <%- include('notificationBell') %>
-        <div class="user">
-            <div class="user-avatar"><%= currentUser.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
+        <div class="user" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="user-dropdown" aria-label="Menú de usuario">
+            <% if (currentUser.hasAvatar) { %>
+                <div class="user-avatar" style="padding:0;overflow:hidden"><img src="/account/avatar/<%= currentUser.id %>" alt="" style="width:100%;height:100%;object-fit:cover"></div>
+            <% } else { %>
+                <div class="user-avatar" aria-hidden="true"><%= currentUser.fullName.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() %></div>
+            <% } %>
             <span class="user-name"><%= currentUser.fullName %></span>
             <span class="user-role"><%= currentUser.roleId == 1 ? "Supervisor" : currentUser.roleId == 2 ? "Operador" : currentUser.roleId == 3 ? "Repartidor" : "Administrador" %></span>
-            <span class="material-symbols-outlined">keyboard_arrow_down</span>
+            <span class="material-symbols-outlined" aria-hidden="true">keyboard_arrow_down</span>
         </div>
         <div class="user-dropdown" id="user-dropdown">
             <li>
-                <ul><a href="/logout"><span class="material-symbols-outlined">manage_accounts</span>Configurar perfil</a></ul>
+                <ul><a href="/account/profile"><span class="material-symbols-outlined">person</span>Mi perfil</a></ul>
+                <ul><a href="/account/2fa"><span class="material-symbols-outlined">security</span>Seguridad (2FA)</a></ul>
+                <ul><a href="/help"><span class="material-symbols-outlined">menu_book</span>Centro de ayuda</a></ul>
+                <ul><a href="#" id="btn-replay-tour"><span class="material-symbols-outlined">tour</span>Ver tour de nuevo</a></ul>
                 <div class="dropdown-divider"></div>
                 <ul class="danger"><a href="/logout"><span class="material-symbols-outlined">logout</span>Cerrar sesión</a></ul>
             </li>
@@ -123,4 +175,26 @@
         if (m && !m.id) { m.id = 'main-content'; }
         if (m && !m.hasAttribute('tabindex')) { m.setAttribute('tabindex', '-1'); }
     });
+
+    // Aviso 2FA: es un banner en flujo normal pero el .top-header es position:fixed y lo
+    // tapaba. Lo posicionamos como barra fija JUSTO debajo del header (midiendo su alto y
+    // offset reales para que funcione en desktop y mobile) y empujamos el contenido.
+    (function () {
+        var nudge = document.getElementById('tfa-nudge');
+        if (!nudge) { return; }
+        function place() {
+            var hdr = document.querySelector('.top-header');
+            var top = hdr ? Math.round(hdr.getBoundingClientRect().height) : 0;
+            nudge.style.position = 'fixed';
+            nudge.style.top = top + 'px';
+            nudge.style.left = hdr ? getComputedStyle(hdr).left : '0px';
+            nudge.style.right = '0';
+            nudge.style.zIndex = '49';
+            var main = document.querySelector('.main-content');
+            if (main) { main.style.paddingTop = (top + Math.round(nudge.getBoundingClientRect().height)) + 'px'; }
+        }
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', place); }
+        else { place(); }
+        window.addEventListener('resize', place);
+    })();
 </script>

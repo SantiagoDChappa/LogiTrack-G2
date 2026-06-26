@@ -3,6 +3,8 @@
 <head>
     <%- include('../partials/head') %>
     <title>Mi Ruta - LogiTrack</title>
+    <meta name="theme-color" content="#2563eb">
+    <script src="/js/fatigue-reaction-scorer.js" defer></script>
     <script src="/js/fatigue-driver.js" defer></script>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -559,6 +561,7 @@
         0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,.55);}
         50%     { box-shadow: 0 0 0 14px rgba(37,99,235,0);}
     }
+
     </style>
 </head>
 <body>
@@ -574,6 +577,7 @@
                 <button class="btn-menu" id="btn-route-menu" title="Menú" aria-label="Menú">
                     <span class="material-symbols-outlined">menu</span>
                 </button>
+                <%- include('../partials/page-help-btn', { helpModule: 'entregas-repartidor' }) %>
             </div>
             <div class="map-actions">
                 <% if (!readOnly) { %>
@@ -728,7 +732,9 @@
                                     </button>
                                 <% } else { %>
                                     <% if (s.shipment) { %>
-                                        <a class="btn-ui btn-cta" href="/delivery/evidence/<%= s.shipment.trackingId %>/pod?routeId=<%= route.id %>&stopId=<%= s.id %>" style="width:100%">
+                                        <a class="btn-ui btn-cta js-pod-btn"
+                                           href="/delivery/evidence/<%= s.shipment.trackingId %>/pod?routeId=<%= route.id %>&stopId=<%= s.id %>"
+                                           style="width:100%">
                                             <span class="material-symbols-outlined">photo_camera</span>Confirmar Entrega (POD)
                                         </a>
                                     <% } %>
@@ -782,12 +788,17 @@
         <button class="fab-current" id="fab-current" hidden>
             <span class="material-symbols-outlined">arrow_downward</span>Paso actual
         </button>
+
+        <%# [prototype] El POD se hace en la página /delivery/evidence/:tracking/pod (online y offline).
+            El botón "Confirmar Entrega" navega a esa página; el SW la sirve cacheada sin conexión. %>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <%# [prototype] Offline del repartidor: globals para el script (cargado desde head.ejs) %>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {
@@ -2452,7 +2463,19 @@
         });
         if (!c.isConfirmed) return;
         const r = await post(`/delivery/route/${routeId}/finish`);
-        if (r) window.location.href = `/delivery/route/${routeId}/summary`;
+        if (!r) return;
+        // Offline: el /finish quedó en la cola (queued). Avisamos y volvemos al inicio;
+        // al recuperar internet se sincroniza todo (estados, fallidos, mails de incidencia).
+        if (r.queued) {
+            await Swal.fire({
+                icon: 'success', title: 'Ruta finalizada',
+                html: 'Quedó guardada sin conexión. Cuando vuelva internet se sincronizan los estados de envío, la ruta y los avisos automáticamente.',
+                confirmButtonColor: '#16a34a',
+            });
+            window.location.href = '/delivery';
+            return;
+        }
+        window.location.href = `/delivery/route/${routeId}/summary`;
     });
 
     // ===================== Chat con el cliente (Última Milla) =====================
@@ -2521,6 +2544,25 @@
         });
         poll();
         setInterval(poll, 5000);
+    })();
+
+    // === POD: navega a la página de evidencia (sirve online y offline) ==============
+    // El botón "Confirmar Entrega" es un <a> a /delivery/evidence/:tracking/pod. Esa página
+    // hace el POST normal online y encola el POD (foto+firma) offline; el SW la sirve cacheada
+    // sin conexión. Acá solo bloqueamos la navegación si el paso anterior no está completo.
+    (function () {
+        if (readOnly) { return; }
+        const list = document.getElementById('stops-list');
+        if (!list) { return; }
+        list.addEventListener('click', (e) => {
+            const btn = e.target.closest('.js-pod-btn');
+            if (!btn) { return; }
+            const row = btn.closest('.stop-row');
+            if (row && row.classList.contains('locked')) {
+                e.preventDefault();
+                Swal.fire({ icon: 'info', title: 'Paso bloqueado', text: 'Completá el paso anterior primero.', confirmButtonColor: '#2563eb' });
+            }
+        });
     })();
     </script>
 </body>

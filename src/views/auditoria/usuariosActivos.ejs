@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría · Usuarios activos - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <%- include('_header', { active: 'usuarios', pageTitle: 'Usuarios activos', pageDesc: 'Quién tiene sesión iniciada en las últimas 8 horas.' }) %>
+
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">group</span>
+                <h2>Usuarios activos</h2>
+                <span class="badge-count"><%= activeUsers.length %> en las últimas 8 h</span>
+            </div>
+            <div class="audit-card-body">
+                <% if (activeUsers.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">person_off</span>
+                    Ningún usuario registró actividad reciente.
+                </div>
+                <% } else { %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Usuario</th><th>Rol</th><th>Email</th><th>Último ingreso</th><th>IP</th></tr>
+                        </thead>
+                        <tbody>
+                            <% activeUsers.forEach(l => { %>
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= avatarColor(l.user?.fullName) %>"><%= initials(l.user?.fullName) %></span>
+                                        <div class="user-cell-info">
+                                            <span style="display:inline-flex;align-items:center;gap:.4rem">
+                                                <strong><%= l.user?.fullName || '—' %></strong>
+                                                <span class="active-dot" style="margin:0"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="badge-role"><%= roleLabels[l.user?.roleId] || '—' %></span></td>
+                                <td style="color:var(--color-text-secondary)"><%= l.user?.email || '—' %></td>
+                                <td><span data-ts="<%= new Date(l.createdAt).toISOString() %>"><%= new Date(l.createdAt).toLocaleString('es-AR') %></span></td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= l.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <%- include('_relativeTime') %>
+</body>
+</html>

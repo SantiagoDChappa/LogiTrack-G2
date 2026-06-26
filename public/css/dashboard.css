@@ -3,6 +3,23 @@
 .dashboard-wrapper {
     padding: clamp(1.25rem, 2.5vw, 2rem) clamp(1.25rem, 3vw, 2.5rem);
     width: 100%;
+    /* Tope generoso (no afecta monitores normales): solo en 30"/ultrawide
+       evita que cards y charts se estiren edge-to-edge y queden deformados. */
+    max-width: 1700px;
+    margin-inline: auto;
+}
+
+@media (min-width: 2560px) {
+    .dashboard-wrapper { max-width: 2100px; }
+}
+
+/* Mapa Leaflet: crea su propio contexto de apilado (z-index:0) para que sus
+   capas internas (panes z~400, controles z~1000) NO tapen el header fijo
+   (z-index:50) al scrollear. Sin esto el mapa "pisaba" la barra superior. */
+#dashboard-heatmap {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
 }
 
 .page-header {

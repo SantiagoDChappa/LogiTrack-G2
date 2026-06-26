@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría · Resumen - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <%- include('_header', { active: 'resumen', pageTitle: 'Auditoría y trazabilidad', pageDesc: 'Registro de quién hizo qué, cuándo y desde dónde.' }) %>
+
+        <div style="display:flex;justify-content:flex-end;margin:-1.4rem 0 1.2rem">
+            <a href="/auditoria/resumen/export-csv" class="btn-filter">
+                <span class="material-symbols-outlined">download</span> Exportar resumen (CSV)
+            </a>
+        </div>
+
+        <%
+            const _maxActivity = Math.max(1, ...(activity||[]).map(a => a.total));
+        %>
+
+        <!-- Stats -->
+        <div class="audit-stats">
+            <div class="stat-card green">
+                <div class="stat-card-label">Activos ahora</div>
+                <div class="stat-card-value"><%= activeUsersCount %></div>
+                <div class="stat-card-sub">en las últimas 8 h</div>
+            </div>
+            <div class="stat-card blue">
+                <div class="stat-card-label">Sesiones en el log</div>
+                <div class="stat-card-value"><%= sessionCount %></div>
+                <div class="stat-card-sub">total registrado</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Acciones registradas</div>
+                <div class="stat-card-value"><%= actionCount %></div>
+                <div class="stat-card-sub">en el log interno</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Última actividad</div>
+                <div class="stat-card-value" style="font-size:1rem;padding-top:.3rem">
+                    <%= lastEvent ? new Date(lastEvent.createdAt).toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}) : '—' %>
+                </div>
+                <div class="stat-card-sub"><%= lastEvent ? (lastEvent.user?.fullName || lastEvent.email || '—') : 'Sin registros' %></div>
+            </div>
+        </div>
+
+        <!-- DAU / WAU / MAU -->
+        <div class="audit-card" style="margin-bottom:1.5rem">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">groups</span>
+                <h2>Usuarios activos por período</h2>
+                <span class="badge-count">engagement</span>
+            </div>
+            <div class="audit-card-body">
+                <%
+                    const _mauMax = Math.max(1, activeUserStats.dau, activeUserStats.wau, activeUserStats.mau);
+                %>
+                <div class="mau-row">
+                    <div class="mau-col">
+                        <span class="mau-icon" style="background:#3b82f622;color:#3b82f6">
+                            <span class="material-symbols-outlined">today</span>
+                        </span>
+                        <div class="mau-value"><%= activeUserStats.dau %></div>
+                        <div class="mau-label">Hoy <span class="mau-tag">DAU</span></div>
+                        <div class="mau-track"><div class="mau-fill" style="width:<%= Math.round(activeUserStats.dau / _mauMax * 100) %>%;background:#3b82f6"></div></div>
+                    </div>
+                    <div class="mau-col">
+                        <span class="mau-icon" style="background:#8b5cf622;color:#8b5cf6">
+                            <span class="material-symbols-outlined">date_range</span>
+                        </span>
+                        <div class="mau-value"><%= activeUserStats.wau %></div>
+                        <div class="mau-label">Esta semana <span class="mau-tag">WAU</span></div>
+                        <div class="mau-track"><div class="mau-fill" style="width:<%= Math.round(activeUserStats.wau / _mauMax * 100) %>%;background:#8b5cf6"></div></div>
+                    </div>
+                    <div class="mau-col">
+                        <span class="mau-icon" style="background:#10b98122;color:#10b981">
+                            <span class="material-symbols-outlined">calendar_month</span>
+                        </span>
+                        <div class="mau-value"><%= activeUserStats.mau %></div>
+                        <div class="mau-label">Este mes <span class="mau-tag">MAU</span></div>
+                        <div class="mau-track"><div class="mau-fill" style="width:<%= Math.round(activeUserStats.mau / _mauMax * 100) %>%;background:#10b981"></div></div>
+                    </div>
+                </div>
+                <p class="mau-note">Usuarios distintos que iniciaron sesión al menos una vez en cada ventana de tiempo (hoy, últimos 7 días, últimos 30 días).</p>
+            </div>
+        </div>
+
+        <!-- Gráfico de actividad -->
+        <div class="audit-card" style="margin-bottom:1.5rem">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">bar_chart</span>
+                <h2>Actividad de los últimos 7 días</h2>
+                <span class="badge-count">logins por día</span>
+            </div>
+            <div class="audit-card-body">
+                <%
+                    const _weekTotal = (activity||[]).reduce((s, a) => s + a.total, 0);
+                    const _weekMax   = (activity||[]).reduce((m, a) => a.total > m.total ? a : m, { total: 0, label: '—' });
+                %>
+                <div style="display:flex;gap:2rem;margin-bottom:1rem">
+                    <div>
+                        <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-secondary)">Total semana</div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--color-primary)"><%= _weekTotal %></div>
+                    </div>
+                    <div>
+                        <div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-secondary)">Día más activo</div>
+                        <div style="font-size:1.1rem;font-weight:700"><%= _weekMax.total > 0 ? _weekMax.label + ' (' + _weekMax.total + ')' : '—' %></div>
+                    </div>
+                </div>
+                <div class="chart-outer">
+                    <div class="chart-grid">
+                        <% (activity||[]).forEach((a, i) => { %>
+                        <div class="chart-bar-col">
+                            <span class="chart-count <%= a.total === 0 ? 'zero' : '' %>"><%= a.total > 0 ? a.total : '' %></span>
+                            <div class="chart-bar <%= a.total === 0 ? 'empty' : '' %>"
+                                 style="height:<%= a.total > 0 ? Math.max(8, Math.round((a.total / _maxActivity) * 110)) : 4 %>px"
+                                 title="<%= a.label %>: <%= a.total %> logins"></div>
+                        </div>
+                        <% }) %>
+                    </div>
+                    <div class="chart-days">
+                        <% (activity||[]).forEach((a, i) => { %>
+                        <span class="chart-day <%= i === 6 ? 'today' : '' %>"><%= a.label %></span>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

@@ -1,29 +1,71 @@
 const jwt = require('jsonwebtoken');
 
+const isApiRequest = (req) => (req.originalUrl || '').startsWith('/api/');
+
 const requireAuth = async (req, res, next) => {
     const token = req.cookies.token;
     if (!token) {
+        if (isApiRequest(req)) {
+            return res.status(401).json({ error: 'No autenticado' });
+        }
         const returnTo = req.originalUrl;
         return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // Refrescar branchId desde DB si en el token vino null (asignacion posterior al login)
-        if (decoded?.id && !decoded.branchId) {
+        // Refrescar desde DB: onboarded (no está en el JWT) y branchId (puede asignarse post-login)
+        if (decoded?.id) {
             try {
                 const userModel = require('../models/user');
                 const fresh = await userModel.getById(decoded.id);
-                if (fresh?.branchId) {
-                    decoded.branchId = fresh.branchId;
-                    const branchModel = require('../models/branch');
-                    const b = await branchModel.getById(fresh.branchId);
-                    if (b) {
-                        decoded.branch = { id: b.id, latitude: b.latitude, longitude: b.longitude };
+                if (fresh) {
+                    decoded.onboarded = fresh.onboarded;
+                    decoded.helpSeen = userModel.parseHelpSeenModules(fresh.helpSeenModules);
+                    if (!decoded.branchId && fresh.branchId) {
+                        decoded.branchId = fresh.branchId;
+                        const branchModel = require('../models/branch');
+                        const b = await branchModel.getById(fresh.branchId);
+                        if (b) decoded.branch = { id: b.id, latitude: b.latitude, longitude: b.longitude };
                     }
                 }
             } catch { /* ignore */ }
         }
+        if (decoded?.id != null)      { decoded.id = Number(decoded.id); }
+        if (decoded?.roleId != null)  { decoded.roleId = Number(decoded.roleId); }
+        if (decoded?.branchId != null){ decoded.branchId = Number(decoded.branchId); }
         res.locals.currentUser = decoded;
+
+        // #1 Primer ingreso: con contraseña temporal pendiente, forzar el cambio antes de
+        // acceder a cualquier otra ruta (salvo la propia pantalla de cambio y el logout).
+        if (decoded.mustChangePassword) {
+            const url = req.originalUrl || '';
+            if (!url.startsWith('/account/password/forced') && !url.startsWith('/logout')) {
+                if (url.startsWith('/api/')) {
+                    return res.status(403).json({ error: 'Debés cambiar tu contraseña temporal antes de continuar.' });
+                }
+                return res.redirect('/account/password/forced');
+            }
+        }
+
+        // #2 2FA obligatorio (Supervisor/Admin): NO pueden quedar con sesión completa sin 2FA.
+        // Una sesión así (p. ej. anterior a la feature) se desloguea; se reenrolan al re-loguear.
+        const { RoleType } = require('../constants/enums');
+        if (!decoded.mustChangePassword
+            && [RoleType.SUPERVISOR.id, RoleType.ADMIN.id].includes(decoded.roleId)
+            && !decoded.twoFactorEnabled) {
+            const url2 = req.originalUrl || '';
+            if (!url2.startsWith('/logout')) {
+                res.clearCookie('token');
+                if (url2.startsWith('/api/')) {
+                    return res.status(403).json({ error: '2FA requerido. Iniciá sesión de nuevo para configurarlo.' });
+                }
+                return res.redirect('/login');
+            }
+        }
+
+        // #2 Nudge: ofrecer activar 2FA a usuarios sin él (la X lo descarta por esta sesión).
+        res.locals.showTfaNudge = !decoded.twoFactorEnabled && req.cookies?.tfaNudge !== 'off';
+
         const settingModel = require('../models/setting');
         const statusModel  = require('../models/status');
         const statusColors = require('../services/statusColors');
@@ -52,6 +94,9 @@ const requireAuth = async (req, res, next) => {
         res.locals.fmtTime     = (v) => dt.formatTime(v, { timeZone: tz, hour24 });
         next();
     } catch {
+        if (isApiRequest(req)) {
+            return res.status(401).json({ error: 'Sesión inválida o expirada' });
+        }
         const returnTo = req.originalUrl;
         return res.status(401).redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
     }
