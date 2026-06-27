@@ -206,6 +206,9 @@
     }
     #voice-bubble[data-kind="error"] { background: #7f1d1d; }
     #voice-bubble[data-kind="state"] { background: #1e293b; font-weight: 600; }
+    /* CV-14: destello al "indicar" una parada encontrada por voz */
+    @keyframes voice-flash-kf { 0%,100% { background: transparent; } 30% { background: rgba(37,99,235,.18); } }
+    .voice-flash { animation: voice-flash-kf 1.1s ease 2; outline: 2px solid var(--lt-blue); outline-offset: 2px; border-radius: 12px; }
     .btn-panic    {
         background: linear-gradient(135deg,#dc2626,#ef4444); color: #fff;
         border-color: rgba(255,255,255,.3);
@@ -853,6 +856,18 @@
             recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
         } : null;
 
+        // Buscar un envío por voz (CV-14): lista de entregas con destinatario y dirección.
+        const _stopsData = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && s.shipment)
+            .sort((a, b) => a.sequence - b.sequence)
+            .map(s => ({
+                seq:       s.sequence,
+                completed: !!s.completed,
+                recipient: (s.shipment.recipient && s.shipment.recipient.fullName) || null,
+                street:    (s.shipment.address && s.shipment.address.street) || null,
+                number:    (s.shipment.address && s.shipment.address.number) || null,
+            }));
+
         // Avance de la ruta (CV-06): conteo sobre las entregas.
         const _deliv = (route.stops || []).filter(s => s.stopType === 'delivery');
         const _completedN = _deliv.filter(s => s.completed).length;
@@ -864,7 +879,7 @@
             postponed: _postponedN,
         };
     %>
-    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- JSON.stringify(_nsData) %>; window.LT_PROGRESS = <%- JSON.stringify(_progress) %>;</script>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- JSON.stringify(_nsData) %>; window.LT_PROGRESS = <%- JSON.stringify(_progress) %>; window.LT_STOPS = <%- JSON.stringify(_stopsData) %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {
@@ -2483,7 +2498,7 @@
             if (pauseReasonE) { pauseReasonE.textContent = '· ' + (reason || 'pausa'); }
             if (pauseBanner) { pauseBanner.hidden = false; }
             startPauseTimer();
-            return { ok: true };
+            return { ok: true, queued: !!data.queued }; // CV-17: offline → quedó en cola
         } catch (_) { return { ok: false, error: true }; }
     };
     window.LT_voiceResume = async function () {
@@ -2495,7 +2510,7 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok) { return { ok: false, error: true }; }
             clearPauseUI();
-            return { ok: true, addedSeconds: data.addedSeconds || 0 };
+            return { ok: true, addedSeconds: data.addedSeconds || 0, queued: !!data.queued }; // CV-17
         } catch (_) { return { ok: false, error: true }; }
     };
 

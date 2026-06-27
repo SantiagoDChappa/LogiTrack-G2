@@ -232,6 +232,7 @@
         run: async () => {
             if (typeof window.LT_voicePause !== 'function') { return { speak: 'No puedo registrar la pausa ahora.', error: true }; }
             const r = await window.LT_voicePause('pausa');
+            if (r.ok && r.queued) { return { speak: 'Sin señal: la pausa quedó en cola y se registra al volver la conexión.' }; } // CV-17
             if (r.ok) { return { speak: 'Listo, pausa registrada. Decime retomar ruta cuando arranques de nuevo.' }; } // CA1
             if (r.already) { return { speak: 'Ya hay una pausa en curso.' }; }                                       // CA3 (carrera)
             return { speak: 'No pude registrar la pausa, probá de nuevo.', error: true };                            // CA6
@@ -244,6 +245,7 @@
         run: async () => {
             if (typeof window.LT_voiceResume !== 'function') { return { speak: 'No puedo retomar la ruta ahora.', error: true }; }
             const r = await window.LT_voiceResume();
+            if (r.ok && r.queued) { return { speak: 'Sin señal: la reanudación quedó en cola y se aplica al volver la conexión.' }; } // CV-17
             if (r.ok) {                                                                                              // CA2
                 const extra = r.addedSeconds ? ` Estuviste en pausa ${fmtPause(r.addedSeconds)}.` : '';
                 return { speak: `Listo, ruta retomada.${extra}` };
@@ -335,6 +337,91 @@
             return { speak: 'Alerta de emergencia enviada a la central con tu ubicación.' }; // CA2
         },
     });
+
+    // CV-14 — Buscar un envío por voz. Consulta de solo lectura: dice dónde está la parada
+    // y la resalta en pantalla. No reordena la ruta ni cambia estados. Funciona en pausa/offline.
+    register({
+        id: 'search', label: 'buscar un envío',
+        keywords: ['llevame al paquete', 'llevame a la entrega', 'donde esta el paquete', 'donde esta la entrega',
+            'buscar el paquete', 'buscar la entrega', 'buscar paquete', 'buscar entrega', 'paquete de', 'buscar a'],
+        run: (c, raw) => { searchStart(extractSearchName(raw)); return { handled: true }; },
+    });
+
+    // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
+    function extractSearchName(raw) {
+        return String(raw || '').trim().replace(
+            /^\s*(llevame al paquete de|llevame a la entrega de|donde esta el paquete de|donde esta la entrega de|buscar el paquete de|buscar la entrega de|el paquete de|la entrega de|paquete de|entrega de|buscar a|buscar)\s*/i,
+            ''
+        ).trim();
+    }
+    function extractNameOnly(raw) {
+        return String(raw || '').trim().replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
+    }
+    function searchStops(name) {
+        const stops = Array.isArray(window.LT_STOPS) ? window.LT_STOPS : [];
+        const q = normalize(name);
+        if (!q) { return []; }
+        const words = q.split(' ').filter((w) => w.length >= 3);
+        return stops.filter((s) => {
+            if (!s.recipient) { return false; }
+            const r = normalize(s.recipient);
+            return r.includes(q) || words.some((w) => r.includes(w));
+        });
+    }
+    function highlightStop(seq) {
+        try {
+            const el = document.querySelector(`[data-stop-seq="${seq}"]`);
+            if (!el) { return; }
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('voice-flash');
+            setTimeout(() => el.classList.remove('voice-flash'), 2200);
+        } catch (_) { /* el resaltado es best-effort: si falla, igual se dijo por voz */ }
+    }
+    function indicateStop(stop) {
+        const dir = [stop.street, stop.number].filter(Boolean).join(' ').trim();
+        const who = stop.recipient || 'destinatario sin nombre';
+        const where = dir ? `, en ${speakable(dir)}` : '';
+        highlightStop(stop.seq);
+        return respond(`El paquete de ${who} es la parada ${stop.seq}${where}.`, {}); // CA1
+    }
+    function resolvePick(answer, candidates) {
+        const t = normalize(answer);
+        const num = t.match(/\b(\d+)\b/);
+        if (num) { const s = candidates.find((c) => String(c.seq) === num[1]); if (s) { return s; } }
+        const ord = { primera: 0, primero: 0, uno: 0, segunda: 1, segundo: 1, dos: 1, tercera: 2, tercero: 2, tres: 2 };
+        for (const k in ord) { if (t.includes(k) && candidates[ord[k]]) { return candidates[ord[k]]; } }
+        // Por calle: alcanza con que el repartidor diga una palabra distintiva de la calle
+        // (ej. "rivadavia" para "Av. Rivadavia"), no el nombre completo.
+        const byStreet = candidates.find((c) => {
+            if (!c.street) { return false; }
+            return normalize(c.street).split(' ').filter((w) => w.length >= 4).some((w) => t.includes(w));
+        });
+        return byStreet || null;
+    }
+    function searchStart(name) {
+        if (!name) { // CA5: no se entendió / no se dijo un nombre
+            pendingPrompt = (ans) => searchStart(extractNameOnly(ans));
+            return respond('¿De quién es el paquete que buscás?', { relisten: true });
+        }
+        const matches = searchStops(name);
+        if (matches.length === 0) { return respond(`No encontré ninguna entrega para ${name}.`, {}); } // CA2
+        const pending = matches.filter((s) => !s.completed);
+        const done = matches.filter((s) => s.completed);
+        if (pending.length === 0) { // CA6: solo hay coincidencias ya entregadas
+            const who = (done[0] && done[0].recipient) || 'esa persona';
+            return respond(`La entrega de ${who} ya está completada.`, {});
+        }
+        if (pending.length === 1) { return indicateStop(pending[0]); } // CA1
+        // CA3: varias pendientes → desambiguar por parada/dirección
+        const opts = pending.slice(0, 3);
+        pendingPrompt = (ans) => {
+            const pick = resolvePick(ans, opts);
+            if (pick) { return indicateStop(pick); } // CA4
+            return respond('Listo, no hago nada.', {});
+        };
+        const parts = opts.map((s) => `la parada ${s.seq}${s.street ? ', en ' + speakable(s.street) : ''}`);
+        return respond(`Hay ${pending.length} coincidencias: ${parts.join('; y ')}. ¿Cuál?`, { relisten: true });
+    }
 
     // Palabras genéricas que no distinguen un comando de otro (no cuentan para el matching).
     const STOPWORDS = new Set(['esta', 'este', 'para', 'cual', 'como', 'donde', 'esto', 'algo', 'quiero', 'tengo']);
