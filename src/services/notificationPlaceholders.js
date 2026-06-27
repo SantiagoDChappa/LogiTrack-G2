@@ -39,6 +39,10 @@ const CATALOG = [
     { token: 'secretCodeLine', label: 'Línea código clave',  group: 'Envío',        description: 'Frase completa con el código clave (si existe).', resolve: s => (s.deliverySecretCode ? `\n\nCódigo clave de entrega: ${s.deliverySecretCode}. Mostráselo al repartidor para confirmar la entrega.` : '') },
     { token: 'failedReason',   label: 'Motivo intento fallido', group: 'Envío',     description: 'Motivo del último intento de entrega fallido.',       resolve: s => s._failedReason || '' },
     { token: 'daysDelayed',    label: 'Días de demora',         group: 'Envío',     description: 'Cantidad de días de demora respecto a la fecha estimada.', resolve: s => s._daysDelayed || '' },
+    // Última Milla — franja horaria de llegada (se resuelven al disparar el aviso "ya casi llego").
+    { token: 'etaText',        label: 'Mensaje de llegada',     group: 'Última Milla', description: 'Frase de llegada calculada (ej. "Tu envío llega antes de las 20:55").', resolve: s => s._etaText || '' },
+    { token: 'etaFrom',        label: 'Llegada desde',          group: 'Última Milla', description: 'Hora estimada de inicio de la franja (HH:MM).',            resolve: s => s._etaFrom || '' },
+    { token: 'etaTo',          label: 'Llegada hasta',          group: 'Última Milla', description: 'Hora estimada de fin de la franja / tope (HH:MM).',        resolve: s => s._etaTo || '' },
     // Dirección
     { token: 'addressLine',    label: 'Dirección',           group: 'Dirección',    description: 'Calle y número de entrega.',                   resolve: s => s.address ? `${s.address.street || ''} ${s.address.number || ''}`.trim() : '' },
     { token: 'province',       label: 'Provincia',           group: 'Dirección',    description: 'Provincia de destino.',                        resolve: s => s.address?.province?.description || '' },

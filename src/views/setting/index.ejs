@@ -1618,6 +1618,45 @@
                 </form>
             </div>
 
+            <!-- Card ETA: Última Milla — avisos de llegada -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Última Milla — avisos de llegada
+                </h2>
+                <p class="settings-subtitle">
+                    Cómo se calcula la franja horaria que ve el cliente en el portal y cuándo se le avisa que el repartidor está por llegar.
+                </p>
+                <form method="POST" action="/setting/eta-settings">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4) var(--space-5)">
+                        <div class="field">
+                            <label for="eta_proximity_minutes">Aviso "ya casi llego" cuando falten (min)</label>
+                            <input type="number" id="eta_proximity_minutes" name="eta_proximity_minutes" min="1" max="60" step="1" value="<%= params.eta_proximity_minutes %>">
+                        </div>
+                        <div class="field">
+                            <label for="eta_format">Formato de la hora mostrada</label>
+                            <select id="eta_format" name="eta_format">
+                                <option value="range" <%= params.eta_format === 'range' ? 'selected' : '' %>>Franja (entre 20:35 y 20:55)</option>
+                                <option value="exact" <%= params.eta_format === 'exact' ? 'selected' : '' %>>Hora exacta (20:35)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="eta_range_margin_minutes">Margen de la franja (min)</label>
+                            <input type="number" id="eta_range_margin_minutes" name="eta_range_margin_minutes" min="1" max="120" step="1" value="<%= params.eta_range_margin_minutes %>">
+                        </div>
+                        <div class="field">
+                            <label for="eta_avg_speed_kmh">Velocidad promedio asumida (km/h)</label>
+                            <input type="number" id="eta_avg_speed_kmh" name="eta_avg_speed_kmh" min="5" max="120" step="1" value="<%= params.eta_avg_speed_kmh %>">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card 4: Asignación de sucursales -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
