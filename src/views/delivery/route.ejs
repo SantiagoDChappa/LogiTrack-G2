@@ -601,6 +601,9 @@
                     <span class="material-symbols-outlined">menu</span>
                 </button>
                 <%- include('../partials/page-help-btn', { helpModule: 'entregas-repartidor' }) %>
+                <button class="btn-menu" id="btn-sim" title="Modo prueba (simular viaje)" aria-label="Modo prueba">
+                    <span class="material-symbols-outlined">science</span>
+                </button>
             </div>
             <div class="map-actions">
                 <% if (!readOnly) { %>
@@ -1142,6 +1145,11 @@
             document.querySelector('.left-header')?.classList.add('open');
             document.getElementById('nav-overlay')?.classList.add('open');
         }
+    });
+
+    // Botón 🧪 de la barra superior: entra al modo prueba (construye y muestra el panel).
+    document.getElementById('btn-sim')?.addEventListener('click', () => {
+        if (window.__openSim) { window.__openSim(); }
     });
 
     // Sincroniza body.nav-open con .left-header.open para z-index correcto
@@ -2607,7 +2615,10 @@
     // Inyecta posiciones GPS falsas (heartbeats) para probar avisos/ETA/mapa sin manejar.
     // El GPS real se pausa mientras está activo (window.__simActive). Sólo aparece con ?sim=1.
     (function initSimPanel() {
-        if (new URLSearchParams(location.search).get('sim') !== '1') { return; }
+        let __built = false;
+        function build() {
+        if (__built) { return; }
+        __built = true;
 
         const pendingDeliveries = () => (stops || [])
             .filter(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipmentId && Number.isFinite(s.lat) && Number.isFinite(s.lng))
@@ -2683,6 +2694,15 @@
         setInterval(() => { if (window.__simActive && lastSim) { sendSim(lastSim.lat, lastSim.lng); } }, 12000);
 
         setStatus('Listo. Tildá "Simular" y tocá un botón.');
+        }
+        // Abre el panel: lo construye una vez y lo muestra. Lo usa el botón 🧪 de arriba.
+        window.__openSim = () => {
+            build();
+            const p = document.getElementById('sim-panel');
+            if (p) { p.style.display = 'block'; const b = p.querySelector('.sim-body'); if (b) { b.style.display = 'flex'; } }
+        };
+        // Auto-abre si se entró con ?sim=1 (compatibilidad).
+        if (new URLSearchParams(location.search).get('sim') === '1') { build(); }
     })();
 
     // === POD: navega a la página de evidencia (sirve online y offline) ==============
