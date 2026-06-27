@@ -190,6 +190,15 @@ const postLoginSetup = async (req, res) => {
     const fresh = await userModel.getById(user.id);
     res.clearCookie(SETUP_PRE_COOKIE);
     setAuthCookie(res, await buildToken(fresh, !!pre.remember), !!pre.remember);
+    // Exponer currentUser en la vista de backup: el tour se programa al entrar a /home.
+    res.locals.currentUser = {
+        id: Number(fresh.id),
+        roleId: Number(fresh.roleId),
+        onboarded: !!fresh.onboarded,
+        helpSeen: userModel.parseHelpSeenModules(fresh.helpSeenModules),
+        fullName: fresh.fullName,
+        twoFactorEnabled: true,
+    };
     res.render('login2faBackup', { codes: plain });
 };
 

@@ -173,10 +173,18 @@
         return best;
     }
 
+    function tourDismissedForUser() {
+        if (!window.__LGT || window.__LGT.onboarded) return true;
+        try {
+            var uid = window.__LGT.userId != null ? String(window.__LGT.userId) : '0';
+            return sessionStorage.getItem('lgt_tour_dismissed_' + uid) === '1';
+        } catch (_) { return false; }
+    }
+
     function canAutoStart() {
         if (!window.__LGT) return false;
         if (window.__LGT.onboarded) return true;
-        try { return sessionStorage.getItem('lgt_tour_dismissed') === '1'; } catch (_) { return false; }
+        return tourDismissedForUser();
     }
 
     function startContextualTour(tour, force) {
