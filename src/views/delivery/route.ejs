@@ -558,6 +558,28 @@
     body.sheet-detail #fatigue-next-check,
     body.sheet-detail #sim-panel { display: none !important; }
 
+    /* En el ruteo ocultamos la barra superior global: ya hay botones flotantes sobre el
+       mapa (volver, menú, tour, ayuda). El drawer (.left-header) sigue abriéndose con el
+       botón de menú flotante. */
+    .top-header { display: none !important; }
+    .main-content { height: 100vh !important; }
+
+    /* Tour e info (page-help) con el mismo estilo glass que volver/menú. */
+    .map-topleft .page-help-actions { position: static !important; display: flex; gap: 6px; margin: 0; padding: 0; }
+    .map-topleft .page-help-btn {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-brdr);
+        border-radius: 50%; width: 44px; height: 44px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: var(--shadow-md);
+        color: var(--lt-text-strong) !important;
+        text-decoration: none !important;
+        transition: transform .15s ease;
+    }
+    .map-topleft .page-help-btn:hover { transform: scale(1.05); }
+    .map-topleft .page-help-btn .material-symbols-outlined { font-size: 22px; }
+
     @keyframes pulse {
         0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,.55);}
         50%     { box-shadow: 0 0 0 14px rgba(37,99,235,0);}
@@ -2142,11 +2164,8 @@
             const pendingActionable = rows.some(r => !r.classList.contains('completed') && r.dataset.skipped !== '1');
             finishBtn.hidden = pendingActionable;
         }
-
-        if (window.innerWidth <= 768) {
-            const cur = document.querySelector('.stop-row.is-current');
-            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        // No auto-abrimos el detalle del envío: el repartidor decide cuándo subir el panel.
+        // (Antes esto hacía scrollIntoView al stop actual en cada render.)
     }
 
     function markStopDone(stopId, kind) {
@@ -2612,7 +2631,7 @@
 
         const panel = document.createElement('div');
         panel.id = 'sim-panel';
-        panel.style.cssText = 'position:fixed;bottom:88px;left:14px;z-index:1300;width:min(248px,84vw);background:#111827;color:#cbd5e1;border:1px solid #2a3441;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:Inter,sans-serif;overflow:hidden;font-size:.8rem;';
+        panel.style.cssText = 'position:fixed;top:64px;left:10px;z-index:1300;width:min(248px,84vw);background:#111827;color:#cbd5e1;border:1px solid #2a3441;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:Inter,sans-serif;overflow:hidden;font-size:.8rem;';
         const btnStyle = 'padding:.5rem;border-radius:8px;font-weight:600;font-size:.8rem;cursor:pointer;text-align:center;background:transparent;';
         panel.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;border-bottom:1px solid #1f2937;font-weight:600;color:#e2e8f0;font-size:.76rem;letter-spacing:.03em;text-transform:uppercase;"><span style="display:flex;align-items:center;gap:.4rem;">🧪 Modo prueba</span><span class="sim-min" style="cursor:pointer;color:#64748b;font-size:1.1rem;line-height:1;">—</span></div>' +
