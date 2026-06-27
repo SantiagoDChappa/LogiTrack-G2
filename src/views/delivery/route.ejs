@@ -159,7 +159,7 @@
     .btn-back:hover, .btn-menu:hover { transform: scale(1.05); }
     .btn-back .material-symbols-outlined, .btn-menu .material-symbols-outlined { font-size: 22px; }
 
-    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic, .btn-voice {
+    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic, .btn-voice, .btn-voice-wake {
         background: var(--glass-bg);
         backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--glass-brdr);
@@ -169,7 +169,7 @@
         color: var(--lt-blue); transition: transform .15s ease;
         font-family: inherit;
     }
-    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover, .btn-voice:hover { transform: scale(1.05); }
+    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover, .btn-voice:hover, .btn-voice-wake:hover { transform: scale(1.05); }
     .btn-gmaps    { color: var(--lt-green); }
     .btn-pause    { color: var(--lt-amber); }
     .btn-incident { color: var(--lt-purple); }
@@ -189,6 +189,14 @@
         50%     { box-shadow: 0 8px 30px rgba(37,99,235,.85); }
     }
     .btn-voice .material-symbols-outlined { font-size: 22px; }
+    /* Modo escucha (palabra clave): apagado = neutro; encendido = verde con latido suave */
+    .btn-voice-wake { color: var(--lt-blue); }
+    .btn-voice-wake .material-symbols-outlined { font-size: 22px; }
+    .btn-voice-wake.active {
+        background: linear-gradient(135deg,#16a34a,#22c55e); color: #fff;
+        border-color: rgba(255,255,255,.3);
+        animation: voice-pulse 1.8s infinite;
+    }
     #voice-bubble {
         position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
         max-width: min(86vw, 420px); z-index: 10001;
@@ -616,6 +624,9 @@
                     </button>
                     <button class="btn-voice"    id="btn-voice"    title="Copiloto de voz: tocá para hablar" aria-label="Copiloto de voz: tocá para hablar" aria-pressed="false">
                         <span class="material-symbols-outlined">mic</span>
+                    </button>
+                    <button class="btn-voice-wake" id="btn-voice-wake" title="Modo escucha: activá para hablar diciendo &quot;hola copiloto&quot;" aria-label="Modo escucha por palabra clave" aria-pressed="false">
+                        <span class="material-symbols-outlined">hearing</span>
                     </button>
                 <% } %>
                 <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">

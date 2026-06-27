@@ -41,6 +41,8 @@
     let pendingPrompt = null;  // función que captura la próxima respuesta (flujo multipaso: motivo de fallida)
     let audioCtx = null;
     let speakGen = 0;         // invalida callbacks de locuciones interrumpidas (CA12)
+    let wakeMode = false;     // CV-12: escucha continua de la palabra clave (opt-in)
+    let wakeRec = null;       // reconocimiento de fondo para el wake word
 
     const NO_SPEECH_MS = 7000;   // corte de seguridad si no se detecta voz (CA5)
 
@@ -420,6 +422,7 @@
 
     // ── UI: botón + burbuja de texto ────────────────────────────────────────────
     let btn = null;
+    let wakeBtn = null;
     let bubble = null;
     const LABELS = {
         idle: 'Tocá para hablar',
@@ -470,6 +473,7 @@
 
     function startListening() {
         if (state === 'listening') { return; } // evita abrir dos escuchas a la vez
+        stopWakeListener();                     // CV-12: un solo reconocimiento activo a la vez
         try {
             recognition = new SpeechRec();
         } catch { genericError(); return; }
@@ -494,11 +498,11 @@
             const err = ev && ev.error;
             if (err === 'no-speech') { respond('No escuché nada, tocá para hablar de nuevo.', { error: true }); return; } // CA5
             if (err === 'not-allowed' || err === 'service-not-allowed') { micBlocked(); return; }                          // CA6
-            if (err === 'aborted') { setState('idle'); showBubble(LABELS.idle, 'state'); return; }                          // CA7
+            if (err === 'aborted') { setState('idle'); showBubble(LABELS.idle, 'state'); maybeStartWake(); return; }          // CA7
             genericError();
         };
         recognition.onend = () => {
-            if (!handled && state === 'listening') { setState('idle'); showBubble(LABELS.idle, 'state'); }
+            if (!handled && state === 'listening') { setState('idle'); showBubble(LABELS.idle, 'state'); maybeStartWake(); }
         };
 
         try {
@@ -511,7 +515,7 @@
     function stopListening(userCancel) {
         clearTimeout(noSpeechTimer);
         try { if (recognition) { userCancel ? recognition.abort() : recognition.stop(); } } catch { /* noop */ }
-        if (userCancel) { pendingChoice = null; pendingConfirm = null; pendingPrompt = null; setState('idle'); showBubble(LABELS.idle, 'state'); }
+        if (userCancel) { pendingChoice = null; pendingConfirm = null; pendingPrompt = null; setState('idle'); showBubble(LABELS.idle, 'state'); maybeStartWake(); }
     }
 
     function handleTranscript(text) {
@@ -595,6 +599,7 @@
             if (opts.relisten && SpeechRec) { startListening(); return; }
             setState('idle');
             hideBubbleSoon();
+            maybeStartWake(); // CV-12: al volver a reposo, reanuda la escucha de la palabra clave
         });
     }
 
@@ -614,6 +619,70 @@
     function genericError() {
         setState('idle'); showBubble('No pude escuchar, probá de nuevo.', 'error'); earcon.error();
         hideBubbleSoon();
+        maybeStartWake();
+    }
+
+    // ── CV-12: activación por palabra clave ("Hola copiloto") ───────────────────
+    // Escucha continua en segundo plano (opt-in). Al detectar la frase, abre la escucha
+    // de la orden. Un solo reconocimiento activo a la vez: el de fondo se frena cuando
+    // arranca una orden y se reanuda al volver a reposo.
+    const WAKE_RE = /\b(hola|ola)\s+copiloto\b/;
+    function maybeStartWake() {
+        if (wakeMode && SpeechRec && state === 'idle') { startWakeListener(); }
+    }
+    function startWakeListener() {
+        if (!wakeMode || wakeRec || state !== 'idle' || !SpeechRec) { return; }
+        let rec;
+        try { rec = new SpeechRec(); } catch { return; }
+        wakeRec = rec;
+        rec.lang = 'es-AR';
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.onresult = (ev) => {
+            let txt = '';
+            for (let i = ev.resultIndex; i < ev.results.length; i++) { txt += ev.results[i][0].transcript + ' '; }
+            if (WAKE_RE.test(normalize(txt))) { detectWake(); }
+        };
+        rec.onerror = (ev) => {
+            const err = ev && ev.error;
+            if (err === 'not-allowed' || err === 'service-not-allowed') { disableWakeForPermission(); }
+            // otros errores (no-speech, network): el onend se encarga de reintentar
+        };
+        rec.onend = () => {
+            if (wakeRec === rec) { wakeRec = null; }
+            // Chrome corta la escucha continua sola cada tanto: la reanudamos si seguimos atentos.
+            if (wakeMode && state === 'idle') { setTimeout(maybeStartWake, 350); }
+        };
+        try { rec.start(); } catch { wakeRec = null; }
+    }
+    function stopWakeListener() {
+        if (!wakeRec) { return; }
+        const rec = wakeRec; wakeRec = null;
+        rec.onend = null; rec.onresult = null; rec.onerror = null; // que no se reinicie al abortar
+        try { rec.abort(); } catch { /* noop */ }
+    }
+    function detectWake() {
+        stopWakeListener();
+        unlockAudio();
+        earcon.start();
+        startListening(); // CA1: la palabra clave abre la escucha de la orden
+    }
+    function toggleWake() {
+        if (!SpeechRec) { explainUnavailable(); return; }
+        unlockAudio();
+        wakeMode = !wakeMode;
+        updateWakeBtn();
+        if (wakeMode) { respond('Modo escucha activado. Decí: hola copiloto, y después tu orden.', {}); }
+        else { stopWakeListener(); respond('Modo escucha desactivado.', {}); }
+    }
+    function updateWakeBtn() {
+        if (!wakeBtn) { return; }
+        wakeBtn.classList.toggle('active', wakeMode);
+        wakeBtn.setAttribute('aria-pressed', wakeMode ? 'true' : 'false');
+    }
+    function disableWakeForPermission() {
+        wakeMode = false; stopWakeListener(); updateWakeBtn();
+        micBlocked();
     }
 
     // ── Arranque ────────────────────────────────────────────────────────────────
@@ -629,6 +698,13 @@
             TTS.onvoiceschanged = () => TTS.getVoices();
         }
         btn.addEventListener('click', onButton);
+
+        // CV-12: botón de modo escucha (palabra clave). Solo si el navegador soporta voz.
+        wakeBtn = document.getElementById('btn-voice-wake');
+        if (wakeBtn) {
+            if (!SpeechRec) { wakeBtn.style.display = 'none'; }
+            else { updateWakeBtn(); wakeBtn.addEventListener('click', toggleWake); }
+        }
     }
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
