@@ -551,6 +551,13 @@
     }
     @media (min-width: 769px) { .fab-current { display: none; } }
 
+    /* En el detalle (bottom-sheet arriba, mapa tapado) ocultamos los overlays del mapa
+       para bajar el ruido: chip de fatiga "Manejo", su countdown y el panel de prueba.
+       !important para ganarle al display inline que setean sus propios updaters. */
+    body.sheet-detail #fatigue-drive-chip,
+    body.sheet-detail #fatigue-next-check,
+    body.sheet-detail #sim-panel { display: none !important; }
+
     @keyframes pulse {
         0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,.55);}
         50%     { box-shadow: 0 0 0 14px rgba(37,99,235,0);}
@@ -996,7 +1003,15 @@
         setSheetY(pts[name]);
         sheet.classList.toggle('is-tucked', name === 'tucked'); // muestra el hint "Deslizá…"
         setTimeout(() => map.invalidateSize(), 380);
-        if (window.__updateFab) { window.__updateFab(); } // refresca "Paso actual" / "Ver mapa"
+        setSheetContext();
+    }
+
+    // Detalle = sheet arriba tapando el mapa (mobile, no 'tucked'). Marca el body para
+    // ocultar overlays del mapa y refresca el rótulo del FAB.
+    function setSheetContext() {
+        const detail = isMobile() && currentSnap !== 'tucked';
+        document.body.classList.toggle('sheet-detail', detail);
+        if (window.__updateFab) { window.__updateFab(); }
     }
 
     function nearestSnap(px, velocityPxPerMs) {
@@ -2182,7 +2197,7 @@
             if (window.innerWidth > 768) { fab.hidden = true; return; }
             if (inDetail()) {
                 fab.hidden = false;
-                fabIcon.textContent = 'map';
+                fabIcon.textContent = 'arrow_upward';
                 fabLabel.textContent = 'Ver mapa';
                 return;
             }
@@ -2596,6 +2611,7 @@
         };
 
         const panel = document.createElement('div');
+        panel.id = 'sim-panel';
         panel.style.cssText = 'position:fixed;bottom:88px;left:14px;z-index:1300;width:min(248px,84vw);background:#111827;color:#cbd5e1;border:1px solid #2a3441;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:Inter,sans-serif;overflow:hidden;font-size:.8rem;';
         const btnStyle = 'padding:.5rem;border-radius:8px;font-weight:600;font-size:.8rem;cursor:pointer;text-align:center;background:transparent;';
         panel.innerHTML =
