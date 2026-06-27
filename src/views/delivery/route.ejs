@@ -780,7 +780,7 @@
         </section>
 
         <button class="fab-current" id="fab-current" hidden>
-            <span class="material-symbols-outlined">arrow_downward</span>Paso actual
+            <span class="material-symbols-outlined fab-icon">arrow_downward</span><span class="fab-label">Paso actual</span>
         </button>
 
         <%# [prototype] El POD se hace en la página /delivery/evidence/:tracking/pod (online y offline).
@@ -996,6 +996,7 @@
         setSheetY(pts[name]);
         sheet.classList.toggle('is-tucked', name === 'tucked'); // muestra el hint "Deslizá…"
         setTimeout(() => map.invalidateSize(), 380);
+        if (window.__updateFab) { window.__updateFab(); } // refresca "Paso actual" / "Ver mapa"
     }
 
     function nearestSnap(px, velocityPxPerMs) {
@@ -2167,22 +2168,47 @@
     applyStepState();
     setInterval(applyStepState, 30000);
 
-    // FAB
+    // FAB — contextual:
+    //  • En detalle (sheet arriba tapando el mapa): dice "Ver mapa" y al tocarlo baja el
+    //    sheet para mostrar el mapa.
+    //  • Con el mapa visible: vuelve a "Paso actual" y lleva al stop en curso si quedó fuera.
     const fab = document.getElementById('fab-current');
     if (fab) {
-        fab.addEventListener('click', () => {
-            const cur = document.querySelector('.stop-row.is-current');
-            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-        const onScroll = () => {
+        const fabIcon = fab.querySelector('.fab-icon');
+        const fabLabel = fab.querySelector('.fab-label');
+        const inDetail = () => isMobile() && currentSnap !== 'tucked';
+
+        const updateFab = () => {
             if (window.innerWidth > 768) { fab.hidden = true; return; }
+            if (inDetail()) {
+                fab.hidden = false;
+                fabIcon.textContent = 'map';
+                fabLabel.textContent = 'Ver mapa';
+                return;
+            }
+            fabIcon.textContent = 'arrow_downward';
+            fabLabel.textContent = 'Paso actual';
             const cur = document.querySelector('.stop-row.is-current');
             if (!cur) { fab.hidden = true; return; }
             const r = cur.getBoundingClientRect();
             fab.hidden = r.top > 80 && r.bottom < window.innerHeight - 80;
         };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
+
+        fab.addEventListener('click', () => {
+            if (inDetail()) {
+                snapTo('tucked');                 // baja el sheet → muestra el mapa
+                setTimeout(() => map.invalidateSize(), 200);
+                setTimeout(updateFab, 420);
+                return;
+            }
+            const cur = document.querySelector('.stop-row.is-current');
+            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+
+        window.addEventListener('scroll', updateFab, { passive: true });
+        updateFab();
+        // Permite que el snap/drag del sheet refresque el rótulo del FAB.
+        window.__updateFab = updateFab;
     }
 
     // === Helpers ===
