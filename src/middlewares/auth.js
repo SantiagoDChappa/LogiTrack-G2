@@ -92,6 +92,13 @@ const requireAuth = async (req, res, next) => {
         res.locals.fmtDateTime = (v) => dt.formatDateTime(v, { timeZone: tz, hour24 });
         res.locals.fmtDate     = (v) => dt.formatDate(v, { timeZone: tz });
         res.locals.fmtTime     = (v) => dt.formatTime(v, { timeZone: tz, hour24 });
+        // Serializa datos para embeber dentro de <script> sin riesgo de inyección: escapa
+        // los caracteres que podrían cerrar el tag o romper el parser (</script>, U+2028/9).
+        // Uso en vistas: <script>window.X = <%- jsonScript(data) %>;</script>
+        res.locals.jsonScript = (v) => JSON.stringify(v === undefined ? null : v)
+            .replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')
+            .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+
         next();
     } catch {
         if (isApiRequest(req)) {

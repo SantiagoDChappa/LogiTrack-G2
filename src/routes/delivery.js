@@ -1059,7 +1059,46 @@ router.post('/panic', requireDelivery, async (req, res) => {
         longitude: longitude || null,
         message:   message  || null,
     });
+    // Alerta dedicada de alta severidad (punto 4): línea de log distinta y etiquetada para que
+    // el monitoreo pueda enganchar y paginar a la central. El evento ya queda persistido arriba.
+    console.error('[ALERT][PANIC]', JSON.stringify({
+        panicId:     ev.id,
+        userId:      res.locals.currentUser.id,
+        routeId:     routeId || null,
+        hasLocation: (latitude ?? null) !== null && (longitude ?? null) !== null,
+        latitude:    latitude || null,
+        longitude:   longitude || null,
+        message:     message || null,
+        at:          new Date().toISOString(),
+    }));
     res.json({ ok: true, panicId: ev.id });
+});
+
+// === Telemetría del copiloto de voz (punto 4) ===
+// Mide la tasa de aciertos / "no entendí" para mejorar el reconocimiento. NO recibe audio ni
+// el texto dictado (privacidad): solo la intención detectada, puntaje y latencia. Best-effort:
+// llega por sendBeacon y nunca debe afectar la operación, por eso responde 204 sin validar mucho.
+router.post('/voice/telemetry', requireDelivery, (req, res) => {
+    try {
+        const b = req.body || {};
+        console.log('[voice-telemetry]', JSON.stringify({
+            userId:    res.locals.currentUser ? res.locals.currentUser.id : null,
+            event:     b.event || null,
+            intent:    b.intent || null,
+            score:     b.score ?? null,
+            strong:    b.strong ?? null,
+            applied:   b.applied ?? null,
+            a:         b.a || null,
+            b:         b.b || null,
+            words:     b.words ?? null,
+            source:    b.source || null,
+            offline:   b.offline ?? null,
+            latencyMs: b.latencyMs ?? null,
+            routeId:   b.routeId || null,
+            ts:        b.ts || Date.now(),
+        }));
+    } catch { /* la telemetría nunca rompe la operación */ }
+    res.status(204).end();
 });
 
 // === Sprint 3 - 2.4 Cancelar ruta (antes de iniciarla o durante) ===

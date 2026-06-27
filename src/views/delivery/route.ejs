@@ -879,7 +879,7 @@
             postponed: _postponedN,
         };
     %>
-    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- JSON.stringify(_nsData) %>; window.LT_PROGRESS = <%- JSON.stringify(_progress) %>; window.LT_STOPS = <%- JSON.stringify(_stopsData) %>;</script>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- jsonScript(_nsData) %>; window.LT_PROGRESS = <%- jsonScript(_progress) %>; window.LT_STOPS = <%- jsonScript(_stopsData) %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {
@@ -940,9 +940,9 @@
     })();
     const routeStarted = <%= route.startedAt ? 'true' : 'false' %>;
     let activePauseId = <%= activePause ? activePause.id : 'null' %>;
-    let activePauseStart = <%- activePause ? JSON.stringify(activePause.startedAt) : 'null' %>;
+    let activePauseStart = <%- activePause ? jsonScript(activePause.startedAt) : 'null' %>;
 
-    const stops = <%- JSON.stringify((route.stops || []).map(s => ({
+    const stops = <%- jsonScript((route.stops || []).map(s => ({
         id: s.id, sequence: s.sequence, stopType: s.stopType,
         lat: Number(s.lat), lng: Number(s.lng),
         completed: s.completed, skipped: s.skipped,

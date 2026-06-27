@@ -41,8 +41,11 @@
     let pendingPrompt = null;  // función que captura la próxima respuesta (flujo multipaso: motivo de fallida)
     let audioCtx = null;
     let speakGen = 0;         // invalida callbacks de locuciones interrumpidas (CA12)
+    let turnGen = 0;          // invalida respuestas de red que llegan tarde tras cancelar/empezar otra orden
     let wakeMode = false;     // CV-12: escucha continua de la palabra clave (opt-in)
     let wakeRec = null;       // reconocimiento de fondo para el wake word
+    let lastSource = 'button'; // cómo se abrió la última escucha: 'button' | 'wake' (telemetría)
+    let listenStartedAt = 0;   // marca para medir latencia de reconocimiento (telemetría)
 
     const NO_SPEECH_MS = 7000;   // corte de seguridad si no se detecta voz (CA5)
 
@@ -109,43 +112,98 @@
         if (/^(cancelar|cancela|olvidalo|dejalo|nada)\b/.test(t)) { return 'cancel'; }
         return 'redo'; // "no", "corregir" o poco claro → re-pedir el motivo (CA3)
     }
-    function failedStart(motivo) {
-        if (!motivo) { return failedAskMotivo(false); } // CA4
-        return failedConfirm(motivo);
+
+    // Motivos oficiales de entrega fallida — los mismos del formulario manual y del cálculo de
+    // fecha sugerida. La voz NO guarda el texto crudo como motivo (el STT se equivoca y la
+    // oficina recibe basura): encasilla lo dictado en uno de estos códigos y deja lo dictado
+    // como observación. Los labels se pueden sobreescribir desde el catálogo configurable del
+    // servidor (window.LT_FAILED_REASONS); los sinónimos para reconocer el habla viven acá.
+    const FAILED_REASON_DEFS = [
+        { code: 'ausente', label: 'Ausente',
+            syn: ['ausente', 'no habia nadie', 'no hay nadie', 'no estaba', 'no estaban', 'nadie',
+                'no atendio', 'no atiende', 'no responde', 'no contesta', 'no abrio', 'no abre', 'toque y nada'] },
+        { code: 'domicilio_erroneo', label: 'Domicilio incorrecto',
+            syn: ['domicilio incorrecto', 'domicilio erroneo', 'direccion incorrecta', 'direccion equivocada', 'direccion mal',
+                'direccion erronea', 'mal la direccion', 'domicilio inexistente', 'direccion inexistente', 'no existe la direccion',
+                'no existe el domicilio', 'no es la direccion', 'no encontre la direccion'] },
+        { code: 'rechazo', label: 'Rechazo',
+            syn: ['rechazo', 'rechazado', 'rechaza', 'no lo quiso', 'no lo quiere', 'no lo acepto', 'no acepto',
+                'no quiso recibir', 'no quiere recibir', 'devolvio el paquete'] },
+        { code: 'calle_cortada', label: 'Calle cortada / zona inaccesible',
+            syn: ['zona inaccesible', 'inaccesible', 'calle cortada', 'no pude entrar', 'no puedo entrar', 'no se puede acceder',
+                'no hay acceso', 'zona peligrosa', 'no llegue', 'no pude llegar'] },
+        { code: 'otro', label: 'Otro', syn: [] },
+    ];
+    function reasonDefs() {
+        const override = Array.isArray(window.LT_FAILED_REASONS) ? window.LT_FAILED_REASONS : null;
+        if (!override) { return FAILED_REASON_DEFS; }
+        return FAILED_REASON_DEFS.map((d) => {
+            const o = override.find((x) => x.code === d.code);
+            return o ? { ...d, label: o.label || d.label } : d;
+        });
+    }
+    // Encasilla lo dictado en un motivo oficial. Devuelve { code, label, observation, matched } o null.
+    function classifyReason(raw) {
+        const obs = String(raw || '').trim();
+        const t = normalize(obs);
+        if (!t) { return null; }
+        const defs = reasonDefs();
+        for (const d of defs) {
+            if (d.syn.some((s) => t.includes(normalize(s)))) {
+                return { code: d.code, label: d.label, observation: obs, matched: true };
+            }
+        }
+        const otro = defs.find((d) => d.code === 'otro');           // sin coincidencia → "otro" + lo dictado como detalle
+        return { code: 'otro', label: otro ? otro.label : 'Otro', observation: obs, matched: false };
+    }
+
+    function failedStart(motivoText) {
+        const r = motivoText ? classifyReason(motivoText) : null;
+        if (!r) { return failedAskMotivo(false); } // CA4
+        return failedConfirm(r);
     }
     function failedAskMotivo(again) {                   // CA3/CA4: pedir (o re-pedir) el motivo
         pendingPrompt = (text) => {
-            const m = cleanMotivo(text);
-            if (!m) { return failedAskMotivo(true); }
-            return failedConfirm(m);
+            const r = classifyReason(cleanMotivo(text));
+            if (!r) { return failedAskMotivo(true); }
+            return failedConfirm(r);
         };
         respond(again
             ? 'No te entendí el motivo. Decímelo de nuevo, por ejemplo: no había nadie.'
             : '¿Cuál es el motivo de la entrega fallida?', { relisten: true });
     }
-    function failedConfirm(motivo) {                    // CA1: lee el motivo y pide confirmar
+    function failedConfirm(r) {                         // CA1: confirma por el motivo OFICIAL, no por el texto crudo
         pendingPrompt = (text) => {
             const c = classifyFailedConfirm(text);
-            if (c === 'yes') { return failedRegister(motivo); }                 // CA2
+            if (c === 'yes') { return failedRegister(r); }                     // CA2
             if (c === 'cancel') { return respond('Listo, no registro nada.', {}); }
             return failedAskMotivo(false);                                      // CA3 (no/corregir)
         };
-        respond(`Voy a marcar la entrega como fallida por: ${motivo}. ¿Confirmás?`, { relisten: true });
+        // Si no se pudo encasillar, avisa que va como "otro" y repite lo dictado para que el repartidor controle.
+        const detail = r.matched ? '' : ` con tu comentario: ${r.observation}`;
+        respond(`Voy a marcar la entrega como fallida por: ${r.label}${detail}. ¿Confirmás?`, { relisten: true });
     }
     async function failedRegister(motivo) {             // CA2/CA5/CA6/CA7
+        const myTurn = turnGen; // si el repartidor cancela mientras se registra, no respondemos tarde
         const stop = window.LT_NEXT_STOP;
         if (!stop || !stop.id) { return respond('No hay una entrega pendiente para marcar.', {}); }
         const geo = await getGeo();
+        // motivo: { code, label, observation } — código oficial + lo dictado tal cual (punto 3)
         let status, data;
         try {
             // window.fetch pasa por la cola offline: sin señal, queda encolado.
             const res = await fetch(`/delivery/route/${ctx.routeId}/stop/${stop.id}/failed`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reasonText: motivo, comment: motivo, latitude: geo.latitude || null, longitude: geo.longitude || null }),
+                body: JSON.stringify({
+                    reasonCode: motivo.code, reasonText: motivo.label, comment: motivo.observation || null,
+                    latitude: geo.latitude || null, longitude: geo.longitude || null,
+                }),
             });
             status = res.status;
             data = await res.json().catch(() => ({}));
-        } catch (_) { return respond('No pude registrar el intento, probá de nuevo.', { error: true }); }
+        } catch (_) { return myTurn === turnGen ? respond('No pude registrar el intento, probá de nuevo.', { error: true }) : undefined; }
+
+        if (myTurn !== turnGen) { return; } // el repartidor ya pasó a otra cosa: no pisamos su pantalla
 
         if (status === 409) { return respond(data.error || 'No puedo marcar esta parada todavía.', {}); }      // CA5 (orden/pausa)
         if (!data || (data.ok !== true && !data.queued)) {
@@ -156,7 +214,7 @@
             return respond('Intento registrado. Este envío alcanzó el máximo de intentos y no admite más reintentos.', {});
         }
         // CA7: la voz solo deja el intento con su motivo; foto/firma/código se completan a mano en pantalla.
-        return respond('Listo, marqué la entrega como no realizada.', {});                                      // CA2
+        return respond(`Listo, marqué la entrega como no realizada por ${motivo.label}.`, {});                   // CA2
     }
 
     // ── Registro de comandos ────────────────────────────────────────────────────
@@ -507,6 +565,28 @@
         } catch { if (gen === speakGen && onDone) { onDone(); } }
     }
 
+    // ── Telemetría (punto 4) ────────────────────────────────────────────────────
+    // Mide cómo le va al copiloto SIN guardar la grabación ni el texto dictado (privacidad):
+    // solo qué intención se detectó, el puntaje, si se entendió y la latencia. Sirve para
+    // conocer la tasa de "no entendí" y mejorar las palabras clave con datos reales.
+    // Va por sendBeacon: fire-and-forget, no pasa por la cola offline ni bloquea la UI.
+    function track(event, extra) {
+        try {
+            const payload = Object.assign({
+                event,                                   // 'command' | 'no-match' | 'ambiguous' | 'wake'
+                ts: Date.now(),
+                source: lastSource,                      // 'button' | 'wake'
+                offline: typeof navigator.onLine === 'boolean' ? !navigator.onLine : null,
+                routeId: ctx.routeId || null,
+                latencyMs: listenStartedAt ? Date.now() - listenStartedAt : null,
+            }, extra || {});
+            const body = JSON.stringify(payload);
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon('/delivery/voice/telemetry', new Blob([body], { type: 'application/json' }));
+            }
+        } catch { /* la telemetría jamás debe romper el copiloto */ }
+    }
+
     // ── UI: botón + burbuja de texto ────────────────────────────────────────────
     let btn = null;
     let wakeBtn = null;
@@ -553,6 +633,7 @@
     function onButton() {
         if (!SpeechRec) { explainUnavailable(); return; }   // CA13
         unlockAudio();
+        lastSource = 'button';
         if (state === 'listening') { stopListening(true); return; }  // CA7 cancelar
         if (state === 'speaking') { speakGen++; if (TTS) { TTS.cancel(); } } // CA12 interrumpir (invalida el callback en curso)
         startListening();
@@ -560,6 +641,7 @@
 
     function startListening() {
         if (state === 'listening') { return; } // evita abrir dos escuchas a la vez
+        turnGen++;                              // nueva interacción: invalida respuestas de red en vuelo de la anterior
         stopWakeListener();                     // CV-12: un solo reconocimiento activo a la vez
         try {
             recognition = new SpeechRec();
@@ -570,7 +652,7 @@
         recognition.continuous = false;
         let handled = false;
 
-        recognition.onstart = () => { setState('listening'); earcon.start(); showBubble(LABELS.listening, 'state'); };
+        recognition.onstart = () => { listenStartedAt = Date.now(); setState('listening'); earcon.start(); showBubble(LABELS.listening, 'state'); };
         recognition.onresult = (ev) => {
             handled = true;
             clearTimeout(noSpeechTimer);
@@ -602,7 +684,7 @@
     function stopListening(userCancel) {
         clearTimeout(noSpeechTimer);
         try { if (recognition) { userCancel ? recognition.abort() : recognition.stop(); } } catch { /* noop */ }
-        if (userCancel) { pendingChoice = null; pendingConfirm = null; pendingPrompt = null; setState('idle'); showBubble(LABELS.idle, 'state'); maybeStartWake(); }
+        if (userCancel) { turnGen++; pendingChoice = null; pendingConfirm = null; pendingPrompt = null; setState('idle'); showBubble(LABELS.idle, 'state'); maybeStartWake(); }
     }
 
     function handleTranscript(text) {
@@ -631,16 +713,19 @@
 
         const matches = scoreCommands(text);
         if (matches.length === 0) {                                  // CA8 no reconocida
+            track('no-match', { words: tokens(text).length });       // mide la tasa de "no entendí" sin guardar lo dictado
             return respond('No entendí, ¿podés repetir? Podés decir “¿qué puedo decir?”.', { error: true, relisten: true });
         }
         const top = matches[0];
         const second = matches[1];
         // Ambiguo (CA9): dos comandos parciales (ninguno dicho completo) y empatados → preguntar.
         if (second && !top.strong && !second.strong && top.score === second.score) {
+            track('ambiguous', { a: top.cmd.id, b: second.cmd.id, score: top.score });
             pendingChoice = [top.cmd, second.cmd];
             return respond(`¿Quisiste decir ${top.cmd.label} o ${second.cmd.label}?`, { relisten: true });
         }
         const applic = top.cmd.applies ? top.cmd.applies(ctx) : { ok: true };
+        track('command', { intent: top.cmd.id, score: top.score, strong: top.strong, applied: applic.ok });
         if (!applic.ok) { return respond(applic.reason, {}); }       // CA10 fuera de contexto
         return runCommand(top.cmd, text);
     }
@@ -667,13 +752,15 @@
     }
     // out puede traer { handled:true } si el comando ya manejó su propia respuesta (flujo multipaso).
     function executeCommand(cmd, text) {
+        const myTurn = turnGen; // si el repartidor cancela o empieza otra orden, esta respuesta queda obsoleta
         let out;
         try { out = cmd.run(ctx, text) || {}; }
         catch { return respond('Tuve un problema al procesar ese comando.', { error: true }); }
         Promise.resolve(out).then((r) => {
+            if (myTurn !== turnGen) { return; }
             if (r && r.handled) { return; }
             respond((r && r.speak) || 'Listo.', { error: !!(r && r.error) });
-        }).catch(() => respond('Tuve un problema al procesar ese comando.', { error: true }));
+        }).catch(() => { if (myTurn === turnGen) { respond('Tuve un problema al procesar ese comando.', { error: true }); } });
     }
 
     // Muestra + dice una respuesta. opts: { error, relisten }
@@ -751,6 +838,8 @@
     function detectWake() {
         stopWakeListener();
         unlockAudio();
+        lastSource = 'wake';
+        track('wake', {});
         earcon.start();
         startListening(); // CA1: la palabra clave abre la escucha de la orden
     }
