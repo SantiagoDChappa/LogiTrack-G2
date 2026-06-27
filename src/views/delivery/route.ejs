@@ -32,8 +32,8 @@
         --row-bg-cur:   rgba(255,255,255,.95);
         --row-bg-locked:rgba(241,245,249,.5);
         --row-bg-skip:  rgba(254, 243, 199, .35);
-        --shadow-md:    0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
-        --shadow-sheet: 0 -12px 40px rgba(15, 23, 42, .12), 0 -2px 6px rgba(15, 23, 42, .04);
+        --shadow-md:    0 2px 8px rgba(15, 23, 42, .06);
+        --shadow-sheet: 0 -8px 28px rgba(15, 23, 42, .08);
         --tile-filter:  saturate(.85) brightness(1.02);
         --lock-chip-bg: rgba(15,23,42,.04);
     }
@@ -264,10 +264,8 @@
     }
     .stop-row.is-current {
         background: var(--row-bg-cur);
-        border: 1.5px solid rgba(37, 99, 235, .45);
-        box-shadow:
-            0 0 0 4px rgba(37, 99, 235, .12),
-            0 8px 24px rgba(37, 99, 235, .18);
+        border: 1px solid rgba(37, 99, 235, .35);
+        box-shadow: 0 2px 10px rgba(37, 99, 235, .12);
         padding: 1.1rem;
     }
 
@@ -292,15 +290,14 @@
         width: 32px; height: 32px; border-radius: 10px;
         font-weight: 700; font-size: .88rem;
         color: #fff; flex-shrink: 0;
-        box-shadow: 0 2px 6px rgba(15,23,42,.12);
     }
-    .stop-bubble.pending  { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
-    .stop-bubble.current  { background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%); }
-    .stop-bubble.delivered{ background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); }
-    .stop-bubble.failed   { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); }
-    .stop-bubble.pickup   { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
-    .stop-bubble.locked   { background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%); }
-    .stop-bubble.skipped  { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
+    .stop-bubble.pending  { background: #64748b; }
+    .stop-bubble.current  { background: var(--lt-blue); }
+    .stop-bubble.delivered{ background: #16a34a; }
+    .stop-bubble.failed   { background: #dc2626; }
+    .stop-bubble.pickup   { background: #f59e0b; }
+    .stop-bubble.locked   { background: #94a3b8; }
+    .stop-bubble.skipped  { background: #f59e0b; }
 
     .stop-title-wrap { flex: 1; min-width: 0; }
     .stop-tracking {
@@ -343,9 +340,8 @@
         text-transform: uppercase; letter-spacing: .06em;
     }
     .status-badge.amber {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        background: #fef3c7;
         color: #92400e;
-        box-shadow: 0 1px 3px rgba(245, 158, 11, .25);
     }
     html[data-theme="dark"] .status-badge.amber {
         background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(245,158,11,.12));
@@ -356,8 +352,6 @@
     .status-badge.amber::before {
         content: ''; width: 6px; height: 6px; border-radius: 50%;
         background: var(--lt-amber);
-        box-shadow: 0 0 0 2px rgba(245, 158, 11, .25);
-        animation: pulse-dot 1.6s infinite;
     }
     .status-badge.green { background: #dcfce7; color: #166534; }
     .status-badge.gray  { background: #f1f5f9; color: #475569; }
@@ -425,16 +419,16 @@
     .btn-skip-ui, .btn-skip-ui:hover, .btn-skip-ui:focus, .btn-skip-ui:visited { color: #b45309 !important; }
     html[data-theme="dark"] .btn-skip-ui, html[data-theme="dark"] .btn-skip-ui:hover, html[data-theme="dark"] .btn-skip-ui:focus, html[data-theme="dark"] .btn-skip-ui:visited { color: #fcd34d !important; }
     .btn-cta {
-        background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+        background: var(--lt-blue);
         color: #fff; border-color: transparent;
-        box-shadow: 0 4px 14px rgba(37, 99, 235, .35), inset 0 1px 0 rgba(255,255,255,.2);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, .22);
         font-weight: 700;
     }
-    .btn-cta:hover { box-shadow: 0 6px 20px rgba(37,99,235,.45); }
+    .btn-cta:hover { box-shadow: 0 3px 12px rgba(37,99,235,.3); }
     .btn-pickup-cta {
-        background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        background: #f59e0b;
         color: #fff; border-color: transparent;
-        box-shadow: 0 4px 14px rgba(245, 158, 11, .35), inset 0 1px 0 rgba(255,255,255,.2);
+        box-shadow: 0 2px 8px rgba(245, 158, 11, .22);
         font-weight: 700;
     }
     .btn-failed-ui {
@@ -456,11 +450,11 @@
         border-color: rgba(96,165,250,.22);
     }
     .btn-finish-route {
-        background: linear-gradient(135deg, var(--lt-green), #22c55e);
+        background: var(--lt-green);
         color: #fff; border: none; font-weight: 700;
         padding: .85rem 1rem; width: 100%; margin-top: 1rem;
         border-radius: 14px; cursor: pointer;
-        box-shadow: 0 6px 18px rgba(22,163,74,.4);
+        box-shadow: 0 2px 8px rgba(22,163,74,.22);
         font-family: inherit; font-size: 1rem;
         display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     }
@@ -477,12 +471,12 @@
     /* Pause banner */
     .pause-banner {
         position: absolute; top: 70px; left: 12px; right: 12px; z-index: 720;
-        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        background: #f59e0b;
         color: #78350f;
         padding: 12px 16px; border-radius: 14px;
         display: flex; align-items: center; gap: 12px;
         font-weight: 700;
-        box-shadow: 0 8px 24px rgba(245,158,11,.4);
+        box-shadow: 0 3px 12px rgba(245,158,11,.28);
     }
     .pause-banner .material-symbols-outlined { font-size: 22px; }
     .pause-banner button {
@@ -546,16 +540,53 @@
         .stop-row.is-current .secondary-row .btn-ui { flex: 1; min-height: 46px; font-size: .9rem; padding: .65rem; }
         .fab-current {
             position: fixed; right: 16px; bottom: 16px; z-index: 800;
-            background: linear-gradient(135deg, var(--lt-blue) 0%, var(--lt-blue-soft) 100%);
+            background: var(--lt-blue);
             color: #fff;
             border-radius: 999px; padding: .9rem 1.1rem;
-            box-shadow: 0 8px 24px rgba(37,99,235,.45);
+            box-shadow: 0 3px 12px rgba(37,99,235,.3);
             display: flex; align-items: center; gap: .4rem;
             font-weight: 700; font-size: .9rem; border: none;
             cursor: pointer; font-family: inherit;
         }
     }
     @media (min-width: 769px) { .fab-current { display: none; } }
+
+    /* En el detalle (bottom-sheet arriba, mapa tapado) ocultamos los overlays del mapa
+       para bajar el ruido: chip de fatiga "Manejo", su countdown y el panel de prueba.
+       !important para ganarle al display inline que setean sus propios updaters. */
+    body.sheet-detail #fatigue-drive-chip,
+    body.sheet-detail #fatigue-next-check,
+    body.sheet-detail #fatigue-stop-btn,
+    body.sheet-detail .route-toolbar,
+    body.sheet-detail #dchat-btn,
+    body.sheet-detail #dchat-panel,
+    body.sheet-detail #sim-panel { display: none !important; }
+
+    /* Modo prueba abierto: ocultamos la tarjeta de info de la ruta para que el panel no
+       se superponga (comparten la esquina superior izquierda). Vuelve al cerrar el panel. */
+    body.sim-open .route-toolbar { display: none !important; }
+
+    /* En el ruteo ocultamos la barra superior global: ya hay botones flotantes sobre el
+       mapa (volver, menú, tour, ayuda). El drawer (.left-header) sigue abriéndose con el
+       botón de menú flotante. */
+    .top-header { display: none !important; }
+    .main-content { height: 100vh !important; }
+
+    /* Tour e info (page-help) con el mismo estilo glass que volver/menú. */
+    .map-topleft .page-help-actions { position: static !important; display: flex; gap: 6px; margin: 0; padding: 0; }
+    .map-topleft .page-help-btn {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-brdr);
+        border-radius: 50%; width: 44px; height: 44px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: var(--shadow-md);
+        color: var(--lt-text-strong) !important;
+        text-decoration: none !important;
+        transition: transform .15s ease;
+    }
+    .map-topleft .page-help-btn:hover { transform: scale(1.05); }
+    .map-topleft .page-help-btn .material-symbols-outlined { font-size: 22px; }
 
     @keyframes pulse {
         0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,.55);}
@@ -578,6 +609,9 @@
                     <span class="material-symbols-outlined">menu</span>
                 </button>
                 <%- include('../partials/page-help-btn', { helpModule: 'entregas-repartidor' }) %>
+                <button class="btn-menu" id="btn-sim" title="Modo prueba (simular viaje)" aria-label="Modo prueba">
+                    <span class="material-symbols-outlined">science</span>
+                </button>
             </div>
             <div class="map-actions">
                 <% if (!readOnly) { %>
@@ -786,7 +820,7 @@
         </section>
 
         <button class="fab-current" id="fab-current" hidden>
-            <span class="material-symbols-outlined">arrow_downward</span>Paso actual
+            <span class="material-symbols-outlined fab-icon">arrow_downward</span><span class="fab-label">Paso actual</span>
         </button>
 
         <%# [prototype] El POD se hace en la página /delivery/evidence/:tracking/pod (online y offline).
@@ -863,6 +897,7 @@
 
     const stops = <%- JSON.stringify((route.stops || []).map(s => ({
         id: s.id, sequence: s.sequence, stopType: s.stopType,
+        shipmentId: s.shipmentId || null,
         lat: Number(s.lat), lng: Number(s.lng),
         completed: s.completed, skipped: s.skipped,
         estimatedMinutes: s.estimatedMinutes || 5,
@@ -1000,7 +1035,18 @@
         currentSnap = name;
         setSheetY(pts[name]);
         sheet.classList.toggle('is-tucked', name === 'tucked'); // muestra el hint "Deslizá…"
-        setTimeout(() => map.invalidateSize(), 380);
+        // pan:false → el mapa NO se reposiciona al subir/bajar el sheet; queda fijo y la
+        // solapa de detalle lo tapa (en vez de que el mapa "se suba").
+        setTimeout(() => map.invalidateSize({ pan: false }), 380);
+        setSheetContext();
+    }
+
+    // Detalle = sheet arriba tapando el mapa (mobile, no 'tucked'). Marca el body para
+    // ocultar overlays del mapa y refresca el rótulo del FAB.
+    function setSheetContext() {
+        const detail = isMobile() && currentSnap !== 'tucked';
+        document.body.classList.toggle('sheet-detail', detail);
+        if (window.__updateFab) { window.__updateFab(); }
     }
 
     function nearestSnap(px, velocityPxPerMs) {
@@ -1111,6 +1157,11 @@
         }
     });
 
+    // Botón 🧪 de la barra superior: entra al modo prueba (construye y muestra el panel).
+    document.getElementById('btn-sim')?.addEventListener('click', () => {
+        if (window.__openSim) { window.__openSim(); }
+    });
+
     // Sincroniza body.nav-open con .left-header.open para z-index correcto
     const leftHdr = document.querySelector('.left-header');
     if (leftHdr) {
@@ -1126,6 +1177,9 @@
             () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
         );
         const sendHb = (pos) => {
+            // Modo prueba (?sim=1): mientras está activo, el GPS real no pisa la posición
+            // simulada (el panel de prueba es la única fuente de heartbeats).
+            if (window.__simActive) { return; }
             updateDriverDot(pos.coords.latitude, pos.coords.longitude);
             fetch('/delivery/heartbeat', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1895,10 +1949,23 @@
                 `<div style="margin-top:4px;font-weight:500;opacity:.85">${ready ? '✓ Si te detenés, se pedirá la prueba.' : 'Aún no llegás al mínimo para el re-chequeo.'}</div>`;
             driveChip.style.display = 'block';
         };
+        // Último estado del server; el front recompone el minutaje local entre polls.
+        let lastDriveStatus = null;
+        // Pinta el chip recomputando driveMin LOCALMENTE cuando está en marcha, así
+        // tickea cada minuto sin depender del poll al server (que es cada 60s).
+        const paintDrive = (s) => {
+            if (!s) { return; }
+            let driveMin = s.driveMin;
+            if (s.driving && s.driveStartedAt) {
+                driveMin = Math.max(0, Math.floor((Date.now() - new Date(s.driveStartedAt).getTime()) / 60000));
+            }
+            renderDriveChip(Object.assign({}, s, { driveMin }));
+        };
         async function updateDriveChip() {
             try {
-                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
-                renderDriveChip(await r.json());
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`, { cache: 'no-store' });
+                lastDriveStatus = await r.json();
+                paintDrive(lastDriveStatus);
             } catch (_) { /* red */ }
         }
 
@@ -1906,9 +1973,10 @@
 
         async function refresh() {
             try {
-                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`, { cache: 'no-store' });
                 const s = await r.json();
-                renderDriveChip(s);
+                lastDriveStatus = s;
+                paintDrive(s);
                 if (s.paused) {
                     btn.textContent = `⏸ Pausada por fatiga (${s.restRemainingMin}m)`;
                     btn.style.background = '#dc2626';
@@ -1977,11 +2045,15 @@
             poll = setInterval(refresh, 30000);
         });
 
-        // Al entrar a la ruta: si hay un re-chequeo pendiente, se fuerza la prueba
-        // (obligatoria). El chip de manejo se muestra y se actualiza cada minuto.
+        // Al entrar a la ruta: refresca el estado y muestra el chip de manejo ya con el
+        // tiempo acumulado desde el inicio de la ruta (no desde que se abre el widget).
         refresh();
         updateDriveChip();
+        // Sync con el server cada minuto (estado real: detenido/pausado/umbral).
         setInterval(updateDriveChip, 60000);
+        // Tick LOCAL cada 30s: recompone el minutaje sin esperar al poll, así el número
+        // sube solo mientras está en marcha (antes parecía "congelado" entre polls).
+        setInterval(() => paintDrive(lastDriveStatus), 30000);
     }
 
     // Inicia ruta con gate de fatiga si aún no se inició (sólo modo activo).
@@ -2128,11 +2200,8 @@
             const pendingActionable = rows.some(r => !r.classList.contains('completed') && r.dataset.skipped !== '1');
             finishBtn.hidden = pendingActionable;
         }
-
-        if (window.innerWidth <= 768) {
-            const cur = document.querySelector('.stop-row.is-current');
-            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        // No auto-abrimos el detalle del envío: el repartidor decide cuándo subir el panel.
+        // (Antes esto hacía scrollIntoView al stop actual en cada render.)
     }
 
     function markStopDone(stopId, kind) {
@@ -2169,22 +2238,66 @@
     applyStepState();
     setInterval(applyStepState, 30000);
 
-    // FAB
+    // FAB — contextual:
+    //  • En detalle (sheet arriba tapando el mapa): dice "Ver mapa" y al tocarlo baja el
+    //    sheet para mostrar el mapa.
+    //  • Con el mapa visible: vuelve a "Paso actual" y lleva al stop en curso si quedó fuera.
     const fab = document.getElementById('fab-current');
     if (fab) {
-        fab.addEventListener('click', () => {
-            const cur = document.querySelector('.stop-row.is-current');
-            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-        const onScroll = () => {
-            if (window.innerWidth > 768) { fab.hidden = true; return; }
+        const fabIcon = fab.querySelector('.fab-icon');
+        const fabLabel = fab.querySelector('.fab-label');
+        // "En detalle" = el sheet NO está plegado (tapa el mapa). Usamos el estado lógico
+        // `currentSnap` (lo setea snapTo al instante) y NO la geometría: durante la animación
+        // del snap, getBoundingClientRect devuelve la posición vieja y el rótulo/overlays
+        // quedaban desfasados hasta el próximo evento (click/drag). Esto lo hace inmediato.
+        const inDetail = () => isMobile() && currentSnap !== 'tucked';
+
+        const updateFab = () => {
+            if (window.innerWidth > 768) { fab.hidden = true; document.body.classList.remove('sheet-detail'); return; }
+            const detail = inDetail();
+            // Misma fuente para ocultar overlays del mapa (Manejo / Modo prueba) y el FAB.
+            document.body.classList.toggle('sheet-detail', detail);
+            if (detail) {
+                fab.hidden = false;
+                fabIcon.textContent = 'arrow_upward';
+                fabLabel.textContent = 'Ver mapa';
+                return;
+            }
+            fabIcon.textContent = 'arrow_downward';
+            fabLabel.textContent = 'Paso actual';
             const cur = document.querySelector('.stop-row.is-current');
             if (!cur) { fab.hidden = true; return; }
             const r = cur.getBoundingClientRect();
             fab.hidden = r.top > 80 && r.bottom < window.innerHeight - 80;
         };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
+
+        fab.addEventListener('click', () => {
+            if (inDetail()) {
+                snapTo('tucked');                 // baja el sheet → muestra el mapa
+                setTimeout(() => map.invalidateSize({ pan: false }), 200);
+                setTimeout(updateFab, 420);
+                return;
+            }
+            // "Paso actual": sube la solapa como overlay (snapTo cambia currentSnap →
+            // oculta overlays del mapa y pasa el FAB a "Ver mapa") y centra el stop en curso
+            // DENTRO del sheet, sin scrollear el documento (que haría "subir" el mapa).
+            snapTo('full');
+            setTimeout(() => {
+                const cur = document.querySelector('.stop-row.is-current');
+                if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 380);
+        });
+
+        window.addEventListener('scroll', updateFab, { passive: true });
+        // El sheet se mueve por transform (no dispara scroll de window): seguimos su drag,
+        // su scroll interno y el fin de la animación de snap.
+        sheet.addEventListener('scroll', updateFab, { passive: true });
+        sheet.addEventListener('pointermove', updateFab, { passive: true });
+        sheet.addEventListener('transitionend', updateFab);
+        window.addEventListener('resize', updateFab, { passive: true });
+        updateFab();
+        // Permite que el snap/drag del sheet refresque el rótulo del FAB.
+        window.__updateFab = updateFab;
     }
 
     // === Helpers ===
@@ -2476,6 +2589,173 @@
         }
         window.location.href = `/delivery/route/${routeId}/summary`;
     });
+
+    // ===================== Chat con el cliente (Última Milla) =====================
+    // Apunta a la entrega en mano (primera parada delivery pendiente). Polling 5s.
+    (function initDriverChat() {
+        const current = (stops || []).find(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipmentId);
+        if (!current) return;
+        const sid = current.shipmentId;
+
+        const btn = document.createElement('button');
+        btn.id = 'dchat-btn';
+        btn.textContent = '💬';
+        btn.title = 'Chat con el cliente';
+        btn.style.cssText = 'position:fixed;top:230px;right:18px;z-index:1200;width:52px;height:52px;border-radius:50%;border:0;background:#2563eb;color:#fff;font-size:1.4rem;box-shadow:0 4px 14px rgba(15,23,42,.35);cursor:pointer;';
+        const dot = document.createElement('span');
+        dot.style.cssText = 'position:absolute;top:6px;right:6px;width:12px;height:12px;border-radius:50%;background:#ef4444;border:2px solid #fff;display:none;';
+        btn.appendChild(dot);
+
+        const panel = document.createElement('div');
+        panel.id = 'dchat-panel';
+        panel.style.cssText = 'position:fixed;top:290px;right:18px;z-index:1200;width:min(340px,92vw);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 8px 28px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden;';
+        panel.innerHTML =
+            '<div style="background:#1e3a8a;color:#fff;padding:.6rem .9rem;font-weight:600;">Chat con el cliente</div>' +
+            '<div class="dchat-msgs" style="height:240px;overflow-y:auto;padding:.6rem .9rem;display:flex;flex-direction:column;gap:.4rem;background:#f8fafc;"></div>' +
+            '<form class="dchat-form" style="display:flex;gap:.4rem;padding:.6rem;border-top:1px solid #e2e8f0;">' +
+            '<input type="text" class="dchat-input" maxlength="1000" placeholder="Mensaje…" autocomplete="off" style="flex:1;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:8px;">' +
+            '<button type="submit" style="padding:.5rem .9rem;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;">Enviar</button></form>';
+        document.body.appendChild(btn);
+        document.body.appendChild(panel);
+
+        const msgsEl = panel.querySelector('.dchat-msgs');
+        const form = panel.querySelector('.dchat-form');
+        const input = panel.querySelector('.dchat-input');
+        let lastId = 0, open = false;
+
+        const append = (m) => {
+            const mine = m.role === 'DRIVER';
+            const row = document.createElement('div');
+            row.style.cssText = 'align-self:' + (mine ? 'flex-end' : 'flex-start') + ';max-width:80%;padding:.4rem .65rem;border-radius:10px;font-size:.88rem;background:' + (mine ? '#dbeafe' : '#fff') + ';border:1px solid ' + (mine ? '#bfdbfe' : '#e2e8f0') + ';';
+            row.textContent = m.body;
+            msgsEl.appendChild(row);
+            if (m.id > lastId) lastId = m.id;
+        };
+        const poll = () => {
+            fetch('/delivery/chat/shipment/' + sid + '/messages?since=' + lastId)
+                .then(r => r.ok ? r.json() : null)
+                .then(t => {
+                    if (!t || !t.messages) return;
+                    const had = t.messages.length > 0;
+                    t.messages.forEach(append);
+                    if (had) { msgsEl.scrollTop = msgsEl.scrollHeight; if (!open) dot.style.display = 'block'; }
+                }).catch(() => {});
+        };
+        btn.addEventListener('click', () => {
+            open = !open;
+            panel.style.display = open ? 'flex' : 'none';
+            if (open) { dot.style.display = 'none'; msgsEl.scrollTop = msgsEl.scrollHeight; }
+        });
+        form.addEventListener('submit', (ev) => {
+            ev.preventDefault();
+            const body = input.value.trim();
+            if (!body) return;
+            input.value = '';
+            fetch('/delivery/chat/shipment/' + sid + '/messages', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body }),
+            }).then(r => r.ok ? r.json() : null).then(m => { if (m) { append(m); msgsEl.scrollTop = msgsEl.scrollHeight; } }).catch(() => {});
+        });
+        poll();
+        setInterval(poll, 5000);
+    })();
+
+    // ===================== Modo prueba — simular viaje (?sim=1) ===================
+    // Inyecta posiciones GPS falsas (heartbeats) para probar avisos/ETA/mapa sin manejar.
+    // El GPS real se pausa mientras está activo (window.__simActive). Sólo aparece con ?sim=1.
+    (function initSimPanel() {
+        let __built = false;
+        function build() {
+        if (__built) { return; }
+        __built = true;
+
+        const pendingDeliveries = () => (stops || [])
+            .filter(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipmentId && Number.isFinite(s.lat) && Number.isFinite(s.lng))
+            .sort((a, b) => a.sequence - b.sequence);
+
+        // Punto a N cuadras (≈100 m c/u) al norte de una parada.
+        const offsetFrom = (stop, cuadras) => ({
+            lat: stop.lat + (cuadras * 100) / 111000,
+            lng: stop.lng,
+        });
+
+        let lastSim = null;
+        const sendSim = (lat, lng) => {
+            lastSim = { lat, lng };
+            if (typeof updateDriverDot === 'function') { updateDriverDot(lat, lng); }
+            fetch('/delivery/heartbeat', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ latitude: lat, longitude: lng, speedKmh: 15, routeId }),
+            }).catch(() => {});
+        };
+
+        const panel = document.createElement('div');
+        panel.id = 'sim-panel';
+        panel.style.cssText = 'position:fixed;top:64px;left:10px;z-index:1300;width:min(248px,84vw);background:#111827;color:#cbd5e1;border:1px solid #2a3441;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:Inter,sans-serif;overflow:hidden;font-size:.8rem;';
+        const btnStyle = 'padding:.5rem;border-radius:8px;font-weight:600;font-size:.8rem;cursor:pointer;text-align:center;background:transparent;';
+        panel.innerHTML =
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;border-bottom:1px solid #1f2937;font-weight:600;color:#e2e8f0;font-size:.76rem;letter-spacing:.03em;text-transform:uppercase;"><span style="display:flex;align-items:center;gap:.4rem;">🧪 Modo prueba</span><span class="sim-min" title="Cerrar modo prueba" style="cursor:pointer;color:#94a3b8;font-size:1.05rem;line-height:1;">&times;</span></div>' +
+            '<div class="sim-body" style="padding:.7rem .75rem;display:flex;flex-direction:column;gap:.6rem;">' +
+              '<label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;color:#cbd5e1;line-height:1.3;"><input type="checkbox" class="sim-toggle" style="margin-top:2px;"> Simular ubicación <span style="color:#64748b;">(pausa GPS real)</span></label>' +
+              '<div style="display:flex;align-items:center;gap:.45rem;color:#94a3b8;">A <input type="number" class="sim-cuadras" value="5" min="0" max="50" style="width:52px;padding:.3rem .4rem;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:.8rem;"> cuadras</div>' +
+              '<button class="sim-near" style="' + btnStyle + 'border:1px solid #2563eb;color:#93c5fd;">📍 Acercarme al próximo</button>' +
+              '<button class="sim-door" style="' + btnStyle + 'border:1px solid #334155;color:#cbd5e1;">🚪 En la puerta (0 cuadras)</button>' +
+              '<div class="sim-status" style="font-size:.72rem;color:#94a3b8;line-height:1.35;"></div>' +
+            '</div>';
+        document.body.appendChild(panel);
+
+        const toggle = panel.querySelector('.sim-toggle');
+        const cuadrasEl = panel.querySelector('.sim-cuadras');
+        const statusEl = panel.querySelector('.sim-status');
+        const body = panel.querySelector('.sim-body');
+        // ✕ cierra el panel y restaura la tarjeta de info de la ruta.
+        panel.querySelector('.sim-min').addEventListener('click', () => {
+            panel.style.display = 'none';
+            document.body.classList.remove('sim-open');
+        });
+
+        const setStatus = (msg) => { statusEl.textContent = msg; };
+        const targetInfo = () => {
+            const pend = pendingDeliveries();
+            if (!pend.length) { return null; }
+            return { current: pend[0], next: pend[1] || null };
+        };
+
+        toggle.addEventListener('change', () => {
+            window.__simActive = toggle.checked;
+            setStatus(toggle.checked
+                ? 'Simulación ON: el GPS real está pausado. Usá los botones.'
+                : 'Simulación OFF: vuelve el GPS real.');
+        });
+
+        const jump = (cuadras) => {
+            const info = targetInfo();
+            if (!info) { setStatus('No hay entregas pendientes para simular.'); return; }
+            if (!window.__simActive) { toggle.checked = true; window.__simActive = true; }
+            const p = offsetFrom(info.current, cuadras);
+            sendSim(p.lat, p.lng);
+            const nextTxt = info.next ? ('Debería avisarle al siguiente (' + (info.next.label || ('#' + info.next.shipmentId)) + ').') : 'Es la última entrega: no hay "siguiente" a avisar.';
+            setStatus('A ' + cuadras + ' cuadras de ' + (info.current.label || ('#' + info.current.shipmentId)) + '. ' + nextTxt);
+        };
+
+        panel.querySelector('.sim-near').addEventListener('click', () => jump(parseInt(cuadrasEl.value, 10) || 5));
+        panel.querySelector('.sim-door').addEventListener('click', () => jump(0));
+
+        // Mantiene viva la posición simulada (sigue siendo la "última") cada 12s.
+        setInterval(() => { if (window.__simActive && lastSim) { sendSim(lastSim.lat, lastSim.lng); } }, 12000);
+
+        setStatus('Listo. Tildá "Simular" y tocá un botón.');
+        }
+        // Abre el panel: lo construye una vez y lo muestra. Lo usa el botón 🧪 de arriba.
+        window.__openSim = () => {
+            build();
+            const p = document.getElementById('sim-panel');
+            if (p) { p.style.display = 'block'; const b = p.querySelector('.sim-body'); if (b) { b.style.display = 'flex'; } }
+            document.body.classList.add('sim-open');  // oculta la tarjeta de info mientras dura
+        };
+        // Auto-abre si se entró con ?sim=1 (compatibilidad).
+        if (new URLSearchParams(location.search).get('sim') === '1') { build(); document.body.classList.add('sim-open'); }
+    })();
 
     // === POD: navega a la página de evidencia (sirve online y offline) ==============
     // El botón "Confirmar Entrega" es un <a> a /delivery/evidence/:tracking/pod. Esa página

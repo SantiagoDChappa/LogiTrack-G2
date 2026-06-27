@@ -86,18 +86,25 @@ const buildMapStops = (json, history) => {
     return stops;
 };
 
+// Ruta activa (planificada o en curso) más reciente que contiene a este envío.
+// Vía modelos Sequelize: respetan el mapeo de columnas a snake_case. La versión previa
+// usaba SQL crudo con identificadores camelCase ("shipmentId"/"statusId") que no existen
+// en el esquema → siempre tiraba y el camión del mapa en vivo nunca aparecía.
 const fetchActiveRouteId = async (shipmentId) => {
     try {
-        const sequelize = require('../database/connection');
-        const { QueryTypes } = require('sequelize');
-        const routeRows = await sequelize.query(
-            `SELECT r.id FROM logitrack.route r
-               JOIN logitrack.route_stop rs ON rs.route_id=r.id
-              WHERE rs."shipmentId"=:sid AND r."statusId" IN (1,2)
-              ORDER BY r."createdAt" DESC LIMIT 1`,
-            { replacements: { sid: shipmentId }, type: QueryTypes.SELECT }
-        );
-        return routeRows[0]?.id || null;
+        const { Route, RouteStatus } = require('../models/route');
+        const { RouteStop } = require('../models/routeStop');
+        const stops = await RouteStop.findAll({
+            where: { shipmentId, stopType: 'delivery' },
+            attributes: ['routeId'],
+        });
+        if (stops.length === 0) { return null; }
+        const route = await Route.findOne({
+            where: { id: stops.map(s => s.routeId), statusId: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
+            order: [['createdAt', 'DESC']],
+            attributes: ['id'],
+        });
+        return route?.id || null;
     } catch {
         return null;
     }
