@@ -134,6 +134,10 @@ async function getStatus(routeId, route, cfg) {
         methodRecheck: cfg.methodRecheck,
         nextCheckAt: next ? next.toISOString() : null,
         driveMin,
+        // El front recompone el minutaje localmente (tick cada minuto) sin esperar al poll:
+        // mientras DRIVING cuenta desde driveStartedAt; si está detenido, queda congelado.
+        driveStartedAt: s.driveStartedAt ? new Date(s.driveStartedAt).toISOString() : null,
+        driving: d.state === RecheckState.DRIVING,
         driveThresholdMin: cfg.recheckDriveMin,
         stoppedThresholdMin: cfg.recheckStoppedMin,
         driveReady: driveMin >= cfg.recheckDriveMin,

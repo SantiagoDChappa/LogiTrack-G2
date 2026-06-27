@@ -556,7 +556,15 @@
        !important para ganarle al display inline que setean sus propios updaters. */
     body.sheet-detail #fatigue-drive-chip,
     body.sheet-detail #fatigue-next-check,
+    body.sheet-detail #fatigue-stop-btn,
+    body.sheet-detail .route-toolbar,
+    body.sheet-detail #dchat-btn,
+    body.sheet-detail #dchat-panel,
     body.sheet-detail #sim-panel { display: none !important; }
+
+    /* Modo prueba abierto: ocultamos la tarjeta de info de la ruta para que el panel no
+       se superponga (comparten la esquina superior izquierda). Vuelve al cerrar el panel. */
+    body.sim-open .route-toolbar { display: none !important; }
 
     /* En el ruteo ocultamos la barra superior global: ya hay botones flotantes sobre el
        mapa (volver, menú, tour, ayuda). El drawer (.left-header) sigue abriéndose con el
@@ -1027,7 +1035,9 @@
         currentSnap = name;
         setSheetY(pts[name]);
         sheet.classList.toggle('is-tucked', name === 'tucked'); // muestra el hint "Deslizá…"
-        setTimeout(() => map.invalidateSize(), 380);
+        // pan:false → el mapa NO se reposiciona al subir/bajar el sheet; queda fijo y la
+        // solapa de detalle lo tapa (en vez de que el mapa "se suba").
+        setTimeout(() => map.invalidateSize({ pan: false }), 380);
         setSheetContext();
     }
 
@@ -1939,10 +1949,23 @@
                 `<div style="margin-top:4px;font-weight:500;opacity:.85">${ready ? '✓ Si te detenés, se pedirá la prueba.' : 'Aún no llegás al mínimo para el re-chequeo.'}</div>`;
             driveChip.style.display = 'block';
         };
+        // Último estado del server; el front recompone el minutaje local entre polls.
+        let lastDriveStatus = null;
+        // Pinta el chip recomputando driveMin LOCALMENTE cuando está en marcha, así
+        // tickea cada minuto sin depender del poll al server (que es cada 60s).
+        const paintDrive = (s) => {
+            if (!s) { return; }
+            let driveMin = s.driveMin;
+            if (s.driving && s.driveStartedAt) {
+                driveMin = Math.max(0, Math.floor((Date.now() - new Date(s.driveStartedAt).getTime()) / 60000));
+            }
+            renderDriveChip(Object.assign({}, s, { driveMin }));
+        };
         async function updateDriveChip() {
             try {
-                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
-                renderDriveChip(await r.json());
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`, { cache: 'no-store' });
+                lastDriveStatus = await r.json();
+                paintDrive(lastDriveStatus);
             } catch (_) { /* red */ }
         }
 
@@ -1950,9 +1973,10 @@
 
         async function refresh() {
             try {
-                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`);
+                const r = await fetch(`/delivery/route/${routeId}/fatigue/recheck-status`, { cache: 'no-store' });
                 const s = await r.json();
-                renderDriveChip(s);
+                lastDriveStatus = s;
+                paintDrive(s);
                 if (s.paused) {
                     btn.textContent = `⏸ Pausada por fatiga (${s.restRemainingMin}m)`;
                     btn.style.background = '#dc2626';
@@ -2021,11 +2045,15 @@
             poll = setInterval(refresh, 30000);
         });
 
-        // Al entrar a la ruta: si hay un re-chequeo pendiente, se fuerza la prueba
-        // (obligatoria). El chip de manejo se muestra y se actualiza cada minuto.
+        // Al entrar a la ruta: refresca el estado y muestra el chip de manejo ya con el
+        // tiempo acumulado desde el inicio de la ruta (no desde que se abre el widget).
         refresh();
         updateDriveChip();
+        // Sync con el server cada minuto (estado real: detenido/pausado/umbral).
         setInterval(updateDriveChip, 60000);
+        // Tick LOCAL cada 30s: recompone el minutaje sin esperar al poll, así el número
+        // sube solo mientras está en marcha (antes parecía "congelado" entre polls).
+        setInterval(() => paintDrive(lastDriveStatus), 30000);
     }
 
     // Inicia ruta con gate de fatiga si aún no se inició (sólo modo activo).
@@ -2218,13 +2246,11 @@
     if (fab) {
         const fabIcon = fab.querySelector('.fab-icon');
         const fabLabel = fab.querySelector('.fab-label');
-        // "En detalle" medido por geometría real: si el bottom-sheet tapa más de ~45% del
-        // alto, estás leyendo el envío (no mirando el mapa). Es robusto al timing del snap.
-        const inDetail = () => {
-            if (!isMobile()) { return false; }
-            const r = sheet.getBoundingClientRect();
-            return r.top < window.innerHeight * 0.55;
-        };
+        // "En detalle" = el sheet NO está plegado (tapa el mapa). Usamos el estado lógico
+        // `currentSnap` (lo setea snapTo al instante) y NO la geometría: durante la animación
+        // del snap, getBoundingClientRect devuelve la posición vieja y el rótulo/overlays
+        // quedaban desfasados hasta el próximo evento (click/drag). Esto lo hace inmediato.
+        const inDetail = () => isMobile() && currentSnap !== 'tucked';
 
         const updateFab = () => {
             if (window.innerWidth > 768) { fab.hidden = true; document.body.classList.remove('sheet-detail'); return; }
@@ -2248,12 +2274,18 @@
         fab.addEventListener('click', () => {
             if (inDetail()) {
                 snapTo('tucked');                 // baja el sheet → muestra el mapa
-                setTimeout(() => map.invalidateSize(), 200);
+                setTimeout(() => map.invalidateSize({ pan: false }), 200);
                 setTimeout(updateFab, 420);
                 return;
             }
-            const cur = document.querySelector('.stop-row.is-current');
-            if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // "Paso actual": sube la solapa como overlay (snapTo cambia currentSnap →
+            // oculta overlays del mapa y pasa el FAB a "Ver mapa") y centra el stop en curso
+            // DENTRO del sheet, sin scrollear el documento (que haría "subir" el mapa).
+            snapTo('full');
+            setTimeout(() => {
+                const cur = document.querySelector('.stop-row.is-current');
+                if (cur) cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 380);
         });
 
         window.addEventListener('scroll', updateFab, { passive: true });
@@ -2566,15 +2598,17 @@
         const sid = current.shipmentId;
 
         const btn = document.createElement('button');
+        btn.id = 'dchat-btn';
         btn.textContent = '💬';
         btn.title = 'Chat con el cliente';
-        btn.style.cssText = 'position:fixed;bottom:84px;left:18px;z-index:1200;width:52px;height:52px;border-radius:50%;border:0;background:#2563eb;color:#fff;font-size:1.4rem;box-shadow:0 4px 14px rgba(15,23,42,.35);cursor:pointer;';
+        btn.style.cssText = 'position:fixed;top:230px;right:18px;z-index:1200;width:52px;height:52px;border-radius:50%;border:0;background:#2563eb;color:#fff;font-size:1.4rem;box-shadow:0 4px 14px rgba(15,23,42,.35);cursor:pointer;';
         const dot = document.createElement('span');
         dot.style.cssText = 'position:absolute;top:6px;right:6px;width:12px;height:12px;border-radius:50%;background:#ef4444;border:2px solid #fff;display:none;';
         btn.appendChild(dot);
 
         const panel = document.createElement('div');
-        panel.style.cssText = 'position:fixed;bottom:148px;left:18px;z-index:1200;width:min(340px,92vw);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 8px 28px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden;';
+        panel.id = 'dchat-panel';
+        panel.style.cssText = 'position:fixed;top:290px;right:18px;z-index:1200;width:min(340px,92vw);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 8px 28px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden;';
         panel.innerHTML =
             '<div style="background:#1e3a8a;color:#fff;padding:.6rem .9rem;font-weight:600;">Chat con el cliente</div>' +
             '<div class="dchat-msgs" style="height:240px;overflow-y:auto;padding:.6rem .9rem;display:flex;flex-direction:column;gap:.4rem;background:#f8fafc;"></div>' +
@@ -2660,7 +2694,7 @@
         panel.style.cssText = 'position:fixed;top:64px;left:10px;z-index:1300;width:min(248px,84vw);background:#111827;color:#cbd5e1;border:1px solid #2a3441;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-family:Inter,sans-serif;overflow:hidden;font-size:.8rem;';
         const btnStyle = 'padding:.5rem;border-radius:8px;font-weight:600;font-size:.8rem;cursor:pointer;text-align:center;background:transparent;';
         panel.innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;border-bottom:1px solid #1f2937;font-weight:600;color:#e2e8f0;font-size:.76rem;letter-spacing:.03em;text-transform:uppercase;"><span style="display:flex;align-items:center;gap:.4rem;">🧪 Modo prueba</span><span class="sim-min" style="cursor:pointer;color:#64748b;font-size:1.1rem;line-height:1;">—</span></div>' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;border-bottom:1px solid #1f2937;font-weight:600;color:#e2e8f0;font-size:.76rem;letter-spacing:.03em;text-transform:uppercase;"><span style="display:flex;align-items:center;gap:.4rem;">🧪 Modo prueba</span><span class="sim-min" title="Cerrar modo prueba" style="cursor:pointer;color:#94a3b8;font-size:1.05rem;line-height:1;">&times;</span></div>' +
             '<div class="sim-body" style="padding:.7rem .75rem;display:flex;flex-direction:column;gap:.6rem;">' +
               '<label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;color:#cbd5e1;line-height:1.3;"><input type="checkbox" class="sim-toggle" style="margin-top:2px;"> Simular ubicación <span style="color:#64748b;">(pausa GPS real)</span></label>' +
               '<div style="display:flex;align-items:center;gap:.45rem;color:#94a3b8;">A <input type="number" class="sim-cuadras" value="5" min="0" max="50" style="width:52px;padding:.3rem .4rem;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:.8rem;"> cuadras</div>' +
@@ -2674,8 +2708,10 @@
         const cuadrasEl = panel.querySelector('.sim-cuadras');
         const statusEl = panel.querySelector('.sim-status');
         const body = panel.querySelector('.sim-body');
+        // ✕ cierra el panel y restaura la tarjeta de info de la ruta.
         panel.querySelector('.sim-min').addEventListener('click', () => {
-            body.style.display = body.style.display === 'none' ? 'flex' : 'none';
+            panel.style.display = 'none';
+            document.body.classList.remove('sim-open');
         });
 
         const setStatus = (msg) => { statusEl.textContent = msg; };
@@ -2715,9 +2751,10 @@
             build();
             const p = document.getElementById('sim-panel');
             if (p) { p.style.display = 'block'; const b = p.querySelector('.sim-body'); if (b) { b.style.display = 'flex'; } }
+            document.body.classList.add('sim-open');  // oculta la tarjeta de info mientras dura
         };
         // Auto-abre si se entró con ?sim=1 (compatibilidad).
-        if (new URLSearchParams(location.search).get('sim') === '1') { build(); }
+        if (new URLSearchParams(location.search).get('sim') === '1') { build(); document.body.classList.add('sim-open'); }
     })();
 
     // === POD: navega a la página de evidencia (sirve online y offline) ==============
