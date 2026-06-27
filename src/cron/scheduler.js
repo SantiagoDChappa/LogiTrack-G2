@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const emailProcessorJob = require('../jobs/emailProcessorJob');
 const delayDetectionJob = require('../jobs/delayDetectionJob');
 const fatigueRecheckEscalationJob = require('../jobs/fatigueRecheckEscalationJob');
+const pendingPaymentCancellationJob = require('../jobs/pendingPaymentCancellationJob');
 
 // Intervalos parametrizables por env (formato cron). Antes corrían cada 1 y 2 min
 // y martillaban Neon (quemaban la cuota de egress). El envío de mails al instante
@@ -46,6 +47,12 @@ function startSchedulers() {
     const fatigueCron = pickCron(FATIGUE_CRON, '*/5 * * * *', 'fatiga');
     cron.schedule(fatigueCron, async () => {
         await fatigueRecheckEscalationJob.processOmittedRechecks();
+    });
+
+    // Cancela envíos "Pendiente de Pago" vencidos (umbral configurable en Ajustes,
+    // default 48hs). Cada hora alcanza de sobra para ese plazo.
+    cron.schedule('0 * * * *', async () => {
+        await pendingPaymentCancellationJob.processPendingPaymentExpirations();
     });
 
     console.log(`[scheduler] activo — mails: "${mailCron}", fatiga: "${fatigueCron}"`);
