@@ -904,6 +904,8 @@
         distanceFromPrevKm: Number(s.distanceFromPrevKm || 0),
         completedAt: s.completedAt || null,
         label: s.stopType === 'pickup' ? (s.branch ? s.branch.name : 'Pickup') : (s.shipment ? s.shipment.trackingId : 'Entrega'),
+        tracking: s.shipment ? s.shipment.trackingId : null,
+        recipient: s.shipment && s.shipment.recipient ? s.shipment.recipient.fullName : null,
     }))) %>;
     const totalKm = <%= route.totalDistanceKm || 0 %>;
 
@@ -2591,37 +2593,69 @@
     });
 
     // ===================== Chat con el cliente (Última Milla) =====================
-    // Apunta a la entrega en mano (primera parada delivery pendiente). Polling 5s.
+    // Inbox: el repartidor ve/atiende los chats de TODAS sus entregas pendientes (cualquier
+    // cliente que abrió el "seguimiento en vivo"), no sólo la entrega en mano. Mismo canal
+    // por envío que usa el cliente desde el mapa en vivo (delivery_chat por shipmentId).
     (function initDriverChat() {
-        const current = (stops || []).find(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipmentId);
-        if (!current) return;
-        const sid = current.shipmentId;
+        const deliveries = (stops || []).filter(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipmentId);
+        if (!deliveries.length) return;
+        const labelFor = (sid) => {
+            const st = deliveries.find(d => d.shipmentId === sid);
+            if (!st) return 'Cliente';
+            return (st.recipient || st.tracking || ('Envío ' + sid));
+        };
 
         const btn = document.createElement('button');
         btn.id = 'dchat-btn';
         btn.textContent = '💬';
-        btn.title = 'Chat con el cliente';
+        btn.title = 'Chat con los clientes';
         btn.style.cssText = 'position:fixed;top:230px;right:18px;z-index:1200;width:52px;height:52px;border-radius:50%;border:0;background:#2563eb;color:#fff;font-size:1.4rem;box-shadow:0 4px 14px rgba(15,23,42,.35);cursor:pointer;';
         const dot = document.createElement('span');
-        dot.style.cssText = 'position:absolute;top:6px;right:6px;width:12px;height:12px;border-radius:50%;background:#ef4444;border:2px solid #fff;display:none;';
+        dot.style.cssText = 'position:absolute;top:6px;right:6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ef4444;color:#fff;font-size:.7rem;font-weight:700;line-height:18px;text-align:center;border:2px solid #fff;display:none;';
         btn.appendChild(dot);
 
         const panel = document.createElement('div');
         panel.id = 'dchat-panel';
         panel.style.cssText = 'position:fixed;top:290px;right:18px;z-index:1200;width:min(340px,92vw);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 8px 28px rgba(15,23,42,.25);display:none;flex-direction:column;overflow:hidden;';
         panel.innerHTML =
-            '<div style="background:#1e3a8a;color:#fff;padding:.6rem .9rem;font-weight:600;">Chat con el cliente</div>' +
-            '<div class="dchat-msgs" style="height:240px;overflow-y:auto;padding:.6rem .9rem;display:flex;flex-direction:column;gap:.4rem;background:#f8fafc;"></div>' +
+            '<div style="background:#1e3a8a;color:#fff;padding:.55rem .9rem;font-weight:600;">Chat con el cliente</div>' +
+            '<select class="dchat-sel" style="margin:.55rem .9rem 0;padding:.45rem .5rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;"></select>' +
+            '<div class="dchat-msgs" style="height:220px;overflow-y:auto;padding:.6rem .9rem;display:flex;flex-direction:column;gap:.4rem;background:#f8fafc;margin-top:.55rem;"></div>' +
             '<form class="dchat-form" style="display:flex;gap:.4rem;padding:.6rem;border-top:1px solid #e2e8f0;">' +
             '<input type="text" class="dchat-input" maxlength="1000" placeholder="Mensaje…" autocomplete="off" style="flex:1;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:8px;">' +
             '<button type="submit" style="padding:.5rem .9rem;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;">Enviar</button></form>';
         document.body.appendChild(btn);
         document.body.appendChild(panel);
 
+        const selEl = panel.querySelector('.dchat-sel');
         const msgsEl = panel.querySelector('.dchat-msgs');
         const form = panel.querySelector('.dchat-form');
         const input = panel.querySelector('.dchat-input');
+        let sid = deliveries[0].shipmentId;  // por defecto, la entrega en mano
         let lastId = 0, open = false;
+        let unreadBySid = {};
+
+        // Opciones del selector (una por entrega pendiente).
+        deliveries.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.shipmentId;
+            opt.textContent = labelFor(d.shipmentId);
+            selEl.appendChild(opt);
+        });
+
+        const renderSelLabels = () => {
+            Array.from(selEl.options).forEach(opt => {
+                const id = Number(opt.value);
+                const u = unreadBySid[id] || 0;
+                opt.textContent = labelFor(id) + (u > 0 ? ' (' + u + ')' : '');
+            });
+        };
+        const totalUnread = () => Object.values(unreadBySid).reduce((a, b) => a + b, 0);
+        const renderDot = () => {
+            const t = totalUnread();
+            if (t > 0 && !open) { dot.textContent = t; dot.style.display = 'block'; }
+            else { dot.style.display = 'none'; }
+        };
 
         const append = (m) => {
             const mine = m.role === 'DRIVER';
@@ -2631,20 +2665,45 @@
             msgsEl.appendChild(row);
             if (m.id > lastId) lastId = m.id;
         };
-        const poll = () => {
+
+        // Refresca el hilo de la conversación seleccionada.
+        const pollThread = () => {
             fetch('/delivery/chat/shipment/' + sid + '/messages?since=' + lastId)
                 .then(r => r.ok ? r.json() : null)
                 .then(t => {
                     if (!t || !t.messages) return;
-                    const had = t.messages.length > 0;
-                    t.messages.forEach(append);
-                    if (had) { msgsEl.scrollTop = msgsEl.scrollHeight; if (!open) dot.style.display = 'block'; }
+                    if (t.messages.length) { t.messages.forEach(append); msgsEl.scrollTop = msgsEl.scrollHeight; }
                 }).catch(() => {});
         };
+
+        // Resumen de no leídos por entrega (inbox).
+        const pollSummary = () => {
+            fetch('/delivery/route/' + routeId + '/chats')
+                .then(r => r.ok ? r.json() : null)
+                .then(rows => {
+                    if (!Array.isArray(rows)) return;
+                    unreadBySid = {};
+                    rows.forEach(r => { unreadBySid[Number(r.shipmentId)] = r.unread || 0; });
+                    renderSelLabels();
+                    renderDot();
+                }).catch(() => {});
+        };
+
+        // Carga un hilo desde cero (al abrir o cambiar de cliente) + marca leído.
+        const loadThread = (newSid) => {
+            sid = Number(newSid);
+            lastId = 0;
+            msgsEl.innerHTML = '';
+            pollThread();
+            fetch('/delivery/chat/shipment/' + sid + '/read', { method: 'POST' })
+                .then(() => { unreadBySid[sid] = 0; renderSelLabels(); renderDot(); }).catch(() => {});
+        };
+
+        selEl.addEventListener('change', () => loadThread(selEl.value));
         btn.addEventListener('click', () => {
             open = !open;
             panel.style.display = open ? 'flex' : 'none';
-            if (open) { dot.style.display = 'none'; msgsEl.scrollTop = msgsEl.scrollHeight; }
+            if (open) { loadThread(sid); selEl.value = String(sid); renderDot(); }
         });
         form.addEventListener('submit', (ev) => {
             ev.preventDefault();
@@ -2656,8 +2715,10 @@
                 body: JSON.stringify({ body }),
             }).then(r => r.ok ? r.json() : null).then(m => { if (m) { append(m); msgsEl.scrollTop = msgsEl.scrollHeight; } }).catch(() => {});
         });
-        poll();
-        setInterval(poll, 5000);
+
+        pollSummary();
+        setInterval(pollSummary, 5000);
+        setInterval(() => { if (open) pollThread(); }, 3000);
     })();
 
     // ===================== Modo prueba — simular viaje (?sim=1) ===================

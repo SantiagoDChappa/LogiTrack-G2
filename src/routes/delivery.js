@@ -1441,6 +1441,26 @@ router.post('/chat/shipment/:shipmentId/messages', requireDelivery, async (req, 
     } catch (e) { console.error('[chat] driver post:', e.message); res.status(500).json({ error: 'chat' }); }
 });
 
+// Repartidor: marcar como leídos los mensajes del cliente (al abrir ese hilo).
+router.post('/chat/shipment/:shipmentId/read', requireDelivery, async (req, res) => {
+    try {
+        const n = await deliveryChat.markClientRead(Number(req.params.shipmentId));
+        res.json({ ok: true, marked: n });
+    } catch (e) { console.error('[chat] driver read:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Repartidor: inbox — resumen de chats abiertos de las entregas de la ruta (no leídos).
+router.get('/route/:id/chats', requireDelivery, async (req, res) => {
+    try {
+        const route = await routeModel.getById(req.params.id);
+        if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+        const rows = await deliveryChat.routeChatSummary(req.params.id);
+        res.json(rows);
+    } catch (e) { console.error('[chat] route summary:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
 // Cliente (público): leer hilo por código de seguimiento.
 router.get('/chat/track/:trackingId/messages', async (req, res) => {
     try {
