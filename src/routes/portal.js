@@ -4,6 +4,7 @@ const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
     getSelfServiceForm, saveSelfService, getSelfServiceSaved,
+    getCotizador, cotizarPublic,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -38,6 +39,13 @@ const portalEvidenceUpload = (req, res, next) => {
 };
 
 router.get('/',                        getPortal);
+
+// Cotizador público de envíos (estimación de costo sin login). No expone datos
+// personales (solo parámetros de tarifa). Mejora futura: rate-limit básico en el
+// POST para evitar scraping abusivo (hoy no hay middleware de rate-limit global).
+router.get('/portal/cotizar',          getCotizador);
+router.post('/portal/cotizar',         cotizarPublic);
+
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        optionalEvidence, createPublic);
 router.get('/portal/incident/confirm', confirmIncident);

@@ -15,6 +15,17 @@ const shipmentHistoryModel = require('../models/shipmentHistory');
 const { ShipmentHistoryEvent, NotificationEvent } = require('../constants/enums');
 const settingModel = require('../models/setting');
 const { URLSearchParams } = require('url');
+const { resolveZone } = require('../services/zoneResolver.service');
+const costSvc = require('../services/shipmentCostService');
+
+// Cotizador público: presets de tamaño para que el cliente no tenga que conocer su
+// volumen en m3. Cada preset mapea a un peso y volumen representativos. El front
+// también permite carga manual ("avanzado").
+const QUOTE_SIZE_PRESETS = {
+    chico:   { weightKg: 1,  volumeM3: 0.005 },
+    mediano: { weightKg: 5,  volumeM3: 0.03 },
+    grande:  { weightKg: 15, volumeM3: 0.1 },
+};
 
 const SUPPORT_INFO = {
     email: 'soporte@logitrack.com',
@@ -827,4 +838,62 @@ const getSelfServiceSaved = (req, res) => {
     });
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };
+// Cotizador público (sin login). Muestra el formulario con el listado de provincias.
+const getCotizador = async (req, res) => {
+    const provinces = await Province.findAll({
+        attributes: ['id', 'description'],
+        order: [['description', 'ASC']],
+    });
+    res.render('portal/cotizar', { provinces });
+};
+
+// Estimación pública del costo de un envío. Reutiliza el mismo motor que el alta
+// (resolveZone + computeCost) pero NO expone datos personales ni evalúa zonas
+// peligrosas (liveDanger: false) para no revelar qué áreas están marcadas como
+// peligrosas en una consulta pública. El valor es aproximado.
+const cotizarPublic = async (req, res) => {
+    try {
+        const { provinceId, postalCode, size, weightKg, volumeM3, declaredValue } = req.body || {};
+
+        const preset = QUOTE_SIZE_PRESETS[String(size || '').toLowerCase()];
+        const w = preset ? preset.weightKg : Number(weightKg) || 0;
+        const v = preset ? preset.volumeM3 : Number(volumeM3) || 0;
+
+        if ((!provinceId && !postalCode) || w <= 0) {
+            return res.json({ ok: false });
+        }
+
+        const zone = await resolveZone({
+            postalCode: postalCode || null,
+            provinceId: provinceId ? Number(provinceId) : null,
+        });
+
+        const pseudoShipment = {
+            zone,
+            weightKg: w,
+            volumeM3: v,
+            declaredValue: Number(declaredValue) || 0,
+        };
+        const breakdown = await costSvc.computeCost(pseudoShipment, { liveDanger: false });
+        if (!breakdown) { return res.json({ ok: false }); }
+
+        // Solo parámetros de tarifa, ningún dato de personas.
+        return res.json({
+            ok: true,
+            zoneName: zone?.name || null,
+            breakdown: {
+                costoBase: breakdown.costoBase,
+                zoneBase: breakdown.zoneBase,
+                wSurcharge: breakdown.wSurcharge,
+                vSurcharge: breakdown.vSurcharge,
+                insurance: breakdown.insurance,
+                final: breakdown.final,
+            },
+        });
+    } catch (e) {
+        console.error('[portal/cotizar]', e.message);
+        return res.status(500).json({ ok: false });
+    }
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getCotizador, cotizarPublic };
