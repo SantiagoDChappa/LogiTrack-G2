@@ -40,14 +40,18 @@
                      box-shadow:var(--shadow); display:flex; align-items:center; gap:.5rem; max-width:92%; }
         .lm-banner .material-symbols-outlined { color:var(--c-primary); font-size:1.15rem; }
 
-        /* Marcadores minimalistas: puntos simples. */
-        .lm-dot { width:16px; height:16px; border-radius:50%; border:3px solid var(--c-surface); box-shadow:var(--shadow); }
-        .lm-dot--dest { background:var(--c-danger); }
-        .lm-dot--driver { position:relative; background:var(--c-primary); }
-        .lm-dot--driver::after { content:''; position:absolute; inset:-3px; border-radius:50%;
-                  border:2px solid var(--c-primary); opacity:.55; animation:lm-pulse 1.8s ease-out infinite; }
-        @keyframes lm-pulse { 0%{ transform:scale(1); opacity:.55; } 100%{ transform:scale(2.6); opacity:0; } }
-        @media (prefers-reduced-motion: reduce) { .lm-dot--driver::after { animation:none; } }
+        /* Marcadores: camión (repartidor) y casa (destino) — limpios, en badge circular. */
+        .lm-mk { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+                 border:3px solid var(--c-surface); box-shadow:var(--shadow); color:#fff; }
+        .lm-mk .material-symbols-outlined { font-size:20px; line-height:1; }
+        .lm-mk--dest { background:var(--c-danger); }
+        .lm-mk--driver { background:var(--c-primary); position:relative; }
+        .lm-mk--driver::after { content:''; position:absolute; inset:-3px; border-radius:50%;
+                  border:2px solid var(--c-primary); opacity:.5; animation:lm-pulse 1.8s ease-out infinite; }
+        @keyframes lm-pulse { 0%{ transform:scale(1); opacity:.5; } 100%{ transform:scale(2.4); opacity:0; } }
+        @media (prefers-reduced-motion: reduce) { .lm-mk--driver::after { animation:none; } }
+        /* Transición suave del camión entre actualizaciones (cada 1s). */
+        .leaflet-marker-icon.lm-driver-marker { transition: transform 1s linear; }
 
         .lm-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
                     justify-content:center; gap:.4rem; padding:2rem; text-align:center; color:var(--c-text-2); }
@@ -114,8 +118,11 @@
             attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19,
         }).addTo(map);
 
-        var destIcon = L.divIcon({ className:'', html:'<div class="lm-dot lm-dot--dest"></div>',
-            iconSize:[16,16], iconAnchor:[8,8], popupAnchor:[0,-10] });
+        var cssVar = function(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#2563eb'; };
+
+        // Destino = casa.
+        var destIcon = L.divIcon({ className:'', iconSize:[36,36], iconAnchor:[18,18], popupAnchor:[0,-16],
+            html:'<div class="lm-mk lm-mk--dest"><span class="material-symbols-outlined">home</span></div>' });
         L.marker([DATA.dest.lat, DATA.dest.lng], { icon: destIcon })
             .addTo(map)
             .bindPopup('<b>Punto de entrega</b><br>' + (DATA.dest.label || '')
@@ -130,11 +137,28 @@
             map.setView([DATA.dest.lat, DATA.dest.lng], 15);
         }
 
-        var driverIcon = L.divIcon({ className:'', html:'<div class="lm-dot lm-dot--driver"></div>',
-            iconSize:[16,16], iconAnchor:[8,8] });
+        // Repartidor = camión.
+        var driverIcon = L.divIcon({ className:'lm-driver-marker', iconSize:[36,36], iconAnchor:[18,18],
+            html:'<div class="lm-mk lm-mk--driver"><span class="material-symbols-outlined">local_shipping</span></div>' });
         var liveMarker = null;
         var fittedOnce = false;
         var lastPos = null;
+        var routeLine = null;
+        var lastRoutedPos = null;
+
+        // Camino trazado por calle (OSRM) desde el repartidor hasta el destino. Se recalcula
+        // sólo cuando el repartidor se movió > ~40 m, para no golpear el router cada segundo.
+        var drawRoute = function(from, to) {
+            var url = 'https://router.project-osrm.org/route/v1/driving/'
+                + from.lng + ',' + from.lat + ';' + to.lng + ',' + to.lat
+                + '?overview=full&geometries=geojson';
+            fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+                if (!d || !d.routes || !d.routes[0]) { return; }
+                var poly = d.routes[0].geometry.coordinates.map(function(c){ return [c[1], c[0]]; });
+                if (routeLine) { map.removeLayer(routeLine); }
+                routeLine = L.polyline(poly, { color: cssVar('--c-primary'), weight: 4, opacity: 0.7 }).addTo(map);
+            }).catch(function(){});
+        };
 
         var haversineKm = function(a, b) {
             var R = 6371, toRad = function(d){ return d*Math.PI/180; };
@@ -157,6 +181,12 @@
                     if (liveMarker) { liveMarker.setLatLng([p.lat, p.lng]); }
                     else { liveMarker = L.marker([p.lat, p.lng], { icon: driverIcon }).addTo(map).bindPopup('Repartidor en camino'); }
 
+                    // Trazar / actualizar el camino por calle hasta el destino al moverse.
+                    if (!lastRoutedPos || haversineKm(lastPos, lastRoutedPos) > 0.04) {
+                        drawRoute(lastPos, DATA.dest);
+                        lastRoutedPos = lastPos;
+                    }
+
                     var km = haversineKm(lastPos, DATA.dest);
                     if (km < 0.15) { setBanner('flag', '¡El repartidor está llegando a tu domicilio!'); }
                     else { setBanner('my_location', 'Repartidor en camino · a ' + (km < 1 ? Math.round(km*1000) + ' m' : km.toFixed(1) + ' km') + ' del destino'); }
@@ -168,7 +198,7 @@
                 }).catch(function(){});
         };
         updateLive();
-        setInterval(updateLive, 8000);
+        setInterval(updateLive, 1000);
 
         var etaBox = document.getElementById('lm-eta');
         var updateEta = function() {
