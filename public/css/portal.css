@@ -297,6 +297,24 @@ ul { list-style: none; }
     max-width: 500px;
 }
 
+.portal-hero-quote-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 1.25rem;
+    padding: 0.7rem 1.25rem;
+    border-radius: 9999px;
+    background: #fff;
+    color: #1e3a8a;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .25);
+}
+.portal-hero-quote-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(15, 23, 42, .32); text-decoration: none; }
+.portal-hero-quote-btn .material-symbols-outlined { font-size: 1.15rem; }
+
 /* ─── SEARCH ─── */
 .portal-search-form { width: 100%; }
 
