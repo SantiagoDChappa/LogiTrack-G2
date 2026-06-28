@@ -924,4 +924,34 @@ const getLiveEta = async (req, res) => {
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta };
+// Chat cliente ↔ repartidor del mapa en vivo (público, por tracking). El endpoint de
+// /delivery exige auth, así que el destinatario anónimo no puede usarlo; estos espejan la
+// lógica de deliveryChat pero abiertos por código de seguimiento.
+const getLiveChat = async (req, res) => {
+    try {
+        const chat = require('../services/deliveryChat.service');
+        const sid = await chat.shipmentIdByTracking((req.params.trackingId || '').trim().toUpperCase());
+        if (!sid) { return res.json({ status: 'NONE', open: false, chatId: null, messages: [] }); }
+        const thread = await chat.getThread(sid, Number(req.query.since) || 0);
+        return res.json(thread);
+    } catch (err) {
+        console.error('[live] chat get:', err.message);
+        return res.json({ status: 'NONE', open: false, chatId: null, messages: [] });
+    }
+};
+
+const postLiveChat = async (req, res) => {
+    try {
+        const chat = require('../services/deliveryChat.service');
+        const sid = await chat.shipmentIdByTracking((req.params.trackingId || '').trim().toUpperCase());
+        if (!sid) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        const msg = await chat.addMessage(sid, chat.SenderRole.CLIENT, req.body.body);
+        if (!msg) { return res.status(409).json({ error: 'Chat cerrado o mensaje vacío' }); }
+        return res.json(msg);
+    } catch (err) {
+        console.error('[live] chat post:', err.message);
+        return res.status(500).json({ error: 'chat' });
+    }
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta, getLiveChat, postLiveChat };

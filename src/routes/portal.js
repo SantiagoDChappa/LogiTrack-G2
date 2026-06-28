@@ -3,7 +3,7 @@ const router = express.Router();
 const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
-    getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta,
+    getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta, getLiveChat, postLiveChat,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -43,6 +43,9 @@ router.get('/track/:trackingId/live',     getLiveMap);
 // Datos del mapa en vivo (públicos, sin login): posición del repartidor + franja de ETA.
 router.get('/track/:trackingId/position', getLivePosition);
 router.get('/track/:trackingId/eta',      getLiveEta);
+// Chat cliente ↔ repartidor del mapa en vivo (público, por tracking).
+router.get('/track/:trackingId/chat',     getLiveChat);
+router.post('/track/:trackingId/chat',    postLiveChat);
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        optionalEvidence, createPublic);
 router.get('/portal/incident/confirm', confirmIncident);
