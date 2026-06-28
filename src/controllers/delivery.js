@@ -304,6 +304,11 @@ const saveEvidence = async (req, res) => {
         require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
         // Última Milla: cierra el chat de entrega (ya no hay coordinación pendiente).
         require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
+        // Última Milla: entrega confirmada → recalcular y avisar al destinatario de la próxima.
+        if (routeId) {
+            require('../services/etaWindow.service').notifyUpcomingDelivery(Number(routeId))
+                .catch(e => console.error('[eta] notifyUpcomingDelivery (entregado):', e.message));
+        }
 
         if (clientActionId) {
             require('../models/offlineSyncLog').create({ clientActionId, userId: res.locals.currentUser?.id || null, actionType: 'POD' }).catch(() => {});

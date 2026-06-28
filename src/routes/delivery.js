@@ -617,6 +617,9 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 { completed: true, completedAt: new Date() },
                 { where: { id: stop.id, routeId: route.id } }
             );
+            // Última Milla: parada resuelta → avisar al destinatario de la próxima entrega.
+            require('../services/etaWindow.service').notifyUpcomingDelivery(route.id)
+                .catch(e => console.error('[eta] notifyUpcomingDelivery (dañado):', e.message));
             return res.json({ ok: true, packageFailed: true });
         }
 
@@ -698,6 +701,9 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             const shipmentCtrl = require('../controllers/shipment');
             shipmentCtrl.notifyShipmentEvent(NE.SHIPMENT_RESCHEDULED, stop.shipmentId)
                 .catch(e => console.error('notif RESCHEDULED retry', stop.shipmentId, e.message));
+            // Última Milla: parada postergada → avisar al destinatario de la próxima entrega.
+            require('../services/etaWindow.service').notifyUpcomingDelivery(route.id)
+                .catch(e => console.error('[eta] notifyUpcomingDelivery (retry):', e.message));
             return res.json({ ok: true, retrySameDay: true });
         }
 
@@ -715,6 +721,9 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             { completed: true, completedAt: new Date() },
             { where: { id: stop.id, routeId: route.id } }
         );
+        // Última Milla: parada resuelta (intento fallido) → avisar al destinatario de la próxima.
+        require('../services/etaWindow.service').notifyUpcomingDelivery(route.id)
+            .catch(e => console.error('[eta] notifyUpcomingDelivery (fallido):', e.message));
         res.json({ ok: true });
     } catch (e) {
         res.status(422).json({ error: e.message });
@@ -734,6 +743,9 @@ router.post('/route/:id/stop/:stopId/skip', requireDelivery, async (req, res) =>
         { skipped: true, skipReason: reason, skippedAt: new Date() },
         { where: { id: req.params.stopId, routeId: req.params.id } }
     );
+    // Última Milla: parada postergada → avisar al destinatario de la próxima entrega.
+    require('../services/etaWindow.service').notifyUpcomingDelivery(route.id)
+        .catch(e => console.error('[eta] notifyUpcomingDelivery (skip):', e.message));
     res.json({ ok: true });
 });
 
@@ -1373,12 +1385,9 @@ router.post('/heartbeat', requireDelivery, async (req, res) => {
         `INSERT INTO logitrack.driver_position (user_id, route_id, latitude, longitude, speed_kmh) VALUES (:uid, :rid, :lat, :lng, :sp)`,
         { replacements: { uid: res.locals.currentUser.id, rid: routeId || null, lat: Number(latitude), lng: Number(longitude), sp: speedKmh || null } }
     );
-    // Última Milla: con la posición fresca, evalúa si el repartidor ya está a < N min de
-    // la entrega en mano y, si corresponde, avisa al destinatario del envío siguiente.
-    if (routeId) {
-        require('../services/etaWindow.service').maybeNotifyNextDelivery(Number(routeId))
-            .catch(e => console.error('[eta] maybeNotifyNextDelivery:', e.message));
-    }
+    // Última Milla: el heartbeat sólo guarda la posición (alimenta el mapa en vivo y el
+    // recálculo de ETA). El aviso de "próxima entrega" ya NO se dispara por GPS: ahora se
+    // dispara por evento cuando el repartidor resuelve una parada (ver notifyUpcomingDelivery).
     res.json({ ok: true });
 });
 

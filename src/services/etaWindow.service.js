@@ -189,11 +189,20 @@ async function etaForShipment(shipmentId) {
     };
 }
 
-// Aviso "ya casi llego" disparado por GPS. Se llama desde el heartbeat del repartidor:
-// cuando está a <= proximityMin de la entrega que tiene en mano (pending[0]), avisa por
-// mail al destinatario del envío SIGUIENTE (pending[1]) con su hora estimada + link al
-// mapa en vivo. Idempotente vía route_stop.next_notified.
-async function maybeNotifyNextDelivery(routeId) {
+// Aviso "sos la próxima entrega" disparado por EVENTO. Se llama justo después de que el
+// repartidor RESUELVE una parada (entrega confirmada, intento fallido o postergada): en ese
+// momento recalcula las ETAs y le avisa por mail al destinatario de la parada que quedó
+// PRIMERA en la cola (la próxima que el repartidor va a visitar), con su franja horaria +
+// link al mapa en vivo.
+//
+// Por qué por evento y no por GPS: el disparo por proximidad del heartbeat dependía de que
+// el repartidor tuviera el GPS prendido y reportando; si no, no avisaba nunca. Al colgarlo
+// de "terminó una entrega" el aviso es determinístico y llega con la antelación natural de
+// una parada completa.
+//
+// Idempotente por parada vía route_stop.next_notified: cada parada se avisa UNA sola vez,
+// cuando llega al frente de la cola.
+async function notifyUpcomingDelivery(routeId) {
     if (!routeId) { return; }
     const routeModel = require('../models/route');
     const route = await routeModel.getById(routeId);
@@ -201,30 +210,25 @@ async function maybeNotifyNextDelivery(routeId) {
 
     const cfg = await loadConfig();
     const pending = pendingDeliveryStops(route);
-    if (pending.length < 2) { return; } // hace falta una "actual" y una "siguiente"
+    if (pending.length === 0) { return; } // no quedan entregas por delante
+
+    const next = pending[0];
+    if (next.nextNotified) { return; } // ya avisado al ponerse al frente
 
     const etas = await computeEtas(route, cfg);
-    const current = pending[0];
-    const etaCurrent = etas.get(current.id);
-    if (!etaCurrent) { return; }
-    const minsToCurrent = (etaCurrent.getTime() - Date.now()) / 60000;
-    if (minsToCurrent > cfg.proximityMin) { return; }
-
-    const next = pending[1];
-    if (next.nextNotified) { return; }
     const etaNext = etas.get(next.id);
     if (!etaNext) { return; }
     const window = formatWindow(etaNext, cfg);
 
-    // Marca ANTES de despachar para no duplicar si entran dos heartbeats juntos.
+    // Marca ANTES de despachar para no duplicar si entran dos eventos casi juntos.
     const { RouteStop } = require('../models/routeStop');
     const [updated] = await RouteStop.update(
         { nextNotified: true },
         { where: { id: next.id, nextNotified: false } }
     );
-    if (updated === 0) { return; } // otro heartbeat ya disparó
+    if (updated === 0) { return; } // otro evento ya disparó
 
-    // "antes de las X": el aviso casi-llego usa el tope superior de la franja.
+    // "antes de las X": el aviso de próxima entrega usa el tope superior de la franja.
     const etaText = cfg.format === 'exact'
         ? `Tu envío llega cerca de las ${window.fromLabel}.`
         : `Tu envío llega antes de las ${window.toLabel}.`;
@@ -237,7 +241,7 @@ async function maybeNotifyNextDelivery(routeId) {
         etaTo:   window.toLabel,
     });
 
-    // Chat: abrir el canal del envío siguiente ya, así el cliente puede coordinar apenas
+    // Chat: abrir el canal del envío que viene ya, así el cliente puede coordinar apenas
     // recibe el aviso (no esperamos a que el repartidor llegue físicamente).
     require('./deliveryChat.service').ensureOpen(next.shipmentId, next.id)
         .catch(e => console.error('[chat] ensureOpen next:', e.message));
@@ -251,6 +255,6 @@ module.exports = {
     formatWindow,
     persistPromisedEtas,
     etaForShipment,
-    maybeNotifyNextDelivery,
+    notifyUpcomingDelivery,
     DEFAULTS,
 };
