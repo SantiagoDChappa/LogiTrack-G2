@@ -3,7 +3,7 @@ const router = express.Router();
 const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
-    getSelfServiceForm, saveSelfService, getSelfServiceSaved,
+    getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -38,6 +38,11 @@ const portalEvidenceUpload = (req, res, next) => {
 };
 
 router.get('/',                        getPortal);
+// Última Milla — mapa de seguimiento en vivo (link del mail "ya casi llego"), público.
+router.get('/track/:trackingId/live',     getLiveMap);
+// Datos del mapa en vivo (públicos, sin login): posición del repartidor + franja de ETA.
+router.get('/track/:trackingId/position', getLivePosition);
+router.get('/track/:trackingId/eta',      getLiveEta);
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        optionalEvidence, createPublic);
 router.get('/portal/incident/confirm', confirmIncident);

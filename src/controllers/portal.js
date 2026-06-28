@@ -9,7 +9,7 @@ const { Province } = require('../models/province');
 const { TypeShipment } = require('../models/typeShipment');
 const { Branch } = require('../models/branch');
 const { applyStatusExposurePolicy, sanitizeChatbotComment } = require('../services/chatbot/publicPolicy');
-const { enrichShipmentsForPortal } = require('../services/portalShipmentView');
+const { enrichShipmentsForPortal, enrichShipmentRecord, publicIncludes: trackingIncludes } = require('../services/portalShipmentView');
 const { submitPortalModification, canModifyShipment } = require('../services/portalModificationService');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const { ShipmentHistoryEvent, NotificationEvent } = require('../constants/enums');
@@ -827,4 +827,101 @@ const getSelfServiceSaved = (req, res) => {
     });
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved };
+// Última Milla — mapa de seguimiento en vivo (link del mail "ya casi llego").
+// Página dedicada y pública: muestra el punto de entrega + la ubicación del repartidor
+// actualizándose sola (reusa /delivery/position/route/:id y /delivery/eta/shipment/:id).
+const getLiveMap = async (req, res) => {
+    const trackingId = (req.params.trackingId || '').trim().toUpperCase();
+    const nombreEmpresa = await settingModel.get('nombre_empresa').catch(() => null);
+    const support = { nombre: nombreEmpresa || 'LogiTrack' };
+
+    if (!trackingId) {
+        return res.status(404).render('portal/liveMap', { support, notFound: true, trackingId: '', shipment: null });
+    }
+
+    try {
+        const shipment = await Shipment.findOne({ where: { trackingId }, include: trackingIncludes });
+        if (!shipment) {
+            return res.status(404).render('portal/liveMap', { support, notFound: true, trackingId, shipment: null });
+        }
+        const enriched = await enrichShipmentRecord(shipment);
+        const addr = enriched.address || {};
+        const dest = (addr.lat !== null && addr.lat !== undefined && addr.lng !== null && addr.lng !== undefined)
+            ? {
+                lat: Number(addr.lat),
+                lng: Number(addr.lng),
+                label: `${addr.street || ''} ${addr.number || ''}`.trim() || 'Destino',
+              }
+            : null;
+
+        return res.render('portal/liveMap', {
+            support,
+            notFound: false,
+            trackingId,
+            shipment: {
+                id: enriched.id,
+                trackingId: enriched.trackingId,
+                recipient: enriched.recipient?.fullName || '',
+                activeRouteId: enriched.activeRouteId || null,
+                dest,
+                mapStops: enriched.mapStops || [],
+            },
+        });
+    } catch (err) {
+        console.error('Live map error:', err.message);
+        return res.status(404).render('portal/liveMap', { support, notFound: true, trackingId, shipment: null });
+    }
+};
+
+// Resuelve un envío por código de seguimiento (sólo el id, para los endpoints públicos).
+const resolveShipmentByTracking = (trackingId) => {
+    const t = (trackingId || '').trim().toUpperCase();
+    if (!t) { return null; }
+    return Shipment.findOne({ where: { trackingId: t }, attributes: ['id'] });
+};
+
+// Ruta activa (planificada o en curso) más reciente de un envío. Igual criterio que
+// portalShipmentView.fetchActiveRouteId, replicado acá para no exportarlo.
+const activeRouteIdForShipment = async (shipmentId) => {
+    const { Route, RouteStatus } = require('../models/route');
+    const { RouteStop } = require('../models/routeStop');
+    const stops = await RouteStop.findAll({ where: { shipmentId, stopType: 'delivery' }, attributes: ['routeId'] });
+    if (stops.length === 0) { return null; }
+    const route = await Route.findOne({
+        where: { id: stops.map((s) => s.routeId), statusId: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
+        order: [['createdAt', 'DESC']],
+        attributes: ['id'],
+    });
+    return route?.id || null;
+};
+
+// Última Milla — endpoints PÚBLICOS (keyed por tracking, sin login) que alimentan el mapa
+// en vivo del link del mail. El router /delivery exige auth, así que el destinatario anónimo
+// no puede usar esos endpoints: estos exponen sólo lo necesario (posición + ETA) y nada más.
+const getLivePosition = async (req, res) => {
+    try {
+        const sh = await resolveShipmentByTracking(req.params.trackingId);
+        if (!sh) { return res.json(null); }
+        const routeId = await activeRouteIdForShipment(sh.id);
+        if (!routeId) { return res.json(null); }
+        const pos = await require('../services/etaWindow.service').latestDriverPosition(routeId);
+        return res.json(pos || null);
+    } catch (err) {
+        console.error('[live] position:', err.message);
+        return res.json(null);
+    }
+};
+
+const getLiveEta = async (req, res) => {
+    try {
+        const sh = await resolveShipmentByTracking(req.params.trackingId);
+        if (!sh) { return res.json(null); }
+        const eta = await require('../services/etaWindow.service').etaForShipment(sh.id);
+        return res.json(eta || null);
+    } catch (err) {
+        console.error('[live] eta:', err.message);
+        return res.json(null);
+    }
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta };

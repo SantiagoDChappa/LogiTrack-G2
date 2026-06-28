@@ -51,6 +51,7 @@ const CATALOG = [
     { token: 'branchName',     label: 'Sucursal actual',     group: 'Sucursal',     description: 'Sucursal donde está el envío.',                resolve: s => s.currentBranch?.name || '' },
     // URLs accionables
     { token: 'trackingUrl',    label: 'Enlace seguimiento',  group: 'Enlaces',      description: '🔗 Ver el seguimiento del envío en el portal.', resolve: s => (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl()) },
+    { token: 'liveMapUrl',     label: 'Mapa en vivo',        group: 'Enlaces',      description: '🔗 Seguir al repartidor en un mapa en vivo (punto de entrega + ubicación del repartidor en tiempo real).', resolve: s => (s.trackingId ? `${baseUrl()}/track/${encodeURIComponent(s.trackingId)}/live` : baseUrl()) },
     { token: 'selfServiceUrl', label: 'Enlace autogestión',  group: 'Enlaces',      description: '🔗 Reprogramar o elegir retiro en sucursal (sin login).', resolve: s => (s.portalToken ? `${baseUrl()}/portal/self/${s.portalToken}` : (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl())) },
     { token: 'incidentUrl',    label: 'Enlace incidencia',   group: 'Enlaces',      description: '🔗 Ver la incidencia creada (o reportar una nueva si no existe).', resolve: s => (notNil(s._incidentId)
         ? `${baseUrl()}/portal/mis-envios/incidencia/${s._incidentId}`
