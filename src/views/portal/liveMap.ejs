@@ -3,68 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= support.nombre %> - Seguimiento en vivo</title>
+    <title><%= support.nombre %> - Seguí tu envío en vivo</title>
     <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <style>
-        html, body { margin:0; height:100%; font-family:var(--font-family); background:var(--color-bg); color:var(--color-text); }
-        .lm-wrap { position:fixed; inset:0; display:flex; flex-direction:column; }
+        html, body { margin:0; height:100%; }
+        body { display:flex; flex-direction:column; min-height:100vh; background:var(--c-bg); color:var(--c-text);
+               font-family:'Inter',system-ui,sans-serif; }
 
-        .lm-top { display:flex; align-items:center; gap:.6rem; padding:.7rem 1.1rem;
-                  background:var(--color-surface); border-bottom:1px solid var(--color-border); z-index:1000; }
-        .lm-top .material-symbols-outlined { color:var(--color-primary); font-size:1.3rem; }
-        .lm-brand { font-weight:600; font-size:.98rem; }
-        .lm-tracking { margin-left:auto; font-size:.8rem; color:var(--color-text-secondary); }
-        .lm-tracking b { color:var(--color-text); font-weight:600; }
+        /* Barra de contexto bajo el nav público. */
+        .lm-bar { display:flex; align-items:center; gap:.6rem; padding:.6rem 1.1rem;
+                  background:var(--c-surface); border-bottom:1px solid var(--c-border); }
+        .lm-bar .material-symbols-outlined { color:var(--c-primary); font-size:1.2rem; }
+        .lm-bar-title { font-weight:600; font-size:.95rem; }
+        .lm-bar-track { margin-left:auto; font-size:.8rem; color:var(--c-text-2); }
+        .lm-bar-track b { color:var(--c-text); }
 
-        #lm-map { flex:1; width:100%; background:var(--color-surface-alt); }
-        .leaflet-container { font-family:var(--font-family); }
+        /* Escenario del mapa: ocupa el alto restante. */
+        .lm-stage { position:relative; flex:1; min-height:0; }
+        #lm-map { position:absolute; inset:0; width:100%; height:100%; background:var(--c-bg); }
+        .leaflet-container { font-family:'Inter',system-ui,sans-serif; }
 
-        /* Píldora de ETA — limpia, tono informativo del sistema. */
-        .lm-eta { position:absolute; left:50%; transform:translateX(-50%); top:60px; z-index:1000;
-                  background:var(--color-info-bg); color:var(--color-info); border:1px solid var(--color-border);
-                  border-radius:var(--radius-full); padding:.45rem 1rem; font-weight:500; font-size:.85rem;
-                  box-shadow:var(--shadow-sm); display:none; max-width:90%; text-align:center; }
-        .lm-eta.delayed { background:var(--color-warning-bg); color:var(--color-warning); }
+        .lm-eta { position:absolute; left:50%; transform:translateX(-50%); top:14px; z-index:1000;
+                  background:var(--badge-transit-bg); color:var(--badge-transit-text); border:1px solid var(--c-border);
+                  border-radius:999px; padding:.45rem 1rem; font-weight:500; font-size:.85rem;
+                  box-shadow:var(--shadow); display:none; max-width:90%; text-align:center; }
+        .lm-eta.delayed { background:var(--badge-delayed-bg); color:var(--badge-delayed-text); }
 
-        /* Banner inferior — tarjeta sobria con tokens del sistema. */
         .lm-banner { position:absolute; left:50%; transform:translateX(-50%); bottom:20px; z-index:1000;
-                     background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border);
-                     border-radius:var(--radius-md); padding:.6rem 1rem; font-size:.85rem;
-                     box-shadow:var(--shadow-md); display:flex; align-items:center; gap:.5rem; max-width:92%; }
-        .lm-banner .material-symbols-outlined { color:var(--color-primary); font-size:1.15rem; }
+                     background:var(--c-surface); color:var(--c-text); border:1px solid var(--c-border);
+                     border-radius:var(--radius); padding:.6rem 1rem; font-size:.85rem;
+                     box-shadow:var(--shadow); display:flex; align-items:center; gap:.5rem; max-width:92%; }
+        .lm-banner .material-symbols-outlined { color:var(--c-primary); font-size:1.15rem; }
 
-        /* Marcadores minimalistas: puntos simples, sin íconos recargados. */
-        .lm-dot { width:16px; height:16px; border-radius:50%; border:3px solid var(--color-surface); box-shadow:var(--shadow-sm); }
-        .lm-dot--dest { background:var(--color-danger); }
-        .lm-dot--driver { position:relative; background:var(--color-primary); }
+        /* Marcadores minimalistas: puntos simples. */
+        .lm-dot { width:16px; height:16px; border-radius:50%; border:3px solid var(--c-surface); box-shadow:var(--shadow); }
+        .lm-dot--dest { background:var(--c-danger); }
+        .lm-dot--driver { position:relative; background:var(--c-primary); }
         .lm-dot--driver::after { content:''; position:absolute; inset:-3px; border-radius:50%;
-                  border:2px solid var(--color-primary); opacity:.55; animation:lm-pulse 1.8s ease-out infinite; }
+                  border:2px solid var(--c-primary); opacity:.55; animation:lm-pulse 1.8s ease-out infinite; }
         @keyframes lm-pulse { 0%{ transform:scale(1); opacity:.55; } 100%{ transform:scale(2.6); opacity:0; } }
         @media (prefers-reduced-motion: reduce) { .lm-dot--driver::after { animation:none; } }
 
-        .lm-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-                    gap:.4rem; padding:2rem; text-align:center; color:var(--color-text-secondary); }
-        .lm-empty .material-symbols-outlined { font-size:2.6rem; color:var(--color-text-secondary); }
-        .lm-empty h1 { color:var(--color-text); font-size:1.15rem; font-weight:600; margin:.3rem 0 0; }
+        .lm-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+                    justify-content:center; gap:.4rem; padding:2rem; text-align:center; color:var(--c-text-2); }
+        .lm-empty .material-symbols-outlined { font-size:2.6rem; color:var(--c-text-3); }
+        .lm-empty h1 { color:var(--c-text); font-size:1.15rem; font-weight:600; margin:.3rem 0 0; }
         .lm-empty p { margin:.15rem 0; font-size:.9rem; }
-        .lm-link { color:var(--color-primary); font-weight:600; text-decoration:none; margin-top:.4rem; }
+        .lm-link { color:var(--c-primary); font-weight:600; text-decoration:none; margin-top:.4rem; }
     </style>
 </head>
 <body>
-    <div class="lm-wrap">
-        <div class="lm-top">
-            <span class="material-symbols-outlined">local_shipping</span>
-            <span class="lm-brand"><%= support.nombre %></span>
-            <% if (!notFound && shipment) { %>
-            <span class="lm-tracking">Seguimiento <b><%= shipment.trackingId %></b></span>
-            <% } %>
-        </div>
+    <%- include('../partials/portal-nav', { support }) %>
 
+    <div class="lm-bar">
+        <span class="material-symbols-outlined">my_location</span>
+        <span class="lm-bar-title">Seguí tu envío en vivo</span>
+        <% if (!notFound && shipment) { %>
+        <span class="lm-bar-track">Seguimiento <b><%= shipment.trackingId %></b></span>
+        <% } %>
+    </div>
+
+    <div class="lm-stage">
         <% if (notFound || !shipment) { %>
         <div class="lm-empty">
             <span class="material-symbols-outlined">wrong_location</span>
@@ -89,6 +93,7 @@
         <% } %>
     </div>
 
+    <script src="/js/theme.js" defer></script>
     <% if (!notFound && shipment && shipment.dest) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -103,14 +108,12 @@
         var map = L.map('lm-map', { zoomControl: true, attributionControl: true })
             .setView([DATA.dest.lat, DATA.dest.lng], 14);
 
-        // Basemap minimalista (CARTO) que acompaña el tema claro/oscuro — mucho menos
-        // ruido visual que el OSM estándar.
+        // Basemap minimalista (CARTO) que acompaña el tema claro/oscuro.
         var dark = document.documentElement.getAttribute('data-theme') === 'dark';
         L.tileLayer('https://{s}.basemaps.cartocdn.com/' + (dark ? 'dark_all' : 'light_all') + '/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19,
         }).addTo(map);
 
-        // Punto de entrega: punto simple en color de alerta.
         var destIcon = L.divIcon({ className:'', html:'<div class="lm-dot lm-dot--dest"></div>',
             iconSize:[16,16], iconAnchor:[8,8], popupAnchor:[0,-10] });
         L.marker([DATA.dest.lat, DATA.dest.lng], { icon: destIcon })
@@ -118,7 +121,6 @@
             .bindPopup('<b>Punto de entrega</b><br>' + (DATA.dest.label || '')
                 + (DATA.recipient ? '<br>' + DATA.recipient : ''));
 
-        var banner = document.getElementById('lm-banner');
         var bannerText = document.getElementById('lm-banner-text');
         var bannerIcon = document.getElementById('lm-banner-icon');
         var setBanner = function(icon, text) { bannerIcon.textContent = icon; bannerText.textContent = text; };
@@ -128,7 +130,6 @@
             map.setView([DATA.dest.lat, DATA.dest.lng], 15);
         }
 
-        // Repartidor en vivo: punto simple en color primario, con halo sutil que late.
         var driverIcon = L.divIcon({ className:'', html:'<div class="lm-dot lm-dot--driver"></div>',
             iconSize:[16,16], iconAnchor:[8,8] });
         var liveMarker = null;
@@ -169,7 +170,6 @@
         updateLive();
         setInterval(updateLive, 8000);
 
-        // Franja horaria de llegada (ETA), se recalcula sola.
         var etaBox = document.getElementById('lm-eta');
         var updateEta = function() {
             fetch('/track/' + encodeURIComponent(DATA.trackingId) + '/eta')
