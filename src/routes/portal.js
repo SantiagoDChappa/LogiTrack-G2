@@ -4,7 +4,7 @@ const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
     getSelfServiceForm, saveSelfService, getSelfServiceSaved,
-    getCotizador, cotizarPublic,
+    getCotizador, cotizarPublic, sucursalesCercanas,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -45,6 +45,9 @@ router.get('/',                        getPortal);
 // POST para evitar scraping abusivo (hoy no hay middleware de rate-limit global).
 router.get('/portal/cotizar',          getCotizador);
 router.post('/portal/cotizar',         cotizarPublic);
+// Sucursales más cercanas a la ubicación del cliente (dónde despachar). Solo
+// expone datos de la empresa, no afecta la cotización.
+router.post('/portal/sucursales-cercanas', sucursalesCercanas);
 
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        optionalEvidence, createPublic);

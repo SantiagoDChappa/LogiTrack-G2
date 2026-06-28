@@ -43,6 +43,36 @@
         .ctz-placeholder { display: inline-flex; align-items: center; gap: .4rem; color: var(--c-text-2); font-size: .9rem; }
         .ctz-spin { animation: ctz-rot 1s linear infinite; }
         @keyframes ctz-rot { to { transform: rotate(360deg); } }
+        .ctz-dispatch-block { margin-top: 1.25rem; }
+        .ctz-dispatch-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-top: .5rem; }
+        .ctz-dispatch-cp { display: flex; align-items: center; gap: .5rem; flex: 1 1 240px; padding: 0 .75rem; border: 1.5px solid var(--c-border); border-radius: 10px; background: var(--c-bg); transition: border-color .15s, box-shadow .15s; }
+        .ctz-dispatch-cp:focus-within { border-color: var(--c-primary); box-shadow: 0 0 0 3px var(--c-primary-lt); }
+        .ctz-cp-icon { color: var(--c-text-3); font-size: 1.2rem; flex: none; }
+        .ctz-dispatch-cp input { flex: 1; min-width: 0; border: none; background: transparent; color: var(--c-text); font: inherit; padding: .65rem 0; }
+        .ctz-dispatch-cp input:focus { outline: none; }
+        .ctz-dispatch-or { color: var(--c-text-3); font-size: .85rem; padding: 0 .15rem; }
+        .ctz-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .65rem 1.1rem; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; border: 1.5px solid transparent; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
+        .ctz-btn .material-symbols-outlined { font-size: 1.1rem; }
+        .ctz-btn-primary { background: var(--c-primary); color: #fff; }
+        .ctz-btn-primary:hover { background: var(--c-primary-dk); }
+        .ctz-btn-outline { background: transparent; color: var(--c-primary); border-color: var(--c-border); }
+        .ctz-btn-outline:hover { border-color: var(--c-primary); background: var(--c-primary-lt); }
+        @media (max-width: 560px) {
+            .ctz-dispatch-actions { flex-direction: column; align-items: stretch; }
+            .ctz-dispatch-cp { flex-basis: auto; }
+            .ctz-btn { justify-content: center; }
+            .ctz-dispatch-or { text-align: center; }
+        }
+        .ctz-branches { display: grid; gap: .6rem; margin-top: .9rem; }
+        .ctz-branch { display: flex; align-items: flex-start; gap: .75rem; border: 1px solid var(--c-border); border-radius: 12px; padding: .8rem .9rem; background: var(--c-surface); }
+        .ctz-branch-rank { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--c-primary-lt); color: var(--c-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; }
+        .ctz-branch-body { flex: 1; min-width: 0; }
+        .ctz-branch-name { font-weight: 600; color: var(--c-text); }
+        .ctz-branch-meta { font-size: .82rem; color: var(--c-text-2); margin-top: .1rem; }
+        .ctz-branch-aside { flex: none; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
+        .ctz-branch-dist { font-weight: 700; color: var(--c-text); white-space: nowrap; }
+        .ctz-branch-map { font-size: .8rem; display: inline-flex; align-items: center; gap: .2rem; }
+        .ctz-branch-map .material-symbols-outlined { font-size: .95rem; }
         @media (max-width: 520px) { .ctz-presets { grid-template-columns: 1fr; } .ctz-preset-box { min-height: 0; flex-direction: row; gap: .6rem; text-align: left; } }
     </style>
 </head>
@@ -194,6 +224,36 @@
                     <span class="material-symbols-outlined">info</span>
                     Valor estimado y orientativo. El costo final puede variar y se confirma al generar el envío.
                 </p>
+
+                <section class="portal-incident-block ctz-dispatch-block">
+                    <div class="portal-incident-block-header">
+                        <div class="portal-incident-block-icon">
+                            <span class="material-symbols-outlined">storefront</span>
+                        </div>
+                        <div>
+                            <h3>¿Dónde despachar tu paquete?</h3>
+                            <p>Compartí tu ubicación y te mostramos las sucursales más cercanas para llevar el envío.</p>
+                        </div>
+                    </div>
+
+                    <div class="ctz-dispatch-actions">
+                        <div class="ctz-dispatch-cp">
+                            <span class="material-symbols-outlined ctz-cp-icon">location_on</span>
+                            <input type="text" id="ctz-origin-cp" maxlength="10" placeholder="Tu código postal (ej: 1407)" aria-label="Tu código postal">
+                        </div>
+                        <button type="button" id="ctz-cp-btn" class="ctz-btn ctz-btn-primary">
+                            <span class="material-symbols-outlined">search</span>
+                            Buscar
+                        </button>
+                        <span class="ctz-dispatch-or">o</span>
+                        <button type="button" id="ctz-geo-btn" class="ctz-btn ctz-btn-outline">
+                            <span class="material-symbols-outlined">my_location</span>
+                            Usar mi ubicación
+                        </button>
+                    </div>
+
+                    <div id="ctz-branches" class="ctz-branches" aria-live="polite"></div>
+                </section>
             </div>
         </div>
     </section>

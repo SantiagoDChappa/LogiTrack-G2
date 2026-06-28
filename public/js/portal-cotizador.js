@@ -99,6 +99,107 @@
         }
     }
 
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function renderBranches(state, data) {
+        var box = el('ctz-branches');
+        if (!box) { return; }
+
+        if (state === 'loading') {
+            box.innerHTML = '<span class="ctz-placeholder"><span class="material-symbols-outlined ctz-spin">autorenew</span> Buscando sucursales cercanas...</span>';
+            return;
+        }
+        if (state === 'denied') {
+            box.innerHTML = '<span class="ctz-placeholder">No pudimos acceder a tu ubicación. Habilitá los permisos del navegador e intentá de nuevo.</span>';
+            return;
+        }
+        if (data && data.reason === 'geocode') {
+            box.innerHTML = '<span class="ctz-placeholder">No encontramos ese código postal. Revisalo o usá tu ubicación.</span>';
+            return;
+        }
+        if (state === 'error' || !data || !data.ok || !Array.isArray(data.branches)) {
+            box.innerHTML = '<span class="ctz-placeholder">No pudimos obtener las sucursales en este momento.</span>';
+            return;
+        }
+        if (data.branches.length === 0) {
+            box.innerHTML = '<span class="ctz-placeholder">No encontramos sucursales operativas cercanas.</span>';
+            return;
+        }
+
+        var html = data.branches.map(function (b, i) {
+            var meta = [b.address, b.province].filter(Boolean).join(' · ');
+            var phone = b.phone ? '<div class="ctz-branch-meta">Tel: ' + escapeHtml(b.phone) + '</div>' : '';
+            var maps = 'https://www.google.com/maps/dir/?api=1&destination=' + b.lat + ',' + b.lng;
+            return '' +
+                '<div class="ctz-branch">' +
+                    '<span class="ctz-branch-rank">' + (i + 1) + '</span>' +
+                    '<div class="ctz-branch-body">' +
+                        '<div class="ctz-branch-name">' + escapeHtml(b.name) + '</div>' +
+                        '<div class="ctz-branch-meta">' + escapeHtml(meta) + '</div>' +
+                        phone +
+                    '</div>' +
+                    '<div class="ctz-branch-aside">' +
+                        '<span class="ctz-branch-dist">' + b.distanceKm.toLocaleString('es-AR') + ' km</span>' +
+                        '<a class="ctz-branch-map" href="' + maps + '" target="_blank" rel="noopener">' +
+                            '<span class="material-symbols-outlined">directions</span> Cómo llegar' +
+                        '</a>' +
+                    '</div>' +
+                '</div>';
+        }).join('');
+        box.innerHTML = html;
+    }
+
+    async function fetchNearestBranches(payload) {
+        renderBranches('loading');
+        try {
+            var res = await fetch('/portal/sucursales-cercanas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            var data = await res.json();
+            renderBranches('ok', data);
+        } catch (e) {
+            renderBranches('error');
+        }
+    }
+
+    function initPostalSearch() {
+        var btn = el('ctz-cp-btn');
+        var input = el('ctz-origin-cp');
+        if (!btn || !input) { return; }
+        var run = function () {
+            var cp = input.value.trim();
+            if (!cp) { input.focus(); return; }
+            fetchNearestBranches({ postalCode: cp });
+        };
+        btn.addEventListener('click', run);
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); run(); }
+        });
+    }
+
+    function initGeolocation() {
+        var btn = el('ctz-geo-btn');
+        if (!btn) { return; }
+        btn.addEventListener('click', function () {
+            if (!navigator.geolocation) {
+                renderBranches('denied');
+                return;
+            }
+            renderBranches('loading');
+            navigator.geolocation.getCurrentPosition(
+                function (pos) { fetchNearestBranches({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+                function () { renderBranches('denied'); },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            );
+        });
+    }
+
     function initAdvancedToggle() {
         var btn = el('ctz-toggle-adv');
         var adv = el('ctz-advanced');
@@ -109,11 +210,35 @@
             btn.textContent = show ? 'Usar tamaños predefinidos' : 'Cargar peso y volumen manualmente';
             // Al alternar, los inputs de presets y manuales se excluyen mutuamente.
             document.querySelectorAll('.ctz-presets').forEach(function (p) { p.style.opacity = show ? '.45' : '1'; });
+            debouncedCalculate();
+        });
+    }
+
+    var debounceTimer = null;
+    function debouncedCalculate() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(calculate, 400);
+    }
+
+    function initAutoRecalc() {
+        // Recalcula el costo al cambiar cualquier dato relevante (incluido el tamaño),
+        // así no queda un total viejo si el usuario cambia el preset.
+        ['provinceId', 'postalCode', 'weightKg', 'volumeM3', 'declaredValue'].forEach(function (id) {
+            var node = el(id);
+            if (!node) { return; }
+            node.addEventListener('change', debouncedCalculate);
+            if (node.tagName === 'INPUT') { node.addEventListener('input', debouncedCalculate); }
+        });
+        document.querySelectorAll('input[name="size"]').forEach(function (radio) {
+            radio.addEventListener('change', debouncedCalculate);
         });
     }
 
     function init() {
         initAdvancedToggle();
+        initGeolocation();
+        initPostalSearch();
+        initAutoRecalc();
         var form = el('ctz-form');
         if (form) {
             form.addEventListener('submit', function (e) {

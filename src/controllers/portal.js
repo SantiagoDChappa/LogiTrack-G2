@@ -17,6 +17,20 @@ const settingModel = require('../models/setting');
 const { URLSearchParams } = require('url');
 const { resolveZone } = require('../services/zoneResolver.service');
 const costSvc = require('../services/shipmentCostService');
+const { PROVINCES } = require('../utils/provinces');
+const { geocodePostalCode } = require('../services/geocode');
+
+// Distancia en km con decimales (haversine). No reutilizamos utils/geo.js porque
+// ese redondea a km enteros (min 1), demasiado tosco para ordenar/mostrar sucursales.
+const haversineKm = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.asin(Math.sqrt(a));
+};
 
 // Cotizador público: presets de tamaño para que el cliente no tenga que conocer su
 // volumen en m3. Cada preset mapea a un peso y volumen representativos. El front
@@ -896,4 +910,62 @@ const cotizarPublic = async (req, res) => {
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getCotizador, cotizarPublic };
+// Sucursales más cercanas para que el cliente sepa dónde despachar el paquete.
+// Recibe la ubicación del cliente (lat/lng, típicamente de la geolocalización del
+// navegador) y devuelve las sucursales operativas ordenadas por distancia. Solo
+// expone datos de la empresa (nombre, dirección, teléfono), ningún dato personal.
+// No afecta la cotización: es información orientativa para el cliente.
+const sucursalesCercanas = async (req, res) => {
+    try {
+        let lat = Number(req.body?.lat);
+        let lng = Number(req.body?.lng);
+        let valid = Number.isFinite(lat) && Number.isFinite(lng)
+            && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+
+        // Si no vino una ubicación válida pero sí un código postal, lo geocodificamos.
+        if (!valid && req.body?.postalCode) {
+            try {
+                const geo = await geocodePostalCode(req.body.postalCode);
+                lat = Number(geo.lat);
+                lng = Number(geo.lng);
+                valid = Number.isFinite(lat) && Number.isFinite(lng);
+            } catch {
+                return res.json({ ok: false, reason: 'geocode' });
+            }
+        }
+
+        if (!valid) { return res.json({ ok: false }); }
+
+        const branches = await Branch.findAll({
+            where: { closed: false },
+            attributes: ['name', 'address', 'phone', 'postalCode', 'provinceId', 'latitude', 'longitude'],
+        });
+
+        const nearest = branches
+            .map((b) => {
+                const blat = Number(b.latitude);
+                const blng = Number(b.longitude);
+                if (!Number.isFinite(blat) || !Number.isFinite(blng)) { return null; }
+                return {
+                    name: b.name,
+                    address: b.address,
+                    phone: b.phone || null,
+                    postalCode: b.postalCode || null,
+                    province: PROVINCES[b.provinceId]?.name || null,
+                    lat: blat,
+                    lng: blng,
+                    distanceKm: Number(haversineKm(lat, lng, blat, blng).toFixed(1)),
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.distanceKm - b.distanceKm)
+            .slice(0, 5);
+
+        return res.json({ ok: true, branches: nearest });
+    } catch (e) {
+        console.error('[portal/sucursales-cercanas]', e.message);
+        return res.status(500).json({ ok: false });
+    }
+};
+
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getCotizador, cotizarPublic, sucursalesCercanas };
