@@ -28,6 +28,8 @@ const Invoice = sequelize.define('Invoice', {
     // [prototype] Pago real con Mercado Pago: ids para correlacionar el webhook.
     mpPreferenceId:  { type: DataTypes.STRING(80), allowNull: true,  field: 'mpPreferenceId' },
     mpPaymentId:     { type: DataTypes.STRING(80), allowNull: true,  field: 'mpPaymentId' },
+    // [prototype] Anulada por una nota de crédito que cubrió el total del envío.
+    voidedByCreditNoteId: { type: DataTypes.INTEGER, allowNull: true, field: 'voidedByCreditNoteId' },
 }, {
     tableName: 'invoice',
     schema: 'logitrack',

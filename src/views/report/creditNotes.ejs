@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Notas de Crédito</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Notas de Crédito</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/credit-notes" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="branchId">Sucursal</label>
+                            <select id="branchId" name="branchId">
+                                <option value="">Todas</option>
+                                <% branches.forEach(b => { %>
+                                <option value="<%= b.id %>" <%= Number(filters.branchId) === b.id ? 'selected' : '' %>><%= b.name %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="filter-field">
+                            <label for="q">Cliente / envío / N° NC</label>
+                            <input type="text" id="q" name="q" value="<%= filters.q %>" placeholder="Nombre, documento, tracking...">
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <a href="/report/credit-notes" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <span class="material-symbols-outlined">refresh</span>
+                            </a>
+                            <a href="/report/credit-notes/export?from=<%= filters.from %>&to=<%= filters.to %>&branchId=<%= filters.branchId %>&q=<%= encodeURIComponent(filters.q) %>" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
+                                <span class="material-symbols-outlined">download</span>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <% if (rows.length === 0) { %>
+                <div class="report-card">
+                    <div class="report-empty-state">
+                        <span class="material-symbols-outlined">receipt_long</span>
+                        <p>No se encontraron notas de crédito con esos filtros.</p>
+                    </div>
+                </div>
+            <% } else { %>
+                <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+                <% const totalReembolsado = rows.reduce((s, r) => s + Number(r.amount || 0), 0); %>
+                <div class="report-card" style="display:flex;gap:2rem;flex-wrap:wrap">
+                    <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Total reembolsado</div><strong style="font-size:1.2rem;color:#3730a3"><%= fmt(totalReembolsado) %></strong></div>
+                    <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Cantidad de NC</div><strong style="font-size:1.2rem"><%= rows.length %></strong></div>
+                </div>
+
+                <div class="report-card">
+                    <div class="dp-table-header">
+                        <h2>Resultados — <%= rows.length %> nota<%= rows.length !== 1 ? 's' : '' %> de crédito</h2>
+                    </div>
+                    <div class="audit-table-wrap">
+                    <table class="audit-table" id="cn-report-table">
+                        <thead>
+                            <tr>
+                                <th>N° NC</th>
+                                <th>Envío</th>
+                                <th>Cliente</th>
+                                <th>Sucursal</th>
+                                <th style="text-align:right">Monto</th>
+                                <th>Motivo</th>
+                                <th>Fecha</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% rows.forEach(r => { %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= r.number %></td>
+                                <td style="white-space:nowrap"><%= r.trackingId || '—' %></td>
+                                <td>
+                                    <strong><%= r.senderName %></strong>
+                                    <div class="user-cell-sub"><%= r.senderDocument %></div>
+                                </td>
+                                <td style="white-space:nowrap"><%= r.branchName %></td>
+                                <td style="text-align:right"><strong><%= fmt(r.amount) %></strong></td>
+                                <td><span class="status-badge devuelto"><%= r.motivo %></span></td>
+                                <td style="white-space:nowrap" class="user-cell-sub"><%= new Date(r.createdAt).toLocaleDateString('es-AR') %></td>
+                                <td><a href="/credit-note/<%= r.id %>" target="_blank" class="action-btn" data-tooltip="Ver comprobante" aria-label="Ver comprobante"><span class="material-symbols-outlined">receipt_long</span></a></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    </div>
+                    <div class="pagination" id="cn-report-pagination"></div>
+                </div>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        (function () {
+            const PAGE_SIZE = 15;
+            const table = document.getElementById('cn-report-table');
+            const pagEl = document.getElementById('cn-report-pagination');
+            if (!table || !pagEl) { return; }
+            const rows = Array.from(table.tBodies[0].rows);
+            const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+            let page = 0;
+
+            function render() {
+                rows.forEach((row, i) => {
+                    row.style.display = (i >= page * PAGE_SIZE && i < (page + 1) * PAGE_SIZE) ? '' : 'none';
+                });
+                pagEl.innerHTML = '';
+                if (pages <= 1) { return; }
+                const info = document.createElement('span');
+                info.className = 'pagination-info';
+                info.textContent = `Página ${page + 1} de ${pages} (${rows.length} notas)`;
+                const prev = document.createElement('button');
+                prev.type = 'button';
+                prev.className = 'btn-filter' + (page <= 0 ? ' ghost' : '');
+                prev.innerHTML = '<span class="material-symbols-outlined">chevron_left</span> Anterior';
+                prev.disabled = page <= 0;
+                prev.addEventListener('click', () => { page--; render(); });
+                const next = document.createElement('button');
+                next.type = 'button';
+                next.className = 'btn-filter' + (page >= pages - 1 ? ' ghost' : '');
+                next.innerHTML = 'Siguiente <span class="material-symbols-outlined">chevron_right</span>';
+                next.disabled = page >= pages - 1;
+                next.addEventListener('click', () => { page++; render(); });
+                pagEl.append(info, prev, next);
+            }
+            render();
+        })();
+
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -90,7 +90,7 @@ const postPay = async (req, res) => {
 // al checkout de MP. Solo tiene sentido si MP está configurado.
 const postPayMp = async (req, res) => {
     const invoice = await invoiceService.getByToken(req.params.token);
-    if (!invoice || invoice.payStatus === 'PAGADA' || !mercadoPagoService.isConfigured()) {
+    if (!invoice || invoice.payStatus !== 'PENDIENTE' || !mercadoPagoService.isConfigured()) {
         return res.redirect(`/pago/${req.params.token}`);
     }
     const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);

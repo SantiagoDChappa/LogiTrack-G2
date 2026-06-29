@@ -4,6 +4,7 @@
 const { CreditNote } = require('../models/creditNote');
 const shipmentModel = require('../models/shipment');
 const costSvc = require('./shipmentCostService');
+const invoiceService = require('./invoiceService');
 
 const findExisting = ({ incidentId, returnId }) => {
     if (incidentId) { return CreditNote.findOne({ where: { incidentId } }); }
@@ -40,6 +41,16 @@ const generate = async ({ shipmentId, incidentId = null, returnId = null, userId
             createdByUserId: userId, createdAt: new Date(),
         });
         await created.update({ number: buildNumber(created.id) });
+
+        // La NC siempre cubre el costo completo del envío → anula la factura.
+        // Best-effort: si la factura no existe (envío sin facturar), no rompe la NC.
+        try {
+            const invoice = await invoiceService.getByShipment(shipmentId);
+            if (invoice) { await invoiceService.voidByCreditNote(invoice, created.id); }
+        } catch (e) {
+            console.error('[creditNoteService] error al anular factura:', e.message);
+        }
+
         return { ok: true, creditNote: created };
     } catch (e) {
         // Carrera contra el índice único parcial: ya existe → devolvemos la existente.

@@ -61,6 +61,11 @@
                 <div class="row"><span>Medio</span><strong><%= invoice.payMethod || 'mercadopago' %></strong></div>
                 <div class="row"><span>Fecha</span><strong><%= invoice.paidAt ? new Date(invoice.paidAt).toLocaleString('es-AR') : '—' %></strong></div>
                 <% if (shipment) { %><div class="row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+            <% } else if (invoice.payStatus === 'ANULADA') { %>
+                <div class="center">
+                    <div class="badge" style="background:#e0e7ff;color:#3730a3">FACTURA ANULADA</div>
+                    <p style="color:var(--muted);margin:16px 0 0">Esta factura fue anulada por una nota de crédito. No tenés nada que pagar.</p>
+                </div>
             <% } else { %>
                 <div class="amount-box">
                     <div class="lbl">Total a pagar</div>

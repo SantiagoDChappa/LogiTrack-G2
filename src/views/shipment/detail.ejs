@@ -333,6 +333,8 @@
                             </a>
                             <% if (invoice.payStatus === 'PAGADA') { %>
                                 <span class="status-badge entregado">Cobrada (<%= invoice.payMethod || '—' %>)</span>
+                            <% } else if (invoice.payStatus === 'ANULADA') { %>
+                                <span class="status-badge cancelado">Anulada por nota de crédito</span>
                             <% } else { %>
                                 <span class="status-badge retrasado">Pendiente de cobro</span>
                                 <% if ([1, 2, 4].includes(currentUser.roleId)) { %>

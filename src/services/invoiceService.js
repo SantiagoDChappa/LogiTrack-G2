@@ -59,11 +59,13 @@ const getByShipment = (shipmentId) => findByShipment(shipmentId);
 // no crear una nueva preferencia cada vez que el cliente reabre el link de pago).
 const setMpPreference = (invoice, mpPreferenceId) => invoice.update({ mpPreferenceId });
 
-// Marca la factura como PAGADA (pago simulado). Idempotente: si ya está pagada,
-// devuelve la existente sin re-escribir el comprobante.
+// Marca la factura como PAGADA (pago simulado). Idempotente: si ya está pagada o
+// anulada (nota de crédito por el total), devuelve la existente sin tocar nada.
 const markPaid = async (invoice, { method = 'mercadopago' } = {}) => {
     if (!invoice) { return { ok: false, message: 'Factura no encontrada' }; }
-    if (invoice.payStatus === 'PAGADA') { return { ok: true, invoice, duplicated: true }; }
+    if (invoice.payStatus === 'PAGADA' || invoice.payStatus === 'ANULADA') {
+        return { ok: true, invoice, duplicated: true };
+    }
     await invoice.update({
         payStatus: 'PAGADA',
         payMethod: method,
@@ -75,7 +77,9 @@ const markPaid = async (invoice, { method = 'mercadopago' } = {}) => {
 
 // Pago aprobado por Mercado Pago vía webhook: marca PAGADA y guarda el payment id real.
 const markPaidByMp = async (invoice, mpPaymentId) => {
-    if (invoice.payStatus === 'PAGADA') { return { ok: true, invoice, duplicated: true }; }
+    if (invoice.payStatus === 'PAGADA' || invoice.payStatus === 'ANULADA') {
+        return { ok: true, invoice, duplicated: true };
+    }
     await invoice.update({
         payStatus: 'PAGADA',
         payMethod: 'mercadopago',
@@ -86,7 +90,15 @@ const markPaidByMp = async (invoice, mpPaymentId) => {
     return { ok: true, invoice };
 };
 
+// La nota de crédito de este sistema siempre cubre el costo completo del envío
+// (no hay notas de crédito parciales), así que toda NC generada anula la factura.
+const voidByCreditNote = async (invoice, creditNoteId) => {
+    if (!invoice || invoice.payStatus === 'ANULADA') { return { ok: true, invoice, duplicated: true }; }
+    await invoice.update({ payStatus: 'ANULADA', voidedByCreditNoteId: creditNoteId });
+    return { ok: true, invoice };
+};
+
 module.exports = {
     generate, getById, getByShipment, getByToken, markPaid, buildNumber,
-    setMpPreference, markPaidByMp,
+    setMpPreference, markPaidByMp, voidByCreditNote,
 };
