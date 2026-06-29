@@ -1,6 +1,32 @@
 (function () {
     let debounceTimer = null;
 
+    // Última predicción del ML (sin la fecha elegida): se reutiliza para recalcular
+    // la fiabilidad cuando el operador cambia la fecha estimada de entrega.
+    let lastPred = null; // { prob, mlDays, distKm }
+
+    // BUG-35 — la fiabilidad debe contemplar el margen entre la fecha elegida y la
+    // estimada por el ML. Cada RISK_HALFLIFE_DAYS días de margen, el riesgo de demora
+    // se reduce a la mitad (y crece si la fecha elegida es anterior a la estimada).
+    const RISK_HALFLIFE_DAYS = 3;
+
+    function chosenDeliveryDays() {
+        const input = document.getElementById('expected-date');
+        if (!input || !input.value) { return null; }
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const d = new Date(input.value + 'T00:00:00');
+        if (isNaN(d.getTime())) { return null; }
+        return Math.round((d.getTime() - today.getTime()) / 86400000);
+    }
+
+    // Riesgo de demora efectivo para la fecha elegida. Sin fecha → riesgo del modelo.
+    function effectiveRisk(prob, mlDays, chosenDays) {
+        if (chosenDays == null) { return prob; }
+        const slack = chosenDays - mlDays;            // días de margen sobre la estimación
+        const risk = prob * Math.pow(2, -slack / RISK_HALFLIFE_DAYS);
+        return Math.max(0, Math.min(100, Math.round(risk)));
+    }
+
     function getFormValues() {
         const widget = document.getElementById('prediction-widget');
 
@@ -151,45 +177,62 @@
         el.innerHTML = `<span class="pred-error"><span class="material-symbols-outlined">error_outline</span> ${msg}</span>`;
     }
 
-   function showResult(pred, distKm) {
-        const el = document.getElementById('prediction-result');
-        if (!el) return;
-
-        // Semáforo de fiabilidad (3 niveles, umbrales LGT-111 sobre la prob. de demora).
-        const prob = pred.probability;
-        const fiabilidad = Math.max(0, Math.min(100, 100 - prob));
-        let semaforoColor, semaforoLabel, semaforoClass;
-        if (prob < 20) {
-            semaforoColor = '🟢';
-            semaforoLabel = 'Alta fiabilidad';
-            semaforoClass = 'alta';
-        } else if (prob <= 50) {
-            semaforoColor = '🟡';
-            semaforoLabel = 'Fiabilidad media';
-            semaforoClass = 'media';
-        } else {
-            semaforoColor = '🔴';
-            semaforoLabel = 'Baja fiabilidad';
-            semaforoClass = 'baja';
-        }
-
-        // Fecha estimada en lenguaje natural
+    // Entra cuando llega la respuesta del ML: fija la fecha estimada en el form,
+    // guarda la predicción cruda y dispara el render (que ya usa la fecha elegida).
+    function showResult(pred, distKm) {
         const days = pred.delivery_days;
         const fechaEstimada = new Date();
         fechaEstimada.setDate(fechaEstimada.getDate() + days);
-        const fechaLabel = fechaEstimada.toLocaleDateString('es-AR', {
-            weekday: 'long', day: 'numeric', month: 'long'
-        });
 
         // Fecha estimada del ML → campo del form. Se habilita recién cuando el ML
         // termina; el piso (min) es la fecha estimada, y nunca anterior ni igual a hoy.
         // El operador puede elegir esa fecha o una posterior, no antes.
         applyMlDeliveryDate(fechaEstimada);
 
+        lastPred = { prob: pred.probability, mlDays: days, distKm };
+        renderResult({ fetchSuggestion: true });
+    }
+
+    // Render (re)ejecutable: recalcula la fiabilidad con la fecha elegida actual.
+    // Se llama al recibir la predicción y cada vez que cambia la fecha de entrega.
+    function renderResult(opts) {
+        const el = document.getElementById('prediction-result');
+        if (!el || !lastPred) { return; }
+        const { prob, mlDays, distKm } = lastPred;
+
+        // Riesgo ajustado por el margen de la fecha elegida (BUG-35) y fiabilidad.
+        const chosenDays = chosenDeliveryDays();
+        const risk = effectiveRisk(prob, mlDays, chosenDays);
+        const fiabilidad = Math.max(0, Math.min(100, 100 - risk));
+
+        // Semáforo de fiabilidad (3 niveles sobre el riesgo efectivo).
+        let semaforoColor, semaforoLabel, semaforoClass;
+        if (risk < 20) {
+            semaforoColor = '🟢'; semaforoLabel = 'Alta fiabilidad';  semaforoClass = 'alta';
+        } else if (risk <= 50) {
+            semaforoColor = '🟡'; semaforoLabel = 'Fiabilidad media'; semaforoClass = 'media';
+        } else {
+            semaforoColor = '🔴'; semaforoLabel = 'Baja fiabilidad';  semaforoClass = 'baja';
+        }
+
+        // Fecha estimada del ML en lenguaje natural
+        const fechaEstimada = new Date();
+        fechaEstimada.setDate(fechaEstimada.getDate() + mlDays);
+        const fechaLabel = fechaEstimada.toLocaleDateString('es-AR', {
+            weekday: 'long', day: 'numeric', month: 'long'
+        });
+
+        // Nota de margen cuando la fecha elegida difiere de la estimada por el ML.
+        const slack = chosenDays != null ? chosenDays - mlDays : null;
+        const probNota = slack == null ? ''
+            : slack > 0  ? ` <span class="pred-prob--hint">(${slack} día${slack !== 1 ? 's' : ''} de margen sobre lo estimado)</span>`
+            : slack < 0  ? ` <span class="pred-prob--hint">(${-slack} día${-slack !== 1 ? 's' : ''} antes de lo estimado)</span>`
+            :              '';
+
         // Etiquetas de justificación (factores objetivos; el nivel ya lo dice el semáforo).
         const etiquetas = [];
-        if (distKm > 800)           etiquetas.push('Larga distancia');
-        if (pred.delivery_days > 5) etiquetas.push('Entrega lenta');
+        if (distKm > 800) etiquetas.push('Larga distancia');
+        if (mlDays > 5)   etiquetas.push('Entrega lenta');
 
         el.innerHTML = `
             <div class="pred-row">
@@ -198,11 +241,11 @@
             </div>
             <div class="pred-prob pred-prob--sub">
                 <span class="material-symbols-outlined">schedule</span>
-                Prob. de demora: <strong>${prob}%</strong>
+                Prob. de demora: <strong>${risk}%</strong>${probNota}
             </div>
             <div class="pred-days">
                 <span class="material-symbols-outlined">event</span>
-                Llega estimado: <strong>${fechaLabel}</strong> (${days} día${days !== 1 ? 's' : ''})
+                Llega estimado: <strong>${fechaLabel}</strong> (${mlDays} día${mlDays !== 1 ? 's' : ''})
             </div>
             <div class="pred-dist">
                 <span class="material-symbols-outlined">route</span>
@@ -212,15 +255,16 @@
             <div class="pred-tags">
                 ${etiquetas.map(e => `<span class="pred-tag">${e}</span>`).join('')}
             </div>` : ''}
-            ${prob > 50 ? `
+            ${risk > 50 ? `
             <div class="pred-alert" id="pred-alert-high-risk">
                 <span class="material-symbols-outlined">warning</span>
                 Fiabilidad baja — cargando sugerencia...
             </div>` : ''}
         `;
 
-        // Si riesgo > 50%, buscar repartidor sugerido
-        if (prob > 50) {
+        // Si riesgo > 50%, buscar repartidor sugerido (solo en la carga del ML, no en
+        // cada cambio de fecha, para no spamear el endpoint).
+        if (risk > 50 && opts && opts.fetchSuggestion) {
             fetch('/api/suggest-delivery')
                 .then(r => r.json())
                 .then(data => {
@@ -251,6 +295,15 @@
             el.addEventListener('change', trigger);
             if (el.tagName === 'INPUT') el.addEventListener('input', trigger);
         });
+
+        // Al cambiar la fecha de entrega elegida recalculamos la fiabilidad (sin
+        // volver a pegarle al ML: el riesgo del modelo no depende de la fecha).
+        const dateInput = document.getElementById('expected-date');
+        if (dateInput) {
+            dateInput.addEventListener('change', function () {
+                if (lastPred) { renderResult({ fetchSuggestion: false }); }
+            });
+        }
 
         const widget = document.getElementById('prediction-widget');
         if (widget && widget.dataset.autoload === 'true') {

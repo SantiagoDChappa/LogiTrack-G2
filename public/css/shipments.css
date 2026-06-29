@@ -1873,6 +1873,13 @@
 
 .pred-prob--sub { margin-top: var(--space-1); }
 
+/* Nota de margen entre la fecha elegida y la estimada por el ML (BUG-35) */
+.pred-prob--hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-weight: var(--font-weight-regular, 400);
+}
+
 /* Etiquetas/factores como chips (antes salían pegadas y sin estilo) */
 .pred-tags {
   display: flex;

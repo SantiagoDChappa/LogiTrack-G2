@@ -300,6 +300,11 @@ const saveEvidence = async (req, res) => {
             await autoCloseForShipment(shipment.id, { reason: 'Cierre automático: envío entregado' }, t);
         });
 
+        // Entrega confirmada → notificar al cliente "tu envío fue entregado". El flujo del
+        // repartidor usa ShipmentModel.updateStatus directo (no el controller de shipment),
+        // así que la notificación NO salía por esta vía: la emitimos acá explícitamente.
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_DELIVERED, shipment.id)
+            .catch(e => console.error('[delivery] notif SHIPMENT_DELIVERED:', e.message));
         // CP-ENCS01: al entregar, enviar email con el link a la encuesta (fire-and-forget).
         require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
         // Última Milla: cierra el chat de entrega (ya no hay coordinación pendiente).

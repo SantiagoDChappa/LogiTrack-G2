@@ -236,7 +236,15 @@
                     </div>
                 </div>
 
-                <div style="display:flex;justify-content:flex-end;padding-bottom:var(--space-6)">
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:var(--space-4);flex-wrap:wrap;padding-bottom:var(--space-6)">
+                    <div class="route-strategy">
+                        <label for="route-strategy" style="display:block;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:var(--space-1)">Estrategia de optimización</label>
+                        <select id="route-strategy" name="strategy" class="search-input">
+                            <option value="price">Menor precio (costo total)</option>
+                            <option value="time">Menor tiempo (ruta directa, vehículo más rápido)</option>
+                            <option value="balanced">Balanceado (costo y tiempo)</option>
+                        </select>
+                    </div>
                     <button type="submit" id="route-optimize-submit" class="action-btn action-btn--lg buscar" data-tooltip="Calcular ruta óptima" aria-label="Calcular ruta óptima">
                         <span class="material-symbols-outlined">alt_route</span>
                     </button>
@@ -284,7 +292,11 @@
             window.rtAlert('Seleccioná al menos un envío.', 'warning');
             return;
         }
-        const body = { shipmentIds, branchId: window.CURRENT_BRANCH_ID };
+        const body = {
+            shipmentIds,
+            branchId: window.CURRENT_BRANCH_ID,
+            strategy: document.getElementById('route-strategy')?.value || 'price',
+        };
         if (manualTxMode) {
             const selectedTx = fd.getAll('transportIds').map(Number);
             if (selectedTx.length === 0) {

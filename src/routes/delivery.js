@@ -9,7 +9,7 @@ const { Route, RouteStatus } = require('../models/route');
 const { RouteStop } = require('../models/routeStop');
 const { RoutePause } = require('../models/routePause');
 const stateMachine = require('../services/shipmentStateMachine');
-const { Status } = require('../constants/enums');
+const { Status, NotificationEvent } = require('../constants/enums');
 const { deliveryValidation, handleCreateValidationErrors } = require('../middlewares/delivery');
 const sequelize = require('../database/connection');
 
@@ -523,6 +523,62 @@ router.post('/route/:id/stop/:stopId/pickup-confirmed', requireDelivery, async (
     } catch (e) {
         console.error('pickup-confirmed err', e.message);
         res.status(422).json({ error: `No se pudo confirmar el pickup: ${e.message}. Revisá los envíos y reintentá.` });
+    }
+});
+
+// Retiro por sucursal: el repartidor DEJA el paquete en la sucursal de retiro (no es una
+// entrega a domicilio, no requiere POD). El envío pasa a AT_BRANCH con currentBranchId =
+// sucursal de retiro, queda disponible para que el cliente lo retire, y se le avisa.
+router.post('/route/:id/stop/:stopId/drop-at-branch', requireDelivery, async (req, res) => {
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+    const pauseCheck = await ensureNotPaused(route.id);
+    if (!pauseCheck.ok) { return res.status(409).json(pauseCheck); }
+    const gateP = checkStopOrder(route, req.params.stopId);
+    if (!gateP.ok) { return res.status(409).json({ error: gateP.error, blockingStop: gateP.blockingStop }); }
+
+    const stop = (route.stops || []).find(s => String(s.id) === String(req.params.stopId));
+    if (!stop || stop.stopType !== 'delivery' || !stop.branchId || !stop.shipmentId) {
+        return res.status(422).json({ error: 'Esta parada no es una entrega en sucursal de retiro.' });
+    }
+    try {
+        const shipment = await shipmentModel.getById(stop.shipmentId);
+        if (!shipment) { throw new Error('Envío no encontrado'); }
+        // Si todavía no salió a tránsito (ASSIGNED/IN_PREPARATION), primero IN_TRANSIT
+        // (ASSIGNED→AT_BRANCH no es una transición válida; pasa siempre por IN_TRANSIT).
+        if (shipment.statusId === Status.ASSIGNED.id || shipment.statusId === Status.IN_PREPARATION.id) {
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.IN_TRANSIT.id,
+                actor:      res.locals.currentUser,
+                branchId:   route.originBranchId,
+            });
+        }
+        // Dejar en la sucursal de retiro: IN_TRANSIT → AT_BRANCH (la transición setea
+        // currentBranchId = sucursal). Si ya está AT_BRANCH (reintento), solo cerramos.
+        const fresh = await shipmentModel.getById(stop.shipmentId);
+        if (fresh && fresh.statusId !== Status.AT_BRANCH.id) {
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.AT_BRANCH.id,
+                actor:      res.locals.currentUser,
+                branchId:   stop.branchId,
+            });
+        }
+        await RouteStop.update(
+            { completed: true, completedAt: new Date() },
+            { where: { id: req.params.stopId, routeId: req.params.id } }
+        );
+        // Aviso al cliente: disponible para retiro en sucursal (evento SHIPMENT_IN_BRANCH).
+        require('../controllers/shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_IN_BRANCH, stop.shipmentId)
+            .catch(e => console.error('[delivery] notif SHIPMENT_IN_BRANCH:', e.message));
+        const branchName = stop.branch ? stop.branch.name : 'la sucursal de retiro';
+        res.json({ ok: true, trackingId: shipment.trackingId, branchName });
+    } catch (e) {
+        console.error('drop-at-branch err', e.message);
+        res.status(422).json({ error: `No se pudo dejar en sucursal: ${e.message}` });
     }
 });
 
