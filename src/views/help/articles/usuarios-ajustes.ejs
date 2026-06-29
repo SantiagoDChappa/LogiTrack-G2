@@ -1,17 +1,41 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>En <a href="/user">Usuarios</a> das de alta cuentas, asignás rol y sucursal, y activás/desbloqueás.</li>
+            <li>Las <a href="/branch">Sucursales</a> definen el alcance de datos de cada usuario y envío.</li>
+            <li>En <strong>Ajustes</strong> configurás empresa, comunicaciones, ruteo, seguridad y fatiga.</li>
+        </ul>
+    </div>
+</div>
+
 <h2>Usuarios</h2>
-<p>En <a href="/user">Usuarios</a> administrás las cuentas del sistema:</p>
-<ul>
-    <li>Alta de supervisor, operador, repartidor o administrador.</li>
-    <li>Asignación de sucursal y rol.</li>
-    <li>Activar / desactivar cuentas.</li>
-    <li>Desbloqueo manual tras intentos fallidos de login.</li>
-</ul>
+<p>En <a href="/user">Usuarios</a> administrás las cuentas del sistema: alta de supervisor, operador, repartidor o administrador, asignación de rol y sucursal, activar/desactivar y desbloqueo manual tras intentos fallidos de login.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/usuarios-ajustes/01-usuarios.png',
+    alt: 'Formulario de alta de usuario con nombre, documento, email y rol',
+    caption: 'Alta de usuario: completás nombre, documento, email y rol. El sistema genera una contraseña temporal que se muestra una sola vez.'
+}) %>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">password</span>
+    <div class="help-callout__body">No tipeás la contraseña: el sistema genera una <strong>temporal</strong> al crear el usuario y la muestra una única vez para que se la pases. El usuario deberá cambiarla en su primer ingreso.</div>
+</div>
 
 <h2>Sucursales</h2>
-<p><a href="/branch">Sucursales</a> define los puntos físicos de la operación. Los envíos y usuarios se asocian a una sucursal para el alcance de datos.</p>
+<p><a href="/branch">Sucursales</a> define los puntos físicos de la operación. Los envíos y usuarios se asocian a una sucursal, y eso determina el <strong>alcance de datos</strong>: cada usuario ve lo de su sucursal (salvo el admin, que ve todo).</p>
 
 <h2>Ajustes del sistema</h2>
-<p>En <strong>Ajustes</strong> configurás:</p>
+<p>En <strong>Ajustes</strong> configurás los parámetros operativos del sistema.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/usuarios-ajustes/02-ajustes.png',
+    alt: 'Pantalla de Ajustes generales con dirección de origen del sistema y configuración de fecha y hora',
+    caption: 'Ajustes → General: dirección de origen del sistema (para calcular distancias), zona horaria y formato de fecha/hora.'
+}) %>
+
 <ul>
     <li>Datos de la empresa y logo.</li>
     <li>Comunicaciones y plantillas de email.</li>
@@ -21,28 +45,71 @@
 </ul>
 
 <h2>Paso a paso</h2>
-<ol>
-    <li>Para dar de alta un usuario, andá a <a href="/user">Usuarios</a> → Crear y completá rol, sucursal y datos personales.</li>
-    <li>Asigná la sucursal correcta: define qué envíos e incidencias verá el usuario.</li>
-    <li>Configurá sucursales en <a href="/branch">Sucursales</a> antes de asociar usuarios.</li>
-    <li>En <strong>Ajustes</strong>, revisá comunicaciones, ruteo y parámetros de incidencias según tu operación.</li>
-    <li>Configurá <a href="/help/transportes-zonas">Transportes y zonas</a> para habilitar el ruteo.</li>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Configurá las sucursales primero</p>
+        <div class="help-steps__text">En <a href="/branch">Sucursales</a>, antes de asociar usuarios.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Dá de alta los usuarios</p>
+        <div class="help-steps__text">En <a href="/user">Usuarios</a> → Crear, completá rol, sucursal y datos personales.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Asigná la sucursal correcta</p>
+        <div class="help-steps__text">Define qué envíos e incidencias verá el usuario.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá los ajustes</p>
+        <div class="help-steps__text">En <strong>Ajustes</strong>, configurá comunicaciones, ruteo y parámetros de incidencias según tu operación.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Habilitá el ruteo</p>
+        <div class="help-steps__text">Configurá <a href="/help/transportes-zonas">Transportes y zonas</a> para poder optimizar rutas.</div>
+    </li>
 </ol>
 
-<h2>Errores frecuentes</h2>
-<ul>
-    <li><strong>El usuario no ve envíos de otra sucursal:</strong> el alcance está ligado a la sucursal asignada; solo admin ve panorama global.</li>
-    <li><strong>Cuenta bloqueada por intentos fallidos:</strong> desbloqueala desde el detalle del usuario en Usuarios.</li>
-    <li><strong>Cambié ajustes de ruteo y no surten efecto:</strong> verificá que guardaste en Ajustes; algunos parámetros (piggyback, desvío máximo) aplican a rutas nuevas.</li>
-</ul>
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">history</span>
+    <div class="help-callout__body">Los cambios de configuración quedan registrados en Auditoría para trazabilidad.</div>
+</div>
 
-<div class="help-tip">Los cambios de configuración quedan registrados en Auditoría para trazabilidad.</div>
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El usuario no ve envíos de otra sucursal
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El alcance está ligado a la sucursal asignada. Solo el admin ve el panorama global.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Cuenta bloqueada por intentos fallidos
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Desbloqueala desde el detalle del usuario en <a href="/user">Usuarios</a>.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Cambié ajustes de ruteo y no surten efecto
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Verificá que guardaste en Ajustes. Algunos parámetros (piggyback, desvío máximo) aplican solo a rutas nuevas.</p>
+    </div>
+</details>
 
 <h2>Artículos relacionados</h2>
-<ul>
-    <li><a href="/help/transportes-zonas">Transportes y zonas</a></li>
-    <li><a href="/help/ojo-patron">Ojo de Patrón (fatiga)</a></li>
-    <li><a href="/help/import-csv">Importar envíos por CSV</a></li>
-    <li><a href="/help/notificaciones">Notificaciones</a></li>
-    <li><a href="/help/glosario">Glosario</a></li>
+<ul class="help-related">
+    <li><a href="/help/transportes-zonas"><span class="material-symbols-outlined">local_shipping</span>Transportes y zonas</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/import-csv"><span class="material-symbols-outlined">upload_file</span>Importar envíos por CSV</a></li>
+    <li><a href="/help/notificaciones"><span class="material-symbols-outlined">notifications</span>Notificaciones</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
 </ul>

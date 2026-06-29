@@ -211,7 +211,7 @@ const getArticlesForRole = (roleId) => {
         .sort((a, b) => {
             const ca = CATEGORIES[a.category]?.order ?? 99;
             const cb = CATEGORIES[b.category]?.order ?? 99;
-            if (ca !== cb) return ca - cb;
+            if (ca !== cb) { return ca - cb; }
             return a.title.localeCompare(b.title, 'es');
         });
 };
@@ -221,14 +221,17 @@ const getArticleBySlug = (slug, roleId) => {
     return ARTICLES.find((a) => a.slug === slug && a.roles.includes(role)) || null;
 };
 
+/** Conjunto de slugs que el rol puede ver. Útil para no enlazar a artículos restringidos. */
+const getAccessibleSlugs = (roleId) => new Set(getArticlesForRole(roleId).map((a) => a.slug));
+
 const getCategoriesForArticles = (articles) => {
     const seen = new Set();
     const list = [];
     for (const a of articles) {
-        if (seen.has(a.category)) continue;
+        if (seen.has(a.category)) { continue; }
         seen.add(a.category);
         const meta = CATEGORIES[a.category];
-        if (meta) list.push({ id: a.category, label: meta.label, order: meta.order });
+        if (meta) { list.push({ id: a.category, label: meta.label, order: meta.order }); }
     }
     return list.sort((a, b) => a.order - b.order);
 };
@@ -238,5 +241,6 @@ module.exports = {
     ARTICLES,
     getArticlesForRole,
     getArticleBySlug,
+    getAccessibleSlugs,
     getCategoriesForArticles,
 };

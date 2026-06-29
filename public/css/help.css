@@ -442,3 +442,460 @@
     background: var(--color-surface);
     box-shadow: var(--shadow-sm);
 }
+
+/* ============================================================
+   Componentes visuales del manual (capturas, pasos, callouts…)
+   Pensados para reducir texto y hacer la lectura escaneable.
+   ============================================================ */
+
+/* --- TL;DR / Resumen rápido arriba del artículo --- */
+.help-tldr {
+    display: flex;
+    gap: 14px;
+    padding: 14px 16px;
+    margin: 0 0 1.5rem;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.help-tldr__icon {
+    flex-shrink: 0;
+    color: var(--color-primary);
+}
+
+.help-tldr__icon .material-symbols-outlined {
+    font-size: 24px;
+}
+
+.help-tldr__body {
+    min-width: 0;
+}
+
+.help-tldr__title {
+    margin: 0 0 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+.help-tldr ul {
+    margin: 0;
+    padding-left: 1.15rem;
+}
+
+.help-tldr li {
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.help-tldr li:last-child {
+    margin-bottom: 0;
+}
+
+/* --- Figura / captura con marco, pie y zoom --- */
+.help-figure {
+    margin: 1.25rem 0;
+}
+
+.help-figure__frame {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+    overflow: hidden;
+    cursor: zoom-in;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+button.help-figure__frame {
+    font: inherit;
+    text-align: left;
+}
+
+.help-figure__frame:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.help-figure__frame:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.help-figure__img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Estado "captura pendiente": cuando el .webp aún no fue generado por Playwright,
+   en lugar de una imagen rota mostramos un marcador prolijo. */
+.help-figure--pending .help-figure__frame {
+    cursor: default;
+    pointer-events: none;
+}
+
+.help-figure__pending {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 120px;
+    padding: 24px 16px;
+    color: var(--color-text-secondary);
+    text-align: center;
+}
+
+.help-figure__pending .material-symbols-outlined {
+    font-size: 30px;
+    opacity: 0.7;
+}
+
+.help-figure__pending span:last-child {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.help-figure__caption {
+    margin: 8px 2px 0;
+    font-size: 0.82rem;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+    text-align: center;
+}
+
+.help-figure__caption b,
+.help-figure__caption strong {
+    color: var(--color-text);
+}
+
+/* --- Lightbox / zoom de imagen --- */
+.help-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(1rem, 4vw, 3rem);
+    background: rgba(15, 23, 42, 0.82);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.18s ease;
+}
+
+.help-lightbox[aria-hidden="false"] {
+    opacity: 1;
+    visibility: visible;
+}
+
+.help-lightbox__img {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-md);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.help-lightbox__close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.help-lightbox__close:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* --- Pasos visuales (reemplazan <ol> planos) ---
+   Usamos ol.help-steps para ganar especificidad sobre `.help-article__content ol`
+   (si no, el <ol> mostraría su numeración nativa además del contador). */
+ol.help-steps {
+    list-style: none;
+    counter-reset: help-step;
+    margin: 1.25rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.help-steps__item {
+    counter-increment: help-step;
+    position: relative;
+    padding: 14px 16px 14px 52px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.help-steps__item::before {
+    content: counter(help-step);
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.help-steps__item > :first-child {
+    margin-top: 0;
+}
+
+.help-steps__item > :last-child {
+    margin-bottom: 0;
+}
+
+.help-steps__item .help-figure {
+    margin: 12px 0 0;
+}
+
+.help-steps__title {
+    margin: 0 0 4px;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+/* --- Callouts (tip / info / aviso / importante) --- */
+.help-callout {
+    display: flex;
+    gap: 12px;
+    margin: 1rem 0;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-left-width: 3px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 0.88rem;
+    line-height: 1.55;
+}
+
+.help-callout__icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.help-callout__icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.help-callout__body {
+    min-width: 0;
+}
+
+.help-callout__body > :first-child { margin-top: 0; }
+.help-callout__body > :last-child { margin-bottom: 0; }
+
+.help-callout--tip {
+    background: rgba(37, 99, 235, 0.08);
+    border-left-color: var(--color-primary);
+}
+.help-callout--tip .help-callout__icon { color: var(--color-primary); }
+
+.help-callout--info {
+    background: rgba(100, 116, 139, 0.1);
+    border-left-color: #64748b;
+}
+.help-callout--info .help-callout__icon { color: #64748b; }
+
+.help-callout--warning {
+    background: rgba(217, 119, 6, 0.1);
+    border-left-color: #d97706;
+}
+.help-callout--warning .help-callout__icon { color: #d97706; }
+
+.help-callout--important {
+    background: rgba(220, 38, 38, 0.09);
+    border-left-color: #dc2626;
+}
+.help-callout--important .help-callout__icon { color: #dc2626; }
+
+/* --- Accordion (detalles colapsables = menos texto visible) --- */
+.help-accordion {
+    margin: 1rem 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    overflow: hidden;
+}
+
+.help-accordion + .help-accordion {
+    margin-top: 8px;
+}
+
+.help-accordion__summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.help-accordion__summary::-webkit-details-marker { display: none; }
+
+.help-accordion__summary:hover {
+    background: var(--color-surface-alt);
+}
+
+.help-accordion__summary .help-accordion__chevron {
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    transition: transform 0.18s ease;
+}
+
+.help-accordion[open] .help-accordion__chevron {
+    transform: rotate(90deg);
+}
+
+.help-accordion__content {
+    padding: 0 14px 12px 14px;
+    font-size: 0.9rem;
+}
+
+.help-accordion__content > :first-child { margin-top: 0; }
+.help-accordion__content > :last-child { margin-bottom: 0; }
+
+/* --- Badges / pills (estados, roles) --- */
+.help-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.6;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.help-badge .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.help-flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 1rem 0;
+}
+
+.help-flow__arrow {
+    color: var(--color-text-secondary);
+    font-size: 18px;
+}
+
+/* --- Relacionados como tarjetas (en vez de lista de links) ---
+   ul.help-related para ganar a `.help-article__content ul` (sangría y viñetas). */
+ul.help-related {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.help-related a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.help-related a:hover {
+    border-color: var(--color-primary);
+    background: var(--color-surface-alt);
+}
+
+.help-related .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--color-primary);
+}
+
+/* --- Glosario: tarjetas de término en grilla (más escaneable que una lista) --- */
+.help-glossary {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 1rem 0 1.5rem;
+}
+
+.help-glossary__item {
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    padding: 14px 16px;
+}
+
+.help-glossary__term {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.help-glossary__term .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.help-glossary__def {
+    margin: 0;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.help-glossary__def code {
+    font-size: 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .help-lightbox,
+    .help-accordion__chevron {
+        transition: none;
+    }
+}

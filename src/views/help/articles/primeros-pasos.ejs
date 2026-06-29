@@ -1,37 +1,104 @@
-<h2>Bienvenida</h2>
-<p>LogiTrack es el sistema de gestión logística de tu operación. Al ingresar por primera vez verás un <strong>tour guiado</strong> que recorre las funciones principales de tu rol.</p>
-<p>Podés volver a verlo cuando quieras desde <strong>Centro de ayuda</strong> o desde el menú de usuario → <em>Ver tour de nuevo</em>.</p>
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Al ingresar por primera vez se abre un <strong>tour guiado</strong> de tu rol.</li>
+            <li>Te movés con el <strong>menú lateral</strong> y la <strong>barra superior</strong> (búsqueda, notificaciones y perfil).</li>
+            <li>Lo que ves en el menú depende de tu rol.</li>
+        </ul>
+    </div>
+</div>
 
-<h2>Navegación</h2>
+<h2>Bienvenida</h2>
+<p>LogiTrack es el sistema de gestión logística de tu operación. Al ingresar por primera vez verás un <strong>tour guiado</strong> que recorre las funciones principales de tu rol. Podés volver a verlo cuando quieras desde el <a href="/help">Centro de ayuda</a> → <em>Ver tour de nuevo</em>.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/primeros-pasos/01-inicio.png',
+    alt: 'Pantalla de inicio con el menú lateral a la izquierda y la barra superior arriba',
+    caption: 'Inicio: <b>menú lateral</b> (módulos según tu rol) y <b>barra superior</b> (búsqueda, notificaciones y perfil).'
+}) %>
+
+<h2>Cómo navegar</h2>
+<div class="help-flow">
+    <span class="help-badge"><span class="material-symbols-outlined">menu</span>Menú lateral</span>
+    <span class="help-badge"><span class="material-symbols-outlined">search</span>Búsqueda rápida</span>
+    <span class="help-badge"><span class="material-symbols-outlined">notifications</span>Notificaciones</span>
+    <span class="help-badge"><span class="material-symbols-outlined">dashboard</span>Panel general</span>
+</div>
 <ul>
     <li><strong>Menú lateral:</strong> acceso a todos los módulos según tu rol.</li>
     <li><strong>Barra superior:</strong> <a href="/help/busqueda-universal">búsqueda rápida</a>, <a href="/help/notificaciones">notificaciones</a> (campana) y tu perfil.</li>
-    <li><strong>Inicio / Panel general:</strong> resumen del día y accesos directos — ver <a href="/help/panel-general">Panel general</a>.</li>
+    <li><strong>Inicio:</strong> resumen del día y accesos directos — ver <a href="/help/panel-general">Panel general</a>.</li>
 </ul>
 
-<h2>Paso a paso</h2>
-<ol>
-    <li>Ingresá con tu usuario y contraseña. Si es tu primera vez, completá el tour inicial que se abre automáticamente.</li>
-    <li>Revisá el <a href="/home">Panel general</a> para ver el estado del día: envíos activos, entregas y alertas.</li>
-    <li>Usá el menú lateral para ir al módulo que necesites (envíos, ruteo, incidencias, etc.).</li>
-    <li>Probá la <a href="/help/busqueda-universal">búsqueda del header</a> escribiendo un código de <a href="/help/glosario">tracking</a> o nombre de destinatario.</li>
-    <li>Consultá el <a href="/help/glosario">glosario</a> si encontrás términos desconocidos (RETURN, fatiga, NPS, etc.).</li>
-    <li>Volvé al <a href="/help">Centro de ayuda</a> cuando necesites una guía de un módulo específico.</li>
+<%- include('../partials/figure', {
+    src: '/images/help/primeros-pasos/02-busqueda.png',
+    alt: 'Barra superior con la búsqueda rápida, la campana de notificaciones y el menú de perfil',
+    caption: 'La <b>búsqueda del header</b> te lleva directo a un envío, incidencia o ruta.'
+}) %>
+
+<h2>Tus primeros pasos</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Ingresá</p>
+        <div class="help-steps__text">Con tu usuario y contraseña. Si es tu primera vez, completá el tour inicial que se abre solo.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá el panel</p>
+        <div class="help-steps__text">El <a href="/home">Panel general</a> muestra el estado del día: envíos activos, entregas y alertas.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Entrá a tu módulo</p>
+        <div class="help-steps__text">Usá el menú lateral para ir a envíos, ruteo, incidencias, etc.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Probá la búsqueda</p>
+        <div class="help-steps__text">Escribí un código de <a href="/help/glosario">tracking</a> o un nombre de destinatario en la <a href="/help/busqueda-universal">búsqueda del header</a>.</div>
+    </li>
 </ol>
 
-<h2>Errores frecuentes</h2>
-<ul>
-    <li><strong>No veo ciertos módulos en el menú:</strong> el acceso depende de tu rol. Un repartidor ve Mi ruteo y entregas; un operador ve envíos e incidencias; el administrador ve todo.</li>
-    <li><strong>El tour no aparece:</strong> podés relanzarlo desde Centro de ayuda → <em>Ver tour de nuevo</em> o desde el menú de usuario.</li>
-    <li><strong>Me perdí en la navegación:</strong> usá la búsqueda del header o volvé a Inicio (<a href="/home">/home</a>) como punto de partida.</li>
-</ul>
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">lightbulb</span>
+    <div class="help-callout__body">¿Aparece un término desconocido (RETURN, fatiga, NPS…)? Consultá el <a href="/help/glosario">glosario</a>.</div>
+</div>
 
-<div class="help-tip">Tip: usá la búsqueda del header para ir directo a un envío, incidencia o ruta sin navegar menús.</div>
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No veo ciertos módulos en el menú
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El acceso depende de tu rol: un repartidor ve Mi ruteo y entregas; un operador ve envíos e incidencias; el administrador ve todo.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El tour no aparece
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Relanzalo desde el <a href="/help">Centro de ayuda</a> → <em>Ver tour de nuevo</em> o desde el menú de usuario.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Me perdí en la navegación
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Usá la búsqueda del header o volvé a <a href="/home">Inicio</a> como punto de partida.</p>
+    </div>
+</details>
 
 <h2>Artículos relacionados</h2>
-<ul>
-    <li><a href="/help/busqueda-universal">Búsqueda rápida</a></li>
-    <li><a href="/help/panel-general">Panel general (Inicio)</a></li>
-    <li><a href="/help/notificaciones">Notificaciones</a></li>
-    <li><a href="/help/glosario">Glosario</a></li>
+<ul class="help-related">
+    <li><a href="/help/busqueda-universal"><span class="material-symbols-outlined">search</span>Búsqueda rápida</a></li>
+    <li><a href="/help/panel-general"><span class="material-symbols-outlined">dashboard</span>Panel general</a></li>
+    <li><a href="/help/notificaciones"><span class="material-symbols-outlined">notifications</span>Notificaciones</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
 </ul>
