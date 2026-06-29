@@ -491,7 +491,9 @@ const createShipment = async (req, res) => {
             expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
-            statusId: body.requirePaymentFirst === 'true' ? Status.PENDING_PAYMENT.id : undefined,
+            // El alta manual siempre espera el cobro antes de avanzar; la carga
+            // masiva (CSV) no pasa por acá y no genera factura, así que no aplica.
+            statusId: Status.PENDING_PAYMENT.id,
         }, { transaction: t });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);

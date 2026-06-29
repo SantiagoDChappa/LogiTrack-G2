@@ -594,6 +594,12 @@
                             <small style="color:var(--color-text-secondary)">Días hábiles que el paquete queda disponible para retiro en la sucursal antes de volver al circuito de devolución. Se usa para estimar la ventana de retiro en el alta de envío.</small>
                         </div>
 
+                        <div class="field">
+                            <label for="horas_cancelacion_pago_pendiente">Cancelar si no se paga, después de (horas) <span class="req">*</span></label>
+                            <input type="number" id="horas_cancelacion_pago_pendiente" name="horas_cancelacion_pago_pendiente" min="1" max="720" step="1" value="<%= params.horas_cancelacion_pago_pendiente %>" required>
+                            <small style="color:var(--color-text-secondary)">Envíos con "Pago antes de despachar" que sigan sin cobrarse pasado este plazo se cancelan solos y se le avisa al cliente. Default: 48 horas.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">

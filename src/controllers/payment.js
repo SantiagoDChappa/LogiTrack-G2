@@ -70,15 +70,17 @@ const getCheckout = async (req, res) => {
     return renderCheckout(res, invoice);
 };
 
-// POST /pago/:token — confirma el pago simulado (efectivo/transferencia, o
-// mercadopago cuando MP no está configurado).
+// POST /pago/:token — confirma el pago simulado con Mercado Pago, solo cuando MP
+// no está configurado (si está configurado, se usa /pago/:token/mp en su lugar).
+// Efectivo y transferencia ya no se autoconfirman desde el link público: las
+// registra un operador desde el detalle del envío (ver postRegisterPayment),
+// para que quede constancia real de quién verificó el cobro.
 const postPay = async (req, res) => {
     const invoice = await invoiceService.getByToken(req.params.token);
     if (!invoice) {
         return res.status(404).render('payment/checkout', { invoice: null, layout: false });
     }
-    const method = ['mercadopago', 'efectivo', 'transferencia'].includes(req.body.method)
-        ? req.body.method : 'mercadopago';
+    const method = 'mercadopago';
     await invoiceService.markPaid(invoice, { method });
     await unlockShipmentIfPendingPayment(invoice.shipmentId, { method });
     return renderCheckout(res, invoice, { justPaid: true });

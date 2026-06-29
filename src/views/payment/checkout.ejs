@@ -20,12 +20,8 @@
         .amount-box .val { font-size:34px; font-weight:800; margin-top:4px; }
         .row { display:flex; justify-content:space-between; font-size:14px; padding:6px 0; color:var(--muted); }
         .row strong { color:var(--ink); }
-        .methods { display:flex; flex-direction:column; gap:10px; margin:18px 0; }
-        .method { display:flex; align-items:center; gap:10px; border:1.5px solid var(--border); border-radius:10px; padding:12px 14px; cursor:pointer; font-size:14px; }
-        .method input { accent-color:var(--mp); }
-        .method.sel { border-color:var(--mp); background:rgba(0,158,227,.06); }
         .btn { display:block; width:100%; text-align:center; border:none; border-radius:10px; padding:14px;
-            font-size:16px; font-weight:700; cursor:pointer; color:#fff; background:var(--mp); }
+            font-size:16px; font-weight:700; cursor:pointer; color:#fff; background:var(--mp); margin-top:18px; }
         .btn:hover { background:var(--mp-dark); }
         .note { margin-top:16px; font-size:12px; color:#94a3b8; text-align:center; }
         .badge { display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:13px;
@@ -78,40 +74,19 @@
                 <% } %>
 
                 <form method="POST" action="/pago/<%= invoice.payToken %><%= mpConfigured ? '/mp' : '' %>" id="checkout-form">
-                    <div class="methods" id="methods">
-                        <label class="method sel">
-                            <input type="radio" name="method" value="mercadopago" data-mp="<%= mpConfigured ? '1' : '0' %>" checked> Dinero en cuenta / Mercado Pago
-                        </label>
-                        <label class="method"><input type="radio" name="method" value="transferencia" data-mp="0"> Transferencia bancaria</label>
-                        <label class="method"><input type="radio" name="method" value="efectivo" data-mp="0"> Efectivo (pago fácil)</label>
-                    </div>
-                    <button type="submit" class="btn">Pagar <%= fmt(total) %></button>
+                    <button type="submit" class="btn">Pagar con Mercado Pago — <%= fmt(total) %></button>
                 </form>
                 <p class="note">
                     <% if (mpConfigured) { %>
-                        Mercado Pago te redirige a un entorno seguro para completar el pago. Transferencia y efectivo se confirman manualmente.
+                        Mercado Pago te redirige a un entorno seguro para completar el pago.
                     <% } else { %>
                         Pago simulado para fines de demostración. No se procesa dinero real.
                     <% } %>
+                    <br>¿Pagás en efectivo o por transferencia? Coordinalo con quien gestiona tu envío.
                 </p>
             <% } %>
         </div>
     <% } %>
     </div>
-    <script>
-        // Resalta el medio de pago seleccionado y, si es Mercado Pago real, manda
-        // el form al endpoint que crea la preferencia en vez del simulado.
-        const form = document.getElementById('checkout-form');
-        const baseAction = form ? form.getAttribute('action').replace(/\/mp$/, '') : null;
-        document.querySelectorAll('#methods .method').forEach((m) => {
-            m.addEventListener('click', () => {
-                document.querySelectorAll('#methods .method').forEach((x) => x.classList.remove('sel'));
-                m.classList.add('sel');
-                if (!form) { return; }
-                const usesRealMp = m.querySelector('input').dataset.mp === '1';
-                form.setAttribute('action', usesRealMp ? baseAction + '/mp' : baseAction);
-            });
-        });
-    </script>
 </body>
 </html>

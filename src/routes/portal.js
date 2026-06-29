@@ -4,6 +4,7 @@ const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
     getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta, getLiveChat, postLiveChat,
+    getCotizador, cotizarPublic, sucursalesCercanas,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -46,6 +47,16 @@ router.get('/track/:trackingId/eta',      getLiveEta);
 // Chat cliente ↔ repartidor del mapa en vivo (público, por tracking).
 router.get('/track/:trackingId/chat',     getLiveChat);
 router.post('/track/:trackingId/chat',    postLiveChat);
+
+// Cotizador público de envíos (estimación de costo sin login). No expone datos
+// personales (solo parámetros de tarifa). Mejora futura: rate-limit básico en el
+// POST para evitar scraping abusivo (hoy no hay middleware de rate-limit global).
+router.get('/portal/cotizar',          getCotizador);
+router.post('/portal/cotizar',         cotizarPublic);
+// Sucursales más cercanas a la ubicación del cliente (dónde despachar). Solo
+// expone datos de la empresa, no afecta la cotización.
+router.post('/portal/sucursales-cercanas', sucursalesCercanas);
+
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        optionalEvidence, createPublic);
 router.get('/portal/incident/confirm', confirmIncident);

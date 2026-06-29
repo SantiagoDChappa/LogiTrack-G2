@@ -122,6 +122,7 @@ const getSettings = async (req, res) => {
             seguro_pct:               settings.seguro_pct               || '0',
             recargo_zona_peligrosa_pct: settings.recargo_zona_peligrosa_pct || '0',
             dias_retencion_sucursal:    settings.dias_retencion_sucursal    || '10',
+            horas_cancelacion_pago_pendiente: settings.horas_cancelacion_pago_pendiente || '48',
             nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
             logo_empresa:             settings.logo_empresa             || '',
             telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
@@ -769,6 +770,7 @@ const saveParams = async (req, res) => {
             'seguro_pct',
             'recargo_zona_peligrosa_pct',
             'dias_retencion_sucursal',
+            'horas_cancelacion_pago_pendiente',
             // 'nombre_empresa' se gestiona en la tarjeta "Identidad visual" (/setting/identity) — LGT-172
             'telefono_soporte',
             'email_soporte',
@@ -828,6 +830,12 @@ const saveParams = async (req, res) => {
         const retencion = parseInt(req.body.dias_retencion_sucursal);
         if (isNaN(retencion) || retencion < 1 || retencion > 90) {
             return res.redirect(settingBack(req, '?error=dias_retencion_sucursal'));
+        }
+
+        // Horas sin pagar antes de cancelar automáticamente un envío "Pendiente de Pago".
+        const horasCancelacion = parseInt(req.body.horas_cancelacion_pago_pendiente);
+        if (isNaN(horasCancelacion) || horasCancelacion < 1 || horasCancelacion > 720) {
+            return res.redirect(settingBack(req, '?error=horas_cancelacion_pago_pendiente'));
         }
 
         const horaInicio = req.body.horario_entrega_inicio;
