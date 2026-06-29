@@ -50,6 +50,32 @@ const classifyTransport = (t) => {
     return { type, maxRangeKm: effectiveRange };
 };
 
+// Estrategias de optimización (LGT — selector de ruteo): el supervisor elige el objetivo.
+//   price    → menor costo total (fijo + $/km). Comportamiento por defecto.
+//   time     → menor tiempo: prioriza el vehículo más rápido y va directo (sin desvíos
+//              oportunistas), aunque cueste algo más.
+//   balanced → combina costo y tiempo (mitad y mitad, con un costo-hora de referencia).
+const STRATEGIES = new Set(['price', 'time', 'balanced']);
+const normalizeStrategy = (s) => (STRATEGIES.has(s) ? s : 'price');
+
+// Velocidad media por tipo de vehículo (km/h) para estimar tiempo de viaje. La distancia
+// de la ruta es la misma para cualquier transporte del cluster; el diferencial de tiempo
+// lo da la velocidad del vehículo.
+const AVG_SPEED_KMH = { 'moto': 45, 'van': 60, 'camion-chico': 55, 'camion-grande': 50 };
+const transportSpeedKmh = (t) => AVG_SPEED_KMH[classifyTransport(t).type] || 50;
+
+// Costo-hora de referencia para balancear $ vs tiempo en la estrategia 'balanced'.
+const BALANCED_HOUR_COST = 1000;
+
+// Puntaje de un transporte para una distancia de cluster, según la estrategia. Menor = mejor.
+const scoreTransport = (t, distKm, strategy) => {
+    const price  = num(t.fixedCost) + num(t.costPerKm) * distKm;
+    const travelH = distKm / transportSpeedKmh(t);
+    if (strategy === 'time')     { return travelH; }
+    if (strategy === 'balanced') { return price + travelH * BALANCED_HOUR_COST; }
+    return price; // 'price'
+};
+
 // Margen de seguridad: paramos a recargar al 85% de la autonomia para evitar quedar varados
 const AUTONOMY_SAFETY = 0.85;
 // Radio maximo razonable para desvio a sucursal de servicio (km)
@@ -97,14 +123,18 @@ const clusterMaxDistanceKm = (branch, cluster) => {
     return max;
 };
 
-const loadShipments = (shipmentIds, supervisorBranchId) => {
-    return Shipment.findAll({
+// ¿El envío debe entrar a una ruta? Domicilio: siempre. Retiro por sucursal: solo si
+// la sucursal de retiro es distinta a la sucursal actual (necesita transferencia). Si
+// ya está en su sucursal de retiro, está listo para que el cliente lo retire.
+const isRoutableShipment = (s) =>
+    s.deliveryMode !== 'branch_pickup' || (s.pickupBranchId && s.pickupBranchId !== s.currentBranchId);
+
+const loadShipments = async (shipmentIds, supervisorBranchId) => {
+    const rows = await Shipment.findAll({
         where: {
             id:              { [Op.in]: shipmentIds },
             statusId:        { [Op.in]: ROUTABLE_STATUS_IDS },
             currentBranchId: supervisorBranchId,
-            // Retiro por sucursal: el cliente lo retira en la sucursal, no se rutea a domicilio.
-            deliveryMode:    { [Op.ne]: 'branch_pickup' },
         },
         include: [
             { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province', required: false }] },
@@ -112,6 +142,10 @@ const loadShipments = (shipmentIds, supervisorBranchId) => {
             { model: Person,  as: 'recipient', required: false },
         ],
     });
+    // Retiro por sucursal: el destino es la sucursal de retiro (address ya apunta a ella).
+    // Se rutea como una entrega cuya parada es la sucursal; al completarla queda en
+    // sucursal para que el cliente la retire (no es una entrega a domicilio).
+    return rows.filter(isRoutableShipment);
 };
 
 const loadEnabledTransportsForBranch = async (branchId) => {
@@ -228,12 +262,14 @@ const clusterByProvince = (shipments, mergeRadiusKm) => {
 // si no entra, parte el cluster y usa multiples.
 const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) => {
     const urgentCombine = options.urgentCombine || { enabled: false, maxKm: 0 };
+    const strategy = normalizeStrategy(options.strategy);
     const sortedShipments = [...cluster.shipments].sort((a, b) => num(b.weightKg) - num(a.weightKg));
     // Filtra transportes elegibles para alguna zona del cluster (al menos uno)
     const zoneIds = [...new Set(cluster.shipments.map(s => s.zoneId).filter(Boolean))];
     const zoneEligible = availableTx.filter(t => zoneIds.length === 0 || !t.zones?.length || zoneIds.some(z => t.zones.some(tz => tz.id === z)));
     const rangeEligible = zoneEligible.filter(t => classifyTransport(t).maxRangeKm >= distKm);
-    const candidates = rangeEligible.sort((a, b) => (num(a.fixedCost) + num(a.costPerKm)) - (num(b.fixedCost) + num(b.costPerKm)));
+    // Selección del vehículo según la estrategia elegida (precio / tiempo / balanceado).
+    const candidates = rangeEligible.sort((a, b) => scoreTransport(a, distKm, strategy) - scoreTransport(b, distKm, strategy));
 
     if (candidates.length === 0) {
         const zoneNames = [...new Set(cluster.shipments.map(s => s.zone?.name).filter(Boolean))].join(', ');
@@ -1229,7 +1265,8 @@ const loadFuelMultiplier = async () => {
     } catch { globalThis.__fuelMultiplier = 1; }
 };
 
-const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTransportIds = [] }) => {
+const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTransportIds = [], strategy = 'price' }) => {
+    const objective = normalizeStrategy(strategy);
     await loadFuelMultiplier();
     if (!shipmentIds?.length) { return { proposals: [], unassigned: [], rejected: [] }; }
 
@@ -1389,11 +1426,14 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
         }
         const distKm = clusterMaxDistanceKm(branch, cluster);
         cluster.maxDistanceKm = distKm;
-        const { buckets, unassigned: clUn } = assignClusterToTransports(cluster, available, distKm, { urgentCombine });
+        const { buckets, unassigned: clUn } = assignClusterToTransports(cluster, available, distKm, { urgentCombine, strategy: objective });
         unassigned.push(...clUn);
         for (const bucket of buckets) {
             usedTxIds.add(bucket.transport.id);
-            await enrichBucketWithOpportunisticPickups({ bucket, branch, cluster, thresholds: piggySettings });
+            // Estrategia 'time' = ruta directa, sin desvíos oportunistas (priorizar tiempo).
+            if (objective !== 'time') {
+                await enrichBucketWithOpportunisticPickups({ bucket, branch, cluster, thresholds: piggySettings });
+            }
             const proposal = await buildProposal({ bucket, branch, cluster });
             proposals.push(proposal);
         }
@@ -1416,6 +1456,7 @@ const optimizeRoutes = async ({ shipmentIds, supervisorBranchId, excludeTranspor
     const totalAssigned = allProposals.reduce((a, p) => a + (p.shipmentIds?.length || 0), 0);
 
     const summary = {
+        strategy: objective,
         totalShipments: shipmentIds.length,
         validShipments: validShipments.length + piggybackProposals.reduce((a, p) => a + (p.addedShipmentIds?.length || 0), 0),
         assignedCount: totalAssigned,

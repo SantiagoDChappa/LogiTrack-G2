@@ -5,7 +5,8 @@
     <title>Mi Ruta - LogiTrack</title>
     <meta name="theme-color" content="#2563eb">
     <script src="/js/fatigue-reaction-scorer.js" defer></script>
-    <script src="/js/fatigue-driver.js" defer></script>
+    <%# BUG-33 — quitado fatigue-driver.js: wrapper global de fetch redundante con el gate
+        inline de esta página; reabría la prueba ante cualquier 409 de /start (doble gate). %>
     <link rel="stylesheet" href="/css/shipments.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -676,6 +677,9 @@
             <ol class="stops-list" id="stops-list">
                 <% (route.stops || []).forEach((s) => {
                     const isPickup = s.stopType === 'pickup';
+                    // Retiro por sucursal: parada de entrega con branchId = dejar el paquete en
+                    // la sucursal de retiro (no es entrega a domicilio, no requiere POD).
+                    const isBranchDrop = !isPickup && !!s.branchId && !!s.shipment;
                     const recipientPhone = s.shipment && s.shipment.recipient ? s.shipment.recipient.phone : null;
                     const trackingId = s.shipment ? s.shipment.trackingId : null;
                     const sh = s.shipment || {};
@@ -686,6 +690,7 @@
                         data-stop-id="<%= s.id %>"
                         data-stop-seq="<%= s.sequence %>"
                         data-stop-type="<%= s.stopType %>"
+                        data-branch-drop="<%= isBranchDrop ? '1' : '0' %>"
                         data-skipped="<%= s.skipped ? '1' : '0' %>"
                         data-est-min="<%= s.estimatedMinutes || 5 %>"
                         data-lat="<%= s.lat %>"
@@ -701,7 +706,7 @@
                                 <% } else { %>
                                     <div class="stop-tracking"><%= trackingId || 'Entrega' %></div>
                                     <div class="stop-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                                        Entrega
+                                        <%= isBranchDrop ? 'Dejar en sucursal' : 'Entrega' %>
                                         <span class="status-badge amber js-status-badge">En camino</span>
                                     </div>
                                 <% } %>
@@ -763,6 +768,10 @@
                                 <% if (isPickup) { %>
                                     <button class="btn-ui btn-pickup-cta" data-action="pickup-confirmed" data-stop-id="<%= s.id %>" style="width:100%">
                                         <span class="material-symbols-outlined">inventory_2</span>Confirmar pickup
+                                    </button>
+                                <% } else if (isBranchDrop) { %>
+                                    <button class="btn-ui btn-pickup-cta" data-action="drop-at-branch" data-stop-id="<%= s.id %>" style="width:100%">
+                                        <span class="material-symbols-outlined">store</span>Dejar en sucursal
                                     </button>
                                 <% } else { %>
                                     <% if (s.shipment) { %>
@@ -1810,14 +1819,35 @@
             </div>`;
     }
 
+    // BUG-32 — aviso no bloqueante cuando no hay conexión para correr el gate de fatiga.
+    // La ruta queda visible en modo lectura; el control se difiere hasta recuperar señal.
+    let fatigueOfflineShown = false;
+    function notifyFatigueOffline() {
+        hideRouteLoader();
+        if (fatigueOfflineShown) { return; }
+        fatigueOfflineShown = true;
+        const b = document.createElement('div');
+        b.id = 'fatigue-offline-banner';
+        b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#b45309;color:#fff;' +
+            'padding:10px 14px;font:600 .9rem system-ui,sans-serif;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+        b.textContent = '📴 Sin conexión: el control de fatiga y el inicio de ruta se harán al recuperar señal.';
+        document.body.appendChild(b);
+        window.addEventListener('online', () => { b.remove(); fatigueOfflineShown = false; }, { once: true });
+    }
+
     // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
     async function startWithFatigue() {
+        // BUG-32 — sin conexión no se puede correr el gate ni persistir el inicio en el
+        // server; abortamos sin recargar (evita el bucle) y diferimos hasta que vuelva online.
+        if (!navigator.onLine) { notifyFatigueOffline(); return; }
         // Bloquea la ruta mientras se carga la config y se resuelve el gate (no se puede operar antes).
         showRouteLoader('Preparando control de fatiga…');
         const cfg = await getFatigueCfg();
         if (!cfg.enabled) {
-            await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).catch(() => {});
-            window.location.reload();
+            // Sólo recargamos si el inicio se persistió en el server; si falló (offline/
+            // error) NO recargamos para no reentrar en bucle: avisamos y diferimos.
+            const ok = await fetch(`/delivery/route/${routeId}/start`, { method: 'POST' }).then(r => r.ok).catch(() => false);
+            if (ok) { window.location.reload(); } else { notifyFatigueOffline(); }
             return;
         }
         hideRouteLoader();
@@ -2059,8 +2089,16 @@
     }
 
     // Inicia ruta con gate de fatiga si aún no se inició (sólo modo activo).
+    // BUG-32 — startWithFatigue() se autoprotege offline (difiere sin recargar). Si
+    // entramos sin conexión, reintentamos una vez cuando vuelva la señal.
     if (!routeStarted && !readOnly) {
         startWithFatigue();
+        if (!navigator.onLine) {
+            window.addEventListener('online', function onBack() {
+                window.removeEventListener('online', onBack);
+                startWithFatigue();
+            });
+        }
     } else if (routeStarted && !readOnly) {
         getFatigueCfg().then(cfg => { if (cfg.enabled) { mountRecheckWidget(); } });
     }
@@ -2115,7 +2153,8 @@
                     } else if (shipStatus === 9) {
                         badge.classList.add('red'); badge.textContent = 'Intento fallido';
                     } else if (shipStatus === 3) {
-                        badge.classList.add('blue'); badge.textContent = 'Devuelto a sucursal';
+                        badge.classList.add('blue');
+                        badge.textContent = r.dataset.branchDrop === '1' ? 'Dejado en sucursal' : 'Devuelto a sucursal';
                     } else if (shipStatus === 5) {
                         badge.classList.add('red'); badge.textContent = 'Cancelado';
                     } else if (shipStatus === 8) {
@@ -2212,6 +2251,7 @@
         row.classList.add('completed');
         row.dataset.skipped = '0';
         if (kind === 'failed') row.dataset.shipStatus = '9';
+        else if (kind === 'branch-dropped') row.dataset.shipStatus = '3';
         else if (kind === 'delivered') row.dataset.shipStatus = '4';
         const actions = row.querySelector('.stop-actions'); if (actions) actions.remove();
         const lock = row.querySelector('.lock-msg'); if (lock) lock.remove();
@@ -2431,6 +2471,25 @@
         if (action === 'pickup-confirmed') {
             const r = await post(`${baseUrl}/pickup-confirmed`, geo);
             if (r) markStopDone(stopId, 'pickup-done');
+            return;
+        }
+        if (action === 'drop-at-branch') {
+            const c = await Swal.fire({
+                icon: 'question', title: '¿Dejar en sucursal?',
+                text: 'El paquete queda disponible para que el cliente lo retire en la sucursal.',
+                showCancelButton: true, confirmButtonText: 'Sí, dejar en sucursal',
+                confirmButtonColor: '#16a34a',
+            });
+            if (!c.isConfirmed) return;
+            const r = await post(`${baseUrl}/drop-at-branch`, geo);
+            if (r) {
+                markStopDone(stopId, 'branch-dropped');
+                Swal.fire({
+                    icon: 'success', title: 'Dejado en sucursal',
+                    html: `<b>${r.trackingId || 'Envío'}</b> quedó en <b>${r.branchName || 'la sucursal'}</b> para retiro del cliente.`,
+                    confirmButtonColor: '#16a34a', timer: 4000, timerProgressBar: true,
+                });
+            }
             return;
         }
     });

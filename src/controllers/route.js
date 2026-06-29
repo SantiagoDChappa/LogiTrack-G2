@@ -44,13 +44,11 @@ const optimizeForm = async (req, res) => {
 
     const { Transport } = require('../models/transport');
     const { User } = require('../models/user');
-    const [shipments, transports] = await Promise.all([
+    const [shipmentsRaw, transports] = await Promise.all([
         Shipment.findAll({
             where: {
                 statusId: { [Op.in]: [StatusEnum.PENDING.id, StatusEnum.AT_BRANCH.id, StatusEnum.IN_PREPARATION.id] },
                 currentBranchId: branchId,
-                // Retiro por sucursal: el cliente lo retira en la sucursal → no es candidato a ruta de reparto.
-                deliveryMode: { [Op.ne]: 'branch_pickup' },
             },
             include: [
                 { model: Address, as: 'address', required: false },
@@ -68,6 +66,12 @@ const optimizeForm = async (req, res) => {
             order: [['name', 'ASC']],
         }),
     ]);
+
+    // Retiro por sucursal: candidato a ruta solo si hay que transferirlo a OTRA sucursal
+    // de retiro. Si ya está en su sucursal de retiro, está listo para que el cliente lo
+    // retire (no se rutea). El destino del envío es la sucursal (address = sucursal).
+    const shipments = shipmentsRaw.filter(s =>
+        s.deliveryMode !== 'branch_pickup' || (s.pickupBranchId && s.pickupBranchId !== branchId));
 
     const activeRoutes = await Route.findAll({
         where: {
@@ -117,9 +121,10 @@ const previewOptimization = async (req, res) => {
         return res.status(400).json({ error: 'Debe seleccionar al menos un envío' });
     }
     const excludeTransportIds = [].concat(req.body.excludeTransportIds || []).map(Number).filter(Boolean);
+    const strategy = req.body.strategy; // 'price' | 'time' | 'balanced' (el optimizer valida)
 
     const result = await optimizer.optimizeRoutes({
-        shipmentIds, supervisorBranchId: branchId, excludeTransportIds,
+        shipmentIds, supervisorBranchId: branchId, excludeTransportIds, strategy,
     });
     res.json(result);
 };
@@ -176,6 +181,19 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
     }, { transaction: t });
 
     const stops = (p.stops || []);
+    // Retiro por sucursal: para las entregas cuya modalidad es branch_pickup guardamos
+    // branchId = sucursal de retiro. Así la parada se distingue como "dejar en sucursal"
+    // (al completarla el envío queda en sucursal para retiro, no entregado a domicilio).
+    const deliveryShipmentIds = stops.filter(s => s.stopType !== 'pickup' && s.stopType !== 'service' && s.shipmentId).map(s => s.shipmentId);
+    const pickupBranchByShipment = new Map();
+    if (deliveryShipmentIds.length > 0) {
+        const ships = await Shipment.findAll({
+            where: { id: { [Op.in]: deliveryShipmentIds }, deliveryMode: 'branch_pickup' },
+            attributes: ['id', 'pickupBranchId'],
+            transaction: t,
+        });
+        for (const sh of ships) { pickupBranchByShipment.set(sh.id, sh.pickupBranchId); }
+    }
     for (const s of stops) {
         if (s.stopType === 'pickup') {
             await RouteStop.create({
@@ -194,7 +212,7 @@ const persistProposal = async ({ p, branchId, actor, t }) => {
         } else {
             await RouteStop.create({
                 routeId: route.id, sequence: s.sequence, stopType: 'delivery',
-                branchId: null, shipmentId: s.shipmentId,
+                branchId: pickupBranchByShipment.get(s.shipmentId) || null, shipmentId: s.shipmentId,
                 lat: s.lat, lng: s.lng,
                 distanceFromPrevKm: s.distanceFromPrevKm || 0,
             }, { transaction: t });

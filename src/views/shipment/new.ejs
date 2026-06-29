@@ -365,16 +365,19 @@
 
             function update() {
                 if (!select.value) {
-                    setBox('empty', '<span class="material-symbols-outlined" style="font-size:1rem">schedule</span> Elegí una sucursal para estimar la ventana de retiro.');
+                    setBox('empty', '<span class="material-symbols-outlined" style="font-size:1rem">schedule</span>' +
+                        '<span class="pickup-info-text">Elegí una sucursal para estimar la ventana de retiro.</span>');
                     return;
                 }
                 const arrival = addBusinessDays(new Date(), LEAD_PICKUP_DAYS);
                 const until   = addBusinessDays(arrival, retentionDays);
                 setBox('valid',
-                    '<span class="material-symbols-outlined" style="font-size:1rem">storefront</span> ' +
+                    '<span class="material-symbols-outlined" style="font-size:1rem">storefront</span>' +
+                    '<span class="pickup-info-text">' +
                     'Disponible para retiro <strong>desde el ' + fmt(arrival) + '</strong>, ' +
                     'durante <strong>' + retentionDays + ' días hábiles</strong> (hasta el <strong>' + fmt(until) + '</strong>). ' +
-                    'Pasado ese plazo, el paquete vuelve al circuito de devolución.');
+                    'Pasado ese plazo, el paquete vuelve al circuito de devolución.' +
+                    '</span>');
             }
 
             select.addEventListener('change', update);

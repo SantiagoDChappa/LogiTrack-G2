@@ -314,6 +314,14 @@ html[data-theme="dark"] {
     border: 1px solid transparent;
 }
 
+/* Cartel de ventana de retiro: hereda display:flex del .addr-validation-box de
+   shipments.css. Con texto multilínea (varios <strong>) el flex apilaba cada
+   fragmento en columnas; envolvemos el texto en .pickup-info-text (un solo hijo
+   flex) y alineamos el ícono arriba para que fluya como párrafo. */
+#pickup-info { align-items: flex-start; }
+#pickup-info .material-symbols-outlined { flex-shrink: 0; margin-top: 2px; }
+#pickup-info .pickup-info-text { flex: 1 1 auto; line-height: 1.5; }
+
 .addr-validation-box--empty {
     background: var(--shp-surface-alt);
     border-color: var(--shp-border-soft);
