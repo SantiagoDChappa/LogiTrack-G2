@@ -60,7 +60,7 @@ async function fallbackDeliveryNav() {
 }
 
 function isAsset(url) {
-    return /\.(css|js|png|jpg|jpeg|svg|ico|woff2?)$/.test(url.pathname)
+    return /\.(css|js|png|jpg|jpeg|webp|svg|ico|woff2?)$/.test(url.pathname)
         || url.host.includes('unpkg.com')
         || url.host.includes('jsdelivr.net')
         || url.host.includes('fonts.googleapis.com')

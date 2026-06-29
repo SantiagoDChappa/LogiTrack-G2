@@ -1,44 +1,111 @@
-<h2>Listado y detalle</h2>
-<p>En <a href="/shipment">Envíos</a> ves todos los envíos de tu alcance. Cada fila muestra <a href="/help/glosario">tracking</a>, destinatario, estado y sucursal.</p>
-<p>El <strong>detalle</strong> de un envío incluye historial de estados, datos del paquete, dirección, incidencias asociadas y acciones según el estado actual.</p>
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>En <a href="/shipment">Envíos</a> ves y filtrás todos los envíos de tu alcance.</li>
+            <li>Creás un envío en pocos pasos y el sistema genera un <a href="/help/glosario">tracking</a> único.</li>
+            <li>Cada envío avanza por estados; tu rol define qué transiciones podés hacer.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>El listado de envíos</h2>
+<p>Cada fila muestra tracking, destinatario, estado y sucursal. Al hacer click se abre el <strong>detalle</strong> con el historial de estados, datos del paquete e incidencias asociadas.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/envios/01-listado.png',
+    alt: 'Listado de envíos con sus columnas de tracking, destinatario, estado y sucursal',
+    caption: 'Listado de envíos: filtrá por estado, sucursal o fecha y hacé click en una fila para ver el detalle.'
+}) %>
 
 <h2>Crear un envío</h2>
-<ol>
-    <li>Ir a <a href="/shipment/new">Crear envío</a>.</li>
-    <li>Completar remitente, destinatario y dirección (el sistema sugiere CP y valida la dirección).</li>
-    <li>Elegir tipo de envío, prioridad y sucursal de origen.</li>
-    <li>Guardar — se genera un código de tracking único.</li>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Abrí el alta</p>
+        <div class="help-steps__text">Entrá a <a href="/shipment/new">Crear envío</a>.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Completá los datos</p>
+        <div class="help-steps__text">Remitente, destinatario y dirección. El sistema sugiere el CP y valida la dirección.</div>
+        <%- include('../partials/figure', {
+            src: '/images/help/envios/02-crear.png',
+            alt: 'Formulario de creación de envío con los campos de remitente, destinatario y dirección',
+            caption: 'Formulario de alta: los campos obligatorios están marcados.'
+        }) %>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Elegí tipo y origen</p>
+        <div class="help-steps__text">Tipo de envío, prioridad y sucursal de origen.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Guardá</p>
+        <div class="help-steps__text">Se genera un código de <a href="/help/glosario">tracking</a> único.</div>
+    </li>
 </ol>
 
-<h2>Estados</h2>
-<p>Los envíos avanzan por estados (Pendiente → En preparación → Asignado → En tránsito → Entregado, etc.). Solo ciertas transiciones están permitidas según el rol y el contexto operativo.</p>
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">lightbulb</span>
+    <div class="help-callout__body">Para carga masiva no hace falta repetir el alta: usá <a href="/help/import-csv">Importar CSV</a>.</div>
+</div>
 
-<h2>Tour contextual</h2>
-<p>En la pantalla de Envíos verás un ícono <strong>tour</strong> en la barra superior. Usalo para un recorrido guiado por el listado, filtros y acciones principales.</p>
+<h2>Estados de un envío</h2>
+<p>Los envíos avanzan por estos estados. Solo ciertas transiciones están permitidas según tu rol y el contexto operativo:</p>
 
-<h2>Paso a paso</h2>
-<ol>
-    <li>Entrá a <a href="/shipment">Envíos</a> desde el menú lateral.</li>
-    <li>Filtrá por estado, sucursal o fecha si necesitás acotar la lista.</li>
-    <li>Hacé click en una fila para abrir el detalle con historial e incidencias vinculadas.</li>
-    <li>Para alta individual, usá <a href="/shipment/new">Crear envío</a>; para carga masiva, consultá <a href="/help/import-csv">Importar CSV</a>.</li>
-    <li>Cuando el envío esté listo, pasalo a ruteo desde <a href="/help/ruteo">Ruteo</a> o visualizalo en el <a href="/help/kanban">Kanban</a>.</li>
-</ol>
+<div class="help-flow">
+    <span class="help-badge"><span class="material-symbols-outlined">schedule</span>Pendiente</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">inventory_2</span>En preparación</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">assignment_ind</span>Asignado</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">local_shipping</span>En tránsito</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">check_circle</span>Entregado</span>
+</div>
 
-<h2>Errores frecuentes</h2>
-<ul>
-    <li><strong>No puedo cambiar el estado:</strong> la transición puede no estar permitida para tu rol o el estado actual del envío (ej. ya Entregado).</li>
-    <li><strong>La dirección no valida:</strong> completá calle, altura y código postal; el sistema sugiere normalización pero requiere datos mínimos.</li>
-    <li><strong>No encuentro un envío antiguo:</strong> los envíos finalizados pueden identificarse con prefijo <a href="/help/glosario">HIST-</a>; los activos con <a href="/help/glosario">IENV-</a>. Usá la búsqueda del header.</li>
-</ul>
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">tour</span>
+    <div class="help-callout__body">En la pantalla de Envíos tenés un ícono <strong>tour</strong> en la barra superior para un recorrido guiado por el listado, filtros y acciones.</div>
+</div>
 
-<div class="help-tip">Usá la búsqueda del header si conocés el código de tracking o el nombre del destinatario.</div>
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No puedo cambiar el estado
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>La transición puede no estar permitida para tu rol o para el estado actual del envío (por ejemplo, si ya está <em>Entregado</em>).</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        La dirección no valida
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Completá calle, altura y código postal. El sistema sugiere la normalización, pero necesita esos datos mínimos.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No encuentro un envío antiguo
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Los envíos finalizados se identifican con el prefijo <a href="/help/glosario">HIST-</a> y los activos con <a href="/help/glosario">IENV-</a>. Usá la búsqueda del header con el tracking o el nombre del destinatario.</p>
+    </div>
+</details>
 
 <h2>Artículos relacionados</h2>
-<ul>
-    <li><a href="/help/kanban">Tablero Kanban</a></li>
-    <li><a href="/help/ruteo">Ruteo y optimización</a></li>
-    <li><a href="/help/import-csv">Importar envíos por CSV</a></li>
-    <li><a href="/help/incidencias">Incidencias operativas</a></li>
-    <li><a href="/help/glosario">Glosario</a></li>
+<ul class="help-related">
+    <li><a href="/help/kanban"><span class="material-symbols-outlined">view_kanban</span>Tablero Kanban</a></li>
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/import-csv"><span class="material-symbols-outlined">upload_file</span>Importar por CSV</a></li>
+    <li><a href="/help/incidencias"><span class="material-symbols-outlined">report</span>Incidencias</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
 </ul>

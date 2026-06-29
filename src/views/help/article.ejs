@@ -29,7 +29,11 @@
                 </header>
 
                 <div class="help-article__content">
-                    <%- include('articles/' + article.partial) %>
+                    <% if (typeof articleHtml !== 'undefined' && articleHtml) { %>
+                        <%- articleHtml %>
+                    <% } else { %>
+                        <%- include('articles/' + article.partial) %>
+                    <% } %>
                 </div>
 
                 <footer class="help-article__footer">
@@ -43,5 +47,6 @@
     </main>
     <script src="/js/theme.js?v=<%= assetVersion %>" defer></script>
     <script src="/js/ui.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/help.js?v=<%= assetVersion %>" defer></script>
 </body>
 </html>

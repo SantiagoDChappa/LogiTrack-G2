@@ -9,6 +9,8 @@ server/.env
 # Logs
 *.log
 *.png
+# Capturas del centro de ayuda: se versionan a propósito (el manual las referencia)
+!public/images/help/**/*.png
 npm-debug.log*
 CLAUDE.MD
 
