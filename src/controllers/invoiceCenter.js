@@ -9,11 +9,13 @@ const branchModel = require('../models/branch');
 
 const PAY_STATUS_LABELS = { PENDIENTE: 'Pendiente de cobro', PAGADA: 'Cobrada', ANULADA: 'Anulada' };
 
-const buildInvoiceCenterData = async (query) => {
+const buildInvoiceCenterData = async (query, viewer) => {
+    const isAdmin = viewer?.roleId === 4;
     const from = query.from || '';
     const to = query.to || '';
     const payStatus = query.payStatus || '';
-    const branchId = query.branchId || '';
+    // Supervisor: forzado a su propia sucursal, no puede ver las demás.
+    const branchId = isAdmin ? (query.branchId || '') : String(viewer?.branchId || '');
     const q = String(query.q || '').trim();
 
     const where = {};
@@ -69,17 +71,17 @@ const buildInvoiceCenterData = async (query) => {
             || r.number.toLowerCase().includes(qLower));
     }
 
-    return { rows, branches, filters: { from, to, payStatus, branchId, q } };
+    return { rows, branches, filters: { from, to, payStatus, branchId, q }, isAdmin };
 };
 
 const getInvoiceCenter = async (req, res) => {
-    const data = await buildInvoiceCenterData(req.query);
+    const data = await buildInvoiceCenterData(req.query, res.locals.currentUser);
     res.render('report/invoices', { ...data, payStatusOptions: PAY_STATUS_LABELS });
 };
 
 const exportInvoiceCenter = async (req, res) => {
     try {
-        const data = await buildInvoiceCenterData(req.query);
+        const data = await buildInvoiceCenterData(req.query, res.locals.currentUser);
         const rows = [['Factura', 'Envío', 'Cliente', 'Documento', 'Sucursal', 'Monto', 'Estado', 'Medio de pago', 'Fecha', 'Fecha de pago']];
         for (const r of data.rows) {
             rows.push([

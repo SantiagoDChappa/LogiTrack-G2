@@ -39,12 +39,16 @@
                         </div>
                         <div class="filter-field">
                             <label for="branchId">Sucursal</label>
+                            <% if (isAdmin) { %>
                             <select id="branchId" name="branchId">
                                 <option value="">Todas</option>
                                 <% branches.forEach(b => { %>
                                 <option value="<%= b.id %>" <%= Number(filters.branchId) === b.id ? 'selected' : '' %>><%= b.name %></option>
                                 <% }) %>
                             </select>
+                            <% } else { %>
+                            <input type="text" value="<%= (branches.find(b => b.id === Number(filters.branchId)) || {}).name || 'Tu sucursal' %>" disabled>
+                            <% } %>
                         </div>
                         <div class="filter-field">
                             <label for="q">Cliente / envío / N° factura</label>
