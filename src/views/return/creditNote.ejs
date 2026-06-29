@@ -71,9 +71,16 @@
                         <% if (breakdown.wSurcharge) { %><tr><td>Adicional por peso</td><td class="text-right"><%= fmtMoney(breakdown.wSurcharge) %></td></tr><% } %>
                         <% if (breakdown.vSurcharge) { %><tr><td>Adicional por volumen</td><td class="text-right"><%= fmtMoney(breakdown.vSurcharge) %></td></tr><% } %>
                         <% if (breakdown.insurance) { %><tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(breakdown.insurance) %></td></tr><% } %>
-                    <% } else if (cn.insuranceAmount && Number(cn.insuranceAmount) > 0) { %>
-                        <tr><td>Servicio de envío</td><td class="text-right"><%= fmtMoney(subtotal - Number(cn.insuranceAmount)) %></td></tr>
-                        <tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(cn.insuranceAmount) %></td></tr>
+                        <% if (breakdown.distanceSurcharge) { %><tr><td>Recargo distancia<% if (breakdown.distanceKm) { %> (<%= breakdown.distanceKm %> km)<% } %></td><td class="text-right"><%= fmtMoney(breakdown.distanceSurcharge) %></td></tr><% } %>
+                        <% if (breakdown.expressSurcharge) { %><tr><td>Recargo Express</td><td class="text-right"><%= fmtMoney(breakdown.expressSurcharge) %></td></tr><% } %>
+                        <% if (breakdown.fragileSurcharge) { %><tr><td>Recargo frágil</td><td class="text-right"><%= fmtMoney(breakdown.fragileSurcharge) %></td></tr><% } %>
+                    <% } else if ((Number(cn.insuranceAmount) || 0) + (Number(cn.distanceSurcharge) || 0) + (Number(cn.expressSurcharge) || 0) + (Number(cn.fragileSurcharge) || 0) > 0) { %>
+                        <% const _itemized = (Number(cn.insuranceAmount) || 0) + (Number(cn.distanceSurcharge) || 0) + (Number(cn.expressSurcharge) || 0) + (Number(cn.fragileSurcharge) || 0); %>
+                        <tr><td>Servicio de envío</td><td class="text-right"><%= fmtMoney(subtotal - _itemized) %></td></tr>
+                        <% if (Number(cn.insuranceAmount)) { %><tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(cn.insuranceAmount) %></td></tr><% } %>
+                        <% if (Number(cn.distanceSurcharge)) { %><tr><td>Recargo distancia<% if (cn.distanceKm) { %> (<%= cn.distanceKm %> km)<% } %></td><td class="text-right"><%= fmtMoney(cn.distanceSurcharge) %></td></tr><% } %>
+                        <% if (Number(cn.expressSurcharge)) { %><tr><td>Recargo Express</td><td class="text-right"><%= fmtMoney(cn.expressSurcharge) %></td></tr><% } %>
+                        <% if (Number(cn.fragileSurcharge)) { %><tr><td>Recargo frágil</td><td class="text-right"><%= fmtMoney(cn.fragileSurcharge) %></td></tr><% } %>
                     <% } else { %>
                         <tr><td>Servicio de envío</td><td class="text-right"><%= fmtMoney(subtotal) %></td></tr>
                     <% } %>

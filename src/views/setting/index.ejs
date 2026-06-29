@@ -582,6 +582,24 @@
                             <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
                         </div>
 
+        <div class="field">
+                            <label for="costo_por_km">Costo por km de distancia ($) <span class="req">*</span></label>
+                            <input type="number" id="costo_por_km" name="costo_por_km" min="0" max="9999" step="0.01" value="<%= params.costo_por_km %>" required>
+                            <small style="color:var(--color-text-secondary)">Se multiplica por la distancia en línea recta entre la sucursal de origen y el destino. 0 = sin recargo por distancia.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_express_pct">Recargo envío Express (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_express_pct" name="recargo_express_pct" min="0" max="500" step="0.01" value="<%= params.recargo_express_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra para envíos de tipo "Express". 0 = sin recargo.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_fragil_pct">Recargo paquete frágil (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_fragil_pct" name="recargo_fragil_pct" min="0" max="500" step="0.01" value="<%= params.recargo_fragil_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el envío se marca como "Paquete frágil". 0 = sin recargo.</small>
+                        </div>
+
                         <div class="field">
                             <label for="recargo_zona_peligrosa_pct">Recargo zona peligrosa (%) <span class="req">*</span></label>
                             <input type="number" id="recargo_zona_peligrosa_pct" name="recargo_zona_peligrosa_pct" min="0" max="500" step="0.01" value="<%= params.recargo_zona_peligrosa_pct %>" required>
@@ -730,6 +748,69 @@
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
             <% } %>
+
+            <% if (activeSection === 'cobros') { %>
+            <!-- Card: Configuración de cobros (CBU/alias de la empresa + medios habilitados) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">account_balance</span>
+                    Configuración de cobros
+                </h2>
+                <p class="settings-subtitle">
+                    Datos bancarios de la empresa (referencia interna para el operador/supervisor al coordinar una transferencia) y qué medios de pago están habilitados.
+                </p>
+                <form method="POST" action="/setting/cobros">
+                    <input type="hidden" name="_section" value="cobros">
+                    <div class="settings-addr">
+                        <div class="field">
+                            <label for="cbu_empresa">CBU</label>
+                            <input type="text" id="cbu_empresa" name="cbu_empresa" maxlength="30" value="<%= params.cbu_empresa %>" placeholder="0000000000000000000000">
+                        </div>
+                        <div class="field">
+                            <label for="alias_empresa">Alias</label>
+                            <input type="text" id="alias_empresa" name="alias_empresa" maxlength="40" value="<%= params.alias_empresa %>" placeholder="mi.empresa.cobros">
+                        </div>
+                        <div class="field">
+                            <label for="titular_empresa">Titular</label>
+                            <input type="text" id="titular_empresa" name="titular_empresa" maxlength="120" value="<%= params.titular_empresa %>">
+                        </div>
+                        <div class="field">
+                            <label for="banco_empresa">Banco</label>
+                            <input type="text" id="banco_empresa" name="banco_empresa" maxlength="60" value="<%= params.banco_empresa %>">
+                        </div>
+
+                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
+                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                                Medios de pago habilitados
+                            </label>
+                            <small style="color:var(--color-text-secondary);display:block;margin-bottom:var(--space-2)">
+                                Si se deshabilita un medio, deja de aparecer como opción para el operador/supervisor (y Mercado Pago deja de mostrarse en el link de pago del cliente).
+                            </small>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+                                <input type="checkbox" name="medio_pago_mercadopago_habilitado" value="true" <%= params.medio_pago_mercadopago_habilitado ? 'checked' : '' %>>
+                                <span>Mercado Pago</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+                                <input type="checkbox" name="medio_pago_efectivo_habilitado" value="true" <%= params.medio_pago_efectivo_habilitado ? 'checked' : '' %>>
+                                <span>Efectivo</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" name="medio_pago_transferencia_habilitado" value="true" <%= params.medio_pago_transferencia_habilitado ? 'checked' : '' %>>
+                                <span>Transferencia</span>
+                            </label>
+                        </div>
+
+                        <div class="field span-full">
+                            <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem">save</span>
+                                Guardar configuración de cobros
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <% } %>
+
             <% if (activeSection === 'comunicaciones') { %>
             <span class="settings-anchor" id="sec-comunicaciones"></span>
             <section class="settings-category" id="cat-comunicaciones">
@@ -2204,13 +2285,14 @@
 
         const _qs = new URLSearchParams(window.location.search);
         const _param = _qs.get('success');
-        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc') {
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc' || _param === 'cobros') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             const _titles = {
                 '1': 'Ajustes guardados',
                 '2': 'Sucursal asignada correctamente',
                 '3': 'Configuración de ruteo guardada',
-                '4': 'Parámetros guardados correctamente'
+                '4': 'Parámetros guardados correctamente',
+                'cobros': 'Configuración de cobros guardada'
             };
             let _title = _titles[_param];
             let _text;

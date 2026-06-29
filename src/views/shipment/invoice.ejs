@@ -99,6 +99,9 @@
                     <% if (Number(inv.weightSurcharge)) { %><tr><td>Adicional por peso</td><td class="text-right"><%= fmtMoney(inv.weightSurcharge) %></td></tr><% } %>
                     <% if (Number(inv.volumeSurcharge)) { %><tr><td>Adicional por volumen</td><td class="text-right"><%= fmtMoney(inv.volumeSurcharge) %></td></tr><% } %>
                     <% if (Number(inv.insuranceAmount)) { %><tr><td>Seguro de mercadería</td><td class="text-right"><%= fmtMoney(inv.insuranceAmount) %></td></tr><% } %>
+                    <% if (Number(inv.distanceSurcharge)) { %><tr><td>Recargo distancia<% if (inv.distanceKm) { %> (<%= inv.distanceKm %> km)<% } %></td><td class="text-right"><%= fmtMoney(inv.distanceSurcharge) %></td></tr><% } %>
+                    <% if (Number(inv.expressSurcharge)) { %><tr><td>Recargo Express</td><td class="text-right"><%= fmtMoney(inv.expressSurcharge) %></td></tr><% } %>
+                    <% if (Number(inv.fragileSurcharge)) { %><tr><td>Recargo frágil</td><td class="text-right"><%= fmtMoney(inv.fragileSurcharge) %></td></tr><% } %>
                 </tbody>
                 <tfoot>
                     <tr><td class="text-right">Subtotal (neto)</td><td class="text-right"><%= fmtMoney(neto) %></td></tr>

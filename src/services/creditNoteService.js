@@ -31,10 +31,16 @@ const generate = async ({ shipmentId, incidentId = null, returnId = null, userId
     // para mostrarlo desglosado en el comprobante. Usa el valor congelado al alta.
     const frozenInsurance = shipment.insuranceAmount;
     const insuranceAmount = (frozenInsurance !== null && frozenInsurance !== undefined) ? Number(frozenInsurance) : 0;
+    // [prototype] Recargo por distancia + Express/Frágil: idem seguro, usa lo congelado al alta.
+    const numOrZero = (v) => (v !== null && v !== undefined ? Number(v) : 0);
+    const distanceKm = shipment.distanceKm !== null && shipment.distanceKm !== undefined ? Number(shipment.distanceKm) : null;
+    const distanceSurcharge = numOrZero(shipment.distanceSurcharge);
+    const expressSurcharge = numOrZero(shipment.expressSurcharge);
+    const fragileSurcharge = numOrZero(shipment.fragileSurcharge);
     try {
         const created = await CreditNote.create({
             number: 'TMP', shipmentId, incidentId, returnId,
-            amount, insuranceAmount,
+            amount, insuranceAmount, distanceKm, distanceSurcharge, expressSurcharge, fragileSurcharge,
             // La NC de reembolso se emite al remitente: guardamos sus datos fiscales.
             senderName:     shipment.sender?.fullName || null,
             senderDocument: shipment.sender?.document || null,

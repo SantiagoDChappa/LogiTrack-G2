@@ -16,6 +16,15 @@ const statusModel = require('../models/status');
 const { Status } = require('../constants/enums');
 const { resolveUserBranchCoords } = require('../utils/eventLocation');
 const { notifyStatusChange } = require('../utils/notifications');
+const paymentMethodsConfig = require('../services/paymentMethodsConfig');
+
+// Mercado Pago está disponible en el link público solo si hay credenciales
+// configuradas Y el administrador no lo deshabilitó desde Ajustes → Cobros.
+const isMpEnabled = async () => {
+    if (!mercadoPagoService.isConfigured()) { return false; }
+    const cfg = await paymentMethodsConfig.get();
+    return cfg.mercadopagoEnabled;
+};
 
 const renderCheckout = async (res, invoice, extra = {}) => {
     const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);
@@ -25,7 +34,10 @@ const renderCheckout = async (res, invoice, extra = {}) => {
         shipment,
         empresa,
         total: totalConIva(invoice),
-        mpConfigured: mercadoPagoService.isConfigured(),
+        mpConfigured: await isMpEnabled(),
+        // Credenciales presentes pero el admin lo apagó desde Ajustes → distinto
+        // mensaje del modo simulado (que es cuando ni siquiera hay credenciales).
+        mpDisabledByAdmin: mercadoPagoService.isConfigured() && !(await paymentMethodsConfig.get()).mercadopagoEnabled,
         layout: false,
         ...extra,
     });
@@ -90,7 +102,7 @@ const postPay = async (req, res) => {
 // al checkout de MP. Solo tiene sentido si MP está configurado.
 const postPayMp = async (req, res) => {
     const invoice = await invoiceService.getByToken(req.params.token);
-    if (!invoice || invoice.payStatus !== 'PENDIENTE' || !mercadoPagoService.isConfigured()) {
+    if (!invoice || invoice.payStatus !== 'PENDIENTE' || !(await isMpEnabled())) {
         return res.redirect(`/pago/${req.params.token}`);
     }
     const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);
