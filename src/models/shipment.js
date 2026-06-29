@@ -59,6 +59,11 @@ const Shipment = sequelize.define('shipment', {
     insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
     // Recargo por zona peligrosa, congelado al alta. El ruteo no lo recalcula.
     dangerSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'dangerSurcharge' },
+    // Recargo por distancia origen-destino (línea recta) + Express/Frágil, congelados al alta.
+    distanceKm:        { type: DataTypes.DECIMAL(10, 2), allowNull: true, field: 'distanceKm' },
+    distanceSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'distanceSurcharge' },
+    expressSurcharge:  { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'expressSurcharge' },
+    fragileSurcharge:  { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'fragileSurcharge' },
 },
 { timestamps: true, tableName: 'shipment' });
 
@@ -138,6 +143,7 @@ const create = async (data, options = {}) => {
         deliveryMode:     data.deliveryMode    || 'home',
         pickupBranchId:   data.pickupBranchId  || null,
         shipmentTypeId:   data.shipmentTypeId || null,
+        fragile:          !!data.fragile,
         weightKg:         data.weightKg       || null,
         volumeM3:         data.volumeM3        || null,
         packageQty:       data.packageQty      || null,

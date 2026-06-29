@@ -61,6 +61,11 @@
                 <div class="row"><span>Medio</span><strong><%= invoice.payMethod || 'mercadopago' %></strong></div>
                 <div class="row"><span>Fecha</span><strong><%= invoice.paidAt ? new Date(invoice.paidAt).toLocaleString('es-AR') : '—' %></strong></div>
                 <% if (shipment) { %><div class="row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+            <% } else if (invoice.payStatus === 'ANULADA') { %>
+                <div class="center">
+                    <div class="badge" style="background:#e0e7ff;color:#3730a3">FACTURA ANULADA</div>
+                    <p style="color:var(--muted);margin:16px 0 0">Esta factura fue anulada por una nota de crédito. No tenés nada que pagar.</p>
+                </div>
             <% } else { %>
                 <div class="amount-box">
                     <div class="lbl">Total a pagar</div>
@@ -73,17 +78,23 @@
                     <p class="note" style="color:#b91c1c;border:1px dashed #fecaca;border-radius:8px;padding:8px"><%= mpError %></p>
                 <% } %>
 
-                <form method="POST" action="/pago/<%= invoice.payToken %><%= mpConfigured ? '/mp' : '' %>" id="checkout-form">
-                    <button type="submit" class="btn">Pagar con Mercado Pago — <%= fmt(total) %></button>
-                </form>
-                <p class="note">
-                    <% if (mpConfigured) { %>
-                        Mercado Pago te redirige a un entorno seguro para completar el pago.
-                    <% } else { %>
-                        Pago simulado para fines de demostración. No se procesa dinero real.
-                    <% } %>
-                    <br>¿Pagás en efectivo o por transferencia? Coordinalo con quien gestiona tu envío.
-                </p>
+                <% if (typeof mpDisabledByAdmin !== 'undefined' && mpDisabledByAdmin) { %>
+                    <p class="note" style="color:#92400e;border:1px dashed #fcd34d;border-radius:8px;padding:8px">
+                        El pago online no está disponible en este momento. Coordiná el pago con quien gestiona tu envío.
+                    </p>
+                <% } else { %>
+                    <form method="POST" action="/pago/<%= invoice.payToken %><%= mpConfigured ? '/mp' : '' %>" id="checkout-form">
+                        <button type="submit" class="btn">Pagar con Mercado Pago — <%= fmt(total) %></button>
+                    </form>
+                    <p class="note">
+                        <% if (mpConfigured) { %>
+                            Mercado Pago te redirige a un entorno seguro para completar el pago.
+                        <% } else { %>
+                            Pago simulado para fines de demostración. No se procesa dinero real.
+                        <% } %>
+                        <br>¿Pagás en efectivo o por transferencia? Coordinalo con quien gestiona tu envío.
+                    </p>
+                <% } %>
             <% } %>
         </div>
     <% } %>

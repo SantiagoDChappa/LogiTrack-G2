@@ -7,6 +7,7 @@ const { Shipment } = require('../models/shipment');
 const shipmentModel = require('../models/shipment');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const Setting = require('../models/setting');
+const invoiceService = require('../services/invoiceService');
 const { Status, NotificationEvent } = require('../constants/enums');
 
 const DEFAULT_HOURS = 48;
@@ -25,10 +26,20 @@ const processPendingPaymentExpirations = async () => {
         const hours = await readThresholdHours();
         const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-        const candidates = await Shipment.findAll({
+        const expired = await Shipment.findAll({
             where: { statusId: Status.PENDING_PAYMENT.id, createdAt: { [Op.lt]: cutoff } },
             attributes: ['id', 'trackingId', 'createdAt'],
         });
+
+        // Si una nota de crédito ya anuló la factura (ej: el paquete se perdió antes
+        // de pagarse), no tiene sentido cancelar "por falta de pago" — ya no hay nada
+        // que cobrar. Se deja que el flujo de la incidencia/devolución decida el resto.
+        const candidates = [];
+        for (const shipment of expired) {
+            const invoice = await invoiceService.getByShipment(shipment.id).catch(() => null);
+            if (invoice && invoice.payStatus === 'ANULADA') { continue; }
+            candidates.push(shipment);
+        }
 
         if (!candidates.length) {
             console.log(`[pendingPaymentCancellationJob] Sin envíos vencidos (umbral ${hours}h).`);

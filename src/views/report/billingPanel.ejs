@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Panel de Cobranzas</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Panel de Cobranzas</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/billing-panel" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <a href="/report/billing-panel" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <span class="material-symbols-outlined">refresh</span>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+
+            <!-- Totales globales -->
+            <div class="report-card" style="display:flex;gap:2rem;flex-wrap:wrap">
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Facturado</div><strong style="font-size:1.3rem"><%= fmt(totals.facturado) %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Cobrado</div><strong style="font-size:1.3rem;color:#16a34a"><%= fmt(totals.cobrado) %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Pendiente</div><strong style="font-size:1.3rem;color:#b45309"><%= fmt(totals.pendiente) %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Anulado</div><strong style="font-size:1.3rem;color:#3730a3"><%= fmt(totals.anulado) %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">% Cobrado</div><strong style="font-size:1.3rem"><%= totals.pctCobrado %>%</strong></div>
+            </div>
+
+            <% if (rows.length === 0) { %>
+                <div class="report-card">
+                    <div class="report-empty-state">
+                        <span class="material-symbols-outlined">account_balance</span>
+                        <p>No hay facturación registrada en ese rango de fechas.</p>
+                    </div>
+                </div>
+            <% } else { %>
+                <div class="report-card">
+                    <div class="dp-table-header">
+                        <h2>Por sucursal — <%= rows.length %> sucursal<%= rows.length !== 1 ? 'es' : '' %></h2>
+                    </div>
+                    <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr>
+                                <th>Sucursal</th>
+                                <th style="text-align:right">Facturas</th>
+                                <th style="text-align:right">Facturado</th>
+                                <th style="text-align:right">Cobrado</th>
+                                <th style="text-align:right">Pendiente</th>
+                                <th style="text-align:right">Anulado</th>
+                                <th>% Cobrado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% rows.forEach(r => { %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= r.branchName %></td>
+                                <td style="text-align:right"><%= r.cantidad %></td>
+                                <td style="text-align:right"><strong><%= fmt(r.facturado) %></strong></td>
+                                <td style="text-align:right;color:#16a34a"><%= fmt(r.cobrado) %></td>
+                                <td style="text-align:right;color:#b45309"><%= fmt(r.pendiente) %></td>
+                                <td style="text-align:right;color:#3730a3"><%= fmt(r.anulado) %></td>
+                                <td style="white-space:nowrap">
+                                    <div style="display:flex;align-items:center;gap:.5rem">
+                                        <div style="flex:1;background:var(--color-border);border-radius:999px;height:.5rem;max-width:90px;overflow:hidden">
+                                            <div style="height:100%;background:#16a34a;width:<%= r.pctCobrado %>%"></div>
+                                        </div>
+                                        <span><%= r.pctCobrado %>%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

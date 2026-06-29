@@ -265,8 +265,10 @@ const getDetail = async (req, res) => {
         canCreateReturn = !!elig.ok;
     }
 
+    const paymentMethods = await require('../services/paymentMethodsConfig').get();
+
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes, paymentMethods,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
@@ -480,6 +482,7 @@ const createShipment = async (req, res) => {
             deliveryMode:    deliveryMode,
             pickupBranchId:  isPickup ? pickupBranch.id : null,
             shipmentTypeId:  body.shipmentTypeId || null,
+            fragile:         body.fragile === 'true',
             weightKg:        body.weightKg       || null,
             packageQty:      body.packageQty     || null,
             volumeM3:        body.volumeM3       || null,
@@ -524,10 +527,20 @@ const createShipment = async (req, res) => {
         const costTotal = breakdown ? breakdown.final : 0;
         const insuranceAmount = breakdown ? breakdown.insurance : 0;
         const dangerSurcharge = breakdown ? (breakdown.dangerSurcharge || 0) : 0;
+        const distanceKm = breakdown ? breakdown.distanceKm : null;
+        const distanceSurcharge = breakdown ? (breakdown.distanceSurcharge || 0) : 0;
+        const expressSurcharge = breakdown ? (breakdown.expressSurcharge || 0) : 0;
+        const fragileSurcharge = breakdown ? (breakdown.fragileSurcharge || 0) : 0;
         const costUpdates = {};
         if (costTotal > 0)        { costUpdates.costTotal = costTotal;             freshShipment.costTotal = costTotal; }
         if (insuranceAmount > 0)  { costUpdates.insuranceAmount = insuranceAmount; freshShipment.insuranceAmount = insuranceAmount; }
         if (dangerSurcharge > 0)  { costUpdates.dangerSurcharge = dangerSurcharge; freshShipment.dangerSurcharge = dangerSurcharge; }
+        if (distanceKm !== null && distanceKm !== undefined) {
+            costUpdates.distanceKm = distanceKm; freshShipment.distanceKm = distanceKm;
+            costUpdates.distanceSurcharge = distanceSurcharge; freshShipment.distanceSurcharge = distanceSurcharge;
+        }
+        if (expressSurcharge > 0) { costUpdates.expressSurcharge = expressSurcharge; freshShipment.expressSurcharge = expressSurcharge; }
+        if (fragileSurcharge > 0) { costUpdates.fragileSurcharge = fragileSurcharge; freshShipment.fragileSurcharge = fragileSurcharge; }
         if (Object.keys(costUpdates).length) {
             await shipmentModel.Shipment.update(costUpdates, { where: { id: freshShipment.id } });
         }
