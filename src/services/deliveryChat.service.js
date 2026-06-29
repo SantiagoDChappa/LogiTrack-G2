@@ -86,7 +86,41 @@ async function shipmentIdByTracking(trackingId) {
     return s ? s.id : null;
 }
 
+// Marca como leídos los mensajes del CLIENTE en el chat abierto del envío (cuando el
+// repartidor abre ese hilo). Devuelve cuántos marcó.
+async function markClientRead(shipmentId) {
+    const sequelize = require('../database/connection');
+    const [, meta] = await sequelize.query(
+        `UPDATE logitrack.delivery_chat_message
+            SET "read_at" = NOW()
+          WHERE "read_at" IS NULL AND "sender_role" = 'CLIENT'
+            AND "chat_id" IN (SELECT "id" FROM logitrack.delivery_chat
+                               WHERE "shipment_id" = :sid AND "status" = 'OPEN')`,
+        { replacements: { sid: Number(shipmentId) } }
+    );
+    return meta && typeof meta.rowCount === 'number' ? meta.rowCount : 0;
+}
+
+// Resumen de los chats ABIERTOS de las entregas de una ruta (para el inbox del repartidor):
+// por envío, cuántos mensajes del cliente quedan sin leer y la hora del último mensaje.
+async function routeChatSummary(routeId) {
+    const sequelize = require('../database/connection');
+    const { QueryTypes } = require('sequelize');
+    return sequelize.query(
+        `SELECT rs."shipment_id" AS "shipmentId",
+                COALESCE(SUM(CASE WHEN m."sender_role" = 'CLIENT' AND m."read_at" IS NULL THEN 1 ELSE 0 END), 0)::int AS unread,
+                MAX(m."created_at") AS "lastAt"
+           FROM logitrack.route_stop rs
+           JOIN logitrack.delivery_chat dc ON dc."shipment_id" = rs."shipment_id" AND dc."status" = 'OPEN'
+           LEFT JOIN logitrack.delivery_chat_message m ON m."chat_id" = dc."id"
+          WHERE rs."route_id" = :rid AND rs."stop_type" = 'delivery' AND rs."shipment_id" IS NOT NULL
+          GROUP BY rs."shipment_id"`,
+        { replacements: { rid: Number(routeId) }, type: QueryTypes.SELECT }
+    );
+}
+
 module.exports = {
     ensureOpen, close, closeForRoute, getOpenByShipment, getThread, addMessage, shipmentIdByTracking,
+    markClientRead, routeChatSummary,
     SenderRole, MAX_BODY,
 };
