@@ -15,7 +15,7 @@
         </div>
         <div class="form-new">
             <p class="form-required-note"><span class="req">*</span> Campo obligatorio</p>
-            <form action="" method="post">
+            <form action="" method="post" data-no-loader>
                 <div class="remitente">
                     <h3>Remitente</h3>
                     <div class="field">
@@ -211,11 +211,9 @@
 
                 <div class="info-shipment">
                     <h3>Ventana de entrega <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></h3>
-                    <div class="field">
-                        <label for="expected-date">Fecha estimada</label>
-                        <input id="expected-date" type="date" name="expectedDeliveryDate" value="<%= body.expectedDeliveryDate || '' %>" disabled>
-                        <small id="expected-date-hint" class="field-hint">Se completa con la estimación del modelo al cargar los datos.</small>
-                    </div>
+                    <!-- La fecha estimada la define el análisis del modelo al dar de alta
+                         (ver pantalla de análisis post-submit). Se guarda en este hidden. -->
+                    <input id="expected-date" type="hidden" name="expectedDeliveryDate" value="<%= body.expectedDeliveryDate || '' %>">
                     <div class="field">
                         <label for="expected-from">Desde</label>
                         <input id="expected-from" type="time" name="expectedDeliveryFrom" value="<%= body.expectedDeliveryFrom || '' %>">
@@ -224,11 +222,6 @@
                         <label for="expected-to">Hasta</label>
                         <input id="expected-to" type="time" name="expectedDeliveryTo" value="<%= body.expectedDeliveryTo || '' %>">
                     </div>
-                </div>
-
-                <div id="prediction-widget" class="pred-card">
-                    <h3><span class="material-symbols-outlined">psychology</span> Semáforo de fiabilidad</h3>
-                    <div id="prediction-result"></div>
                 </div>
 
                 <div id="cost-preview-widget" class="pred-card">
@@ -258,7 +251,7 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
-    <script src="/js/prediction.js" defer></script>
+    <script src="/js/shipment-alta-ml.js" defer></script>
     <script src="/js/cost-preview.js" defer></script>
     <script src="/js/address-danger.js" defer></script>
     <script src="/js/address-validation.js" defer></script>
