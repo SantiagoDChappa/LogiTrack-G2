@@ -6,7 +6,8 @@ const { Shipment } = require('../models/shipment');
 const { Branch } = require('../models/branch');
 const branchModel = require('../models/branch');
 
-const buildBillingPanelData = async (query) => {
+const buildBillingPanelData = async (query, viewer) => {
+    const isAdmin = viewer?.roleId === 4;
     const from = query.from || '';
     const to = query.to || '';
 
@@ -54,9 +55,15 @@ const buildBillingPanelData = async (query) => {
         else { b.pendiente += amount; }
     }
 
-    const rows = [...buckets.values()]
+    let rows = [...buckets.values()]
         .map(b => ({ ...b, pctCobrado: b.facturado > 0 ? Math.round((b.cobrado / b.facturado) * 100) : 0 }))
         .sort((a, b) => b.facturado - a.facturado);
+
+    // Supervisor: solo ve la fila de su propia sucursal, no las demás.
+    if (!isAdmin) {
+        const myBranchId = viewer?.branchId || null;
+        rows = rows.filter(r => r.branchId === myBranchId);
+    }
 
     const totals = rows.reduce((acc, r) => ({
         facturado: acc.facturado + r.facturado,
@@ -67,11 +74,11 @@ const buildBillingPanelData = async (query) => {
     }), { facturado: 0, cobrado: 0, pendiente: 0, anulado: 0, cantidad: 0 });
     totals.pctCobrado = totals.facturado > 0 ? Math.round((totals.cobrado / totals.facturado) * 100) : 0;
 
-    return { rows, totals, filters: { from, to } };
+    return { rows, totals, filters: { from, to }, isAdmin };
 };
 
 const getBillingPanel = async (req, res) => {
-    const data = await buildBillingPanelData(req.query);
+    const data = await buildBillingPanelData(req.query, res.locals.currentUser);
     res.render('report/billingPanel', data);
 };
 

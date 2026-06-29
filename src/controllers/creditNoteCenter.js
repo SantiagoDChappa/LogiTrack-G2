@@ -6,10 +6,12 @@ const { Shipment } = require('../models/shipment');
 const { Branch } = require('../models/branch');
 const branchModel = require('../models/branch');
 
-const buildCreditNoteCenterData = async (query) => {
+const buildCreditNoteCenterData = async (query, viewer) => {
+    const isAdmin = viewer?.roleId === 4;
     const from = query.from || '';
     const to = query.to || '';
-    const branchId = query.branchId || '';
+    // Supervisor: forzado a su propia sucursal, no puede ver las demás.
+    const branchId = isAdmin ? (query.branchId || '') : String(viewer?.branchId || '');
     const q = String(query.q || '').trim();
 
     const where = {};
@@ -61,17 +63,17 @@ const buildCreditNoteCenterData = async (query) => {
             || r.number.toLowerCase().includes(qLower));
     }
 
-    return { rows, branches, filters: { from, to, branchId, q } };
+    return { rows, branches, filters: { from, to, branchId, q }, isAdmin };
 };
 
 const getCreditNoteCenter = async (req, res) => {
-    const data = await buildCreditNoteCenterData(req.query);
+    const data = await buildCreditNoteCenterData(req.query, res.locals.currentUser);
     res.render('report/creditNotes', data);
 };
 
 const exportCreditNoteCenter = async (req, res) => {
     try {
-        const data = await buildCreditNoteCenterData(req.query);
+        const data = await buildCreditNoteCenterData(req.query, res.locals.currentUser);
         const rows = [['Nota de crédito', 'Envío', 'Cliente', 'Documento', 'Sucursal', 'Monto', 'Motivo', 'Fecha']];
         for (const r of data.rows) {
             rows.push([r.number, r.trackingId || '—', r.senderName, r.senderDocument, r.branchName, r.amount, r.motivo, new Date(r.createdAt).toLocaleString('es-AR')]);
