@@ -53,7 +53,7 @@
     function normalize(s) {
         return String(s || '')
             .toLowerCase()
-            .normalize('NFD').replace(/[̀-ͯ]/g, '') // saca tildes
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // saca tildes (escape Unicode: no se rompe si el archivo se re-guarda)
             .replace(/[¿?¡!.,;:]/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
@@ -108,7 +108,7 @@
     }
     function classifyFailedConfirm(text) {
         const t = normalize(text);
-        if (/^(si|sí|dale|confirmo|confirmar|correcto|afirmativo|ok|okey|de una|obvio|asi es)\b/.test(t)) { return 'yes'; }
+        if (/^(si|sí|sip|dale|confirmo|confirmar|correcto|afirmativo|ok|oka|okey|de una|obvio|asi es)\b/.test(t)) { return 'yes'; }
         if (/^(cancelar|cancela|olvidalo|dejalo|nada)\b/.test(t)) { return 'cancel'; }
         return 'redo'; // "no", "corregir" o poco claro → re-pedir el motivo (CA3)
     }
@@ -157,14 +157,23 @@
         return { code: 'otro', label: otro ? otro.label : 'Otro', observation: obs, matched: false };
     }
 
+    let failedTries = 0; // CV-05: límite de reintentos al pedir el motivo (no preguntar infinito en manos libres)
     function failedStart(motivoText) {
+        failedTries = 0;
         const r = motivoText ? classifyReason(motivoText) : null;
         if (!r) { return failedAskMotivo(false); } // CA4
         return failedConfirm(r);
     }
     function failedAskMotivo(again) {                   // CA3/CA4: pedir (o re-pedir) el motivo
+        if (failedTries >= 3) { // tope: corta el loop y deriva a la pantalla
+            pendingPrompt = null;
+            return respond('No pude entender el motivo. Marcá la entrega como fallida desde la pantalla cuando puedas.', { error: true });
+        }
+        failedTries++;
         pendingPrompt = (text) => {
-            const r = classifyReason(cleanMotivo(text));
+            // extractMotivo (no cleanMotivo): saca también el prefijo del comando, así si repite
+            // "marcar fallida" como respuesta no termina clasificado como "otro" con basura.
+            const r = classifyReason(extractMotivo(text));
             if (!r) { return failedAskMotivo(true); }
             return failedConfirm(r);
         };
@@ -188,6 +197,7 @@
         const stop = window.LT_NEXT_STOP;
         if (!stop || !stop.id) { return respond('No hay una entrega pendiente para marcar.', {}); }
         const geo = await getGeo();
+        if (myTurn !== turnGen) { return; } // canceló/empezó otra orden durante el GPS → NO mandar el POST
         // motivo: { code, label, observation } — código oficial + lo dictado tal cual (punto 3)
         let status, data;
         try {
@@ -319,7 +329,9 @@
         applies: (c) => c.paused ? { ok: false, reason: 'Primero tenés que retomar la ruta.' } : { ok: true },
         confirm: 'Voy a reportar una zona insegura en tu ubicación actual. ¿Confirmás?', // CA1
         run: async () => {
+            const myTurn = turnGen;
             const geo = await getGeo();                                                  // ubicación al confirmar (CA4)
+            if (myTurn !== turnGen) { return { handled: true }; } // canceló durante el GPS → NO registrar
             const hasGeo = geo.latitude != null && geo.longitude != null;
             let data;
             try {
@@ -428,7 +440,9 @@
     }
     function highlightStop(seq) {
         try {
-            const el = document.querySelector(`[data-stop-seq="${seq}"]`);
+            const safeSeq = String(seq).replace(/[^0-9]/g, ''); // #10: solo dígitos en el selector
+            if (!safeSeq) { return; }
+            const el = document.querySelector(`[data-stop-seq="${safeSeq}"]`);
             if (!el) { return; }
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             el.classList.add('voice-flash');
@@ -442,15 +456,18 @@
         highlightStop(stop.seq);
         return respond(`El paquete de ${who} es la parada ${stop.seq}${where}.`, {}); // CA1
     }
-    function resolvePick(answer, candidates) {
+    // ordinalList = las que se nombraron en voz (para "la primera/segunda"); seqList = TODAS las
+    // pendientes (para que el número de parada y la calle alcancen a las que no se nombraron).
+    function resolvePick(answer, ordinalList, seqList) {
+        seqList = seqList || ordinalList;
         const t = normalize(answer);
         const num = t.match(/\b(\d+)\b/);
-        if (num) { const s = candidates.find((c) => String(c.seq) === num[1]); if (s) { return s; } }
+        if (num) { const s = seqList.find((c) => String(c.seq) === num[1]); if (s) { return s; } }
         const ord = { primera: 0, primero: 0, uno: 0, segunda: 1, segundo: 1, dos: 1, tercera: 2, tercero: 2, tres: 2 };
-        for (const k in ord) { if (t.includes(k) && candidates[ord[k]]) { return candidates[ord[k]]; } }
+        for (const k in ord) { if (t.includes(k) && ordinalList[ord[k]]) { return ordinalList[ord[k]]; } }
         // Por calle: alcanza con que el repartidor diga una palabra distintiva de la calle
         // (ej. "rivadavia" para "Av. Rivadavia"), no el nombre completo.
-        const byStreet = candidates.find((c) => {
+        const byStreet = seqList.find((c) => {
             if (!c.street) { return false; }
             return normalize(c.street).split(' ').filter((w) => w.length >= 4).some((w) => t.includes(w));
         });
@@ -470,15 +487,17 @@
             return respond(`La entrega de ${who} ya está completada.`, {});
         }
         if (pending.length === 1) { return indicateStop(pending[0]); } // CA1
-        // CA3: varias pendientes → desambiguar por parada/dirección
+        // CA3: varias pendientes → desambiguar. Nombramos en voz solo las primeras, pero el número
+        // de parada vale para CUALQUIERA (antes decía "hay 5" y solo dejaba elegir 3 → #3).
         const opts = pending.slice(0, 3);
         pendingPrompt = (ans) => {
-            const pick = resolvePick(ans, opts);
+            const pick = resolvePick(ans, opts, pending);
             if (pick) { return indicateStop(pick); } // CA4
             return respond('Listo, no hago nada.', {});
         };
         const parts = opts.map((s) => `la parada ${s.seq}${s.street ? ', en ' + speakable(s.street) : ''}`);
-        return respond(`Hay ${pending.length} coincidencias: ${parts.join('; y ')}. ¿Cuál?`, { relisten: true });
+        const more = pending.length > opts.length ? `, y ${pending.length - opts.length} más` : '';
+        return respond(`Encontré ${pending.length}. Las primeras: ${parts.join('; ')}${more}. Decime el número de parada.`, { relisten: true });
     }
 
     // Palabras genéricas que no distinguen un comando de otro (no cuentan para el matching).
@@ -657,6 +676,13 @@
             handled = true;
             clearTimeout(noSpeechTimer);
             const transcript = ev.results && ev.results[0] && ev.results[0][0] ? ev.results[0][0].transcript : '';
+            if (!transcript || !transcript.trim()) {
+                // #8: en mobile el reconocimiento a veces termina con resultado vacío en vez de
+                // disparar 'no-speech'. Lo tratamos como "no escuché" (sin re-escuchar) en lugar
+                // de "no entendí" + relisten, que es el comportamiento equivocado para este caso.
+                pendingChoice = null; pendingConfirm = null; pendingPrompt = null;
+                return respond('No escuché nada, tocá para hablar de nuevo.', { error: true });
+            }
             setState('processing'); earcon.process(); showBubble(LABELS.processing, 'state');
             setTimeout(() => handleTranscript(transcript), 160); // deja ver el estado "procesando"
         };

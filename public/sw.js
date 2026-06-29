@@ -6,7 +6,7 @@
  */
 importScripts('/js/offline-db.js');
 
-const CACHE = 'lt-delivery-v5';
+const CACHE = 'lt-delivery-v6';
 const SHELL = [
     '/css/style.css', '/css/components.css', '/css/shipments.css', '/css/delivery.css',
     '/js/theme.js', '/js/ui.js', '/js/offline-db.js', '/js/delivery-offline.js', '/js/voice-copilot.js',

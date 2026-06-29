@@ -347,7 +347,12 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
         const settingModel = require('../models/setting');
         const dsSetting = await settingModel.getAll().catch(() => ({}));
         const deliverySecretEnabled = dsSetting.delivery_secret_enabled !== 'false';
-        res.render('delivery/route', { route, readOnly, deliverySecretEnabled });
+        // Catálogo de motivos de entrega fallida para el copiloto de voz (labels configurables).
+        // Se inyecta como window.LT_FAILED_REASONS; el copiloto encasilla por estos códigos.
+        const failedReasons = await require('../models/failedAttemptReason').getActive()
+            .then(rows => rows.map(r => ({ code: r.code, label: r.label })))
+            .catch(() => []);
+        res.render('delivery/route', { route, readOnly, deliverySecretEnabled, failedReasons });
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
