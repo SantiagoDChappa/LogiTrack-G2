@@ -35,7 +35,7 @@
     }
 
     // Acciones operativas encolables offline (van por fetch JSON).
-    const QUEUEABLE = /\/delivery\/route\/\d+\/(stop\/\d+\/(arrive|complete|pickup-confirmed|failed|skip|unskip|delivered)|pause|resume|finish)$/;
+    const QUEUEABLE = /\/delivery\/(route\/\d+\/(stop\/\d+\/(arrive|complete|pickup-confirmed|failed|skip|unskip|delivered)|pause|resume|finish|incident)|panic)$/;
 
     const newKey = () => (Date.now() + '-' + Math.random().toString(36).slice(2, 10));
 
@@ -50,7 +50,7 @@
         return m ? m[1] : null;
     }
     function kindFor(path) {
-        const m = (path || '').match(/\/(arrive|complete|pickup-confirmed|failed|skip|unskip|delivered|pause|resume|finish)$/);
+        const m = (path || '').match(/\/(arrive|complete|pickup-confirmed|failed|skip|unskip|delivered|pause|resume|finish|incident|panic)$/);
         return m ? m[1] : 'action';
     }
     function headerVal(headers, name) {

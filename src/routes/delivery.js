@@ -421,7 +421,12 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
         const settingModel = require('../models/setting');
         const dsSetting = await settingModel.getAll().catch(() => ({}));
         const deliverySecretEnabled = dsSetting.delivery_secret_enabled !== 'false';
-        res.render('delivery/route', { route, readOnly, deliverySecretEnabled });
+        // Catálogo de motivos de entrega fallida para el copiloto de voz (labels configurables).
+        // Se inyecta como window.LT_FAILED_REASONS; el copiloto encasilla por estos códigos.
+        const failedReasons = await require('../models/failedAttemptReason').getActive()
+            .then(rows => rows.map(r => ({ code: r.code, label: r.label })))
+            .catch(() => []);
+        res.render('delivery/route', { route, readOnly, deliverySecretEnabled, failedReasons });
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
@@ -690,8 +695,10 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 if (fr && fr.maxAttemptsOverride) { maxIntentos = fr.maxAttemptsOverride; }
             }
         } catch { /* fallback default */ }
+        let maxAttemptsReached = false;
         const intentosPrevios = await failedAttemptModel.getByShipmentId(stop.shipmentId);
         if (intentosPrevios.length >= maxIntentos) {
+            maxAttemptsReached = true;
             const shipmentHistoryModel = require('../models/shipmentHistory');
             const { Shipment } = require('../models/shipment');
             // Lee estado real antes de cancelar para que el history tenga el fromStatusId correcto.
@@ -774,8 +781,9 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             { completed: true, completedAt: new Date() },
             { where: { id: stop.id, routeId: route.id } }
         );
+        // maxAttemptsReached: el copiloto de voz lo usa para avisar que el envío ya no admite reintentos (CV-05 CA6).
         // Última Milla: el aviso "próxima entrega" se dispara por GPS/distancia (heartbeat).
-        res.json({ ok: true });
+        res.json({ ok: true, maxAttemptsReached });
     } catch (e) {
         res.status(422).json({ error: e.message });
     }
@@ -1209,7 +1217,46 @@ router.post('/panic', requireDelivery, async (req, res) => {
         longitude: longitude || null,
         message:   message  || null,
     });
+    // Alerta dedicada de alta severidad (punto 4): línea de log distinta y etiquetada para que
+    // el monitoreo pueda enganchar y paginar a la central. El evento ya queda persistido arriba.
+    console.error('[ALERT][PANIC]', JSON.stringify({
+        panicId:     ev.id,
+        userId:      res.locals.currentUser.id,
+        routeId:     routeId || null,
+        hasLocation: (latitude ?? null) !== null && (longitude ?? null) !== null,
+        latitude:    latitude || null,
+        longitude:   longitude || null,
+        message:     message || null,
+        at:          new Date().toISOString(),
+    }));
     res.json({ ok: true, panicId: ev.id });
+});
+
+// === Telemetría del copiloto de voz (punto 4) ===
+// Mide la tasa de aciertos / "no entendí" para mejorar el reconocimiento. NO recibe audio ni
+// el texto dictado (privacidad): solo la intención detectada, puntaje y latencia. Best-effort:
+// llega por sendBeacon y nunca debe afectar la operación, por eso responde 204 sin validar mucho.
+router.post('/voice/telemetry', requireDelivery, (req, res) => {
+    try {
+        const b = req.body || {};
+        console.log('[voice-telemetry]', JSON.stringify({
+            userId:    res.locals.currentUser ? res.locals.currentUser.id : null,
+            event:     b.event || null,
+            intent:    b.intent || null,
+            score:     b.score ?? null,
+            strong:    b.strong ?? null,
+            applied:   b.applied ?? null,
+            a:         b.a || null,
+            b:         b.b || null,
+            words:     b.words ?? null,
+            source:    b.source || null,
+            offline:   b.offline ?? null,
+            latencyMs: b.latencyMs ?? null,
+            routeId:   b.routeId || null,
+            ts:        b.ts || Date.now(),
+        }));
+    } catch { /* la telemetría nunca rompe la operación */ }
+    res.status(204).end();
 });
 
 // === Sprint 3 - 2.4 Cancelar ruta (antes de iniciarla o durante) ===

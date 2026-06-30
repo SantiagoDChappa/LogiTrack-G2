@@ -161,7 +161,7 @@
     .btn-back:hover, .btn-menu:hover { transform: scale(1.05); }
     .btn-back .material-symbols-outlined, .btn-menu .material-symbols-outlined { font-size: 22px; }
 
-    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic {
+    .btn-recenter, .btn-gmaps, .btn-pause, .btn-incident, .btn-panic, .btn-voice, .btn-voice-wake {
         background: var(--glass-bg);
         backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--glass-brdr);
@@ -171,10 +171,46 @@
         color: var(--lt-blue); transition: transform .15s ease;
         font-family: inherit;
     }
-    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover { transform: scale(1.05); }
+    .btn-recenter:hover, .btn-gmaps:hover, .btn-pause:hover, .btn-incident:hover, .btn-panic:hover, .btn-voice:hover, .btn-voice-wake:hover { transform: scale(1.05); }
     .btn-gmaps    { color: var(--lt-green); }
     .btn-pause    { color: var(--lt-amber); }
     .btn-incident { color: var(--lt-purple); }
+
+    /* === Copiloto de voz (CV-01) === */
+    .btn-voice { color: var(--lt-blue); position: relative; }
+    .btn-voice.listening {
+        background: linear-gradient(135deg,#2563eb,#3b82f6); color: #fff;
+        border-color: rgba(255,255,255,.3);
+        animation: voice-pulse 1.3s infinite;
+    }
+    .btn-voice.processing { background: linear-gradient(135deg,#7c3aed,#a855f7); color: #fff; }
+    .btn-voice.speaking   { background: linear-gradient(135deg,#0ea5e9,#22d3ee); color: #fff; }
+    .btn-voice.unavailable { opacity: .55; }
+    @keyframes voice-pulse {
+        0%,100% { box-shadow: 0 8px 24px rgba(37,99,235,.45); }
+        50%     { box-shadow: 0 8px 30px rgba(37,99,235,.85); }
+    }
+    .btn-voice .material-symbols-outlined { font-size: 22px; }
+    /* Modo escucha (palabra clave): apagado = neutro; encendido = verde con latido suave */
+    .btn-voice-wake { color: var(--lt-blue); }
+    .btn-voice-wake .material-symbols-outlined { font-size: 22px; }
+    .btn-voice-wake.active {
+        background: linear-gradient(135deg,#16a34a,#22c55e); color: #fff;
+        border-color: rgba(255,255,255,.3);
+        animation: voice-pulse 1.8s infinite;
+    }
+    #voice-bubble {
+        position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+        max-width: min(86vw, 420px); z-index: 10001;
+        background: #0e1730; color: #fff; padding: 12px 16px; border-radius: 12px;
+        font-family: Inter, system-ui, sans-serif; font-size: .92rem; line-height: 1.35;
+        box-shadow: 0 10px 30px rgba(0,0,0,.35); text-align: center;
+    }
+    #voice-bubble[data-kind="error"] { background: #7f1d1d; }
+    #voice-bubble[data-kind="state"] { background: #1e293b; font-weight: 600; }
+    /* CV-14: destello al "indicar" una parada encontrada por voz */
+    @keyframes voice-flash-kf { 0%,100% { background: transparent; } 30% { background: rgba(37,99,235,.18); } }
+    .voice-flash { animation: voice-flash-kf 1.1s ease 2; outline: 2px solid var(--lt-blue); outline-offset: 2px; border-radius: 12px; }
     .btn-panic    {
         background: linear-gradient(135deg,#dc2626,#ef4444); color: #fff;
         border-color: rgba(255,255,255,.3);
@@ -625,6 +661,12 @@
                     <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)" aria-label="Pausar ruta (almuerzo / combustible)">
                         <span class="material-symbols-outlined">pause_circle</span>
                     </button>
+                    <button class="btn-voice"    id="btn-voice"    title="Copiloto de voz: tocá para hablar" aria-label="Copiloto de voz: tocá para hablar" aria-pressed="false">
+                        <span class="material-symbols-outlined">mic</span>
+                    </button>
+                    <button class="btn-voice-wake" id="btn-voice-wake" title="Modo escucha: activá para hablar diciendo &quot;hola copiloto&quot;" aria-label="Modo escucha por palabra clave" aria-pressed="false">
+                        <span class="material-symbols-outlined">hearing</span>
+                    </button>
                 <% } %>
                 <button class="btn-gmaps"    id="btn-gmaps"    title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">
                     <span class="material-symbols-outlined">map</span>
@@ -840,8 +882,48 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/voice-copilot.js" defer></script>
     <%# [prototype] Offline del repartidor: globals para el script (cargado desde head.ejs) %>
-    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>;</script>
+    <%
+        // Copiloto de voz (CV-01): próxima parada pendiente para responder "¿cuál es mi próxima entrega?".
+        const _pendNext = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && !s.completed && !s.skipped && s.shipment)
+            .sort((a, b) => a.sequence - b.sequence);
+        const _altNext = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && !s.completed && s.shipment)
+            .sort((a, b) => a.sequence - b.sequence);
+        const _ns = _pendNext[0] || _altNext[0] || null;
+        const _nsData = _ns ? {
+            id:        _ns.id,
+            street:    (_ns.shipment.address && _ns.shipment.address.street)  || null,
+            number:    (_ns.shipment.address && _ns.shipment.address.number)  || null,
+            recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
+        } : null;
+
+        // Buscar un envío por voz (CV-14): lista de entregas con destinatario y dirección.
+        const _stopsData = (route.stops || [])
+            .filter(s => s.stopType === 'delivery' && s.shipment)
+            .sort((a, b) => a.sequence - b.sequence)
+            .map(s => ({
+                seq:       s.sequence,
+                completed: !!s.completed,
+                recipient: (s.shipment.recipient && s.shipment.recipient.fullName) || null,
+                street:    (s.shipment.address && s.shipment.address.street) || null,
+                number:    (s.shipment.address && s.shipment.address.number) || null,
+            }));
+
+        // Avance de la ruta (CV-06): conteo sobre las entregas.
+        const _deliv = (route.stops || []).filter(s => s.stopType === 'delivery');
+        const _completedN = _deliv.filter(s => s.completed).length;
+        const _postponedN = _deliv.filter(s => s.skipped && !s.completed).length;
+        const _progress = {
+            total:     _deliv.length,
+            completed: _completedN,
+            pending:   _deliv.length - _completedN, // incluye las postergadas (CA4)
+            postponed: _postponedN,
+        };
+    %>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- jsonScript(_nsData) %>; window.LT_PROGRESS = <%- jsonScript(_progress) %>; window.LT_STOPS = <%- jsonScript(_stopsData) %>; window.LT_FAILED_REASONS = <%- jsonScript(typeof failedReasons !== 'undefined' ? failedReasons : []) %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {
@@ -902,9 +984,9 @@
     })();
     const routeStarted = <%= route.startedAt ? 'true' : 'false' %>;
     let activePauseId = <%= activePause ? activePause.id : 'null' %>;
-    let activePauseStart = <%- activePause ? JSON.stringify(activePause.startedAt) : 'null' %>;
+    let activePauseStart = <%- activePause ? jsonScript(activePause.startedAt) : 'null' %>;
 
-    const stops = <%- JSON.stringify((route.stops || []).map(s => ({
+    const stops = <%- jsonScript((route.stops || []).map(s => ({
         id: s.id, sequence: s.sequence, stopType: s.stopType,
         shipmentId: s.shipmentId || null,
         lat: Number(s.lat), lng: Number(s.lng),
@@ -2599,6 +2681,40 @@
         setTimeout(() => window.location.reload(), 200);
     }
     document.getElementById('btn-resume')?.addEventListener('click', resumeHandler);
+
+    // === Hooks para el copiloto de voz (CV-03) ===
+    // Pausar/retomar por voz reutilizando el banner, el timer y el estado (activePauseId).
+    // El flujo por voz no muestra el selector de motivo (manos libres): usa un motivo genérico.
+    window.LT_isPaused = () => !!activePauseId;
+    window.LT_voicePause = async function (reason) {
+        if (activePauseId) { return { ok: false, already: true }; }
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/pause`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason || 'pausa' }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return res.status === 409 ? { ok: false, already: true } : { ok: false, error: true }; }
+            activePauseId = data.pauseId; activePauseStart = data.startedAt;
+            ensurePauseBanner();
+            if (pauseReasonE) { pauseReasonE.textContent = '· ' + (reason || 'pausa'); }
+            if (pauseBanner) { pauseBanner.hidden = false; }
+            startPauseTimer();
+            return { ok: true, queued: !!data.queued }; // CV-17: offline → quedó en cola
+        } catch (_) { return { ok: false, error: true }; }
+    };
+    window.LT_voiceResume = async function () {
+        if (!activePauseId) { return { ok: false, none: true }; }
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/resume`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return { ok: false, error: true }; }
+            clearPauseUI();
+            return { ok: true, addedSeconds: data.addedSeconds || 0, queued: !!data.queued }; // CV-17
+        } catch (_) { return { ok: false, error: true }; }
+    };
 
     // === Incidente ===
     document.getElementById('btn-incident')?.addEventListener('click', async () => {
