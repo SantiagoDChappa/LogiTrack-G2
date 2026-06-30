@@ -298,6 +298,24 @@
         },
     });
 
+    // CV-16 — Abrir navegación hacia la próxima entrega (Google Maps; después guía por voz).
+    register({
+        id: 'navigate', label: 'navegar a la próxima',
+        keywords: ['llevame a la proxima', 'abrir navegacion', 'navegar a la proxima', 'navegar',
+            'como llego', 'como llego a la proxima', 'llevame ahi', 'iniciar navegacion'],
+        run: () => {
+            const n = window.LT_NEXT_STOP;
+            if (!n) { return { speak: 'No te quedan entregas pendientes.' }; }
+            const dir = [n.street, n.number].filter(Boolean).join(' ').trim();
+            const dest = (n.lat != null && n.lng != null) ? `${n.lat},${n.lng}` : dir; // coords si hay; si no, dirección
+            if (!dest) { return { speak: 'La próxima entrega no tiene dirección para navegar.', error: true }; }
+            try {
+                window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest), '_blank');
+            } catch { return { speak: 'No pude abrir la navegación.', error: true }; }
+            return { speak: `Abriendo la navegación hacia ${dir ? speakable(dir) : 'tu próxima entrega'}.` };
+        },
+    });
+
     // CV-06 — Consultar el avance de la ruta. Lee LT_PROGRESS (embebido → funciona sin señal).
     register({
         id: 'progress', label: 'avance de la ruta',

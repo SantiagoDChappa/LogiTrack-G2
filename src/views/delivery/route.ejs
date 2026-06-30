@@ -854,6 +854,8 @@
             street:    (_ns.shipment.address && _ns.shipment.address.street)  || null,
             number:    (_ns.shipment.address && _ns.shipment.address.number)  || null,
             recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
+            lat:       (_ns.lat != null ? Number(_ns.lat) : null), // para abrir navegación (CV-16)
+            lng:       (_ns.lng != null ? Number(_ns.lng) : null),
         } : null;
 
         // Buscar un envío por voz (CV-14): lista de entregas con destinatario y dirección.
