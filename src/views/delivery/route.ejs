@@ -619,7 +619,7 @@
                     <button class="btn-panic"    id="btn-panic"    title="Pánico: enviar ubicación a despacho" aria-label="Pánico: enviar ubicación a despacho">
                         <span class="material-symbols-outlined">sos</span>
                     </button>
-                    <button class="btn-incident" id="btn-incident" title="Reportar incidente vehicular / accidente" aria-label="Reportar incidente vehicular / accidente">
+                    <button class="btn-incident" id="btn-incident" title="Reportar incidente en ruta (vehicular, accidente, etc.)" aria-label="Reportar incidente en ruta">
                         <span class="material-symbols-outlined">report</span>
                     </button>
                     <button class="btn-pause"    id="btn-pause"    title="Pausar ruta (almuerzo / combustible)" aria-label="Pausar ruta (almuerzo / combustible)">
@@ -917,6 +917,17 @@
     .swal2-popup .swal2-select {
         max-width: calc(100% - 2.4em);
         box-sizing: border-box;
+    }
+    /* Alinear el combo (select): el margen por defecto de SweetAlert es asimétrico y lo descentra.
+       Lo dejamos ancho completo, centrado y con padding/alto consistentes con los inputs. */
+    .swal2-popup .swal2-select {
+        width: 100%;
+        margin: 1em auto;
+        padding: .55em .9em;
+        height: 2.625em;
+        line-height: 1.4;
+        border-radius: .375em;
+        text-align: left;
     }
     </style>
 
@@ -2519,7 +2530,7 @@
     // === Incidente ===
     document.getElementById('btn-incident')?.addEventListener('click', async () => {
         const { value: form } = await Swal.fire({
-            title: 'Reportar incidente',
+            title: 'Reportar incidente en ruta',
             html: `
                 <div style="text-align:left;display:flex;flex-direction:column;gap:8px">
                     <label style="font-size:.85rem;font-weight:600">Tipo</label>
@@ -2550,7 +2561,7 @@
         if (!form) return;
         const geo = await getGeo();
         const r = await post(`/delivery/route/${routeId}/incident`, { ...form, ...geo });
-        if (r) Swal.fire({ icon: 'success', title: 'Incidente reportado', text: 'Despacho ya fue notificado.', confirmButtonColor: '#2563eb' });
+        if (r) Swal.fire({ icon: 'success', title: 'Incidente en ruta registrado', text: 'Quedó registrado.', confirmButtonColor: '#2563eb' });
     });
 
     // === Pánico ===

@@ -867,7 +867,11 @@ router.post('/route/:id/resume', requireDelivery, async (req, res) => {
     res.json({ ok: true, addedSeconds: totalAdded, closed: opens.length });
 });
 
-// === Reportar incidente vehicular / accidente ===
+// === Reportar incidente EN RUTA (vehicular / accidente / zona insegura) ===
+// Distinto del módulo de Incidencias (Incident) del envío/cliente: esto es del repartidor/ruta.
+// TODO (a definir con el equipo): hoy RouteIncident es write-only — se guarda pero NO se notifica
+// a nadie ni se muestra en un panel. Falta: (1) notificar al supervisor de la sucursal (reusar el
+// sistema de notificaciones de fatiga/incidencias) y (2) una vista para verlos/resolverlos.
 router.post('/route/:id/incident', requireDelivery, async (req, res) => {
     const { RouteIncident } = require('../models/routeIncident');
     const route = await routeModel.getById(req.params.id);
