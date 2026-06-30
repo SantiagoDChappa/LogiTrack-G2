@@ -3,7 +3,7 @@ const router = express.Router();
 const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
-    getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta, getLiveChat, postLiveChat,
+    getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getTrackStatus, getLivePosition, getLiveEta, getLiveChat, postLiveChat,
     getCotizador, cotizarPublic, sucursalesCercanas,
 } = require('../controllers/portal');
 const {
@@ -56,6 +56,8 @@ router.get('/track/:trackingId/eta',      getLiveEta);
 // Chat cliente ↔ repartidor del mapa en vivo (público, por tracking).
 router.get('/track/:trackingId/chat',     getLiveChat);
 router.post('/track/:trackingId/chat',    postLiveChat);
+// Página pública de estado (estilo ML): último estado + ETA / "llegó al punto de retiro" + timeline.
+router.get('/track/:trackingId',          getTrackStatus);
 
 // Cotizador público de envíos (estimación de costo sin login). No expone datos
 // personales (solo parámetros de tarifa). Mejora futura: rate-limit básico en el

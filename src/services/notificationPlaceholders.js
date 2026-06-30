@@ -49,6 +49,12 @@ const CATALOG = [
     { token: 'postalCode',     label: 'Código postal',       group: 'Dirección',    description: 'Código postal de destino.',                    resolve: s => (notNil(s.address?.postalCode) ? String(s.address.postalCode) : '') },
     // Sucursal
     { token: 'branchName',     label: 'Sucursal actual',     group: 'Sucursal',     description: 'Sucursal donde está el envío.',                resolve: s => s.currentBranch?.name || '' },
+    // Retiro en sucursal (evento SHIPMENT_READY_FOR_PICKUP).
+    { token: 'pickupCode',        label: 'Código de retiro',    group: 'Retiro',  description: 'Código que el cliente muestra en la sucursal para retirar.', resolve: s => s.pickupCode || '' },
+    { token: 'pickupBranchName',  label: 'Sucursal de retiro',  group: 'Retiro',  description: 'Nombre de la sucursal donde se retira el envío.',            resolve: s => s.currentBranch?.name || s.pickupBranch?.name || '' },
+    { token: 'pickupBranchAddress', label: 'Dirección de retiro', group: 'Retiro', description: 'Dirección de la sucursal de retiro.',                       resolve: s => s.currentBranch?.address || s.pickupBranch?.address || '' },
+    { token: 'pickupExpires',     label: 'Vence el retiro',     group: 'Retiro',  description: 'Fecha límite para retirar el envío en la sucursal.',         resolve: s => fmtDate(s.pickupExpiresAt) },
+    { token: 'trackingStatusUrl', label: 'Enlace de estado',    group: 'Retiro',  description: '🔗 Página de estado del envío (estilo seguimiento) con el QR para retirar.', resolve: s => (s.trackingId ? `${baseUrl()}/track/${encodeURIComponent(s.trackingId)}` : baseUrl()) },
     // URLs accionables
     { token: 'trackingUrl',    label: 'Enlace seguimiento',  group: 'Enlaces',      description: '🔗 Ver el seguimiento del envío en el portal.', resolve: s => (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl()) },
     { token: 'liveMapUrl',     label: 'Mapa en vivo',        group: 'Enlaces',      description: '🔗 Seguir al repartidor en un mapa en vivo (punto de entrega + ubicación del repartidor en tiempo real).', resolve: s => (s.trackingId ? `${baseUrl()}/track/${encodeURIComponent(s.trackingId)}/live` : baseUrl()) },

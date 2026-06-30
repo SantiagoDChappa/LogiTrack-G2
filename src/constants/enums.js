@@ -10,6 +10,7 @@ const Status = Object.freeze({
     FAILED_ATTEMPT: { id: 9, description: 'Intento Fallido' },
     RETURNED:       { id: 10, description: 'Devuelto'        },
     PENDING_PAYMENT: { id: 11, description: 'Pendiente de Pago' },
+    READY_FOR_PICKUP: { id: 12, description: 'Listo para Retiro' },
 });
 
 const PersonType = Object.freeze({
@@ -104,6 +105,7 @@ const NotificationEvent = Object.freeze({
     SHIPMENT_PENDING:             'SHIPMENT_PENDING',
     SHIPMENT_IN_TRANSIT:          'SHIPMENT_IN_TRANSIT',
     SHIPMENT_IN_BRANCH:           'SHIPMENT_IN_BRANCH',
+    SHIPMENT_READY_FOR_PICKUP:    'SHIPMENT_READY_FOR_PICKUP',   // Listo para retiro en sucursal (con código/QR)
     SHIPMENT_DELIVERED:           'SHIPMENT_DELIVERED',
     SHIPMENT_CANCELLED:           'SHIPMENT_CANCELLED',
     SHIPMENT_ASSIGNED:            'SHIPMENT_ASSIGNED',
@@ -213,6 +215,7 @@ const mapperShipmentStatusToEvent = {
     [Status.PENDING.id]:        NotificationEvent.SHIPMENT_PENDING,
     [Status.IN_TRANSIT.id]:     NotificationEvent.SHIPMENT_IN_TRANSIT,
     [Status.AT_BRANCH.id]:      NotificationEvent.SHIPMENT_IN_BRANCH,
+    [Status.READY_FOR_PICKUP.id]: NotificationEvent.SHIPMENT_READY_FOR_PICKUP,
     [Status.DELIVERED.id]:      NotificationEvent.SHIPMENT_DELIVERED,
     [Status.CANCELLED.id]:      NotificationEvent.SHIPMENT_CANCELLED,
     [Status.ASSIGNED.id]:       NotificationEvent.SHIPMENT_ASSIGNED,

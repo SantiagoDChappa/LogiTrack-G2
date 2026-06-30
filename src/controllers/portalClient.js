@@ -214,6 +214,24 @@ const getShipmentDetail = async (req, res) => {
     const hasAnyReturn = await returnIncidentService.findAnyByShipment(shipmentId);
     const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasAnyReturn;
 
+    // Resumen de estado (estilo ML) + QR de retiro. Acá SÍ se muestra el QR/código porque el
+    // cliente ya está identificado en Mis Envíos.
+    const statusView = require('../services/shipmentStatusView.service');
+    let eta = null;
+    if (enriched.deliveryMode !== 'branch_pickup') {
+        try { eta = await require('../services/etaWindow.service').etaForShipment(enriched.id); }
+        catch { /* sin ETA */ }
+    }
+    const sv = statusView.buildStatusMessage(enriched, eta);
+    const timeline = statusView.buildTimeline(enriched.history);
+    let qrDataUrl = null;
+    let pickup = null;
+    if (sv.isReady && enriched.pickupToken) {
+        try { qrDataUrl = await require('qrcode').toDataURL(enriched.pickupToken, { width: 320, margin: 1 }); }
+        catch (e) { console.error('[pickup] QR gen:', e.message); }
+        pickup = { code: enriched.pickupCode || '', expires: statusView.fmtDate(enriched.pickupExpiresAt) };
+    }
+
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
@@ -224,6 +242,7 @@ const getShipmentDetail = async (req, res) => {
         returns,
         canRequestReturn,
         returnError: req.query.returnError ? String(req.query.returnError) : null,
+        sv, timeline, qrDataUrl, pickup,
     });
 };
 

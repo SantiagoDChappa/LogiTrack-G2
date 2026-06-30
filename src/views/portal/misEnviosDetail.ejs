@@ -41,6 +41,21 @@
             </a>
             <% } %>
 
+            <%# Resumen de estado estilo ML (último estado + QR/código de retiro si aplica). El
+                detalle completo queda debajo. %>
+            <% if (typeof sv !== 'undefined' && sv) { %>
+                <%- include('../partials/shipment-status-summary', {
+                    sv,
+                    timeline: typeof timeline !== 'undefined' ? timeline : [],
+                    authed: true,
+                    qrDataUrl: typeof qrDataUrl !== 'undefined' ? qrDataUrl : null,
+                    pickup: typeof pickup !== 'undefined' ? pickup : null,
+                    trackingId: shipment.trackingId,
+                    detailUrl: null,
+                    identifyUrl: null,
+                }) %>
+            <% } %>
+
             <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
 
             <%# LGT-182 — Devoluciones del envío %>
