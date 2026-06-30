@@ -340,6 +340,20 @@
         },
     });
 
+    // Hora estimada de fin de la ruta — lee la métrica que ya calcula la vista (#m-eta).
+    register({
+        id: 'eta', label: 'hora de fin',
+        keywords: ['a que hora termino', 'cuando termino', 'a que hora termina la ruta',
+            'cuando termina la ruta', 'hora de fin', 'hora estimada de fin'],
+        run: () => {
+            const el = document.getElementById('m-eta');
+            const v = el ? el.textContent.trim() : '';
+            if (!v || v === '—') { return { speak: 'Todavía no puedo calcular la hora de fin de la ruta.' }; }
+            if (/completa/i.test(v)) { return { speak: 'Ya completaste la ruta.' }; }
+            return { speak: `Calculo que terminás cerca de las ${v}.` };
+        },
+    });
+
     // CV-03 — Registrar y retomar una pausa (acción real vía hooks de la vista).
     register({
         id: 'pause', label: 'registrar pausa',
