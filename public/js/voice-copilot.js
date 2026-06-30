@@ -107,6 +107,30 @@
     function cleanMotivo(raw) {
         return String(raw || '').trim().replace(/^(porque|por que|el motivo es|motivo|ya que|es que|por)\s+/i, '').trim();
     }
+    // Motivo OPCIONAL de pausa para trazabilidad: si el repartidor lo dice en la misma frase
+    // ("registrar pausa por almuerzo") lo tomamos; si no, queda genérico. Cero turnos extra.
+    function extractPauseReason(raw) {
+        return String(raw || '').trim()
+            .replace(/^\s*(registrar pausa|tomar pausa|pausar la ruta|pausar ruta|poner en pausa|pausar|pausa|pausame)\b[\s,:.]*/i, '')
+            .replace(/^(por|porque|para|por que|el motivo es|motivo|a)\s+/i, '')
+            .trim();
+    }
+    const PAUSE_REASONS = [
+        { code: 'almuerzo',    syn: ['almuerzo', 'almorzar', 'comer', 'comida', 'la comida', 'a comer'] },
+        { code: 'combustible', syn: ['combustible', 'nafta', 'gasoil', 'gas oil', 'cargar nafta', 'cargar combustible', 'cargar', 'estacion de servicio', 'surtidor'] },
+        { code: 'descanso',    syn: ['descanso', 'descansar', 'un rato', 'parar un rato', 'bano', 'cafe', 'estirar las piernas', 'merienda'] },
+    ];
+    // Devuelve { reason, label } — reason va al backend; label es para confirmar por voz.
+    function classifyPauseReason(raw) {
+        const text = extractPauseReason(raw);
+        const t = normalize(text);
+        if (!t) { return { reason: 'pausa', label: '' }; }                       // no dijo motivo → genérico
+        for (const r of PAUSE_REASONS) {
+            if (r.syn.some((s) => t.includes(normalize(s)))) { return { reason: r.code, label: r.code }; }
+        }
+        const free = text.slice(0, 60);                                          // motivo libre (no encaja en el catálogo)
+        return { reason: free, label: free };
+    }
     function classifyFailedConfirm(text) {
         const t = normalize(text);
         if (/^(si|sí|sip|dale|confirmo|confirmar|correcto|afirmativo|ok|oka|okey|de una|obvio|asi es)\b/.test(t)) { return 'yes'; }
@@ -235,9 +259,9 @@
 
     register({
         id: 'help', label: 'Ayuda',
-        keywords: ['que puedo decir', 'que puedo hacer', 'ayuda', 'comandos', 'opciones'],
-        run: () => ({ speak: 'Podés decir: cuál es mi próxima entrega; registrar pausa; retomar ruta; '
-            + 'reportar zona insegura; o entrega fallida. También “ayuda” para repetir esta lista.' }),
+        keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
+        run: () => ({ speak: 'Podés pedirme: próxima entrega, cuántas paradas quedan, '
+            + 'registrar o retomar pausa, reportar zona insegura, o entrega fallida.' }),
     });
 
     // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
@@ -307,11 +331,13 @@
             if (c.paused) { return { ok: false, reason: 'Ya hay una pausa en curso.' }; } // CA3
             return { ok: true };
         },
-        run: async () => {
+        run: async (c, raw) => {
             if (typeof window.LT_voicePause !== 'function') { return { speak: 'No puedo registrar la pausa ahora.', error: true }; }
-            const r = await window.LT_voicePause('pausa');
-            if (r.ok && r.queued) { return { speak: 'Sin señal: la pausa quedó en cola y se registra al volver la conexión.' }; } // CV-17
-            if (r.ok) { return { speak: 'Listo, pausa registrada. Decime retomar ruta cuando arranques de nuevo.' }; } // CA1
+            const { reason, label } = classifyPauseReason(raw); // motivo opcional para trazabilidad
+            const por = label ? ` por ${label}` : '';
+            const r = await window.LT_voicePause(reason);
+            if (r.ok && r.queued) { return { speak: `Sin señal: la pausa${por} quedó en cola y se registra al volver la conexión.` }; } // CV-17
+            if (r.ok) { return { speak: `Listo, pausa registrada${por}. Decime retomar ruta cuando arranques de nuevo.` }; } // CA1
             if (r.already) { return { speak: 'Ya hay una pausa en curso.' }; }                                       // CA3 (carrera)
             return { speak: 'No pude registrar la pausa, probá de nuevo.', error: true };                            // CA6
         },
@@ -386,7 +412,7 @@
     // "ayuda" queda para la lista de comandos; la emergencia usa disparadores inequívocos.
     register({
         id: 'panic', label: 'emergencia',
-        keywords: ['emergencia', 'panico', 'pánico', 'socorro', 'auxilio', 'sos', 'ayuda urgente', 'necesito ayuda', 'pedir ayuda'],
+        keywords: ['emergencia', 'panico', 'pánico', 'socorro', 'auxilio', 'sos', 'ayuda', 'ayuda urgente', 'necesito ayuda', 'pedir ayuda'],
         confirm: '¿Confirmás que querés enviar una alerta de emergencia a la central?', // CA1 (confirmación breve)
         run: async () => {
             const geo = await getGeo();
@@ -757,7 +783,7 @@
         const matches = scoreCommands(text);
         if (matches.length === 0) {                                  // CA8 no reconocida
             track('no-match', { words: tokens(text).length });       // mide la tasa de "no entendí" sin guardar lo dictado
-            return respond('No entendí, ¿podés repetir? Podés decir “¿qué puedo decir?”.', { error: true, relisten: true });
+            return respond('No entendí. Decí “opciones” para ver qué podés pedir.', { error: true, relisten: true });
         }
         const top = matches[0];
         const second = matches[1];
