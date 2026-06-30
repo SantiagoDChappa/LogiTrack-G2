@@ -41,6 +41,7 @@
     let pendingPrompt = null;  // función que captura la próxima respuesta (flujo multipaso: motivo de fallida)
     let audioCtx = null;
     let speakGen = 0;         // invalida callbacks de locuciones interrumpidas (CA12)
+    let lastResponse = '';    // última cosa que dijo el copiloto (para el comando "repetir")
     let turnGen = 0;          // invalida respuestas de red que llegan tarde tras cancelar/empezar otra orden
     let wakeMode = false;     // CV-12: escucha continua de la palabra clave (opt-in)
     let wakeRec = null;       // reconocimiento de fondo para el wake word
@@ -237,6 +238,15 @@
         keywords: ['que puedo decir', 'que puedo hacer', 'ayuda', 'comandos', 'opciones'],
         run: () => ({ speak: 'Podés decir: cuál es mi próxima entrega; registrar pausa; retomar ruta; '
             + 'reportar zona insegura; o entrega fallida. También “ayuda” para repetir esta lista.' }),
+    });
+
+    // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
+    register({
+        id: 'repeat', label: 'repetir',
+        keywords: ['repetir', 'repeti', 'repetilo', 'que dijiste', 'no escuche', 'no te escuche', 'como dijiste', 'no escuche bien'],
+        run: () => (lastResponse
+            ? { speak: lastResponse }
+            : { speak: 'Todavía no dije nada para repetir.' }),
     });
 
     // CV-02 — Consultar la próxima entrega.
@@ -555,7 +565,14 @@
     const earcon = {
         start:   () => tone(660, 0.12, 'sine'),
         process: () => tone(520, 0.07, 'sine'),
-        error:   () => tone(220, 0.20, 'triangle'),
+        ok:      () => { tone(700, 0.09, 'sine'); setTimeout(() => tone(950, 0.11, 'sine'), 95); }, // ascendente = éxito
+        error:   () => tone(220, 0.20, 'triangle'),                                                 // grave = error
+    };
+    // Vibración (solo móvil): feedback sin mirar ni depender del audio (lo más "manos al volante").
+    const buzz = {
+        start: () => { try { if (navigator.vibrate) { navigator.vibrate(40); } } catch { /* noop */ } },
+        ok:    () => { try { if (navigator.vibrate) { navigator.vibrate(60); } } catch { /* noop */ } },
+        error: () => { try { if (navigator.vibrate) { navigator.vibrate([70, 50, 70]); } } catch { /* noop */ } }, // doble = error
     };
 
     // ── Voz (TTS) ───────────────────────────────────────────────────────────────
@@ -671,7 +688,7 @@
         recognition.continuous = false;
         let handled = false;
 
-        recognition.onstart = () => { listenStartedAt = Date.now(); setState('listening'); earcon.start(); showBubble(LABELS.listening, 'state'); };
+        recognition.onstart = () => { listenStartedAt = Date.now(); setState('listening'); earcon.start(); buzz.start(); showBubble(LABELS.listening, 'state'); };
         recognition.onresult = (ev) => {
             handled = true;
             clearTimeout(noSpeechTimer);
@@ -794,7 +811,11 @@
         opts = opts || {};
         setState('speaking');
         showBubble(text, opts.error ? 'error' : 'info');
-        if (opts.error) { earcon.error(); }
+        lastResponse = text; // para el comando "repetir"
+        // Feedback sin escuchar la frase: tono + vibración distintos según resultado.
+        // Solo en respuestas terminales (no en preguntas/relisten, que son neutras).
+        if (opts.error) { earcon.error(); buzz.error(); }
+        else if (!opts.relisten) { earcon.ok(); buzz.ok(); }
         speak(text, () => {
             if (opts.relisten && SpeechRec) { startListening(); return; }
             setState('idle');
