@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Satisfacción del Cliente</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        .sat-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .sat-kpi-card { background: var(--rp-surface); border: 1px solid var(--rp-border); border-radius: var(--rp-radius); padding: 1.25rem; text-align: center; position: relative; overflow: hidden; box-shadow: var(--rp-shadow); }
+        .sat-kpi-card--highlight { border-color: var(--rp-blue); box-shadow: 0 0 0 1px var(--rp-blue); }
+        .sat-kpi-value { font-size: 2rem; font-weight: 700; color: var(--rp-blue); line-height: 1.2; }
+        .sat-kpi-label { font-size: .85rem; color: var(--rp-muted); margin-top: .25rem; }
+        .sat-kpi-stars { color: #f59e0b; font-size: 1.1rem; margin-top: .25rem; }
+        .sat-kpi-sublabel { font-size: .75rem; color: var(--rp-muted); margin-top: .15rem; }
+
+        .sat-rating-color--green { color: #22c55e; }
+        .sat-rating-color--amber { color: #f59e0b; }
+        .sat-rating-color--red { color: #ef4444; }
+
+        .sat-nps-gauge { display: flex; align-items: center; justify-content: center; gap: .5rem; margin-top: .35rem; }
+        .sat-nps-bar { width: 80%; height: 8px; background: linear-gradient(to right, #ef4444 0%, #f59e0b 50%, #22c55e 100%); border-radius: 4px; position: relative; }
+        .sat-nps-marker { position: absolute; top: -3px; width: 14px; height: 14px; background: var(--rp-text); border: 2px solid var(--rp-surface); border-radius: 50%; transform: translateX(-50%); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+        .sat-rate-bar { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; }
+        .sat-rate-bar-track { flex: 1; height: 8px; background: var(--rp-border); border-radius: 4px; overflow: hidden; }
+        .sat-rate-bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+        .sat-rate-bar-fill--green { background: #22c55e; }
+        .sat-rate-bar-fill--amber { background: #f59e0b; }
+        .sat-rate-bar-fill--red { background: #ef4444; }
+
+        .sat-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        @media (max-width: 900px) { .sat-charts-grid { grid-template-columns: 1fr; } }
+        .sat-chart-card { background: var(--rp-surface); border: 1px solid var(--rp-border); border-radius: var(--rp-radius); padding: 1.25rem; box-shadow: var(--rp-shadow); }
+        .sat-chart-card h3 { font-size: 1rem; margin: 0 0 1rem 0; color: var(--rp-text); }
+        .sat-chart-full { grid-column: 1 / -1; }
+
+        .sat-detail-card { background: var(--rp-surface); border: 1px solid var(--rp-border); border-radius: var(--rp-radius); padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--rp-shadow); }
+        .sat-detail-card h2 { font-size: 1.1rem; margin: 0 0 1rem 0; color: var(--rp-text); display: flex; align-items: center; gap: .5rem; }
+
+        .sat-comments-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .75rem; }
+        .sat-comment-item { border: 1px solid var(--rp-border); border-radius: .5rem; padding: .75rem 1rem; background: var(--rp-bg); }
+        .sat-comment-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .35rem; flex-wrap: wrap; }
+        .sat-comment-stars { color: #f59e0b; font-size: .9rem; display: flex; gap: 1px; }
+        .sat-comment-meta { font-size: .75rem; color: var(--rp-muted); }
+        .sat-comment-badge { display: inline-block; font-size: .7rem; padding: .1rem .4rem; border-radius: .25rem; font-weight: 600; }
+        .sat-comment-badge--delivery { background: rgba(59,130,246,.15); color: #60a5fa; }
+        .sat-comment-badge--incident { background: rgba(245,158,11,.15); color: #fbbf24; }
+        html:not([data-theme="dark"]) .sat-comment-badge--delivery { background: #dbeafe; color: #1e40af; }
+        html:not([data-theme="dark"]) .sat-comment-badge--incident { background: #fef3c7; color: #92400e; }
+        .sat-comment-text { font-size: .9rem; color: var(--rp-text); line-height: 1.5; }
+        .sat-comment-empty { text-align: center; padding: 1.5rem; color: var(--rp-muted); }
+
+        .sat-comp-table { width: 100%; border-collapse: collapse; }
+        .sat-comp-table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--rp-muted); text-align: right; padding: .5rem .75rem; border-bottom: 2px solid var(--rp-border); }
+        .sat-comp-table th:first-child { text-align: left; }
+        .sat-comp-table td { padding: .65rem .75rem; text-align: right; border-bottom: 1px solid var(--rp-border); font-size: .9rem; color: var(--rp-text); }
+        .sat-comp-table td:first-child { text-align: left; font-weight: 600; }
+        .sat-comp-table tbody tr:last-child td { border-bottom: none; }
+        .sat-comp-table .sat-inline-stars { display: inline-flex; gap: 1px; margin-left: .35rem; vertical-align: middle; }
+
+        .filter-row-extra { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--rp-border); }
+        .filter-row-extra .filter-field { min-width: 180px; }
+
+        .filter-row-extra select {
+            padding: .5rem .75rem;
+            border: 1px solid var(--rp-border);
+            border-radius: 8px;
+            background: var(--rp-bg);
+            color: var(--rp-text);
+            font-size: .9rem;
+            outline: none;
+            cursor: pointer;
+            transition: border-color .15s;
+        }
+        .filter-row-extra select:focus { border-color: var(--rp-blue); }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Satisfacción del Cliente</h1>
+            </div>
+
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/satisfaction" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="type">Tipo de encuesta</label>
+                            <select id="type" name="type">
+                                <option value="all" <%= surveyType === 'all' ? 'selected' : '' %>>Todas</option>
+                                <option value="delivery" <%= surveyType === 'delivery' ? 'selected' : '' %>>Entregas</option>
+                                <option value="incident" <%= surveyType === 'incident' ? 'selected' : '' %>>Incidencias</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/satisfaction" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/satisfaction/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                                <a href="/report/satisfaction/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="action-btn action-btn--lg neutro" data-tooltip="Exportar PDF" aria-label="Exportar PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <div class="filter-row-extra" id="extra-filters">
+                        <div class="filter-field" id="field-incidentType" style="<%= surveyType === 'delivery' ? 'display:none' : '' %>">
+                            <label for="incidentTypeId">Tipo de incidencia</label>
+                            <select id="incidentTypeId" name="incidentTypeId">
+                                <option value="">Todos los tipos</option>
+                                <% (incidentTypes || []).forEach(function(it) { %>
+                                    <option value="<%= it.id %>" <%= incidentTypeId == it.id ? 'selected' : '' %>><%= it.description %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="filter-field" id="field-deliveryStatus" style="<%= surveyType === 'incident' ? 'display:none' : '' %>">
+                            <label for="deliveryStatus">Estado terminal (envío)</label>
+                            <select id="deliveryStatus" name="deliveryStatus">
+                                <option value="">Entregado + Cancelado</option>
+                                <option value="4" <%= deliveryStatus == 4 ? 'selected' : '' %>>Entregado</option>
+                                <option value="5" <%= deliveryStatus == 5 ? 'selected' : '' %>>Cancelado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% if (!error) { %>
+                <% if (kpis.totalSurveys === 0) { %>
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">sentiment_neutral</span>
+                            <p>No existen encuestas respondidas en el período <strong><%= dateFrom %></strong> → <strong><%= dateTo %></strong>.</p>
+                        </div>
+                    </div>
+                <% } else { %>
+
+                <%
+                    var ratingColor = kpis.overallAvg >= 4 ? 'green' : kpis.overallAvg >= 3 ? 'amber' : 'red';
+                    var npsVal = kpis.nps || 0;
+                    var npsColor = npsVal >= 50 ? 'green' : npsVal >= 0 ? 'amber' : 'red';
+                    var npsMarkerPct = Math.min(100, Math.max(0, (npsVal + 100) / 2));
+                    var rr = kpis.responseRate || {};
+                    var rrPct = rr.pct || 0;
+                    var rrColor = rrPct >= 60 ? 'green' : rrPct >= 30 ? 'amber' : 'red';
+                %>
+
+                <div class="report-summary-banner">
+                    <span class="material-symbols-outlined">sentiment_satisfied</span>
+                    <span><%= kpis.totalSurveys %> encuesta<%= kpis.totalSurveys !== 1 ? 's' : '' %> en el período —
+                        NPS: <strong class="sat-rating-color--<%= npsColor %>"><%= npsVal > 0 ? '+' : '' %><%= npsVal %></strong> ·
+                        Promedio: <strong class="sat-rating-color--<%= ratingColor %>"><%= Number(kpis.overallAvg).toFixed(1) %> / 5.0</strong>
+                    </span>
+                    <span class="period-label"><%= dateFrom %> → <%= dateTo %></span>
+                </div>
+
+                <div class="sat-kpis">
+                    <div class="sat-kpi-card sat-kpi-card--highlight">
+                        <div class="sat-kpi-value sat-rating-color--<%= npsColor %>"><%= npsVal > 0 ? '+' : '' %><%= npsVal %></div>
+                        <div class="sat-nps-gauge">
+                            <div class="sat-nps-bar">
+                                <div class="sat-nps-marker" style="left:<%= npsMarkerPct %>%"></div>
+                            </div>
+                        </div>
+                        <div class="sat-kpi-label">NPS</div>
+                        <div class="sat-kpi-sublabel">Net Promoter Score</div>
+                    </div>
+                    <div class="sat-kpi-card">
+                        <div class="sat-kpi-value sat-rating-color--<%= ratingColor %>"><%= Number(kpis.overallAvg).toFixed(1) %></div>
+                        <div class="sat-kpi-stars">
+                            <% for (var i = 1; i <= 5; i++) { %>
+                                <span class="material-symbols-outlined" style="font-size:1.1rem;<%= i <= Math.round(kpis.overallAvg) ? 'color:#f59e0b' : 'color:#cbd5e1' %>">star</span>
+                            <% } %>
+                        </div>
+                        <div class="sat-kpi-label">Promedio general</div>
+                        <div class="sat-kpi-sublabel"><%= kpis.totalSurveys %> respuestas</div>
+                    </div>
+                    <% kpis.dimensions.forEach(function(d) { %>
+                        <% var dColor = d.avg >= 4 ? 'green' : d.avg >= 3 ? 'amber' : 'red'; %>
+                        <div class="sat-kpi-card">
+                            <div class="sat-kpi-value sat-rating-color--<%= dColor %>"><%= Number(d.avg).toFixed(1) %></div>
+                            <div class="sat-kpi-stars">
+                                <% for (var j = 1; j <= 5; j++) { %>
+                                    <span class="material-symbols-outlined" style="font-size:1rem;<%= j <= Math.round(d.avg) ? 'color:#f59e0b' : 'color:#cbd5e1' %>">star</span>
+                                <% } %>
+                            </div>
+                            <div class="sat-kpi-label"><%= d.label %></div>
+                        </div>
+                    <% }); %>
+                    <div class="sat-kpi-card">
+                        <div class="sat-kpi-value sat-rating-color--<%= rrColor %>"><%= rrPct %>%</div>
+                        <div class="sat-rate-bar">
+                            <div class="sat-rate-bar-track">
+                                <div class="sat-rate-bar-fill sat-rate-bar-fill--<%= rrColor %>" style="width:<%= rrPct %>%"></div>
+                            </div>
+                        </div>
+                        <div class="sat-kpi-label">Tasa de respuesta</div>
+                        <div class="sat-kpi-sublabel"><%= rr.responded || 0 %> de <%= rr.eligible || 0 %> elegibles</div>
+                    </div>
+                </div>
+
+                <div class="sat-charts-grid">
+                    <div class="sat-chart-card sat-chart-full">
+                        <h3><span class="material-symbols-outlined" style="font-size:1.1rem;vertical-align:middle;margin-right:.25rem">trending_up</span>Tendencia mensual — Satisfacción y NPS</h3>
+                        <canvas id="trendChart" height="80"></canvas>
+                    </div>
+
+                    <div class="sat-chart-card">
+                        <h3><span class="material-symbols-outlined" style="font-size:1.1rem;vertical-align:middle;margin-right:.25rem">bar_chart</span>Comparativa por tipo de encuesta</h3>
+                        <canvas id="compChart" height="220"></canvas>
+                    </div>
+
+                    <div class="sat-chart-card">
+                        <h3><span class="material-symbols-outlined" style="font-size:1.1rem;vertical-align:middle;margin-right:.25rem">donut_large</span>Distribución de calificaciones</h3>
+                        <canvas id="distChart" height="220"></canvas>
+                    </div>
+                </div>
+
+                <% if (comparison.length > 0) { %>
+                <div class="sat-detail-card">
+                    <h2>
+                        <span class="material-symbols-outlined">table_chart</span>
+                        Detalle comparativo por tipo
+                    </h2>
+                    <table class="sat-comp-table">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Respuestas</th>
+                                <th>General</th>
+                                <% if (surveyType === 'all') { %>
+                                    <th>Dim. Entregas</th>
+                                    <th>Dim. Incidencias</th>
+                                <% } else { %>
+                                    <% kpis.dimensions.forEach(function(d) { %>
+                                        <th><%= d.label %></th>
+                                    <% }); %>
+                                <% } %>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% comparison.forEach(function(row) { %>
+                                <%
+                                    var typeLabel = row.survey_type === 'delivery' ? 'Entregas' : 'Incidencias';
+                                    var dimLabels = row.survey_type === 'delivery'
+                                        ? ['Puntualidad', 'Estado paquete', 'Atención']
+                                        : ['Tiempo resolución', 'Comunicación', 'Resultado'];
+                                %>
+                                <tr>
+                                    <td><%= typeLabel %></td>
+                                    <td><%= row.total %></td>
+                                    <td>
+                                        <%= Number(row.avg_overall).toFixed(1) %>
+                                        <span class="sat-inline-stars">
+                                            <% for (var s = 1; s <= 5; s++) { %>
+                                                <span class="material-symbols-outlined" style="font-size:.85rem;<%= s <= Math.round(row.avg_overall) ? 'color:#f59e0b' : 'color:#cbd5e1' %>">star</span>
+                                            <% } %>
+                                        </span>
+                                    </td>
+                                    <% if (surveyType === 'all') { %>
+                                        <td style="font-size:.8rem;text-align:left;line-height:1.6">
+                                            <% if (row.survey_type === 'delivery') { %>
+                                                <%= dimLabels[0] %>: <strong><%= Number(row.avg_dim1).toFixed(1) %></strong><br>
+                                                <%= dimLabels[1] %>: <strong><%= Number(row.avg_dim2).toFixed(1) %></strong><br>
+                                                <%= dimLabels[2] %>: <strong><%= Number(row.avg_dim3).toFixed(1) %></strong>
+                                            <% } else { %>
+                                                <span style="color:var(--rp-muted)">—</span>
+                                            <% } %>
+                                        </td>
+                                        <td style="font-size:.8rem;text-align:left;line-height:1.6">
+                                            <% if (row.survey_type === 'incident') { %>
+                                                <%= dimLabels[0] %>: <strong><%= Number(row.avg_dim1).toFixed(1) %></strong><br>
+                                                <%= dimLabels[1] %>: <strong><%= Number(row.avg_dim2).toFixed(1) %></strong><br>
+                                                <%= dimLabels[2] %>: <strong><%= Number(row.avg_dim3).toFixed(1) %></strong>
+                                            <% } else { %>
+                                                <span style="color:var(--rp-muted)">—</span>
+                                            <% } %>
+                                        </td>
+                                    <% } else { %>
+                                        <td><%= Number(row.avg_dim1).toFixed(1) %></td>
+                                        <td><%= Number(row.avg_dim2).toFixed(1) %></td>
+                                        <td><%= Number(row.avg_dim3).toFixed(1) %></td>
+                                    <% } %>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+
+                <div class="sat-detail-card">
+                    <h2>
+                        <span class="material-symbols-outlined">chat_bubble</span>
+                        Comentarios recientes de clientes
+                    </h2>
+                    <% if (recentComments.length === 0) { %>
+                        <div class="sat-comment-empty">
+                            <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:.5rem">speaker_notes_off</span>
+                            No hay comentarios en el período seleccionado.
+                        </div>
+                    <% } else { %>
+                        <ul class="sat-comments-list">
+                            <% recentComments.forEach(function(c) { %>
+                                <li class="sat-comment-item">
+                                    <div class="sat-comment-header">
+                                        <span class="sat-comment-badge sat-comment-badge--<%= c.survey_type %>">
+                                            <%= c.survey_type === 'delivery' ? 'Entrega' : 'Incidencia' %>
+                                        </span>
+                                        <span class="sat-comment-stars">
+                                            <% for (var r = 1; r <= 5; r++) { %>
+                                                <span class="material-symbols-outlined" style="font-size:.9rem;<%= r <= c.rating ? 'color:#f59e0b' : 'color:#cbd5e1' %>">star</span>
+                                            <% } %>
+                                        </span>
+                                        <span class="sat-comment-meta"><%= c.ref %> · <%= new Date(c.createdAt).toLocaleDateString('es-AR') %></span>
+                                    </div>
+                                    <div class="sat-comment-text"><%= c.comment %></div>
+                                </li>
+                            <% }); %>
+                        </ul>
+                    <% } %>
+                </div>
+
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            var from = document.getElementById('from').value;
+            var to = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                var existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    var alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+
+        (function() {
+            var typeSelect = document.getElementById('type');
+            var fieldIncident = document.getElementById('field-incidentType');
+            var fieldDelivery = document.getElementById('field-deliveryStatus');
+            function toggleExtraFilters() {
+                var v = typeSelect.value;
+                fieldIncident.style.display = v === 'delivery' ? 'none' : '';
+                fieldDelivery.style.display = v === 'incident' ? 'none' : '';
+            }
+            typeSelect.addEventListener('change', toggleExtraFilters);
+        })();
+
+        <% if (!error && kpis.totalSurveys > 0) { %>
+        (function() {
+            var trend = <%- JSON.stringify(trend) %>;
+            var comparison = <%- JSON.stringify(comparison) %>;
+            var distribution = <%- JSON.stringify(distribution) %>;
+            var compDimLabels = <%- JSON.stringify(comparisonDimLabels) %>;
+
+            var monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            function formatMonth(ym) {
+                var parts = ym.split('-');
+                var mi = parseInt(parts[1], 10) - 1;
+                return monthNames[mi] + ' ' + parts[0];
+            }
+
+            if (trend.length > 0) {
+                new Chart(document.getElementById('trendChart'), {
+                    type: 'line',
+                    data: {
+                        labels: trend.map(function(r) { return formatMonth(r.month); }),
+                        datasets: [{
+                            label: 'Promedio general',
+                            data: trend.map(function(r) { return r.avg_overall; }),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37,99,235,0.08)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#2563eb',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                        }, {
+                            label: 'NPS',
+                            data: trend.map(function(r) { return r.nps; }),
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139,92,246,0.08)',
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#8b5cf6',
+                            borderDash: [5, 3],
+                            yAxisID: 'y1',
+                        }, {
+                            label: 'Cantidad de respuestas',
+                            data: trend.map(function(r) { return r.total; }),
+                            borderColor: '#94a3b8',
+                            backgroundColor: 'rgba(148,163,184,0.1)',
+                            borderDash: [2, 4],
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3,
+                            yAxisID: 'y2',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            y: { min: 0, max: 5, ticks: { stepSize: 1, color: '#94a3b8' }, title: { display: true, text: 'Calificación', color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+                            y1: { position: 'right', min: -100, max: 100, ticks: { stepSize: 50, color: '#8b5cf6' }, title: { display: true, text: 'NPS', color: '#8b5cf6' }, grid: { display: false } },
+                            y2: { display: false, beginAtZero: true },
+                            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.12)' } }
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 12, boxWidth: 14 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        if (ctx.datasetIndex === 0) return 'Promedio: ' + ctx.parsed.y.toFixed(1) + ' / 5.0';
+                                        if (ctx.datasetIndex === 1) return 'NPS: ' + (ctx.parsed.y > 0 ? '+' : '') + ctx.parsed.y;
+                                        return 'Respuestas: ' + ctx.parsed.y;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (comparison.length > 0) {
+                var labels = comparison.map(function(r) { return r.survey_type === 'delivery' ? 'Entregas' : 'Incidencias'; });
+                var datasets = [
+                    { label: 'General', data: comparison.map(function(r) { return r.avg_overall; }), backgroundColor: '#2563eb', borderRadius: 4, borderSkipped: false },
+                ];
+
+                comparison.forEach(function(r, idx) {
+                    var dimL = compDimLabels[r.survey_type] || ['Dim. 1', 'Dim. 2', 'Dim. 3'];
+                    if (idx === 0) {
+                        datasets.push({ label: dimL[0], data: [], backgroundColor: '#f59e0b', borderRadius: 4, borderSkipped: false });
+                        datasets.push({ label: dimL[1], data: [], backgroundColor: '#10b981', borderRadius: 4, borderSkipped: false });
+                        datasets.push({ label: dimL[2], data: [], backgroundColor: '#8b5cf6', borderRadius: 4, borderSkipped: false });
+                    }
+                });
+
+                comparison.forEach(function(r) {
+                    datasets[1].data.push(r.avg_dim1);
+                    datasets[2].data.push(r.avg_dim2);
+                    datasets[3].data.push(r.avg_dim3);
+                });
+
+                new Chart(document.getElementById('compChart'), {
+                    type: 'bar',
+                    data: { labels: labels, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { min: 0, max: 5, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+                            x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                        },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 10, boxWidth: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' / 5.0'; }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (distribution.length > 0) {
+                var allRatings = [1, 2, 3, 4, 5];
+                var distMap = {};
+                var totalDist = 0;
+                distribution.forEach(function(r) { distMap[r.rating] = r.count; totalDist += r.count; });
+                var distData = allRatings.map(function(r) { return distMap[r] || 0; });
+                var distColors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e'];
+
+                new Chart(document.getElementById('distChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: allRatings.map(function(r) { return r + ' estrella' + (r !== 1 ? 's' : ''); }),
+                        datasets: [{
+                            data: distData,
+                            backgroundColor: distColors,
+                            borderWidth: 2,
+                            borderColor: 'var(--rp-surface)',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        cutout: '55%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 10, boxWidth: 12, generateLabels: function(chart) {
+                                var data = chart.data;
+                                return data.labels.map(function(label, i) {
+                                    var value = data.datasets[0].data[i];
+                                    var pct = totalDist > 0 ? Math.round(value / totalDist * 100) : 0;
+                                    return { text: label + ' (' + value + ' - ' + pct + '%)', fillStyle: data.datasets[0].backgroundColor[i], hidden: false, index: i };
+                                });
+                            }}},
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        var pct = totalDist > 0 ? Math.round(ctx.parsed / totalDist * 100) : 0;
+                                        return ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        })();
+        <% } %>
+    </script>
+</body>
+</html>

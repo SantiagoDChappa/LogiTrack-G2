@@ -1,0 +1,20 @@
+<%#
+  Partial reutilizable: lista de pasos numerados visuales (reemplaza <ol> planos).
+  Locals:
+    - steps (requerido) array de objetos:
+        { title?: string, html: string, figure?: { src, alt, caption? } }
+  Uso desde un artículo: incluir '../partials/steps' pasando el array `steps`,
+  donde cada paso admite title (texto), html (contenido) y un figure opcional
+  con { src, alt, caption } que se renderiza con el partial figure.
+%>
+<ol class="help-steps">
+    <% (steps || []).forEach(function (step) { %>
+    <li class="help-steps__item">
+        <% if (step.title) { %><p class="help-steps__title"><%- step.title %></p><% } %>
+        <% if (step.html) { %><div class="help-steps__text"><%- step.html %></div><% } %>
+        <% if (step.figure && step.figure.src) { %>
+        <%- include('figure', { src: step.figure.src, alt: step.figure.alt || '', caption: step.figure.caption || '' }) %>
+        <% } %>
+    </li>
+    <% }); %>
+</ol>

@@ -1,0 +1,256 @@
+<%
+    // Defensivo: este template se renderiza desde distintos lugares que no siempre
+    // pasan todas las variables. Bajo EJS un `with(locals)` NO cubre props inexistentes,
+    // así que referenciarlas directo tira ReferenceError. Normalizamos todo acá.
+    var _status  = (typeof status  !== 'undefined' && status)  ? status  : 500;
+    var _message = (typeof message !== 'undefined') ? message : null;
+    var _stack   = (typeof stack   !== 'undefined') ? stack   : null;
+    var _reason  = (typeof reason  !== 'undefined') ? reason  : null;
+    var _popup   = (typeof popup   !== 'undefined') ? popup   : false;
+    var _isProd  = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production');
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <title><%= _status %> — LogiTrack</title>
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: var(--color-bg);
+            padding: var(--space-6);
+        }
+
+        .error-container {
+            text-align: center;
+            max-width: 480px;
+            width: 100%;
+        }
+
+        /* Modo popup/modal: card flotante sobre fondo atenuado */
+        body.is-popup {
+            background-color: rgba(0, 0, 0, 0.45);
+        }
+
+        body.is-popup .error-container {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+            padding: var(--space-8) var(--space-6);
+            animation: popup-in 0.18s ease-out;
+        }
+
+        @keyframes popup-in {
+            from { opacity: 0; transform: translateY(8px) scale(0.98); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        .error-icon-wrap {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-6);
+            background-color: var(--color-danger-bg);
+            color: var(--color-danger);
+        }
+
+        .error-icon-wrap.warn {
+            background-color: var(--color-warning-bg);
+            color: var(--color-warning);
+        }
+
+        .error-icon-wrap .material-symbols-outlined {
+            font-size: 2.5rem;
+        }
+
+        .error-code {
+            font-size: 5rem;
+            font-weight: 800;
+            color: var(--color-text);
+            line-height: 1;
+            letter-spacing: -0.04em;
+            margin-bottom: var(--space-2);
+        }
+
+        .error-title {
+            font-size: var(--font-size-xl);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text);
+            margin-bottom: var(--space-3);
+        }
+
+        .error-message {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-8);
+            line-height: 1.6;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: var(--space-3);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: 0.55rem 1.25rem;
+            background-color: var(--color-primary);
+            color: #fff;
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            border-radius: var(--radius-sm);
+            border: none;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color var(--transition), transform var(--transition);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--color-primary-dark);
+            color: #fff;
+            text-decoration: none;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: 0.55rem 1.25rem;
+            background-color: var(--color-surface);
+            color: var(--color-text);
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            border-radius: var(--radius-sm);
+            border: 1.5px solid var(--color-border);
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color var(--transition), border-color var(--transition);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--color-bg);
+            border-color: var(--color-text-secondary);
+            color: var(--color-text);
+            text-decoration: none;
+        }
+
+        .error-detail {
+            margin-top: var(--space-8);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            text-align: left;
+        }
+
+        .error-detail summary {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            user-select: none;
+            font-weight: var(--font-weight-semibold);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .error-detail pre {
+            margin-top: var(--space-3);
+            font-size: var(--font-size-xs);
+            color: var(--color-text-secondary);
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+    </style>
+    <link rel="stylesheet" href="/css/error.css">
+</head>
+<body class="<%= _popup ? 'is-popup' : '' %>">
+    <div class="error-container">
+
+        <div class="error-icon-wrap <%= _status === 404 ? 'warn' : '' %>">
+            <span class="material-symbols-outlined">
+                <%= _status === 404 ? 'search_off' : (_status === 403 ? 'lock' : 'error') %>
+            </span>
+        </div>
+
+        <div class="error-code"><%= _status %></div>
+
+        <h1 class="error-title">
+            <%
+                const _titles = {
+                    400: 'Solicitud inválida',
+                    401: 'No autenticado',
+                    403: 'Acceso denegado',
+                    404: 'Página no encontrada',
+                    422: 'Datos inválidos',
+                    429: 'Demasiadas solicitudes',
+                    500: 'Error interno del servidor',
+                    502: 'Servicio no disponible',
+                    503: 'Servicio en mantenimiento',
+                };
+            %>
+            <%= _titles[_status] || 'Algo salió mal' %>
+        </h1>
+
+        <p class="error-message">
+            <% if (_reason) { %>
+                <%= _reason %>
+            <% } else if (_status === 404) { %>
+                La página que buscás no existe o fue movida. Verificá la URL o volvé al inicio.
+            <% } else if (_status === 403) { %>
+                No tenés permiso para acceder a este recurso. Contactá al administrador si creés que es un error.
+            <% } else if (_status === 401) { %>
+                Necesitás iniciar sesión para acceder a este recurso.
+            <% } else { %>
+                Ocurrió un error inesperado. Si el problema persiste, contactá al soporte técnico.
+            <% } %>
+        </p>
+
+        <div class="error-actions">
+            <% if (_status === 401) { %>
+                <a href="/login" class="btn-primary">
+                    <span class="material-symbols-outlined">login</span>Iniciar sesión
+                </a>
+            <% } else { %>
+                <a href="/" class="btn-primary">
+                    <span class="material-symbols-outlined">home</span>Ir al inicio
+                </a>
+                <a href="javascript:history.back()" class="btn-secondary">
+                    <span class="material-symbols-outlined">arrow_back</span>Volver
+                </a>
+            <% } %>
+        </div>
+
+        <% if (_message && !_isProd) { %>
+        <details class="error-detail">
+            <summary>Detalle del error (solo visible en desarrollo)</summary>
+            <pre><%= _message %></pre>
+            <% if (_stack) { %>
+            <pre><%= _stack %></pre>
+            <% } %>
+        </details>
+        <% } %>
+
+    </div>
+
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

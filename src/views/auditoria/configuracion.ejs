@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría · Cambios de configuración - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <%- include('_header', { active: 'configuracion', pageTitle: 'Cambios de configuración', pageDesc: 'Quién modificó los ajustes del sistema, y qué cambió.' }) %>
+
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">history</span>
+                <h2>Cambios de configuración</h2>
+                <span class="badge-count"><%= settingCount %> registros</span>
+            </div>
+            <div class="audit-card-body">
+                <% if (!settingLogs || settingLogs.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">tune</span>
+                    No hay cambios de configuración registrados.
+                </div>
+                <% } else { %>
+                <%
+                    const _SETTING_LABELS = {
+                        nombre_empresa:            'Nombre de la empresa',
+                        logo_empresa:              'Logo de la empresa',
+                        email_auto_send_enabled:   'Envío automático de emails',
+                        email_resend_enabled:      'Reenvío de emails habilitado',
+                        delay_reminder_days:       'Días para recordatorio de demora',
+                        delay_threshold_pct:       'Umbral de demora (%)',
+                        consent_rejection_limit:   'Límite de rechazo de consentimiento',
+                        notify_recipient:          'Notificar al destinatario',
+                        notify_sender:             'Notificar al remitente',
+                        notify_on_incident:        'Notificar en incidencias',
+                    };
+                    const _settingLabel = (key) => {
+                        if (_SETTING_LABELS[key]) { return _SETTING_LABELS[key]; }
+                        const m = key.match(/^status_color_(\d+)$/);
+                        if (m) { return 'Color de estado ' + m[1]; }
+                        return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    };
+                    const _isColor = (v) => v && /^#[0-9a-fA-F]{3,6}$/.test(v.trim());
+                    const _isImage = (v) => v && /\.(png|jpg|jpeg|gif|webp|svg)/i.test(v);
+                    const _isBool  = (v) => v === '0' || v === '1' || v === 'true' || v === 'false';
+                    const _renderVal = (v) => {
+                        if (!v) { return null; }
+                        if (_isColor(v))  { return 'color:' + v.trim(); }
+                        if (_isImage(v))  { return 'image'; }
+                        if (_isBool(v))   { return (v === '1' || v === 'true') ? 'bool:si' : 'bool:no'; }
+                        return 'text:' + v;
+                    };
+                %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Parámetro</th><th>Antes</th><th>Ahora</th></tr>
+                        </thead>
+                        <tbody>
+                            <% settingLogs.forEach(log => {
+                                const _oldR = _renderVal(log.oldValue);
+                                const _newR = _renderVal(log.newValue);
+                            %>
+                            <tr>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)"><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
+                                <td><strong><%= log.user ? log.user.fullName : 'Sistema' %></strong></td>
+                                <td>
+                                    <span style="font-size:.82rem;font-weight:500"><%= _settingLabel(log.key) %></span>
+                                    <div style="font-size:.7rem;color:var(--color-text-secondary);margin-top:.1rem"><code style="background:var(--color-bg);padding:.05rem .3rem;border-radius:4px"><%= log.key %></code></div>
+                                </td>
+                                <td>
+                                    <% if (!_oldR) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else if (_oldR.startsWith('color:')) { %>
+                                    <span style="display:inline-flex;align-items:center;gap:.4rem">
+                                        <span style="width:14px;height:14px;border-radius:4px;background:<%= _oldR.slice(6) %>;border:1px solid var(--color-border);display:inline-block"></span>
+                                        <span style="color:var(--color-text-secondary);font-size:.8rem"><%= _oldR.slice(6) %></span>
+                                    </span>
+                                    <% } else if (_oldR === 'image') { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">imagen anterior</span>
+                                    <% } else if (_oldR === 'bool:si') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-success-bg);color:var(--color-success)">Sí</span>
+                                    <% } else if (_oldR === 'bool:no') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-danger-bg);color:var(--color-danger)">No</span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.85rem"><%= _oldR.slice(5) %></span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (!_newR) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else if (_newR.startsWith('color:')) { %>
+                                    <span style="display:inline-flex;align-items:center;gap:.4rem">
+                                        <span style="width:14px;height:14px;border-radius:4px;background:<%= _newR.slice(6) %>;border:1px solid var(--color-border);display:inline-block"></span>
+                                        <strong style="font-size:.8rem"><%= _newR.slice(6) %></strong>
+                                    </span>
+                                    <% } else if (_newR === 'image') { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">imagen nueva</span>
+                                    <% } else if (_newR === 'bool:si') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-success-bg);color:var(--color-success)">Sí</span>
+                                    <% } else if (_newR === 'bool:no') { %>
+                                    <span style="font-size:.75rem;font-weight:600;padding:.1rem .45rem;border-radius:6px;background:var(--color-danger-bg);color:var(--color-danger)">No</span>
+                                    <% } else { %>
+                                    <strong style="font-size:.85rem"><%= _newR.slice(5) %></strong>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Paginación configuración -->
+                <% if (settingPages > 1) { %>
+                <div class="pagination">
+                    <span class="pagination-info">Página <%= settingPage %> de <%= settingPages %> (<%= settingCount %> registros)</span>
+                    <a href="/auditoria/configuracion?settingPage=<%= settingPage - 1 %>" class="btn-filter" <%- settingPage <= 1 ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        <span class="material-symbols-outlined">chevron_left</span> Anterior
+                    </a>
+                    <a href="/auditoria/configuracion?settingPage=<%= settingPage + 1 %>" class="btn-filter" <%- settingPage >= settingPages ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        Siguiente <span class="material-symbols-outlined">chevron_right</span>
+                    </a>
+                </div>
+                <% } %>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

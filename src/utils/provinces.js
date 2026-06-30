@@ -1,3 +1,5 @@
+const { haversine } = require('./geo');
+
 // Coordenadas aproximadas del centroide de cada provincia argentina.
 // id     → id en la tabla province de la DB
 // ml     → nombre que espera el modelo Python (sin tildes)
@@ -34,37 +36,27 @@ const BY_INDEC = Object.fromEntries(
     Object.entries(PROVINCES).map(([id, p]) => [p.indec, { id: parseInt(id), ...p }])
 );
 
-function haversine(lat1, lon1, lat2, lon2) {
-    const R    = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a    = Math.sin(dLat / 2) ** 2
-               + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
-               * Math.sin(dLon / 2) ** 2;
-    return Math.max(1, Math.round(R * 2 * Math.asin(Math.sqrt(a))));
-}
-
 function normalizeStr(s) {
     return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
 function findProvinceByIndec(indecId) {
-    if (!indecId) return null;
+    if (!indecId) {return null;}
     // El API devuelve IDs como '02', '6', etc. — normalizamos a 2 dígitos
     const key = String(indecId).padStart(2, '0');
     return BY_INDEC[key] || null;
 }
 
 function findProvinceByState(stateName) {
-    if (!stateName) return null;
+    if (!stateName) {return null;}
     const norm = normalizeStr(stateName);
     // 1. Exacto por nombre oficial
     for (const [id, p] of Object.entries(PROVINCES)) {
-        if (normalizeStr(p.name) === norm) return { id: parseInt(id), ...p };
+        if (normalizeStr(p.name) === norm) {return { id: parseInt(id), ...p };}
     }
     // 2. Exacto por alias ml (cubre "CABA", "Cordoba", "Tucuman", etc.)
     for (const [id, p] of Object.entries(PROVINCES)) {
-        if (normalizeStr(p.ml) === norm) return { id: parseInt(id), ...p };
+        if (normalizeStr(p.ml) === norm) {return { id: parseInt(id), ...p };}
     }
     // 3. Parcial por nombre (ej: "Ciudad de Buenos Aires" → CABA)
     for (const [id, p] of Object.entries(PROVINCES)) {

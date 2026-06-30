@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Mis datos de fatiga - LogiTrack</title>
+    <style>
+        .md-wrap { max-width: 760px; margin: 0 auto; padding: 24px; font-family: system-ui, sans-serif; }
+        table { border-collapse: collapse; width:100%; margin-top:10px; }
+        th, td { border:1px solid #e2e8f0; padding:8px 10px; font-size:14px; text-align:left; }
+        .danger { background:#fff; color:#b91c1c; border:1px solid #f3b4b1; padding:9px 14px; border-radius:9px; cursor:pointer; }
+    </style>
+</head>
+<body>
+<div class="md-wrap">
+    <h1>Mis datos de fatiga</h1>
+    <p style="color:#64748b">Acceso y control de tus datos (Ley 25.326, art. 14 y 16). No se almacena tu voz, solo el resultado.</p>
+
+    <table>
+        <tr><th>Fecha</th><th>Tipo</th><th>Método</th><th>Score</th><th>Resultado</th></tr>
+        <% if (!checks.length) { %><tr><td colspan="5" style="color:#64748b">No tenés chequeos registrados.</td></tr><% } %>
+        <% checks.forEach(c => { %>
+            <tr>
+                <td><%= new Date(c.createdAt).toLocaleString('es-AR') %></td>
+                <td><%= c.triggerType %></td>
+                <td><%= c.method || '—' %></td>
+                <td><%= c.score == null ? '—' : c.score %></td>
+                <td><%= c.decision || (c.consentStatus === 'REJECTED' ? 'Consentimiento rechazado' : '—') %></td>
+            </tr>
+        <% }) %>
+    </table>
+
+    <div style="margin-top:18px;display:flex;gap:10px">
+        <button class="danger" onclick="suprimir()">Solicitar supresión de mis datos</button>
+        <button class="danger" onclick="revocar()">Revocar consentimiento</button>
+        <a href="/delivery" style="margin-left:auto">← Volver</a>
+    </div>
+</div>
+<script>
+async function suprimir() {
+    if (!(await window.ltConfirm({ title: '¿Suprimir tus datos de fatiga?', text: 'Se eliminarán todos tus registros. Esta acción queda auditada.', confirmButtonText: 'Sí, suprimir', confirmButtonColor: '#dc2626' }))) { return; }
+    const r = await fetch('/delivery/fatigue/mis-datos/suprimir', { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    await window.ltAlert(j.ok ? { icon: 'success', title: 'Listo', text: 'Se eliminaron ' + j.deleted + ' registros.' } : { icon: 'error', title: 'No se pudo procesar' });
+    location.reload();
+}
+async function revocar() {
+    if (!(await window.ltConfirm({ title: '¿Revocar el consentimiento?', text: 'No podrás iniciar rutas hasta volver a aceptarlo.', confirmButtonText: 'Sí, revocar', confirmButtonColor: '#dc2626' }))) { return; }
+    await fetch('/delivery/fatigue/consent/revoke', { method: 'POST' });
+    await window.ltAlert({ icon: 'success', title: 'Consentimiento revocado' });
+}
+</script>
+</body>
+</html>

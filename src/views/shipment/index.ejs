@@ -4,15 +4,24 @@
     <%- include('../partials/head') %>
     <title>Envíos - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments-restyle.css">
 </head>
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
-        <div class="page-header">
+        <div class="page-header shipment-page-header">
             <h1>Administrador de envios</h1>
-            <a href="/shipment/new" class="btn-primary">
-                <span class="material-symbols-outlined">add</span>Alta
-            </a>
+            <div class="page-header__actions">
+                <%- include('../partials/page-help-btn', { helpModule: 'envios' }) %>
+                <% if (currentUser.roleId === 1 || currentUser.roleId === 4) { %>
+                    <a href="/shipment/export" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV" download>
+                        <span class="material-symbols-outlined">download</span>
+                    </a>
+                <% } %>
+                <a href="/shipment/new" class="action-btn action-btn--lg action-btn--tip-bottom crear shipment-new-btn" data-tooltip="Alta de envío" aria-label="Alta de envío">
+                    <span class="material-symbols-outlined">add</span>
+                </a>
+            </div>
         </div>
 
         <div class="shipments-wrapper">
@@ -59,24 +68,28 @@
                     <input type="text" id="recipientDocument" name="recipientDocument" placeholder="Ej: 45034934" value="<%= query.recipientDocument || '' %>" class="search-input">
                 </div>
 
-                <button type="submit" class="btn-primary search-btn">
-                    <span class="material-symbols-outlined">search</span>Buscar
+                <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                    <span class="material-symbols-outlined">search</span>
                 </button>
-                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= (query.statusIds && query.statusIds.length > 0) ? 'active' : '' %>" onclick="toggleFilterPanel()">
+                <% const _hasBranchFilter = isAdmin && query.currentBranchId; %>
+                <% const _hasStatusFilter = query.statusIds && query.statusIds.length > 0; %>
+                <% const _hasAnyFilter = _hasStatusFilter || _hasBranchFilter; %>
+                <button type="button" id="btn-filtros" class="btn-filter-toggle <%= _hasAnyFilter ? 'active' : '' %>" onclick="toggleFilterPanel()">
                     <span class="material-symbols-outlined">tune</span>Filtros
-                    <% if (query.statusIds && query.statusIds.length > 0) { %>
-                        <span class="filter-count-badge"><%= query.statusIds.length %></span>
+                    <% const _filterCount = (query.statusIds ? query.statusIds.length : 0) + (_hasBranchFilter ? 1 : 0); %>
+                    <% if (_filterCount > 0) { %>
+                        <span class="filter-count-badge"><%= _filterCount %></span>
                     <% } %>
                 </button>
             </div>
 
             <!-- Panel de filtros -->
-            <div id="filter-panel" class="filter-panel" style="<%= (query.statusIds && query.statusIds.length > 0) ? '' : 'display:none;' %>">
+            <div id="filter-panel" class="filter-panel" style="<%= _hasAnyFilter ? '' : 'display:none;' %>">
                 <div class="filter-section">
                     <span class="filter-label">Estado</span>
                     <div class="filter-chips">
                         <%
-                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'};
+                            const _fsl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'};
                             function _fsk(desc) { return desc.toLowerCase().replace(/[\s-]+/g, '_'); }
                         %>
                         <% statuses.forEach(function(s) { %>
@@ -90,11 +103,22 @@
                         <% }); %>
                     </div>
                 </div>
+                <% if (isAdmin && branches && branches.length > 0) { %>
+                    <div class="filter-section">
+                        <span class="filter-label">Sucursal actual</span>
+                        <select name="currentBranchId" class="search-input">
+                            <option value="">-- Todas --</option>
+                            <% branches.forEach(function(b) { %>
+                                <option value="<%= b.id %>" <%= String(query.currentBranchId || '') === String(b.id) ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }); %>
+                        </select>
+                    </div>
+                <% } %>
             </div>
         </form>
 
-        <div class="table-wrapper">
-            <table id="shipments-table">
+        <div class="table-wrapper shipments-table-wrap">
+            <table id="shipments-table" data-paginate="shipments">
                 <thead>
                     <tr>
                         <th rowspan="2" class="th-sortable" data-col="0" data-sort="">
@@ -105,6 +129,11 @@
                         <th rowspan="2" class="th-sortable" data-col="5" data-sort="">
                             Estado <span class="material-symbols-outlined sort-icon">unfold_more</span>
                         </th>
+                        <% if (isAdmin) { %>
+                        <th rowspan="2" class="th-sortable" data-col="6" data-sort="">
+                            Sucursal <span class="material-symbols-outlined sort-icon">unfold_more</span>
+                        </th>
+                        <% } %>
                         <th rowspan="2" class="col-actions">Acciones</th>
                     </tr>
                     <tr>
@@ -117,34 +146,65 @@
                 <tbody>
                     <% if (shipments.length === 0) { %>
                         <tr>
-                            <td colspan="7" class="empty-row">
+                            <td colspan="<%= isAdmin ? 8 : 7 %>" class="empty-row">
                                 <span class="material-symbols-outlined">search</span>
-                                No se encontraron resultados para esa búsqueda
+                                <%- include('../partials/help-empty-hint', { message: 'No se encontraron resultados para esa búsqueda.', helpSlug: 'envios', actionHref: '/shipment/new', actionLabel: 'Crear envío' }) %>
                             </td>
                         </tr>
                     <% } else { %>
-                                                        <% console.log("ultimo envios: " + shipments) %>
-                        <% shipments.forEach(shipment => { %>
+<% shipments.forEach(shipment => { %>
                             <tr>
                                 <td class="tracking-id"><%= shipment.trackingId %></td>
-                                <td><%= shipment.sender.fullName %></td>
-                                <td><%= shipment.sender.document %></td>
-                                <td><%= shipment.recipient.fullName %></td>
-                                <td><%= shipment.recipient.document %></td>
+                                <td><%= shipment.sender ? shipment.sender.fullName : '—' %></td>
+                                <td><%= shipment.sender ? shipment.sender.document : '—' %></td>
+                                <td><%= shipment.recipient ? shipment.recipient.fullName : '—' %></td>
+                                <td><%= shipment.recipient ? shipment.recipient.document : '—' %></td>
                                 <td>
-                                    <% const _sk = shipment.status.description.toLowerCase().replace(/[\s-]+/g, '_'); %>
-                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial'}; %>
+                                    <% const _desc = shipment.status && shipment.status.description ? shipment.status.description : ''; %>
+                                    <% const _sk = _desc.toLowerCase().replace(/[\s-]+/g, '_'); %>
+                                    <% const _sl = {pendiente:'Pendiente',en_transito:'En Tránsito',entregado:'Entregado',cancelado:'Cancelado',cancelada:'Cancelada',retrasado:'Retrasado',en_sucursal:'En Sucursal',inicial:'Inicial',asignado:'Asignado',en_preparacion:'En Preparación',paquete_fallido:'Paquete Fallido',intento_fallido:'Intento Fallido'}; %>
                                     <span class="status-badge <%= _sk %>">
-                                        <%= _sl[_sk] || shipment.status.description %>
+                                        <%= _sl[_sk] || _desc || 'Sin estado' %>
                                     </span>
+                                    <!-- <% const _p = shipment.latestPrediction; %>
+                                    <% if (_p) { %>
+                                        <% const _pp = Number(_p.delayProbability); %>
+                                        <% const _pColor = _pp >= 60 ? '#dc2626' : (_pp >= 30 ? '#d97706' : '#16a34a'); %>
+                                        <% const _pLabel = _pp >= 60 ? 'Alto' : (_pp >= 30 ? 'Medio' : 'Bajo'); %>
+                                        <div title="Predicción ML: <%= _pp %>% prob. demora · estimado <%= _p.predictedDays %> días" style="margin-top:.25rem;display:inline-flex;align-items:center;gap:.3rem;padding:.1rem .5rem;border-radius:999px;font-size:.7rem;font-weight:600;background:<%= _pColor %>;color:#fff;">
+                                            <span class="material-symbols-outlined" style="font-size:.85rem">schedule</span>
+                                            Riesgo <%= _pLabel %> · <%= _pp %>%
+                                        </div>
+                                    <% } %> -->
                                 </td>
+                                <% if (isAdmin) { %>
+                                <td><%= shipment.currentBranch ? shipment.currentBranch.name : '—' %></td>
+                                <% } %>
                                 <td class="col-actions">
-                                    <a href="/shipment/update/<%= shipment.id %>" class="action-btn modificar" data-tooltip="Modificar">
-                                        <span class="material-symbols-outlined">edit</span>
+                                    <% const _isFinalS = shipment.statusId === 4 || shipment.statusId === 5 || shipment.statusId === 8; %>
+                                    <a href="<%= _isFinalS ? '#' : '/shipment/update/' + shipment.id %>"
+                                       class="action-btn modificar<%= _isFinalS ? ' action-btn--disabled' : '' %>"
+                                       data-tooltip="<%= _isFinalS ? 'No modificable' : 'Modificar' %>"
+                                       aria-label="<%= _isFinalS ? 'Envío no modificable' : 'Modificar envío ' + shipment.trackingId %>"
+                                       <%= _isFinalS ? 'aria-disabled="true" tabindex="-1"' : '' %>>
+                                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                                     </a>
-                                    <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle">
-                                        <span class="material-symbols-outlined">info</span>
+                                    <a href="/shipment/detail/<%= shipment.id %>" class="action-btn detalle" data-tooltip="Detalle" aria-label="Ver detalle del envío <%= shipment.trackingId %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">info</span>
                                     </a>
+                                    <button type="button" class="action-btn eliminar" data-tooltip="Reportar incidencia" aria-label="Reportar incidencia"
+                                            data-incident-open
+                                            data-shipment-id="<%= shipment.id %>"
+                                            data-tracking-id="<%= shipment.trackingId %>"
+                                            data-branch-id="<%= shipment.currentBranchId || '' %>"
+                                            data-branch-name="<%= shipment.currentBranch ? shipment.currentBranch.name : 'Sin sucursal' %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">report</span>
+                                    </button>
+                                    <button type="button" class="action-btn" data-tooltip="Ver QR"
+                                            aria-label="Ver código QR del envío <%= shipment.trackingId %>"
+                                            onclick="showQR(<%= shipment.id %>, '<%= shipment.trackingId %>')">
+                                        <span class="material-symbols-outlined" aria-hidden="true">qr_code</span>
+                                    </button>
                                 </td>
                             </tr>
                         <% }); %>
@@ -183,22 +243,32 @@
         }
 
         // --- Table sort ---
+        // LGT-217 (Esc.3) — encabezados ordenables operables por teclado (Enter/Espacio)
+        // y con estado anunciado vía aria-sort. La flecha es decorativa (aria-hidden).
         document.querySelectorAll('.th-sortable').forEach(function(th) {
-            th.addEventListener('click', function() {
-                const col    = parseInt(this.dataset.col);
+            th.setAttribute('tabindex', '0');
+            th.setAttribute('role', 'button');
+            if (!th.hasAttribute('aria-sort')) { th.setAttribute('aria-sort', 'none'); }
+            const icon = th.querySelector('.sort-icon');
+            if (icon) { icon.setAttribute('aria-hidden', 'true'); }
+
+            function doSort() {
+                const col    = parseInt(th.dataset.col);
                 const tbody  = document.querySelector('#shipments-table tbody');
                 const rows   = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.querySelector('.empty-row'));
                 if (rows.length === 0) return;
 
-                const isAsc = this.dataset.sort !== 'asc';
+                const isAsc = th.dataset.sort !== 'asc';
 
                 document.querySelectorAll('.th-sortable').forEach(function(t) {
                     t.dataset.sort = '';
+                    t.setAttribute('aria-sort', 'none');
                     t.querySelector('.sort-icon').textContent = 'unfold_more';
                 });
 
-                this.dataset.sort = isAsc ? 'asc' : 'desc';
-                this.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
+                th.dataset.sort = isAsc ? 'asc' : 'desc';
+                th.setAttribute('aria-sort', isAsc ? 'ascending' : 'descending');
+                th.querySelector('.sort-icon').textContent = isAsc ? 'arrow_upward' : 'arrow_downward';
 
                 rows.sort(function(a, b) {
                     const aVal = (a.cells[col]?.textContent || '').trim();
@@ -207,8 +277,29 @@
                 });
 
                 rows.forEach(function(r) { tbody.appendChild(r); });
+            }
+
+            th.addEventListener('click', doSort);
+            th.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); doSort(); }
             });
         });
+
+        function showQR(id, trackingId) {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                title: trackingId,
+                html: '<img src="/shipment/' + id + '/qr" style="width:220px;height:220px;display:block;margin:0 auto;" alt="QR">',
+                showCancelButton: true,
+                confirmButtonText: '<span style="display:flex;align-items:center;gap:6px">Imprimir Etiqueta</span>',
+                cancelButtonText: 'Cerrar',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then(function (result) {
+                if (result.isConfirmed) window.open('/shipment/' + id + '/label', '_blank');
+            });
+        }
 
         if (new URLSearchParams(window.location.search).get('success') === '1') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
@@ -236,5 +327,6 @@
             });
         }
     </script>
+    <%- include('../partials/incidentQuickModal') %>
 </body>
 </html>

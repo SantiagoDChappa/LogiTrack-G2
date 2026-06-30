@@ -1,0 +1,115 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>El portal externo «Mis Envíos» deja al cliente seguir su envío, reportar problemas y pedir cambios.</li>
+            <li>Lo que hace el cliente impacta adentro: incidencias <strong>externas</strong> y solicitudes en <a href="/help/modificaciones-portal">Modificaciones portal</a>.</li>
+            <li>Como staff, monitoreás esos dos canales y cerrás los casos.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Qué es el portal del cliente</h2>
+<p>El portal externo «Mis Envíos» permite que remitentes y destinatarios consulten el estado de sus envíos, reporten problemas y soliciten cambios sin acceder al backoffice de LogiTrack. El acceso es por token enviado por email (DNI + enlace seguro).</p>
+
+<h2>Qué puede hacer el cliente</h2>
+<ul>
+    <li>Consultar el estado y el <a href="/help/glosario">tracking</a> de sus envíos.</li>
+    <li>Reportar una <a href="/help/glosario">incidencia externa</a> (demora, daño, extravío).</li>
+    <li>Solicitar modificaciones (dirección, fecha) que llegan a <a href="/help/modificaciones-portal">Modificaciones portal</a>.</li>
+    <li>Iniciar una devolución (<a href="/help/glosario">RETURN</a>) según las políticas habilitadas.</li>
+    <li>Completar encuestas de satisfacción que alimentan el <a href="/help/glosario">NPS</a> en <a href="/help/reportes">Reportes</a>.</li>
+</ul>
+
+<div class="help-callout help-callout--important">
+    <span class="help-callout__icon material-symbols-outlined">help_center</span>
+    <div class="help-callout__body">Ante un <strong>paquete dañado</strong>, el remitente recibe un aviso en el portal para elegir la resolución: <strong>reembolso</strong> o <strong>reemplazo</strong>. Hasta que no elija (o el staff cierre la incidencia), el caso queda pendiente.</div>
+</div>
+
+<h2>Vista staff: dónde impacta adentro</h2>
+<p>Lo que el cliente hace en el portal aparece en dos lugares del backoffice. Estos son los canales que tenés que monitorear:</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/incidencias/01-listado.png',
+    alt: 'Listado de incidencias con el filtro de origen para distinguir las externas del portal',
+    caption: 'Las incidencias externas aparecen en <a href="/help/incidencias">Incidencias</a> con origen «Externo» (canal PORTAL).'
+}) %>
+
+<%- include('../partials/figure', {
+    src: '/images/help/modificaciones-portal/01-cola.png',
+    alt: 'Cola de modificaciones del portal con las solicitudes de cambio de los clientes',
+    caption: 'Las solicitudes de cambio del cliente van a <a href="/help/modificaciones-portal">Modificaciones portal</a> para aprobar o rechazar.'
+}) %>
+
+<p>Además, los cambios de estado del envío pueden disparar <a href="/help/notificaciones">notificaciones</a> al cliente.</p>
+
+<h2>Paso a paso</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Entendé qué ve el cliente</p>
+        <div class="help-steps__text">Tracking, historial, opciones de reporte y de modificación.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Monitoreá las incidencias externas</p>
+        <div class="help-steps__text">En <a href="/incident">Incidencias</a> filtrá por origen externo para ver los casos del portal.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá las modificaciones</p>
+        <div class="help-steps__text">Aprobá o rechazá solicitudes pendientes en <a href="/shipment/modifications">Modificaciones portal</a>.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Resolvé los daños</p>
+        <div class="help-steps__text">Verificá si el remitente ya eligió reembolso o reemplazo en el portal.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Cerrá el caso</p>
+        <div class="help-steps__text">Cerrá la incidencia con resolución cuando esté resuelto operativamente.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">visibility_off</span>
+    <div class="help-callout__body">Las incidencias autogeneradas por el sistema (canal SYSTEM) no se muestran al cliente en el portal; solo ve las que él reportó o las relevantes para su seguimiento.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El cliente dice que no recibió el enlace
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El acceso se envía por email. Verificá la plantilla en Ajustes → Comunicaciones y que el email del remitente sea correcto.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        La elección de daño quedó pendiente
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El remitente debe ingresar al portal y elegir. Podés contactarlo o cerrar como no procedente según política.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿Modificación o incidencia?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Un cambio de dirección es una solicitud en <a href="/help/modificaciones-portal">Modificaciones portal</a>; un problema operativo es una <a href="/help/incidencias">incidencia</a>.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/modificaciones-portal"><span class="material-symbols-outlined">edit_note</span>Modificaciones del portal</a></li>
+    <li><a href="/help/incidencias"><span class="material-symbols-outlined">report_problem</span>Incidencias operativas</a></li>
+    <li><a href="/help/reportes"><span class="material-symbols-outlined">bar_chart</span>Reportes y análisis</a></li>
+    <li><a href="/help/notificaciones"><span class="material-symbols-outlined">notifications</span>Notificaciones</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

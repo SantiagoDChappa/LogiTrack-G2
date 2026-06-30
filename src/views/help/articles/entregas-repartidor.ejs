@@ -1,0 +1,93 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Dentro de la ruta ves el mapa, las paradas en orden y el estado de cada envío.</li>
+            <li>Entregás escaneando el QR (o el <a href="/help/glosario">tracking</a>) y subiendo evidencia.</li>
+            <li>Si no pudiste entregar, registrás un <strong>intento fallido</strong> con el motivo.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Recorrido de la ruta</h2>
+<p>Dentro de una ruta ves el mapa con tu posición, el listado de paradas en orden y el estado de cada entrega. Seguí el orden sugerido para optimizar tiempos.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/entregas-repartidor/01-recorrido.png',
+    alt: 'Recorrido de ruta con el mapa de paradas y el listado lateral con el estado de cada entrega',
+    caption: 'Recorrido: el mapa con las paradas numeradas y, a la izquierda, cada entrega con su estado.'
+}) %>
+
+<h2>Registrar una entrega</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Llegá a la parada</p>
+        <div class="help-steps__text">Abrí el envío correspondiente desde el listado lateral.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Identificá el paquete</p>
+        <div class="help-steps__text"><strong>Escaneá</strong> el código QR o ingresá el <a href="/help/glosario">tracking</a> manualmente.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Confirmá la entrega</p>
+        <div class="help-steps__text">Si corresponde, subí <strong>evidencia</strong> (foto, firma).</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Avanzá a la siguiente</p>
+        <div class="help-steps__text">Al completar todas las paradas, la ruta se cierra automáticamente.</div>
+    </li>
+</ol>
+
+<h2>Entrega fallida</h2>
+<p>Si no pudiste entregar, registrá un <strong>intento fallido</strong> indicando el motivo (ausente, dirección incorrecta, etc.). El envío queda en el estado correspondiente para reprogramación.</p>
+
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">wifi_off</span>
+    <div class="help-callout__body">En zonas con conectividad limitada, el <strong>modo offline</strong> permite registrar acciones que se sincronizan al recuperar señal.</div>
+</div>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">tour</span>
+    <div class="help-callout__body">Durante el recorrido hay un ícono <strong>tour</strong> en la barra superior que explica el mapa, las paradas, el escaneo y el registro de evidencia.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El escaneo no reconoce el código
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Verificá que sea el envío de esa parada. Siempre podés ingresar el tracking manualmente.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿Incidencia o intento fallido?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El <strong>intento fallido</strong> es cuando no pudiste entregar en esa visita. La <a href="/help/incidencias-repartidor">incidencia</a> es para problemas que requieren seguimiento del staff (daño, etc.).</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Perdí señal y no pude registrar
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El modo offline guarda tus acciones y las sincroniza automáticamente al recuperar conectividad.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/mi-ruteo"><span class="material-symbols-outlined">map</span>Mi Ruteo (inicio repartidor)</a></li>
+    <li><a href="/help/incidencias-repartidor"><span class="material-symbols-outlined">report</span>Reportar incidencias en ruta</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

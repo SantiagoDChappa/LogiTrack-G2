@@ -1,0 +1,66 @@
+/* ABM Zonas / Transportes — selects, multiselect y layout legibles en ambos temas. */
+
+/* Inputs y selects toman los colores del tema (el multiselect nativo se veía blanco en dark). */
+.form-new .search-input,
+.form-new select.search-input,
+.form-new select[multiple] {
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+}
+.form-new .search-input:focus,
+.form-new select.search-input:focus,
+.form-new select[multiple]:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    outline: none;
+}
+
+/* Multiselect de zonas: alto cómodo y opciones legibles. */
+.form-new select[multiple] {
+    min-height: 150px;
+    padding: 0.3rem;
+}
+.form-new select[multiple] option {
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    color: var(--color-text);
+}
+.form-new select[multiple] option:checked {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* Checkbox "Habilitado/Habilitada" prolijo y alineado. */
+.form-new input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+/* Estos ABM tienen un solo card; el grid de 2 columnas del alta de envío lo dejaba en la
+   mitad izquierda con medio viewport vacío. Lo pasamos a una sola columna y centramos el card. */
+.form-new form {
+    grid-template-columns: 1fr;
+}
+.form-new .usuario {
+    max-width: 1000px;
+    margin-inline: auto;
+    width: 100%;
+}
+/* El título y el multiselect ocupan toda la fila; los campos se adaptan al ancho. */
+.form-new .usuario > h3 {
+    grid-column: 1 / -1;
+}
+.form-new .usuario .field:has(select[multiple]) {
+    grid-column: 1 / -1;
+}
+
+/* Responsive: en pantallas chicas los campos pasan a una sola columna. */
+@media (max-width: 640px) {
+    .form-new .usuario {
+        grid-template-columns: 1fr;
+    }
+}

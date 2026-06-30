@@ -1,30 +1,34 @@
 const { body, validationResult } = require("express-validator");
 const userModel = require("../models/user");
+const branchModel = require("../models/branch");
 const { RoleType } = require("../constants/enums");
 
 
 const validateUserGeneral = [
-    body('fullName').notEmpty().trim().withMessage('El nombre y apellido es obligatorio'),
+    body('fullName')
+        .notEmpty().withMessage('El nombre y apellido es obligatorio')
+        .bail()
+        .trim()
+        .isLength({ max: 100 }).withMessage('El nombre no puede superar 100 caracteres'),
     body('email')
         .notEmpty().withMessage('El email es obligatorio')
         .bail()
         .isEmail().withMessage('El email es inválido')
         .bail()
+        .isLength({ max: 100 }).withMessage('El email no puede superar 100 caracteres')
         .normalizeEmail(),
     body('document')
         .notEmpty().withMessage('El documento es obligatorio')
         .bail()
-        .isInt({ min: 1000000 }).withMessage('El documento es inválido'),
-    body('roleId').notEmpty().withMessage('El rol es obligatorio'),
-];
-const validateUser = [
-    body('password')
-        .notEmpty().withMessage('La contraseña es obligatoria')
+        .isInt({ min: 1000000, max: 99999999 }).withMessage('El documento debe ser un DNI válido (entre 1.000.000 y 99.999.999)'),
+    body('roleId')
+        .notEmpty().withMessage('El rol es obligatorio')
         .bail()
-        .isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres')
-        .matches(/[A-Z]/).withMessage('Debe contener al menos una mayúscula')
-        .matches(/\d/).withMessage('Debe contener al menos un número')
-        .matches(/[^A-Za-z0-9]/).withMessage('Debe contener al menos un símbolo'),
+        .isIn(Object.values(RoleType).map(r => String(r.id))).withMessage('El rol seleccionado no es válido'),
+];
+// Alta de usuario: el sistema genera una contraseña temporal (el admin no la tipea),
+// por eso ya no se valida 'password' en el alta. Ver controllers/user.createUser.
+const validateUser = [
     ...validateUserGeneral
     ];
 
@@ -47,7 +51,8 @@ const handleValidationErrors = async (req, res, next) => {
         return res.render('user/new', {
             errors:    errorsArray,
             body:      req.body,
-            roleTypes: Object.values(RoleType)
+            roleTypes: Object.values(RoleType),
+            branches:  await branchModel.getAll(),
         });
     }
 
@@ -77,9 +82,11 @@ const handleUpdateValidationErrors = async (req, res, next) => {
     if (errorsArray.length > 0) {
         const user = { ...req.body, id };
         return res.render('user/update', {
-            errors:   errorsArray,
+            errors:    errorsArray,
             user,
-            RoleType: require('../constants/enums').RoleType
+            roleTypes: Object.values(RoleType),
+            branches:  await branchModel.getAll(),
+            returnUrl: req.query.from || '/user',
         });
     }
 

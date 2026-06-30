@@ -1,0 +1,19 @@
+<div class="univ-search" id="univ-search" data-role-id="<%= currentUser.roleId %>">
+    <div class="univ-search__bar" id="univ-search-bar">
+        <span class="material-symbols-outlined univ-search__icon-search" aria-hidden="true">search</span>
+        <span class="material-symbols-outlined univ-search__icon-progress" id="univ-search-spinner" aria-hidden="true" hidden>progress_activity</span>
+        <input type="text" id="univ-search-input"
+               placeholder="<%= currentUser.roleId === 3 ? 'Buscar envíos, incidencias o rutas...' : 'Buscar envíos, incidencias...' %>"
+               title="Ctrl+K para enfocar"
+               autocomplete="off" spellcheck="false"
+               aria-label="Buscar envíos, incidencias, rutas y más"
+               aria-controls="univ-search-panel"
+               aria-expanded="false"
+               role="combobox">
+    </div>
+    <div class="univ-search__panel" id="univ-search-panel" hidden>
+        <div class="univ-search__results" id="univ-search-results">
+            <p class="univ-search__hint">Escribí al menos 2 caracteres</p>
+        </div>
+    </div>
+</div>

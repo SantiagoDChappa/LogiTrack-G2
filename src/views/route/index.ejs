@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Rutas - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/routes.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Rutas</h1>
+            <div class="page-header__actions">
+                <a class="action-btn action-btn--lg action-btn--tip-bottom crear" href="/route/optimize" data-tooltip="Optimizar Ruta" aria-label="Optimizar Ruta">
+                    <span class="material-symbols-outlined">add</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="shipments-wrapper">
+            <% if (isAdmin) { %>
+            <form method="GET" action="/route" class="search-form">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="branchId">Filtrar por sucursal</label>
+                        <select id="branchId" name="branchId" class="search-input" onchange="this.form.submit()">
+                            <option value="">— Todas las sucursales —</option>
+                            <% branches.forEach(b => { %>
+                                <option value="<%= b.id %>" <%= branchId === b.id ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+            </form>
+            <% } %>
+
+            <form class="search-form" data-tools-for="routes" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-rt-id">ID</label>
+                        <input type="text" id="f-rt-id" class="search-input" data-col="0" placeholder="Ej: 12">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-rt-transport">Transporte</label>
+                        <input type="text" id="f-rt-transport" class="search-input" data-col="1" placeholder="Ej: Camión 1">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-rt-driver">Conductor</label>
+                        <input type="text" id="f-rt-driver" class="search-input" data-col="2" placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-rt-state">Estado</label>
+                        <input type="text" id="f-rt-state" class="search-input" data-col="6" placeholder="Ej: Completada">
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="table-wrapper">
+                <table data-tools="routes">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Transporte</th>
+                            <th>Conductor</th>
+                            <th>Sucursal</th>
+                            <th>Distancia</th>
+                            <th>Costo</th>
+                            <th>Estado</th>
+                            <th>Creada</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (!routes || routes.length === 0) { %>
+                            <tr>
+                                <td colspan="9" class="empty-row">
+                                    <span class="material-symbols-outlined">route</span>
+                                    <%- include('../partials/help-empty-hint', { message: 'Sin rutas creadas.', helpSlug: 'ruteo', actionHref: '/route/optimize', actionLabel: 'Optimizar ruteo' }) %>
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <%
+                                const _routeStatusMap = {
+                                    1: { label: 'Planificada · sumable', cls: 'en_sucursal' },
+                                    2: { label: 'En tránsito',           cls: 'en_transito' },
+                                    3: { label: 'Completada',            cls: 'entregado'   },
+                                    4: { label: 'Cancelada',             cls: 'cancelado'   },
+                                    6: { label: 'Bloqueada por fatiga',  cls: 'cancelado'   },
+                                    7: { label: 'Pausada por fatiga',    cls: 'retrasado'   },
+                                };
+                            %>
+                            <% routes.forEach(r => { %>
+                                <%
+                                    const _rs = _routeStatusMap[r.statusId] || { label: 'Estado ' + r.statusId, cls: 'inicial' };
+                                %>
+                                <tr>
+                                    <td class="tracking-id">#<%= r.id %></td>
+                                    <td><%= r.transport ? r.transport.name : '-' %></td>
+                                    <td><%= r.transport && r.transport.driver ? r.transport.driver.fullName : '-' %></td>
+                                    <td><%= r.originBranch ? r.originBranch.name : '-' %></td>
+                                    <td><%= r.totalDistanceKm %> km</td>
+                                    <td><%= fmtMoney(r.totalCost) %></td>
+                                    <td>
+                                        <span class="status-badge <%= _rs.cls %>"><%= _rs.label %></span>
+                                    </td>
+                                    <td><%= r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : '-' %></td>
+                                    <td class="col-actions">
+                                        <a href="/route/<%= r.id %>" class="action-btn detalle" data-tooltip="Ver detalle">
+                                            <span class="material-symbols-outlined">info</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
+    <script>
+    (function () {
+        var q = new URLSearchParams(window.location.search).get('q');
+        if (!q) return;
+        function apply() {
+            var idEl = document.getElementById('f-rt-id');
+            var driverEl = document.getElementById('f-rt-driver');
+            var transportEl = document.getElementById('f-rt-transport');
+            if (!idEl && !driverEl) return;
+            var target = /^\d{1,9}$/.test(q.trim()) ? idEl : (driverEl || transportEl);
+            if (!target) return;
+            target.value = q.trim();
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', apply);
+        } else {
+            apply();
+        }
+    })();
+    </script>
+</body>
+</html>

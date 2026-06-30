@@ -4,14 +4,15 @@
     <%- include('../partials/head') %>
     <title>Usuarios - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/users.css">
 </head>
 <body>
     <%- include('../partials/header') %>
-    <main class="main-content">
+    <main class="main-content users-module">
         <div class="page-header">
             <h1>Administrador de usuarios</h1>
-            <a href="/user/new" class="btn-primary">
-                <span class="material-symbols-outlined">add</span>Alta
+            <a href="/user/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Alta de usuario" aria-label="Alta de usuario">
+                <span class="material-symbols-outlined">add</span>
             </a>
         </div>
 
@@ -41,52 +42,78 @@
                         <% }); %>
                     </select>
                 </div>
+                <div class="search-field">
+                    <label for="active">Estado</label>
+                    <select id="active" name="active" class="search-input">
+                        <option value="">Todos</option>
+                        <option value="true" <%= query.active === 'true' ? 'selected' : '' %>>Alta</option>
+                        <option value="false" <%= query.active === 'false' ? 'selected' : '' %>>Baja</option>
+                    </select>
+                </div>
 
-                <button type="submit" class="btn-primary search-btn">
-                    <span class="material-symbols-outlined">search</span>Buscar
+                <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                    <span class="material-symbols-outlined">search</span>
                 </button>
             </div>
         </form>
 
         <div class="table-wrapper">
-            <table>
+            <table data-paginate="users">
                 <thead>
                     <tr>
                         <th>Nombre y Apellido</th>
                         <th>Documento</th>
                         <th>Email</th>
                         <th>Rol</th>
+                        <th>Estado</th>
+                        <th>Último ingreso</th>
                         <th class="col-actions">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% if (users.length === 0) { %>
                         <tr>
-                            <td colspan="5" class="empty-row">
+                            <td colspan="7" class="empty-row">
                                 <span class="material-symbols-outlined">search</span>
                                 No se encontraron resultados para esa búsqueda
                             </td>
                         </tr>
                     <% } else { %>
                         <% users.forEach(user => { %>
+                            <% const _lastLogin = (lastLoginMap || {})[user.id]; %>
                             <tr>
                                 <td><%= user.fullName %></td>
                                 <td><%= user.document %></td>
                                 <td><%= user.email %></td>
                                 <td>
-                                    <span class="status-badge <%= user.roleId === 1 ? 'en_sucursal' : 'en_transito' %>">
+                                    <span class="status-badge <%= roleClasses[user.roleId] || '' %>">
                                         <%= roleLabels[user.roleId] || '-' %>
                                     </span>
                                 </td>
+                                <td>
+                                    <% if (user.active) { %>
+                                        <span class="status-badge entregado">Alta</span>
+                                    <% } else { %>
+                                        <span class="status-badge retrasado">Baja</span>
+                                    <% } %>
+                                </td>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)">
+                                    <%= _lastLogin ? new Date(_lastLogin).toLocaleString('es-AR') : 'Nunca ingresó' %>
+                                </td>
                                 <td class="col-actions">
-                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
-                                        <span class="material-symbols-outlined">edit</span>
+                                    <a href="/user/<%= user.id %>/historial" class="action-btn" data-tooltip="Ver historial" aria-label="Ver historial de <%= user.fullName %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">history</span>
                                     </a>
-                                    <form action="/user/delete/<%= user.id %>" method="POST" style="display:inline">
-                                        <button type="submit" class="action-btn eliminar" data-tooltip="Eliminar">
-                                            <span class="material-symbols-outlined">delete</span>
-                                        </button>
-                                    </form>
+                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar" aria-label="Modificar usuario <%= user.fullName %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                                    </a>
+                                    <% if (user.active) { %>
+                                    <button type="button" class="action-btn eliminar" data-tooltip="Dar de baja"
+                                        aria-label="Dar de baja al usuario <%= user.fullName %>"
+                                        onclick="confirmarBaja('<%= user.id %>', '<%= user.fullName %>')">
+                                        <span class="material-symbols-outlined" aria-hidden="true">person_off</span>
+                                    </button>
+                                    <% } %>
                                 </td>
                             </tr>
                         <% }); %>
@@ -129,13 +156,37 @@
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             Swal.fire({
                 icon: 'success',
-                title: '¡Usuario eliminado con éxito!',
+                title: '¡Usuario dado de baja con éxito!',
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color: isDark ? '#f1f5f9' : '#1e293b',
             }).then(() => {
                 history.replaceState(null, '', '/user');
+            });
+        }
+
+        function confirmarBaja(userId, userName) {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'warning',
+                title: '¿Dar de baja al usuario?',
+                text: `"${userName}" quedará inactivo en el sistema.`,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, dar de baja',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: isDark ? '#475569' : '#6b7280',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color: isDark ? '#f1f5f9' : '#1e293b',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/user/delete/${userId}`;
+                    document.body.appendChild(form);
+                    form.submit();
+                }
             });
         }
     </script>

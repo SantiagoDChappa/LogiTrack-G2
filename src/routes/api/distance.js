@@ -1,6 +1,7 @@
 const express      = require('express');
 const router       = express.Router();
-const { PROVINCES, haversine } = require('../../utils/provinces');
+const { PROVINCES }  = require('../../utils/provinces');
+const { haversine }  = require('../../utils/geo');
 const settingModel = require('../../models/setting');
 
 const GEOREF    = 'https://apis.datos.gob.ar/georef/api';
@@ -40,7 +41,7 @@ router.post('/', async (req, res) => {
     const { destinationProvinceId, destinationStreet, destinationNumber, destinationLat, destinationLng } = req.body;
 
     const destProvince = PROVINCES[parseInt(destinationProvinceId)];
-    if (!destProvince) return res.status(400).json({ error: 'Provincia inválida' });
+    if (!destProvince) {return res.status(400).json({ error: 'Provincia inválida' });}
 
     const [originLat, originLng, originProvinceMl] = await Promise.all([
         settingModel.get('origin_lat'),

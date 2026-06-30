@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encuesta incidencia #<%= incident.id %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/encuestas-incidencias" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al listado
+                </a>
+            </div>
+
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Encuesta post-incidencia</span>
+                <h1>Incidencia #<%= incident.id %></h1>
+                <p class="portal-mis-envios-lead">
+                    Tipo: <strong><%= incident.typeLabel %></strong> &middot; Envío: <strong><%= incident.trackingId %></strong>
+                </p>
+            </div>
+
+            <% if (flash) { %>
+            <div class="portal-mis-envios-alert" style="background:#ecfdf5;color:#065f46;border:1px solid #bbf7d0;">
+                <span class="material-symbols-outlined">check_circle</span>
+                <%= flash %>
+            </div>
+            <% } %>
+            <% if (error) { %>
+            <div class="portal-mis-envios-alert portal-mis-envios-alert-error">
+                <span class="material-symbols-outlined">error</span>
+                <%= error %>
+            </div>
+            <% } %>
+
+            <% if (survey) { %>
+            <div class="portal-incident-detail-card">
+                <div class="portal-survey-completed-banner">
+                    <span class="material-symbols-outlined">verified</span>
+                    <span>Ya respondiste esta encuesta</span>
+                </div>
+                <div class="portal-survey-question">
+                    <span class="portal-card-label">Calificación general</span>
+                    <div class="portal-survey-stars-readonly">
+                        <% for (var i = 1; i <= 5; i++) { %>
+                        <span class="material-symbols-outlined portal-star <%= i <= survey.overallRating ? 'portal-star--filled' : '' %>">star</span>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="portal-survey-question">
+                    <span class="portal-card-label">Tiempo de resolución</span>
+                    <div class="portal-survey-stars-readonly">
+                        <% for (var i = 1; i <= 5; i++) { %>
+                        <span class="material-symbols-outlined portal-star <%= i <= survey.resolutionTimeRating ? 'portal-star--filled' : '' %>">star</span>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="portal-survey-question">
+                    <span class="portal-card-label">Comunicación</span>
+                    <div class="portal-survey-stars-readonly">
+                        <% for (var i = 1; i <= 5; i++) { %>
+                        <span class="material-symbols-outlined portal-star <%= i <= survey.communicationRating ? 'portal-star--filled' : '' %>">star</span>
+                        <% } %>
+                    </div>
+                </div>
+                <div class="portal-survey-question">
+                    <span class="portal-card-label">Resultado obtenido</span>
+                    <div class="portal-survey-stars-readonly">
+                        <% for (var i = 1; i <= 5; i++) { %>
+                        <span class="material-symbols-outlined portal-star <%= i <= survey.outcomeRating ? 'portal-star--filled' : '' %>">star</span>
+                        <% } %>
+                    </div>
+                </div>
+                <% if (survey.comment) { %>
+                <div class="portal-survey-question">
+                    <span class="portal-card-label">Comentario</span>
+                    <p class="portal-incident-description"><%= survey.comment %></p>
+                </div>
+                <% } %>
+            </div>
+
+            <% } else { %>
+            <form method="POST" action="/portal/mis-envios/encuesta-incidencia/<%= incident.id %>" class="portal-mis-envios-form">
+                <div class="portal-incident-detail-card">
+                    <p class="portal-manage-hint">Calificá tu experiencia con la resolución de esta incidencia. Todas las calificaciones son obligatorias.</p>
+
+                    <div class="portal-survey-question">
+                        <label class="portal-card-label">Calificación general</label>
+                        <div class="portal-survey-stars" data-field="overallRating">
+                            <input type="hidden" name="overallRating" value="">
+                            <% for (var i = 1; i <= 5; i++) { %>
+                            <span class="material-symbols-outlined portal-star portal-star--input" data-value="<%= i %>">star</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <div class="portal-survey-question">
+                        <label class="portal-card-label">Tiempo de resolución</label>
+                        <div class="portal-survey-stars" data-field="resolutionTimeRating">
+                            <input type="hidden" name="resolutionTimeRating" value="">
+                            <% for (var i = 1; i <= 5; i++) { %>
+                            <span class="material-symbols-outlined portal-star portal-star--input" data-value="<%= i %>">star</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <div class="portal-survey-question">
+                        <label class="portal-card-label">Comunicación</label>
+                        <div class="portal-survey-stars" data-field="communicationRating">
+                            <input type="hidden" name="communicationRating" value="">
+                            <% for (var i = 1; i <= 5; i++) { %>
+                            <span class="material-symbols-outlined portal-star portal-star--input" data-value="<%= i %>">star</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <div class="portal-survey-question">
+                        <label class="portal-card-label">Resultado obtenido</label>
+                        <div class="portal-survey-stars" data-field="outcomeRating">
+                            <input type="hidden" name="outcomeRating" value="">
+                            <% for (var i = 1; i <= 5; i++) { %>
+                            <span class="material-symbols-outlined portal-star portal-star--input" data-value="<%= i %>">star</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <div class="portal-search-field">
+                        <label class="portal-search-label" for="comment">Comentario (opcional)</label>
+                        <textarea id="comment" name="comment" class="portal-search-input-field" rows="4" maxlength="2000" placeholder="Contanos tu experiencia con la resolución de esta incidencia..."></textarea>
+                    </div>
+
+                    <button type="submit" class="portal-search-panel-btn">
+                        <span class="material-symbols-outlined">send</span>
+                        Enviar encuesta
+                    </button>
+                </div>
+            </form>
+            <% } %>
+
+            <div class="portal-mis-envios-actions" style="border-top:none;padding-top:0;">
+                <a href="/portal/mis-envios/incidencia/<%= incident.id %>" class="portal-card-incident-cta-link">
+                    <span class="material-symbols-outlined">report</span>
+                    Ver incidencia asociada
+                </a>
+            </div>
+        </div>
+    </section>
+    <% if (!survey) { %>
+    <script src="/js/portal-survey-stars.js" defer></script>
+    <% } %>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

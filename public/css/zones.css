@@ -1,0 +1,540 @@
+/* ============================================================
+   Zones — design tokens
+   ============================================================ */
+:root {
+    --zn-bg:          #f0f2f5;
+    --zn-surface:     #ffffff;
+    --zn-surface-alt: #f8fafc;
+    --zn-blue:        #2563eb;
+    --zn-blue-dark:   #1a3566;
+    --zn-blue-soft:   #3b82f6;
+    --zn-green:       #16a34a;
+    --zn-red:         #dc2626;
+    --zn-text:        #0f172a;
+    --zn-text-strong: #1a3566;
+    --zn-muted:       #64748b;
+    --zn-border:      rgba(15, 23, 42, .08);
+    --zn-border-soft: rgba(15, 23, 42, .05);
+    --zn-shadow-sm:   0 1px 2px rgba(15, 23, 42, .04);
+    --zn-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --zn-radius-sm:   8px;
+    --zn-radius-md:   12px;
+    --zn-radius-lg:   18px;
+    --zn-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+    /* Panel overlay (glass) */
+    --zmp-glass:        rgba(255, 255, 255, .9);
+    --zmp-glass-border: rgba(15, 23, 42, .10);
+    --zmp-card:         rgba(255, 255, 255, .55);
+}
+
+html[data-theme="dark"] {
+    --zn-bg:          #0b1220;
+    --zn-surface:     #111827;
+    --zn-surface-alt: #0f172a;
+    --zn-blue:        #60a5fa;
+    --zn-text:        #e2e8f0;
+    --zn-text-strong: #f1f5f9;
+    --zn-muted:       #94a3b8;
+    --zn-border:      rgba(148, 163, 184, .18);
+    --zn-border-soft: rgba(148, 163, 184, .10);
+    --zn-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --zn-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+    --zmp-glass:        rgba(15, 23, 42, .82);
+    --zmp-glass-border: rgba(148, 163, 184, .20);
+    --zmp-card:         rgba(148, 163, 184, .06);
+}
+
+/* ============================================================
+   Listado (heredan estilo de routes.css/shipments.css). Refuerzo
+   tipográfico únicamente.
+   ============================================================ */
+.page-header h1 {
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--zn-text-strong);
+}
+
+/* ============================================================
+   Form (new + update): .form-new > form > .usuario (card)
+   ============================================================ */
+.form-new {
+    max-width: 720px;
+    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.form-new .usuario {
+    background: var(--zn-surface);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-lg);
+    padding: 1.75rem 1.75rem 1.5rem;
+    box-shadow: var(--zn-shadow-md);
+}
+
+.form-error {
+    max-width: 720px;
+    margin: 0 clamp(1.25rem, 2.5vw, 2rem) .75rem;
+    padding: .75rem 1rem;
+    border-radius: var(--zn-radius-sm);
+    background: color-mix(in srgb, var(--zn-red) 12%, var(--zn-surface));
+    border: 1px solid color-mix(in srgb, var(--zn-red) 35%, transparent);
+    color: var(--zn-red);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.partido-picker {
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    background: var(--zn-surface-alt);
+    padding: .5rem;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.partido-picker__msg {
+    margin: 0;
+    padding: .4rem .25rem;
+    font-size: var(--font-size-sm);
+    color: var(--zn-muted);
+}
+.partido-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: .15rem .75rem;
+}
+.partido-picker__item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin: 0;
+    padding: .25rem .35rem;
+    border-radius: 6px;
+    font-size: var(--font-size-sm);
+    text-transform: none;
+    cursor: pointer;
+}
+.partido-picker__item:hover { background: var(--zn-border-soft); }
+.partido-picker__item input { width: auto; margin: 0; }
+
+.form-new .usuario h3 {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--zn-text-strong);
+    letter-spacing: -.02em;
+    padding-bottom: .65rem;
+    border-bottom: 1px solid var(--zn-border-soft);
+}
+
+.form-new .field {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    margin-bottom: 1.1rem;
+}
+
+.form-new .field > label {
+    font-weight: 600;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--zn-muted);
+}
+
+.form-new .field .req { color: var(--zn-red); margin-left: 2px; }
+
+.form-new .search-input {
+    padding: .65rem .85rem;
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    background: var(--zn-surface);
+    color: var(--zn-text);
+    font: inherit;
+    font-size: .92rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    width: 100%;
+}
+
+.form-new .search-input:hover { border-color: rgba(15, 23, 42, .18); }
+
+.form-new .search-input:focus {
+    outline: none;
+    border-color: var(--zn-blue);
+    box-shadow: var(--zn-ring);
+}
+
+.form-new input[type=checkbox] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--zn-blue);
+    cursor: pointer;
+}
+
+.form-new .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .65rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--zn-border-soft);
+}
+
+/* ============================================================
+   Botones (reasegurar consistencia si no se cargó routes.css)
+   ============================================================ */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.1rem;
+    background: linear-gradient(135deg, var(--zn-blue), var(--zn-blue-soft));
+    color: #fff !important;
+    border: 1px solid var(--zn-blue);
+    border-radius: var(--zn-radius-sm);
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .25);
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.1rem;
+    background: var(--zn-surface);
+    color: var(--zn-text-strong);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.btn-secondary:hover { background: var(--zn-surface-alt); border-color: var(--zn-blue); }
+
+/* Acción "Editar límites" del partido fijado (override estético de delimitación). */
+.zmp-dept-actions { margin: .5rem 0 .25rem; }
+.zmp-edit-dept {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .45rem .9rem;
+    background: var(--zn-surface);
+    color: var(--zn-text-strong);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+.zmp-edit-dept:hover { background: var(--zn-surface-alt); border-color: var(--zn-blue); }
+.zmp-edit-dept .material-symbols-outlined { font-size: 1.05rem; }
+
+/* ============================================================
+   Vista mapa (admin de zonas) — aditivo sobre el listado
+   ============================================================ */
+.zone-view-toggle {
+    display: inline-flex;
+    gap: 2px;
+    background: var(--zn-surface-alt);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    padding: 3px;
+    margin-bottom: 1rem;
+}
+.zone-view-toggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .4rem .9rem;
+    border: 0;
+    background: transparent;
+    color: var(--zn-muted);
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.zone-view-toggle button.active {
+    background: var(--zn-surface);
+    color: var(--zn-text-strong);
+    box-shadow: var(--zn-shadow-sm);
+}
+.zone-view-toggle .material-symbols-outlined { font-size: 1.15rem; }
+
+#zone-map {
+    height: 520px;
+    max-height: 64vh;
+    border-radius: var(--zn-radius-md);
+    border: 1px solid var(--zn-border);
+    box-shadow: var(--zn-shadow-md);
+    background: var(--zn-surface-alt);
+    z-index: 0; /* mantener mapa debajo del header/menú */
+}
+
+/* El mapa es el contexto de posicionamiento del panel flotante. */
+#zone-map-view { position: relative; }
+.zone-map-below { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+
+#zone-map-error {
+    background: rgba(220, 38, 38, .1);
+    color: var(--zn-red);
+    border: 1px solid rgba(220, 38, 38, .25);
+    border-radius: var(--zn-radius-sm);
+    padding: .65rem .85rem;
+    font-size: .85rem;
+    margin-bottom: .75rem;
+}
+
+/* ---- Panel de detalle: tarjeta debajo del mapa ---- */
+#zone-map-panel.zmp {
+    display: flex;
+    flex-direction: column;
+    margin-top: 1rem;
+    background: var(--zn-surface);
+    border: 1px solid var(--zmp-glass-border);
+    border-radius: var(--zn-radius-md);
+    box-shadow: var(--zn-shadow-sm);
+    padding: .85rem 1rem 1rem;
+    animation: zmp-in .18s ease;
+}
+#zone-map-panel.zmp:empty { display: none; }
+@keyframes zmp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.zmp-hint { color: var(--zn-muted); font-size: .82rem; margin: .25rem 0; }
+.zmp-hint--foot { margin: .75rem 0 0; flex: 0 0 auto; }
+
+.zmp-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .8rem; flex: 0 0 auto; }
+.zmp-head h3 {
+    margin: 0;
+    font-size: .98rem;
+    font-weight: 700;
+    color: var(--zn-text-strong);
+    letter-spacing: .01em;
+    text-transform: uppercase;
+}
+.zmp-head__sub { font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--zn-muted); }
+.zmp-close {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: var(--zn-muted);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 .15rem;
+    transition: color .15s ease;
+}
+.zmp-close:hover { color: var(--zn-text-strong); }
+
+/* Grilla de cards: se reparten el ancho y scrollean si no entran. */
+.zmp-zones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: .85rem;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    padding-right: .15rem;
+}
+
+.zmp-zone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    border: 1px solid var(--zmp-glass-border);
+    border-left: 3px solid var(--zone-accent, var(--zn-blue));
+    border-radius: var(--zn-radius-sm);
+    background: var(--zmp-card);
+    padding: .85rem .9rem;
+}
+.zmp-zone__head { display: flex; align-items: center; gap: .55rem; }
+.zmp-zone__icon {
+    flex: 0 0 auto;
+    color: var(--zone-accent, var(--zn-blue));
+    font-size: 1.3rem;
+    line-height: 1;
+    padding: .28rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--zone-accent, var(--zn-blue)) 16%, transparent);
+}
+.zmp-zone__head h4 {
+    margin: 0;
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--zn-text-strong);
+    text-transform: uppercase;
+    letter-spacing: .01em;
+}
+.zmp-off {
+    font-size: .62rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--zn-red);
+    background: rgba(220, 38, 38, .12);
+    padding: .12rem .4rem;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+.zmp-sec { display: flex; flex-direction: column; gap: .4rem; }
+.zmp-sec__label {
+    margin: 0;
+    font-size: .62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--zn-muted);
+}
+.zmp-stats { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .55rem; }
+.zmp-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .82rem;
+    color: var(--zn-text);
+    white-space: nowrap;
+}
+.zmp-stat b { font-weight: 700; color: var(--zn-text-strong); }
+.zmp-stat .material-symbols-outlined { font-size: 1.05rem; color: var(--zone-accent, var(--zn-blue)); }
+.zmp-stats .zmp-stat + .zmp-stat { border-left: 1px solid var(--zmp-glass-border); padding-left: .6rem; }
+.zmp-unit {
+    font-size: .58rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    color: var(--zone-accent, var(--zn-blue));
+    background: color-mix(in srgb, var(--zone-accent, var(--zn-blue)) 18%, transparent);
+    padding: .14rem .32rem;
+    border-radius: 4px;
+}
+
+.zmp-locs { display: flex; align-items: flex-start; gap: .4rem; margin: 0; font-size: .82rem; color: var(--zn-text); }
+.zmp-locs .material-symbols-outlined { flex: 0 0 auto; font-size: 1.05rem; color: var(--zone-accent, var(--zn-blue)); }
+.zmp-more { color: var(--zn-blue); font-weight: 600; cursor: pointer; text-decoration: none; }
+.zmp-more:hover { text-decoration: underline; }
+.zmp-locs__full { margin: .4rem 0 0; font-size: .78rem; line-height: 1.55; color: var(--zn-muted); }
+.zmp-cp { color: var(--zn-muted); font-variant-numeric: tabular-nums; }
+
+/* Botón "Volver" del partido fijado. */
+.zmp-back {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    border: 1px solid var(--zmp-glass-border);
+    background: transparent;
+    color: var(--zn-text-strong);
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 600;
+    padding: .3rem .6rem .3rem .45rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+.zmp-back:hover { background: var(--zn-surface-alt); border-color: var(--zn-blue); }
+.zmp-back .material-symbols-outlined { font-size: 1.05rem; }
+
+/* Partido fijado: card a ancho completo, secciones repartidas para aprovechar el espacio. */
+.zmp-zone--wide {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .8rem 1.5rem;
+    align-items: start;
+}
+.zmp-zone--wide .zmp-zone__head { grid-column: 1 / -1; }
+.zmp-zone--wide .zmp-sec:last-child { grid-column: 1 / -1; }
+.zmp-zone--wide .zmp-locs span:last-child { line-height: 1.6; }
+
+/* En pantallas chicas las cards se apilan en una columna. */
+@media (max-width: 760px) {
+    .zmp-zones { grid-template-columns: 1fr; }
+    .zmp-zone--wide { grid-template-columns: 1fr; }
+}
+
+#zone-map-legend {
+    background: var(--zn-surface);
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-md);
+    box-shadow: var(--zn-shadow-sm);
+    padding: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+}
+.zml-item { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: var(--zn-text); }
+.zml-sw { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 auto; box-shadow: 0 0 0 1px var(--zn-border); }
+
+.zml-sw--danger { border: 1.5px dashed rgba(255,255,255,.6); }
+
+/* Formulario flotante para guardar un área peligrosa dibujada. */
+.zone-danger-form {
+    position: absolute;
+    top: .75rem;
+    left: .75rem;
+    z-index: 2;
+    width: min(280px, calc(100% - 1.5rem));
+    background: var(--zmp-glass);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--zmp-glass-border);
+    border-radius: var(--zn-radius-md);
+    box-shadow: var(--zn-shadow-md);
+    padding: .9rem 1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+}
+.zone-danger-form h4 { margin: 0; font-size: .95rem; color: var(--zn-text-strong); }
+.zone-danger-form label {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    font-size: .76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--zn-muted);
+}
+.zone-danger-form input[type=text] {
+    padding: .5rem .65rem;
+    border: 1px solid var(--zn-border);
+    border-radius: var(--zn-radius-sm);
+    background: var(--zn-surface);
+    color: var(--zn-text);
+    font: inherit;
+    font-size: .88rem;
+}
+.zone-danger-form input[type=text]:focus { outline: none; border-color: var(--zn-blue); box-shadow: var(--zn-ring); }
+.zone-danger-form .zdf-check {
+    flex-direction: row;
+    align-items: center;
+    gap: .45rem;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    color: var(--zn-text);
+}
+.zone-danger-form .zdf-check input { width: 16px; height: 16px; accent-color: var(--zn-red); }
+.zone-danger-form .zdf-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .2rem; }
+.zone-danger-form .zdf-err { margin: 0; color: var(--zn-red); font-size: .8rem; font-weight: 600; }
+
+/* Leaflet tooltip en tema oscuro */
+html[data-theme="dark"] .leaflet-tooltip {
+    background: var(--zn-surface);
+    color: var(--zn-text);
+    border-color: var(--zn-border);
+}

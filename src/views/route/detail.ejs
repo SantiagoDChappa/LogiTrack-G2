@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Ruta #<%= route.id %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/routes.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Ruta #<%= route.id %></h1>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button id="btn-print-labels" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Imprimir todas las etiquetas" aria-label="Imprimir todas las etiquetas">
+                    <span class="material-symbols-outlined">print</span>
+                </button>
+                <% if (route.statusId === 1) { %>
+                    <button id="btn-revert-route" class="action-btn action-btn--lg action-btn--tip-bottom eliminar" data-tooltip="Deshabilitar ruteo" aria-label="Deshabilitar ruteo">
+                        <span class="material-symbols-outlined">undo</span>
+                    </button>
+                <% } %>
+                <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+            </div>
+            <script>
+            document.getElementById('btn-print-labels')?.addEventListener('click', () => {
+                const ids = <%- JSON.stringify((route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId).map(s => s.shipmentId)) %>;
+                ids.forEach((id, i) => setTimeout(() => window.open('/shipment/' + id + '/label', '_blank'), i * 200));
+            });
+
+            document.getElementById('btn-revert-route')?.addEventListener('click', async () => {
+                const shipCount = <%= (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId).length %>;
+                const msg = `Se cancelará la ruta (estado: Cancelada). ` +
+                    `Los ${shipCount} envío(s) Asignados volverán a su estado anterior (Pendiente / En Sucursal / En Preparación) ` +
+                    `y el transporte y conductor quedan libres. Solo procede si NINGÚN envío salió aún (todos en estado Asignado).`;
+                if (!(await window.ltConfirm({ title: '¿Deshabilitar el ruteo de la Ruta #<%= route.id %>?', text: msg, confirmButtonText: 'Sí, deshabilitar', confirmButtonColor: '#dc2626' }))) { return; }
+                const btn = document.getElementById('btn-revert-route');
+                btn.disabled = true; btn.textContent = '⏳ Revirtiendo...';
+                try {
+                    const res = await fetch('/route/<%= route.id %>/revert', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        await window.ltAlert({ icon: 'error', title: 'No se pudo revertir', text: data.error || 'Error desconocido' });
+                        btn.disabled = false; btn.textContent = '↩️ Deshabilitar ruteo';
+                        return;
+                    }
+                    await window.ltAlert({ icon: 'success', title: 'Ruta revertida', text: `${data.revertedShipments} envío(s) devueltos a su estado anterior.` });
+                    window.location.href = '/route';
+                } catch (e) {
+                    await window.ltAlert({ icon: 'error', title: 'Error de red al revertir', text: e.message });
+                    btn.disabled = false; btn.textContent = '↩️ Deshabilitar ruteo';
+                }
+            });
+            </script>
+        </div>
+
+        <div class="page-update-wrapper">
+
+            <%
+                const _routeStatusMap = {
+                    1: { label: 'Planificada · sumable', cls: 'en_sucursal' },
+                    2: { label: 'En tránsito',           cls: 'en_transito' },
+                    3: { label: 'Completada',            cls: 'entregado'   },
+                    4: { label: 'Cancelada',             cls: 'cancelado'   },
+                };
+                const _rs = _routeStatusMap[route.statusId] || { label: 'Estado ' + route.statusId, cls: 'inicial' };
+            %>
+
+            <!-- Header card -->
+            <div class="detail-top" style="margin-bottom:1.5rem">
+                <div class="detail-tracking">
+                    <span class="detail-tracking-label">Ruta</span>
+                    <span class="detail-tracking-id">#<%= route.id %></span>
+                </div>
+                <span class="status-badge <%= _rs.cls %>"><%= _rs.label %></span>
+            </div>
+
+            <!-- QR salida de ruta -->
+            <% if (route.statusId === 1) { %>
+            <div class="update-card" style="margin-bottom:1.5rem;display:flex;gap:var(--space-5);align-items:center;flex-wrap:wrap;">
+                <div>
+                    <h3 style="margin-top:0"><span class="material-symbols-outlined">qr_code_2</span> QR de salida</h3>
+                    <p style="color:var(--color-text-secondary);max-width:340px;margin:0 0 var(--space-3);">
+                        El repartidor escanea este QR al salir. Todos los envíos asignados a esta ruta pasan automáticamente a <strong>En Tránsito</strong>.
+                    </p>
+                    <a href="/route/scan/<%= route.id %>" class="action-btn action-btn--lg neutro" data-tooltip="Abrir pantalla de salida" aria-label="Abrir pantalla de salida"><span class="material-symbols-outlined">open_in_new</span></a>
+                </div>
+                <img src="/route/<%= route.id %>/qr" alt="QR ruta <%= route.id %>" style="width:200px;height:200px;background:#fff;border-radius:8px;padding:8px;">
+            </div>
+            <% } %>
+
+            <!-- Top grid: info + mapa -->
+            <div class="update-top-grid" style="margin-bottom:1.5rem">
+
+                <!-- Info de la ruta -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">local_shipping</span> Información</h3>
+                    <div class="detail-field">
+                        <span class="detail-label">Transporte</span>
+                        <span class="detail-value"><%= route.transport ? route.transport.name : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Conductor</span>
+                        <span class="detail-value"><%= route.transport && route.transport.driver ? route.transport.driver.fullName : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Sucursal origen</span>
+                        <span class="detail-value"><%= route.originBranch ? route.originBranch.name : '-' %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Distancia total</span>
+                        <span class="detail-value"><%= route.totalDistanceKm %> km</span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Costo total</span>
+                        <span class="detail-value"><%= fmtMoney(route.totalCost) %></span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Creada</span>
+                        <span class="detail-value"><%= route.createdAt ? new Date(route.createdAt).toLocaleString('es-AR') : '-' %></span>
+                    </div>
+                </div>
+
+                <!-- Mapa -->
+                <div class="update-card update-map-card" style="grid-column: span 2">
+                    <h3><span class="material-symbols-outlined">map</span> Recorrido</h3>
+                    <div id="map" style="height:340px;border-radius:var(--radius-sm);border:1px solid var(--color-border)"></div>
+                </div>
+            </div>
+
+            <!-- KPIs de la ruta -->
+            <% if (kpis && kpis.deliveries > 0) { %>
+            <div class="route-kpis">
+                <div class="route-kpi">
+                    <span class="route-kpi__label">Entregas</span>
+                    <span class="route-kpi__value"><%= kpis.deliveries %></span>
+                </div>
+                <div class="route-kpi route-kpi--green">
+                    <span class="route-kpi__label">Entregados</span>
+                    <span class="route-kpi__value"><%= kpis.delivered %></span>
+                </div>
+                <div class="route-kpi route-kpi--red">
+                    <span class="route-kpi__label">Fallidos</span>
+                    <span class="route-kpi__value"><%= kpis.failed %></span>
+                </div>
+                <div class="route-kpi route-kpi--blue">
+                    <span class="route-kpi__label">Devueltos sucursal</span>
+                    <span class="route-kpi__value"><%= kpis.returned %></span>
+                </div>
+                <div class="route-kpi route-kpi--amber">
+                    <span class="route-kpi__label">Pendientes</span>
+                    <span class="route-kpi__value"><%= kpis.pending %></span>
+                </div>
+                <div class="route-kpi">
+                    <span class="route-kpi__label">Paradas hechas</span>
+                    <span class="route-kpi__value"><%= kpis.stopsDone %> / <%= kpis.stopsTotal %></span>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Envíos de la ruta -->
+            <% if (shipmentsSummary && shipmentsSummary.length > 0) { %>
+            <div class="update-card route-shipments-card">
+                <h3><span class="material-symbols-outlined">inventory_2</span> Envíos de la ruta (<%= shipmentsSummary.length %>)</h3>
+                <div class="route-shipments-table-wrap">
+                    <table class="route-shipments-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Tracking</th>
+                                <th>Destinatario</th>
+                                <th>Dirección</th>
+                                <th>Estado final</th>
+                                <th>Parada</th>
+                                <th class="col-actions">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% shipmentsSummary.forEach(s => {
+                                const _skey = STATUS_KEY(s.statusId);
+                                let stopState = 'Pendiente';
+                                let stopCls = 'pendiente';
+                                if (s.stopCompleted) { stopState = 'Completada'; stopCls = 'entregado'; }
+                                else if (s.stopSkipped) { stopState = 'Postergada'; stopCls = 'retrasado'; }
+                            %>
+                                <tr class="route-ship-row" data-status="<%= _skey %>">
+                                    <td><%= s.stopSequence %></td>
+                                    <td class="tracking-id"><%= s.trackingId %></td>
+                                    <td><%= s.recipientName %></td>
+                                    <td class="route-ship-addr"><%= s.addressLine %></td>
+                                    <td>
+                                        <span class="status-badge <%= _skey %>"><%= s.statusLabel %></span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-badge--sm <%= stopCls %>"><%= stopState %></span>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/shipment/detail/<%= s.shipmentId %>?from=/route/<%= route.id %>&fromLabel=Ruta%20%23<%= route.id %>" class="action-btn" data-tooltip="Ver envío">
+                                            <span class="material-symbols-outlined">info</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Grid 2 cols: paradas y timeline -->
+            <div class="route-detail-bottom-grid">
+
+                <!-- Paradas (orden de visita) -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">pin_drop</span> Paradas (<%= (route.stops || []).length %>)</h3>
+                    <% if (!route.stops || route.stops.length === 0) { %>
+                        <p class="historial-empty">Sin paradas registradas.</p>
+                    <% } else { %>
+                    <ol class="shipment-timeline" style="margin-top:.75rem">
+                        <% route.stops.forEach(function(s) { %>
+                            <li class="shipment-timeline-item">
+                                <%
+                                    const _stopIcon  = s.stopType === 'pickup' ? 'warehouse' : (s.stopType === 'service' ? 'local_gas_station' : 'home');
+                                    const _stopLabel = s.stopType === 'pickup' ? 'Pickup' : (s.stopType === 'service' ? 'Servicio (combustible/descanso)' : 'Entrega');
+                                    const _stopCls   = s.completed ? 'entregado' : (s.skipped ? 'retrasado' : (s.stopType === 'pickup' ? 'en_sucursal' : 'pendiente'));
+                                    const _detailIco = s.stopType === 'pickup' ? 'store' : (s.stopType === 'service' ? 'local_gas_station' : 'package_2');
+                                %>
+                                <span class="shipment-timeline-dot <%= _stopCls %>">
+                                    <span class="material-symbols-outlined"><%= _stopIcon %></span>
+                                </span>
+                                <div class="shipment-timeline-content">
+                                    <div class="shipment-timeline-header">
+                                        <strong style="font-size:.92rem">#<%= s.sequence %> — <%= _stopLabel %></strong>
+                                        <% if (s.completed) { %>
+                                            <span class="status-badge status-badge--sm entregado">Completada</span>
+                                        <% } else if (s.skipped) { %>
+                                            <span class="status-badge status-badge--sm retrasado">Postergada</span>
+                                        <% } else { %>
+                                            <span class="status-badge status-badge--sm pendiente">Pendiente</span>
+                                        <% } %>
+                                    </div>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico"><%= _detailIco %></span>
+                                        <% if (s.stopType === 'pickup' || s.stopType === 'service') { %>
+                                            <%= s.branch ? s.branch.name : 'Sucursal #' + s.branchId %>
+                                        <% } else { %>
+                                            <strong><%= s.shipment ? s.shipment.trackingId : '#' + s.shipmentId %></strong>
+                                            <% if (s.shipment && s.shipment.address) { %>
+                                                · <%= s.shipment.address.street %> <%= s.shipment.address.number %>
+                                            <% } %>
+                                        <% } %>
+                                    </div>
+                                    <div class="shipment-timeline-meta">
+                                        <span class="material-symbols-outlined shipment-timeline-meta-ico">straighten</span>
+                                        +<%= s.distanceFromPrevKm %> km
+                                        <% if (s.completedAt) { %>
+                                            · <span style="color:var(--rt-muted)">Cerrada <%= new Date(s.completedAt).toLocaleString('es-AR', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short' }) %></span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ol>
+                    <% } %>
+                </div>
+
+                <!-- Timeline de eventos -->
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">timeline</span> Línea de tiempo (<%= (timeline || []).length %>)</h3>
+                    <% if (!timeline || timeline.length === 0) { %>
+                        <p class="historial-empty">Sin eventos registrados todavía.</p>
+                    <% } else { %>
+                    <ol class="route-events">
+                        <% timeline.forEach(function(ev) { %>
+                            <li class="route-event route-event--<%= ev.tone || 'gray' %>">
+                                <span class="route-event__dot">
+                                    <span class="material-symbols-outlined"><%= ev.icon || 'circle' %></span>
+                                </span>
+                                <div class="route-event__body">
+                                    <div class="route-event__head">
+                                        <strong class="route-event__label"><%= ev.label %></strong>
+                                        <% if (ev.tracking) { %>
+                                            <span class="route-event__tracking"><%= ev.tracking %></span>
+                                        <% } %>
+                                        <span class="route-event__time"><%= ev.at ? new Date(ev.at).toLocaleString('es-AR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '' %></span>
+                                    </div>
+                                    <% if (ev.detail) { %>
+                                        <div class="route-event__detail"><%= ev.detail %></div>
+                                    <% } %>
+                                    <% if (ev.actor) { %>
+                                        <div class="route-event__actor">
+                                            <span class="material-symbols-outlined">person</span><%= ev.actor %>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ol>
+                    <% } %>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+    (function() {
+        const stops = <%- JSON.stringify((route.stops || []).map(s => ({
+            sequence: s.sequence,
+            stopType: s.stopType,
+            lat: Number(s.lat),
+            lng: Number(s.lng),
+            label: s.stopType === 'pickup'
+                ? (s.branch ? s.branch.name : 'Pickup')
+                : (s.stopType === 'service'
+                    ? (s.branch ? s.branch.name + ' (combustible/descanso)' : 'Servicio')
+                    : (s.shipment ? s.shipment.trackingId : 'Entrega')),
+            completed: s.completed,
+        }))) %>;
+
+        const validStops = stops.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+        const center = validStops.length > 0
+            ? [validStops[0].lat, validStops[0].lng]
+            : [-34.6, -58.4];
+
+        const map = L.map('map').setView(center, 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+
+        const mkIcon = (color) => L.divIcon({
+            className: '',
+            html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+            iconSize: [14, 14], iconAnchor: [7, 7],
+        });
+
+        const latlngs = [];
+        validStops.forEach(s => {
+            const color = s.stopType === 'pickup' ? '#2563eb' : (s.stopType === 'service' ? '#d97706' : (s.completed ? '#16a34a' : '#dc2626'));
+            const typeLabel = s.stopType === 'pickup' ? 'Pickup' : (s.stopType === 'service' ? 'Servicio' : 'Entrega');
+            L.marker([s.lat, s.lng], { icon: mkIcon(color) })
+                .bindPopup('<strong>#' + s.sequence + ' ' + typeLabel + '</strong><br>' + s.label)
+                .addTo(map);
+            latlngs.push([s.lat, s.lng]);
+        });
+
+        if (latlngs.length > 1) {
+            let fallback = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.6 }).addTo(map);
+            map.fitBounds(latlngs, { padding: [24, 24] });
+
+            const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+            fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !d.routes || !d.routes[0]) return;
+                    const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                    map.removeLayer(fallback);
+                    L.polyline(poly, { color: '#2563eb', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(poly, { padding: [24, 24] });
+                }).catch(() => {});
+        } else if (latlngs.length === 1) {
+            map.setView(latlngs[0], 13);
+        }
+    })();
+    </script>
+</body>
+</html>

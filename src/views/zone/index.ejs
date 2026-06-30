@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Zonas - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/routes.css">
+    <link rel="stylesheet" href="/css/zones.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.3/dist/leaflet-geoman.css" />
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Zonas</h1>
+            <div class="page-header__actions">
+                <a href="/zone/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva zona" aria-label="Nueva zona">
+                    <span class="material-symbols-outlined">add</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="zone-view-toggle" role="tablist" aria-label="Vista de zonas">
+            <button type="button" id="view-map" class="active" role="tab" aria-selected="true">
+                <span class="material-symbols-outlined">map</span>Mapa
+            </button>
+            <button type="button" id="view-table" role="tab" aria-selected="false">
+                <span class="material-symbols-outlined">table_rows</span>Tabla
+            </button>
+        </div>
+
+        <div id="zone-table-view" hidden>
+        <div class="shipments-wrapper">
+            <form class="search-form" data-tools-for="zones" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-zone-name">Nombre</label>
+                        <input type="text" id="f-zone-name" class="search-input" data-col="0" placeholder="Ej: CABA - Belgrano">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-zone-prov">Provincia</label>
+                        <input type="text" id="f-zone-prov" class="search-input" data-col="1" placeholder="Ej: 24">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-zone-state">Estado</label>
+                        <select id="f-zone-state" class="search-input" data-col="4">
+                            <option value="">Todas</option>
+                            <option value="Habilitada">Habilitada</option>
+                            <option value="Deshabilitada">Deshabilitada</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="table-wrapper">
+                <table data-tools="zones">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Provincia</th>
+                            <th>Costo base</th>
+                            <th>Prefijos CP</th>
+                            <th>Estado</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (!zones || zones.length === 0) { %>
+                            <tr>
+                                <td colspan="6" class="empty-row">
+                                    <span class="material-symbols-outlined">map</span>
+                                    No hay zonas cargadas.
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% zones.forEach(z => { %>
+                                <tr>
+                                    <td><strong><%= z.name %></strong></td>
+                                    <td><%= z.provinceId || '-' %></td>
+                                    <td><%= fmtMoney(z.baseCost) %></td>
+                                    <td class="tracking-id"><%= z.postalCodePrefixes ? z.postalCodePrefixes.join(', ') : '-' %></td>
+                                    <td>
+                                        <% if (z.enabled) { %>
+                                            <span class="status-badge entregado">Habilitada</span>
+                                        <% } else { %>
+                                            <span class="status-badge cancelado">Deshabilitada</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/zone/update/<%= z.id %>" class="action-btn modificar" data-tooltip="Editar">
+                                            <span class="material-symbols-outlined">edit</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div><!-- /#zone-table-view -->
+
+        <div id="zone-map-view">
+            <div id="zone-map-error" hidden></div>
+            <div id="zone-map" aria-label="Mapa de zonas por provincia"></div>
+            <div id="zone-map-panel" class="zmp"></div>
+        </div>
+        <div class="zone-map-below">
+            <div id="zone-map-legend" aria-label="Referencia de colores"></div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.3/dist/leaflet-geoman.min.js" defer></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/zone-map.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>

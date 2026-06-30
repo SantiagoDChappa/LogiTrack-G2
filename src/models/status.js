@@ -7,12 +7,14 @@ const Status = sequelize.define('status', {
 },
 { tableName: 'status', timestamps: false });
 
-const getAll = async () => {
-    return await Status.findAll({ order: [['id', 'ASC']] });
-};
+const { withTtl } = require('../utils/memoryCache');
 
-const getById = async (id) => {
-    return await Status.findOne({ where: { id } });
+// Status es catalogo casi inmutable (se modifica via migracion, no en runtime).
+// TTL alto: 1 hora.
+const getAll = withTtl(60 * 60 * 1000, () => Status.findAll({ order: [['id', 'ASC']] }), 'status:all');
+
+const getById = (id) => {
+    return Status.findOne({ where: { id } });
 };
 
 module.exports = { Status, getAll, getById };

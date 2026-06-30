@@ -1,0 +1,701 @@
+<!--
+======================================================================
+  LogiTrack — Plantillas de email en HTML (estética del sistema)
+======================================================================
+  Cómo usar:
+  1. Ajustes → Comunicaciones → elegí el evento.
+  2. Poné el formato en "HTML".
+  3. Copiá el bloque <!DOCTYPE html>...</html> del evento y pegalo en el cuerpo.
+  4. El subject sugerido está en el comentario de cada evento.
+  5. Las {{variables}} las resuelve el sistema al enviar.
+
+  Paleta por tipo:
+    info/normal  → azul   #2563eb → #1d4ed8
+    éxito        → verde  #16a34a → #15803d
+    atención     → ámbar  #d97706 → #b45309
+    cancelación  → rojo   #dc2626 → #b91c1c
+======================================================================
+-->
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  SHELL REUTILIZABLE (referencia)
+  Cambiá: ACENTO1/ACENTO2 (degradé header), EYEBROW, TÍTULO, CONTENIDO.
+═════════════════════════════════════════════════════════════════ -->
+<!--
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,ACENTO1,ACENTO2);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">EYEBROW</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">TÍTULO</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">CONTENIDO</td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+-->
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  1) SHIPMENT_PENDING   ·  Asunto: Tu envío {{trackingCode}} está pendiente
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Estado del envío</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío está pendiente</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, registramos tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong>. Te avisaremos en cada paso.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Tipo: {{shipmentType}} · Entrega estimada: {{expectedDeliveryDate}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  2) SHIPMENT_IN_PREPARATION   ·  Asunto: Estamos preparando tu envío {{trackingCode}}
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Estado del envío</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Estamos preparando tu envío</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> está siendo preparado para su despacho.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Entrega estimada: {{expectedDeliveryDate}} · {{deliveryWindow}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  3) SHIPMENT_ASSIGNED   ·  Asunto: Tu envío {{trackingCode}} fue asignado a un repartidor
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Estado del envío</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío fue asignado</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, asignamos tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> a un repartidor. Pronto saldrá a reparto.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Entrega estimada: {{expectedDeliveryDate}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  4) SHIPMENT_OUT_FOR_DELIVERY   ·  Asunto: Tu envío {{trackingCode}} salió a reparto
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">En camino</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío salió a reparto</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> salió a reparto y llega hoy a <strong style="color:#0f172a;">{{addressLine}}</strong>.</p>
+          <div style="margin:0 0 4px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 16px;color:#1d4ed8;font-size:13px;">Código clave de entrega: <strong style="font-size:16px;letter-spacing:.1em;">{{secretCode}}</strong><br>Mostráselo al repartidor para confirmar la entrega.</div>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Seguir en vivo</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  5) SHIPMENT_NEXT_DELIVERY   ·  Asunto: Tu envío {{trackingCode}} es la próxima entrega
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Llega enseguida</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío está cerca</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> es la próxima entrega del repartidor. Te recomendamos estar disponible.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Destino: {{addressLine}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver ubicación</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  6) SHIPMENT_ARRIVED_DESTINATION   ·  Asunto: El repartidor llegó con tu envío {{trackingCode}}
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">En la puerta</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">El repartidor llegó</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, el repartidor llegó a <strong style="color:#0f172a;">{{addressLine}}</strong> con tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong>.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Tené a mano tu código clave si te lo pedimos.</p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  7) SHIPMENT_IN_TRANSIT   ·  Asunto: Tu envío {{trackingCode}} está en tránsito
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Estado del envío</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío está en tránsito</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> va en camino hacia su destino.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Entrega estimada: {{expectedDeliveryDate}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  8) SHIPMENT_IN_BRANCH   ·  Asunto: Tu envío {{trackingCode}} está en sucursal
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#2563eb,#1d4ed8);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Estado del envío</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío está en sucursal</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> se encuentra en <strong style="color:#0f172a;">{{branchName}}</strong>.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Te avisaremos cuando salga a reparto.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#2563eb;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  9) SHIPMENT_DELIVERED   ·  Asunto: ¡Tu envío {{trackingCode}} fue entregado!   (VERDE)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#16a34a,#15803d);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Entregado</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">¡Tu envío fue entregado!</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> fue entregado con éxito. ¡Gracias por elegirnos!</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Si algo no está bien, podés reportarlo desde el portal.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#16a34a;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver detalle</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  10) SHIPMENT_DELAY_RECOVERED   ·  Asunto: Tu envío {{trackingCode}} ya no presenta demora   (VERDE)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#16a34a,#15803d);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Buenas noticias</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío ya no tiene demora</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> ya no se encuentra en demora significativa. Gracias por tu paciencia.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Estado actual: {{statusLabel}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#16a34a;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  11) SHIPMENT_FAILED_ATTEMPT   ·  Asunto: No pudimos entregar tu envío {{trackingCode}}   (ÁMBAR)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Intento de entrega</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">No pudimos entregar tu envío</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, intentamos entregar tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> pero no fue posible.</p>
+          <div style="margin:0 0 4px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;color:#92400e;font-size:13px;">Motivo: {{failedReason}}</div>
+          <p style="margin:16px 0 0;color:#64748b;font-size:13px;">Podés reprogramar la entrega o elegir retiro en sucursal:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{selfServiceUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Gestionar entrega</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  12) SHIPMENT_DELAYED   ·  Asunto: Tu envío {{trackingCode}} presenta una demora   (ÁMBAR)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Demora</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío presenta una demora</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> tiene una demora de <strong style="color:#0f172a;">{{daysDelayed}}</strong> día(s) respecto a la fecha estimada.</p>
+          <p style="margin:0 0 16px;color:#64748b;font-size:13px;">Estado actual: {{statusLabel}}. Estamos trabajando para resolverlo a la brevedad.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{selfServiceUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Reprogramar o retirar</a></td></tr></table>
+          <p style="margin:16px 0 0;text-align:center;"><a href="{{trackingUrl}}" style="color:#2563eb;font-size:13px;text-decoration:underline;">Ver seguimiento</a></p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  13) SHIPMENT_RESCHEDULED   ·  Asunto: Tu envío {{trackingCode}} fue reprogramado   (ÁMBAR)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Reprogramado</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío fue reprogramado</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, reprogramamos tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> para un nuevo intento de entrega.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Nueva ventana estimada: {{expectedDeliveryDate}} · {{deliveryWindow}}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{selfServiceUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Gestionar entrega</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  14) SHIPMENT_RETURNED_BRANCH   ·  Asunto: Tu envío {{trackingCode}} volvió a sucursal   (ÁMBAR)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Estado del envío</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío volvió a sucursal</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> regresó a <strong style="color:#0f172a;">{{branchName}}</strong>. Te avisaremos del próximo intento.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{selfServiceUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Coordinar entrega</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  15) SHIPMENT_INCIDENT   ·  Asunto: Incidencia en tu envío {{trackingCode}}   (ÁMBAR)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Incidencia</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Registramos una incidencia</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, registramos una incidencia en tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong>. Estamos trabajando para resolverla.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Podés ver el estado o aportar información desde el portal.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver incidencia</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  16) INCIDENT_STATUS_CHANGE   ·  Asunto: Actualización de tu incidencia #{{incidentId}} — {{trackingCode}}
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#7c3aed,#5b21b6);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Incidencia actualizada</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Novedades de tu incidencia</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, la incidencia <strong style="color:#0f172a;">#{{incidentId}}</strong> de tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> cambió de estado.</p>
+          <div style="margin:0 0 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:14px 16px;color:#5b21b6;font-size:14px;">Nuevo estado: <strong>{{incidentEstado}}</strong></div>
+          <div style="margin:0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;color:#475569;font-size:14px;"><span style="display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin-bottom:4px;">Comentario del equipo</span>{{incidentComentario}}</div>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#7c3aed;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver incidencia</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  17) SHIPMENT_PACKAGE_FAILED   ·  Asunto: Hubo un problema con tu paquete {{trackingCode}}   (ROJO)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#dc2626,#b91c1c);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Atención</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Hubo un problema con tu paquete</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, lamentamos informarte que hubo un problema con tu paquete <strong style="color:#0f172a;">{{trackingCode}}</strong>.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Por favor contactá a soporte para más información.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#dc2626;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Contactar soporte</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  18) SHIPMENT_CANCELLED   ·  Asunto: Tu envío {{trackingCode}} fue cancelado   (ROJO)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#dc2626,#b91c1c);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Cancelado</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu envío fue cancelado</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> fue cancelado.</p>
+          <p style="margin:0;color:#64748b;font-size:13px;">Si tenés dudas, escribinos a soporte y te ayudamos.</p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  19) ROUTE_CANCELLED   ·  Asunto: La ruta de tu envío {{trackingCode}} fue cancelada   (ROJO)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#dc2626,#b91c1c);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Logística</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Ruta cancelada</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, la ruta de tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> fue cancelada. Será reasignado en el próximo planning.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px auto 0;"><tr><td style="border-radius:10px;background:#dc2626;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  20) SHIPMENT_PACKAGE_FAILED_UNDELIVERED   ·  Asunto: Tu paquete {{trackingCode}} no pudo entregarse   (ROJO)
+       (Ajustes → Incidencias → "PAQUETE FALLIDO — NO ENTREGADO")
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#dc2626,#b91c1c);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Paquete fallido</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu paquete no pudo entregarse</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, no pudimos completar la entrega de tu paquete <strong style="color:#0f172a;">{{trackingCode}}</strong> y quedó marcado como <strong style="color:#0f172a;">paquete fallido — no entregado</strong>.</p>
+          <div style="margin:0;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 16px;color:#991b1b;font-size:14px;">Dirección de entrega: <strong>{{addressLine}}</strong>, {{province}} ({{postalCode}})</div>
+          <p style="margin:16px 0 0;color:#64748b;font-size:13px;">Abrí la incidencia para coordinar un nuevo intento o el retiro en sucursal.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#dc2626;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver incidencia</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  21) SHIPMENT_PACKAGE_FAILED_DELAY   ·  Asunto: Tu paquete {{trackingCode}} quedó frenado por demora   (ÁMBAR)
+       (Ajustes → Incidencias → "PAQUETE FALLIDO — POR DEMORA")
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Paquete fallido</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu paquete quedó frenado por demora</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tu paquete <strong style="color:#0f172a;">{{trackingCode}}</strong> acumuló <strong style="color:#0f172a;">{{daysDelayed}}</strong> día(s) de demora y quedó marcado como <strong style="color:#0f172a;">paquete fallido — por demora</strong>.</p>
+          <div style="margin:0;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;color:#92400e;font-size:14px;">Fecha estimada original: <strong>{{expectedDeliveryDate}}</strong></div>
+          <p style="margin:16px 0 0;color:#64748b;font-size:13px;">Estamos revisando tu envío. Seguí el detalle desde la incidencia.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver incidencia</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  22) SHIPMENT_PACKAGE_FAILED_ATTEMPT   ·  Asunto: Tu paquete {{trackingCode}} quedó frenado tras un intento fallido   (ÁMBAR)
+       (Ajustes → Incidencias → "PAQUETE FALLIDO — POR INTENTO FALLIDO")
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Paquete fallido</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">No pudimos entregar tu paquete</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, tras un intento de entrega fallido tu paquete <strong style="color:#0f172a;">{{trackingCode}}</strong> quedó marcado como <strong style="color:#0f172a;">paquete fallido — por intento fallido</strong>.</p>
+          <div style="margin:0;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;color:#92400e;font-size:14px;">Motivo del último intento: <strong>{{failedReason}}</strong></div>
+          <p style="margin:16px 0 0;color:#64748b;font-size:13px;">Coordiná un nuevo intento o el retiro en sucursal desde la incidencia.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver incidencia</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  23) ROUTE_INTERRUPTED   ·  Asunto: La ruta de tu envío {{trackingCode}} fue interrumpida   (ÁMBAR)
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#d97706,#b45309);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Logística</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Ruta interrumpida</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{fullName}}</strong>, la ruta de tu envío <strong style="color:#0f172a;">{{trackingCode}}</strong> fue interrumpida. Volverá a sucursal y se reasignará.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px auto 0;"><tr><td style="border-radius:10px;background:#d97706;"><a href="{{trackingUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Ver seguimiento</a></td></tr></table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Equipo {{senderName}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+  24) SHIPMENT_PACKAGE_DAMAGED   ·  Asunto: Tu paquete {{trackingCode}} llegó con daño — elegí reembolso o reemplazo   (ROJO)
+       (Ajustes → Incidencias → "PAQUETE ROTO O DAÑADO" · destinatario: Remitente)
+       Va al remitente con un botón al portal para elegir reembolso o reemplazo ({{incidentUrl}}).
+═════════════════════════════════════════════════════════════════ -->
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,.35);">
+        <tr><td style="background-image:linear-gradient(135deg,#dc2626,#b91c1c);padding:28px 32px;text-align:center;">
+          <span style="display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.85);">Paquete dañado</span>
+          <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#ffffff;">Tu paquete llegó con daño</h1>
+        </td></tr>
+        <tr><td style="padding:32px;color:#475569;font-size:14px;line-height:1.6;">
+          <p style="margin:0 0 16px;">Hola <strong style="color:#0f172a;">{{senderName}}</strong>, registramos que el paquete del envío <strong style="color:#0f172a;">{{trackingCode}}</strong> llegó con daño. Abrimos la incidencia <strong style="color:#0f172a;">#{{incidentId}}</strong> para resolverlo.</p>
+          <div style="margin:0;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px 16px;color:#991b1b;font-size:14px;">Como remitente, podés elegir entre <strong>reembolso</strong> (cancelamos el envío) o <strong>reemplazo</strong> (generamos uno nuevo con prioridad alta).</div>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 0;"><tr><td style="border-radius:10px;background:#dc2626;"><a href="{{incidentUrl}}" style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Elegí reembolso o reemplazo</a></td></tr></table>
+          <p style="margin:20px 0 0;color:#64748b;font-size:13px;">Si no podés ver el botón, ingresá a "Mis envíos" en el portal y abrí la incidencia #{{incidentId}}.</p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;"><p style="margin:0;font-size:12px;color:#94a3b8;">Incidencia #{{incidentId}} · Seguimiento {{trackingCode}}</p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

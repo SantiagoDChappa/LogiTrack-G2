@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Nueva incidencia - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Reportar incidencia</h1>
+        </div>
+
+        <% if (error) { %>
+            <div id="incidentErrorBanner" class="alert alert-error" role="alert"><%= error %></div>
+        <% } %>
+
+        <form method="POST" action="/incident" class="incident-form" id="incidentForm" novalidate>
+            <div class="form-group">
+                <label for="shipmentSearch">Envío <span class="req">*</span></label>
+                <input type="hidden" id="shipmentId" name="shipmentId"
+                       value="<%= shipment ? shipment.id : (form.shipmentId || '') %>">
+                <% if (shipment) { %>
+                    <div class="ship-chip" id="ship-chip">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                        <strong><%= shipment.trackingId %></strong>
+                        <% if (shipment.recipient && shipment.recipient.fullName) { %>· <%= shipment.recipient.fullName %><% } %>
+                        <% if (shipment.status && shipment.status.description) { %>· <span class="ship-chip-status">Estado: <strong><%= shipment.status.description %></strong></span><% } %>
+                    </div>
+                <% } else { %>
+                    <div class="ship-search-wrapper" style="position:relative">
+                        <input id="shipmentSearch" type="text" autocomplete="off"
+                               placeholder="Escribí tracking, ID o nombre del destinatario..."
+                               value="">
+                        <div id="shipment-dropdown" class="ship-dropdown" style="display:none;"></div>
+                    </div>
+                    <div class="ship-selected-row" id="ship-selected-row" style="display:none;">
+                        <div class="ship-chip" id="ship-chip"></div>
+                        <button type="button" id="shipment-clear" class="action-btn neutro" data-tooltip="Cambiar envío" aria-label="Cambiar envío">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                    <small>Buscá por tracking (ej: ENV-001), ID numérico o nombre del destinatario.</small>
+                <% } %>
+            </div>
+
+            <% if (shipment && Array.isArray(openIncidents) && openIncidents.length) { %>
+                <%
+                    const _stLabel = { OPEN: 'Abierta', IN_REVIEW: 'En revisión' };
+                %>
+                <div class="assoc-incidents" role="note">
+                    <div class="assoc-incidents__head">
+                        <span class="material-symbols-outlined">report</span>
+                        Este envío ya tiene <strong><%= openIncidents.length %></strong> incidencia<%= openIncidents.length === 1 ? '' : 's' %> abierta<%= openIncidents.length === 1 ? '' : 's' %>
+                    </div>
+                    <ul class="assoc-incidents__list">
+                        <% openIncidents.forEach(i => { %>
+                            <li>
+                                <a href="/incident/<%= i.id %>" target="_blank" rel="noopener">#<%= i.id %></a>
+                                <span class="assoc-incidents__type"><%= i.type ? i.type.description : 'Sin tipo' %></span>
+                                <span class="assoc-incidents__badge assoc-incidents__badge--<%= i.status %>"><%= _stLabel[i.status] || i.status %></span>
+                            </li>
+                        <% }) %>
+                    </ul>
+                    <small>Revisá que el tipo que vas a reportar no esté ya abierto para no duplicar.</small>
+                </div>
+            <% } %>
+
+            <style>
+            .assoc-incidents {
+                margin: 0 0 1rem; padding: .85rem 1rem; border-radius: 10px;
+                background: rgba(217,119,6,.10); border: 1px solid rgba(217,119,6,.35);
+            }
+            .assoc-incidents__head { display: flex; align-items: center; gap: .4rem; font-weight: 600; color: #b45309; font-size: .92rem; }
+            .assoc-incidents__head .material-symbols-outlined { font-size: 20px; }
+            .assoc-incidents__list { list-style: none; margin: .55rem 0 .35rem; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+            .assoc-incidents__list li { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .88rem; }
+            .assoc-incidents__list a { font-weight: 700; color: var(--color-primary); text-decoration: none; }
+            .assoc-incidents__list a:hover { text-decoration: underline; }
+            .assoc-incidents__type { color: var(--color-text); }
+            .assoc-incidents__badge { font-size: .72rem; font-weight: 700; padding: .1rem .5rem; border-radius: 999px; }
+            .assoc-incidents__badge--OPEN { background: rgba(220,38,38,.15); color: #dc2626; }
+            .assoc-incidents__badge--IN_REVIEW { background: rgba(37,99,235,.15); color: var(--color-primary); }
+            .assoc-incidents small { color: var(--color-text-secondary); font-size: .8rem; }
+            .ship-search-wrapper input {
+                width: 100%; padding: .65rem .85rem;
+                border: 1px solid var(--color-border); border-radius: 10px;
+                font-size: .95rem; background: var(--color-surface); color: var(--color-text);
+            }
+            .ship-dropdown {
+                position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+                background: var(--color-surface); border: 1px solid var(--color-border);
+                border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.12);
+                max-height: 280px; overflow-y: auto; z-index: 100;
+            }
+            .ship-dropdown .item {
+                padding: .65rem .85rem; cursor: pointer; border-bottom: 1px solid var(--color-border);
+                display: flex; flex-direction: column; gap: 2px;
+            }
+            .ship-dropdown .item:last-child { border-bottom: none; }
+            .ship-dropdown .item:hover, .ship-dropdown .item.active { background: rgba(37,99,235,.08); }
+            .ship-dropdown .tracking { font-weight: 700; font-size: .9rem; color: var(--color-text); }
+            .ship-dropdown .meta { font-size: .78rem; color: var(--color-text-secondary); }
+            .ship-dropdown .empty { padding: .8rem; color: var(--color-text-secondary); font-size: .85rem; text-align: center; }
+            .ship-chip {
+                display: inline-flex; align-items: center; gap: 6px;
+                padding: .5rem .8rem; background: rgba(37,99,235,.08);
+                border: 1px solid rgba(37,99,235,.2); border-radius: 999px;
+                font-size: .9rem; color: var(--color-text);
+            }
+            .ship-selected-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+            </style>
+
+            <div class="form-group">
+                <label>Sucursal asignada <span class="req">*</span></label>
+                <input type="hidden" id="branchId" name="branchId" value="<%= form.branchId || '' %>" required>
+                <div class="branch-picker" id="branch-picker">
+                    <% const noBranchUsers = users.filter(u => u.branchId === null || u.branchId === undefined).length; %>
+                    <% if (noBranchUsers > 0) {
+                        const isSelected = String(form.branchId) === '0';
+                    %>
+                        <button type="button"
+                                class="branch-card<%= isSelected ? ' is-selected' : '' %>"
+                                data-branch-id="0"
+                                data-user-count="<%= noBranchUsers %>">
+                            <span class="branch-card__icon material-symbols-outlined">person</span>
+                            <span class="branch-card__name">Sin sucursal</span>
+                            <span class="branch-card__count"><%= noBranchUsers %> usuario<%= noBranchUsers === 1 ? '' : 's' %></span>
+                        </button>
+                    <% } %>
+                    <% branches.forEach(b => {
+                        const branchUserCount = users.filter(u => u.branchId === b.id).length;
+                        if (branchUserCount === 0) { return; }
+                        const isSelected = String(form.branchId) === String(b.id);
+                    %>
+                        <button type="button"
+                                class="branch-card<%= isSelected ? ' is-selected' : '' %>"
+                                data-branch-id="<%= b.id %>"
+                                data-user-count="<%= branchUserCount %>">
+                            <span class="branch-card__icon material-symbols-outlined">store</span>
+                            <span class="branch-card__name"><%= b.name %></span>
+                            <span class="branch-card__count"><%= branchUserCount %> usuario<%= branchUserCount === 1 ? '' : 's' %></span>
+                        </button>
+                    <% }) %>
+                </div>
+                <small class="branch-picker__hint" id="branch-picker-hint">Tocá una sucursal para ver sus usuarios.</small>
+            </div>
+
+            <div class="form-group">
+                <label>Usuario asignado <span class="req">*</span></label>
+                <input type="hidden" id="assignedToUserId" name="assignedToUserId" value="<%= form.assignedToUserId || '' %>" required>
+                <div class="user-picker" id="user-picker" data-empty="Elegí una sucursal primero.">
+                    <p class="user-picker__empty">Elegí una sucursal primero.</p>
+                </div>
+                <small>Se listan únicamente los usuarios pertenecientes a la sucursal elegida, con su rol.</small>
+            </div>
+
+            <script id="users-data" type="application/json"><%- JSON.stringify(users) %></script>
+            <script>
+            (function () {
+                const branchPicker = document.getElementById('branch-picker');
+                const userPicker   = document.getElementById('user-picker');
+                const hiddenBranch = document.getElementById('branchId');
+                const hiddenUser   = document.getElementById('assignedToUserId');
+                const hint         = document.getElementById('branch-picker-hint');
+                const allUsers     = JSON.parse(document.getElementById('users-data').textContent || '[]');
+                const preselectedUserId = <%- JSON.stringify(form.assignedToUserId || '') %>;
+
+                const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+                function renderUsers(branchId) {
+                    const filtered = branchId === 0
+                        ? allUsers.filter(u => u.branchId === null || u.branchId === undefined)
+                        : allUsers.filter(u => u.branchId === branchId);
+                    userPicker.innerHTML = '';
+                    if (filtered.length === 0) {
+                        userPicker.innerHTML = '<p class="user-picker__empty">Esta sucursal no tiene usuarios asignados todavía.</p>';
+                        return;
+                    }
+                    filtered.forEach(u => {
+                        const isSel = String(preselectedUserId) === String(u.id);
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'user-card' + (isSel ? ' is-selected' : '');
+                        btn.dataset.userId = String(u.id);
+                        btn.innerHTML = ''
+                            + '<span class="user-card__avatar material-symbols-outlined">person</span>'
+                            + '<span class="user-card__body">'
+                            + '<span class="user-card__name">' + escapeHtml(u.fullName) + '</span>'
+                            + '<span class="user-card__role">' + escapeHtml(u.roleDescription || 'Sin rol') + '</span>'
+                            + '</span>'
+                            + '<span class="user-card__check material-symbols-outlined">check_circle</span>';
+                        btn.addEventListener('click', () => selectUser(u.id, btn));
+                        userPicker.appendChild(btn);
+                    });
+                }
+
+                function selectBranch(branchId, cardEl) {
+                    hiddenBranch.value = String(branchId);
+                    hiddenUser.value = '';
+                    branchPicker.querySelectorAll('.branch-card').forEach(c => c.classList.remove('is-selected'));
+                    cardEl.classList.add('is-selected');
+                    renderUsers(branchId);
+                    hint.textContent = 'Sucursal: ' + cardEl.querySelector('.branch-card__name').textContent + '. Elegí el usuario asignado.';
+                }
+
+                function selectUser(userId, btnEl) {
+                    hiddenUser.value = String(userId);
+                    userPicker.querySelectorAll('.user-card').forEach(c => c.classList.remove('is-selected'));
+                    btnEl.classList.add('is-selected');
+                }
+
+                branchPicker.querySelectorAll('.branch-card').forEach(card => {
+                    card.addEventListener('click', () => selectBranch(Number(card.dataset.branchId), card));
+                });
+
+                // Auto-select si viene preseleccionado (re-render después de error de validación)
+                if (hiddenBranch.value) {
+                    const initialBranch = branchPicker.querySelector('.branch-card[data-branch-id="' + hiddenBranch.value + '"]');
+                    if (initialBranch) { selectBranch(Number(hiddenBranch.value), initialBranch); }
+                }
+            })();
+            </script>
+
+            <div class="form-group" data-col="6">
+                <label for="incidentTypeId">Tipo</label>
+                <select id="incidentTypeId" name="incidentTypeId" required>
+                    <option value="">Seleccione un tipo...</option>
+                    <% types.forEach(t => { %>
+                        <option value="<%= t.id %>" <%= String(form.incidentTypeId) === String(t.id) ? 'selected' : '' %>><%= t.description %></option>
+                    <% }) %>
+                </select>
+            </div>
+
+            <div class="form-group" data-col="6">
+                <label for="priority">Prioridad</label>
+                <select id="priority" name="priority">
+                    <option value="1" <%= String(form.priority) === '1' ? 'selected' : '' %>>Baja</option>
+                    <option value="2" <%= (!form.priority || form.priority === '2') ? 'selected' : '' %>>Media</option>
+                    <option value="3" <%= String(form.priority) === '3' ? 'selected' : '' %>>Alta</option>
+                    <option value="4" <%= String(form.priority) === '4' ? 'selected' : '' %>>Urgente</option>
+                </select>
+            </div>
+
+            <!-- LGT-210 — nivel de demora (solo visible cuando el tipo es Demora) -->
+            <div class="form-group" data-col="6" id="delay-level-group" style="display:none;">
+                <label for="delayLevel">Nivel de demora <span class="req">*</span></label>
+                <select id="delayLevel" name="delayLevel">
+                    <option value="">Seleccione el nivel...</option>
+                    <option value="DEMORADA"     <%= form.delayLevel === 'DEMORADA' ? 'selected' : '' %>>Demorada</option>
+                    <option value="MUY_DEMORADA" <%= form.delayLevel === 'MUY_DEMORADA' ? 'selected' : '' %>>Muy demorada</option>
+                    <option value="REPROGRAMAR"  <%= form.delayLevel === 'REPROGRAMAR' ? 'selected' : '' %>>Se debe reprogramar</option>
+                </select>
+                <span class="field-hint" style="font-size:.8rem;color:var(--color-text-secondary);display:block;margin-top:4px;">"Se debe reprogramar" deja el envío pendiente de nueva fecha; los demás mantienen la fecha comprometida.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Descripción</label>
+                <textarea id="description" name="description" rows="6" maxlength="2000" required><%= form.description || '' %></textarea>
+            </div>
+
+            <% if (error && /Confirmo crear igual/i.test(error)) { %>
+                <div class="form-group" style="grid-column: span 12;">
+                    <label style="display:flex;align-items:center;gap:.5rem;font-weight:600;color:#b45309;">
+                        <input type="checkbox" name="confirmWarning" value="1" required>
+                        Confirmo crear igual la incidencia
+                    </label>
+                </div>
+            <% } %>
+
+            <div class="form-actions">
+                <a href="/incident" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                    <span class="material-symbols-outlined">close</span>
+                </a>
+                <button type="submit" class="action-btn action-btn--lg crear" data-tooltip="Crear incidencia" aria-label="Crear incidencia">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+            </div>
+        </form>
+
+        <script>
+        (function () {
+            const form = document.getElementById('incidentForm');
+            if (!form) return;
+
+            // #3: aviso de "demora dentro de plazo" como popup (sin recargar).
+            <%
+                const _delayType = (types || []).find(t => t.code === 'DELAY');
+                let _within = false;
+                if (typeof shipment !== 'undefined' && shipment && shipment.expectedDeliveryDate) {
+                    const _exp = new Date(shipment.expectedDeliveryDate);
+                    if (!isNaN(_exp.getTime())) {
+                        const _t0 = new Date(); _t0.setHours(0, 0, 0, 0); _exp.setHours(0, 0, 0, 0);
+                        _within = _exp >= _t0;
+                    }
+                }
+            %>
+            const DELAY_TYPE_ID = '<%= _delayType ? _delayType.id : "" %>';
+            const DELAY_WITHIN_WINDOW = <%= _within ? 'true' : 'false' %>;
+
+            // LGT-210 — muestra el nivel de demora solo cuando el tipo es Demora.
+            const delayGroup  = document.getElementById('delay-level-group');
+            const delaySelect = document.getElementById('delayLevel');
+            function isDelaySelected() {
+                return DELAY_TYPE_ID && String(form.incidentTypeId.value) === DELAY_TYPE_ID;
+            }
+            function toggleDelayLevel() {
+                const on = isDelaySelected();
+                if (delayGroup)  { delayGroup.style.display = on ? '' : 'none'; }
+                if (delaySelect) { delaySelect.required = on; if (!on) { delaySelect.value = ''; } }
+            }
+            form.incidentTypeId.addEventListener('change', toggleDelayLevel);
+            toggleDelayLevel();
+            function confirmDelayWarning() {
+                const msg = 'El envío todavía está dentro del plazo estimado de entrega. ¿Confirmás abrir igual una incidencia por demora?';
+                if (window.Swal && typeof window.Swal.fire === 'function') {
+                    return window.Swal.fire({
+                        title: 'Envío dentro del plazo', text: msg, icon: 'warning',
+                        showCancelButton: true, confirmButtonText: 'Sí, crear igual', cancelButtonText: 'Cancelar'
+                    }).then(function (r) { return !!r.isConfirmed; });
+                }
+                return Promise.resolve(window.confirm(msg));
+            }
+
+            const focusField = (el) => {
+                if (!el) { return; }
+                if (typeof el.scrollIntoView === 'function') {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                if (typeof el.focus === 'function') {
+                    try { el.focus({ preventScroll: true }); }
+                    catch (_) { el.focus(); }
+                }
+            };
+            form.addEventListener('submit', function (e) {
+                const missing = [];
+                if (!form.shipmentId.value)       { missing.push('Envío'); }
+                if (!form.incidentTypeId.value)   { missing.push('Tipo de incidencia'); }
+                if (!(form.description.value || '').trim()) { missing.push('Descripción'); }
+                if (isDelaySelected() && delaySelect && !delaySelect.value) { missing.push('Nivel de demora'); }
+                if (!form.branchId.value)         { missing.push('Sucursal asignada'); }
+                if (!form.assignedToUserId.value) { missing.push('Usuario asignado'); }
+                if (missing.length) {
+                    e.preventDefault();
+                    if (!form.shipmentId.value) { focusField(document.getElementById('shipmentSearch') || document.getElementById('ship-selected-row')); }
+                    else if (!form.branchId.value) { focusField(document.querySelector('#branch-picker .branch-card') || document.getElementById('branch-picker')); }
+                    else if (!form.incidentTypeId.value) { focusField(form.incidentTypeId); }
+                    else if (!(form.description.value || '').trim()) { focusField(form.description); }
+                    else if (!form.assignedToUserId.value) { focusField(document.querySelector('#user-picker .user-card') || document.getElementById('user-picker')); }
+                    showIncidentFeedback({
+                        title: 'Completa los datos obligatorios',
+                        subtitle: 'Falta un paso mas antes de poder crear la incidencia.',
+                        intro: 'Revisa estos campos y vuelve a intentar.',
+                        items: missing
+                    });
+                    return;
+                }
+                // #3: "Envío demorado" pero el envío sigue dentro del plazo → confirmar
+                // en popup (sin recargar). Si confirma, se reenvía con confirmWarning=1.
+                if (DELAY_WITHIN_WINDOW && DELAY_TYPE_ID
+                    && String(form.incidentTypeId.value) === DELAY_TYPE_ID
+                    && !form.querySelector('input[name="confirmWarning"]')) {
+                    e.preventDefault();
+                    confirmDelayWarning().then(function (ok) {
+                        if (!ok) { return; }
+                        const inp = document.createElement('input');
+                        inp.type = 'hidden'; inp.name = 'confirmWarning'; inp.value = '1';
+                        form.appendChild(inp);
+                        form.submit();
+                    });
+                }
+            });
+        })();
+        </script>
+    </main>
+    <%- include('../partials/incidentFeedback.ejs') %>
+    <% if (error) { %>
+    <%# Muestra el aviso del server (duplicado, estado inválido, demora, etc.) como
+        popup al cargar, y oculta el banner. Si no hay JS, queda el banner de fallback. %>
+    <script>
+    (function () {
+        var msg = <%- JSON.stringify(error) %>;
+        var isWarning = /confirmo crear igual|confirmás|dentro del plazo|fuera de servicio|figura habilitado|deshabilitado/i.test(msg);
+        function showIt() {
+            if (typeof window.showIncidentFeedback !== 'function') { return; }
+            var banner = document.getElementById('incidentErrorBanner');
+            if (banner) { banner.style.display = 'none'; }
+            window.showIncidentFeedback({
+                icon:  isWarning ? 'warning' : 'error',
+                title: isWarning ? 'Revisá antes de continuar' : 'No se pudo crear la incidencia',
+                text:  msg
+            });
+        }
+        if (document.readyState !== 'loading') { showIt(); }
+        else { document.addEventListener('DOMContentLoaded', showIt); }
+    })();
+    </script>
+    <% } %>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <% if (!shipment) { %>
+    <script>
+    (function () {
+        const input    = document.getElementById('shipmentSearch');
+        const hidden   = document.getElementById('shipmentId');
+        const dropdown = document.getElementById('shipment-dropdown');
+        const selRow   = document.getElementById('ship-selected-row');
+        const chip     = document.getElementById('ship-chip');
+        const clearBtn = document.getElementById('shipment-clear');
+        if (!input) return;
+
+        let timer = null;
+        let activeIdx = -1;
+        let items = [];
+
+        function render(list) {
+            items = list;
+            activeIdx = -1;
+            if (!list.length) {
+                dropdown.innerHTML = '<div class="empty">Sin resultados</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+            dropdown.innerHTML = list.map((s, i) => `
+                <div class="item" data-idx="${i}" data-id="${s.id}">
+                    <div class="tracking">${s.trackingId}${s.statusLabel ? ' · <span class="meta">' + s.statusLabel + '</span>' : ''}</div>
+                    <div class="meta">${s.recipientName || '(sin destinatario)'}${s.addressLine ? ' — ' + s.addressLine : ''}</div>
+                </div>
+            `).join('');
+            dropdown.style.display = 'block';
+        }
+
+        function pick(idx) {
+            const s = items[idx];
+            if (!s) return;
+            hidden.value = s.id;
+            chip.innerHTML = `<span class="material-symbols-outlined">inventory_2</span><strong>${s.trackingId}</strong>${s.recipientName ? ' · ' + s.recipientName : ''}${s.statusLabel ? ' · Estado: <strong>' + s.statusLabel + '</strong>' : ''}`;
+            selRow.style.display = 'flex';
+            input.value = '';
+            input.style.display = 'none';
+            dropdown.style.display = 'none';
+        }
+
+        function search(q) {
+            fetch('/incident/search-shipments?q=' + encodeURIComponent(q))
+                .then(r => r.ok ? r.json() : [])
+                .then(render)
+                .catch(() => render([]));
+        }
+
+        input.addEventListener('input', () => {
+            const q = input.value.trim();
+            clearTimeout(timer);
+            if (q.length < 1) { dropdown.style.display = 'none'; return; }
+            timer = setTimeout(() => search(q), 200);
+        });
+        input.addEventListener('keydown', (ev) => {
+            if (dropdown.style.display === 'none') return;
+            const itemsEl = dropdown.querySelectorAll('.item');
+            if (ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                activeIdx = Math.min(itemsEl.length - 1, activeIdx + 1);
+                itemsEl.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+            } else if (ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                activeIdx = Math.max(0, activeIdx - 1);
+                itemsEl.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+            } else if (ev.key === 'Enter') {
+                if (activeIdx >= 0) { ev.preventDefault(); pick(activeIdx); }
+            } else if (ev.key === 'Escape') {
+                dropdown.style.display = 'none';
+            }
+        });
+        dropdown.addEventListener('click', (ev) => {
+            const item = ev.target.closest('.item');
+            if (item) { pick(Number(item.dataset.idx)); }
+        });
+        document.addEventListener('click', (ev) => {
+            if (!input.contains(ev.target) && !dropdown.contains(ev.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                hidden.value = '';
+                selRow.style.display = 'none';
+                input.style.display = '';
+                input.value = '';
+                input.focus();
+            });
+        }
+    })();
+    </script>
+    <% } %>
+</body>
+</html>

@@ -1,0 +1,1 @@
+ALTER TABLE "logitrack"."user" ADD COLUMN IF NOT EXISTS onboarded BOOLEAN NOT NULL DEFAULT false;

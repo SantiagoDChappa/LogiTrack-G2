@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Transportes - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/routes.css">
+    <link rel="stylesheet" href="/css/transport.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Transportes</h1>
+            <div class="page-header__actions">
+                <a href="/transport/new" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nuevo transporte" aria-label="Nuevo transporte">
+                    <span class="material-symbols-outlined">add</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="shipments-wrapper">
+            <form class="search-form" data-tools-for="transports" onsubmit="return false">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="f-tr-name">Nombre</label>
+                        <input type="text" id="f-tr-name" class="search-input" data-col="0" placeholder="Ej: Camión 1">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-tr-plate">Patente</label>
+                        <input type="text" id="f-tr-plate" class="search-input" data-col="1" placeholder="Ej: AB123CD">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-tr-driver">Conductor</label>
+                        <input type="text" id="f-tr-driver" class="search-input" data-col="6" placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="search-field">
+                        <label for="f-tr-state">Estado</label>
+                        <select id="f-tr-state" class="search-input" data-col="8">
+                            <option value="">Todos</option>
+                            <option value="Habilitado">Habilitado</option>
+                            <option value="Deshabilitado">Deshabilitado</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="action-btn action-btn--lg buscar search-btn" data-tooltip="Buscar" aria-label="Buscar">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="table-wrapper">
+                <table data-tools="transports">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Patente</th>
+                            <th>Peso máx.</th>
+                            <th>Vol. máx.</th>
+                            <th>Costo fijo</th>
+                            <th>Costo/km</th>
+                            <th>Conductor</th>
+                            <th>Sucursal</th>
+                            <th>Estado</th>
+                            <th class="col-actions">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (transports.length === 0) { %>
+                            <tr>
+                                <td colspan="10" class="empty-row">
+                                    <span class="material-symbols-outlined">local_shipping</span>
+                                    No hay transportes cargados.
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% transports.forEach(t => { %>
+                                <tr>
+                                    <td><strong><%= t.name %></strong></td>
+                                    <td class="tracking-id"><%= t.plate || '-' %></td>
+                                    <td><%= t.maxWeightKg %> kg</td>
+                                    <td><%= t.maxVolumeM3 %> m³</td>
+                                    <td><%= fmtMoney(t.fixedCost) %></td>
+                                    <td><%= fmtMoney(t.costPerKm) %></td>
+                                    <td><%= t.driver ? t.driver.fullName : '-' %></td>
+                                    <td><%= t.branch ? t.branch.name : '-' %></td>
+                                    <td>
+                                        <% if (t.enabled) { %>
+                                            <span class="status-badge entregado">Habilitado</span>
+                                        <% } else { %>
+                                            <span class="status-badge cancelado">Deshabilitado</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="col-actions">
+                                        <a href="/transport/update/<%= t.id %>" class="action-btn modificar" data-tooltip="Editar">
+                                            <span class="material-symbols-outlined">edit</span>
+                                        </a>
+                                        <form method="POST" action="/transport/toggle/<%= t.id %>" style="display:inline">
+                                            <button type="submit"
+                                                    class="action-btn <%= t.enabled ? 'eliminar' : 'detalle' %>"
+                                                    data-tooltip="<%= t.enabled ? 'Deshabilitar' : 'Habilitar' %>">
+                                                <span class="material-symbols-outlined"><%= t.enabled ? 'block' : 'check_circle' %></span>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>
+</body>
+</html>

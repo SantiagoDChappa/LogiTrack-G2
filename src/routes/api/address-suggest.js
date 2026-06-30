@@ -12,7 +12,7 @@ function cleanNomenclatura(raw) {
 // Parsea la query separando calle, localidad y provincia
 function parseQuery(q) {
     const parts = q.split(',').map(s => s.trim()).filter(Boolean);
-    if (parts.length === 1) return { street: parts[0], locality: null, province: null };
+    if (parts.length === 1) { return { street: parts[0], locality: null, province: null }; }
 
     const street = parts[0];
     let locality = null;
@@ -23,7 +23,7 @@ function parseQuery(q) {
         if (matched) {
             province = matched;
             const localityParts = parts.slice(1, i);
-            if (localityParts.length > 0) locality = localityParts.join(', ');
+            if (localityParts.length > 0) { locality = localityParts.join(', '); }
             return { street, locality, province };
         }
     }
@@ -32,12 +32,18 @@ function parseQuery(q) {
     return { street, locality, province };
 }
 
+// "1234 Corrientes" → "Corrientes 1234" (Georef requiere calle primero)
+function normalizeStreetOrder(q) {
+    return q.replace(/^(\d+)\s+(.+)$/, '$2 $1');
+}
+
 // ── Georef ────────────────────────────────────────────────────────────────────
 async function searchGeoref(streetQuery, provinceIndec, locality) {
     try {
-        const fullQuery = locality ? `${streetQuery}, ${locality}` : streetQuery;
+        const normalized = normalizeStreetOrder(streetQuery);
+        const fullQuery = locality ? `${normalized}, ${locality}` : normalized;
         let url = `${GEOREF}/direcciones?direccion=${encodeURIComponent(fullQuery)}&max=20&campos=estandar`;
-        if (provinceIndec) url += `&provincia=${provinceIndec}`;
+        if (provinceIndec) { url += `&provincia=${provinceIndec}`; }
 
         const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
         const data     = await response.json();
@@ -127,7 +133,7 @@ async function fillPostalCodes(results) {
 // ── Handler ───────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
     const q = (req.query.q || '').trim();
-    if (q.length < 3) return res.json([]);
+    if (q.length < 3) { return res.json([]); }
 
     const { street, locality, province } = parseQuery(q);
 
@@ -147,9 +153,9 @@ router.get('/', async (req, res) => {
     const results = [];
 
     const addResult = (r) => {
-        if (!r.street) return;
+        if (!r.street) { return; }
         const key = `${r.street.toLowerCase()}|${r.number}|${r.city.toLowerCase()}|${r.province_id}`;
-        if (seen.has(key)) return;
+        if (seen.has(key)) { return; }
         seen.add(key);
         results.push(r);
     };
@@ -159,11 +165,11 @@ router.get('/', async (req, res) => {
     georefItems.slice(0, 10).forEach(i => {
         const r = mapGeorefItem(i);
         // Si Georef no trajo coordenadas, buscar en Nominatim un resultado de la misma ciudad
-        if ((r.lat == null || r.lng == null) && r.city) {
+        if ((r.lat === null || r.lng === null) && r.city) {
             const match = mappedNominatim.find(n =>
                 n.street.toLowerCase().includes(r.street.toLowerCase().split(' ')[0]) &&
                 n.city.toLowerCase().includes(r.city.toLowerCase().split(' ')[0]) &&
-                n.lat != null
+                n.lat !== null
             );
             if (match) { r.lat = match.lat; r.lng = match.lng; }
         }
@@ -173,7 +179,7 @@ router.get('/', async (req, res) => {
     // Completa con Nominatim hasta 10 resultados totales
     if (results.length < 6) {
         mappedNominatim.forEach(i => {
-            if (results.length >= 10) return;
+            if (results.length >= 10) { return; }
             addResult(i);
         });
     }

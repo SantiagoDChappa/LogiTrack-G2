@@ -1,0 +1,97 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li><a href="/fatigue">Ojo de Patrón</a> es el control de <a href="/help/glosario">fatiga</a> de los repartidores.</li>
+            <li>Monitorea tiempos de conducción y bloquea rutas cuando se superan los umbrales.</li>
+            <li>Un repartidor bloqueado no sale a ruta hasta que un supervisor lo habilite.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Qué es Ojo de Patrón</h2>
+<p>Es el módulo de <strong>control de fatiga</strong> para repartidores. Monitorea tiempos de conducción y detenciones para prevenir riesgos operativos. Accedés desde <a href="/fatigue">Ojo de Patrón</a>.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/ojo-patron/01-monitor.png',
+    alt: 'Panel de Ojo de Patrón con rutas bloqueadas por fatiga, avisos sin bloqueo y patrón de fatiga recurrente',
+    caption: 'Ojo de Patrón: umbral actual y bloqueo automático arriba; rutas bloqueadas, avisos sin bloqueo y el patrón de fatiga recurrente por repartidor.'
+}) %>
+
+<h2>Qué podés hacer</h2>
+<ul>
+    <li><strong>Ver el estado de fatiga</strong> de cada repartidor en ruta (apto, en revisión, bloqueado).</li>
+    <li><strong>Liberar con motivo</strong> una ruta bloqueada cuando corresponda.</li>
+    <li><strong>Atender avisos</strong> de control omitido o de patrón recurrente.</li>
+    <li><strong>Configurar</strong> umbrales y reglas en <a href="/fatigue/config">Ajustes → Ojo de Patrón</a> (solo administrador).</li>
+</ul>
+
+<h2>Paso a paso</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Abrí el monitor</p>
+        <div class="help-steps__text">Entrá a <a href="/fatigue">Ojo de Patrón</a> desde el menú lateral.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá los estados</p>
+        <div class="help-steps__text">Mirá cada repartidor activo: apto, en revisión o bloqueado.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Atendé las alertas</p>
+        <div class="help-steps__text">Resolvé los avisos de control omitido o patrón recurrente de fatiga.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Habilitá si corresponde</p>
+        <div class="help-steps__text">Si un repartidor está bloqueado, evaluá la situación y usá <strong>Liberar con motivo</strong>.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Coordiná con Ruteo</p>
+        <div class="help-steps__text">No despaches rutas a repartidores inhabilitados; coordiná desde <a href="/help/ruteo">Ruteo</a>.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--warning">
+    <span class="help-callout__icon material-symbols-outlined">block</span>
+    <div class="help-callout__body">Un repartidor bloqueado por fatiga no puede iniciar ni continuar entregas hasta que un supervisor intervenga.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El repartidor no puede iniciar la ruta
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Completó mal el control de fatiga o superó umbrales. Debe ser habilitado por un supervisor con <strong>Liberar con motivo</strong>.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Recibo alertas pero no veo bloqueo
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Con el bloqueo automático desactivado el repartidor puede salir igual. Revisá la sección «avisos de fatiga sin bloqueo».</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Veo fatiga recurrente en el mismo repartidor
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El panel «patrón de fatiga recurrente» lo marca. Conviene revisar turnos y cargas de ruta de ese repartidor.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/mi-ruteo"><span class="material-symbols-outlined">navigation</span>Mi ruteo (inicio repartidor)</a></li>
+    <li><a href="/help/notificaciones"><span class="material-symbols-outlined">notifications</span>Notificaciones</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

@@ -1,0 +1,116 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">menu_book</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Diccionario rápido de los términos que aparecen en todo el manual.</li>
+            <li>Muchas guías enlazan acá: volvé cuando veas una palabra que no conocés.</li>
+            <li>Cada término enlaza a su guía detallada cuando la hay.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Envíos e importación</h2>
+<div class="help-glossary">
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">qr_code_2</span>Tracking</h3>
+        <p class="help-glossary__def">Código único de seguimiento que se asigna a cada envío al crearlo. Permite rastrear el paquete en el backoffice, en la búsqueda rápida y en el portal del cliente. Ejemplo: <code>LT-2024-000123</code>.</p>
+    </div>
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">local_shipping</span>IENV-</h3>
+        <p class="help-glossary__def">Prefijo de importación CSV para envíos <strong>activos</strong> (Pendiente, En tránsito, En sucursal). Ejemplo: <code>IENV-001</code>. Ver <a href="/help/import-csv">Importar CSV</a>.</p>
+    </div>
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">history</span>HIST-</h3>
+        <p class="help-glossary__def">Prefijo de importación CSV para envíos <strong>terminados</strong> (Entregado, Cancelado). Ejemplo: <code>HIST-001</code>. Ver <a href="/help/import-csv">Importar CSV</a>.</p>
+    </div>
+</div>
+
+<h2>Ruteo</h2>
+<div class="help-glossary">
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">alt_route</span>Piggyback</h3>
+        <p class="help-glossary__def">Función de ruteo que suma envíos adicionales a una ruta ya planificada (pendiente o en curso), dentro de los límites de desvío configurados en Ajustes. Ver <a href="/help/ruteo">Ruteo</a> y <a href="/help/transportes-zonas">Transportes y zonas</a>.</p>
+    </div>
+</div>
+
+<h2>Incidencias y devoluciones</h2>
+<div class="help-glossary">
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">assignment_return</span>RETURN</h3>
+        <p class="help-glossary__def">Tipo de incidencia/devolución iniciada por el cliente desde el portal o registrada por el staff. Sigue un flujo de resolución con checklist propio. Ver <a href="/help/incidencias">Incidencias</a> y <a href="/help/portal-cliente-staff">Portal del cliente</a>.</p>
+    </div>
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">public</span>Incidencia externa</h3>
+        <p class="help-glossary__def">Reportada por un cliente desde el portal «Mis Envíos» (canal PORTAL). Aparece en Incidencias con origen «Externo». El staff la gestiona igual que una interna, pero el cliente puede ver su estado en el portal.</p>
+    </div>
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">support_agent</span>Incidencia interna</h3>
+        <p class="help-glossary__def">Creada por el staff (operador, supervisor, admin) o por un repartidor en ruta (canal INTERNAL). No proviene del portal. Ver <a href="/help/incidencias">Incidencias</a> e <a href="/help/incidencias-repartidor">Incidencias en ruta</a>.</p>
+    </div>
+</div>
+
+<h2>Fatiga del repartidor</h2>
+<div class="help-glossary">
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón</h3>
+        <p class="help-glossary__def">Módulo de control de fatiga. Monitorea conducción, descansos y controles obligatorios. Un repartidor bloqueado no puede iniciar ni continuar rutas hasta la intervención de un supervisor. Guía: <a href="/help/ojo-patron">Ojo de Patrón</a>.</p>
+    </div>
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">battery_alert</span>Fatiga</h3>
+        <p class="help-glossary__def">Estado de alerta del repartidor según tiempos de conducción, detenciones y respuestas al control. Puede derivar en bloqueo de ruta o inhabilitación temporal. Relacionado con <a href="/help/ojo-patron">Ojo de Patrón</a>.</p>
+    </div>
+</div>
+
+<h2>Métricas</h2>
+<div class="help-glossary">
+    <div class="help-glossary__item">
+        <h3 class="help-glossary__term"><span class="material-symbols-outlined">sentiment_satisfied</span>NPS</h3>
+        <p class="help-glossary__def">Net Promoter Score: indicador de satisfacción del cliente calculado a partir de encuestas del portal externo. Se consulta en el reporte de <a href="/help/reportes">Satisfacción</a>.</p>
+    </div>
+</div>
+
+<h2>Confusiones frecuentes</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿Incidencia externa o interna?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>La <strong>externa</strong> la abre el cliente en el portal; la <strong>interna</strong> la crea el staff o el repartidor.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿HIST- o IENV-?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p><strong>HIST-</strong> es solo para envíos ya finalizados en la importación CSV; los activos llevan <strong>IENV-</strong>.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿El piggyback está siempre activo?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>No: debe habilitarse en Ajustes → Ruteo y respeta los límites de desvío configurados.</p>
+    </div>
+</details>
+
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">bookmark</span>
+    <div class="help-callout__body">Muchas guías del manual enlazan acá cuando usan estos términos. Guardá esta página como referencia rápida.</div>
+</div>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/primeros-pasos"><span class="material-symbols-outlined">rocket_launch</span>Primeros pasos</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/portal-cliente-staff"><span class="material-symbols-outlined">contact_support</span>Portal del cliente</a></li>
+</ul>

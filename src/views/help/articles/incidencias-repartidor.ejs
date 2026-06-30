@@ -1,0 +1,92 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Reportá una incidencia cuando hay un problema que el staff debe seguir (daño, dirección errónea, etc.).</li>
+            <li>La creás desde <a href="/incident">Mis incidencias</a> eligiendo envío, tipo y describiendo el caso.</li>
+            <li>Si además no entregaste, registrá también el <strong>intento fallido</strong>.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Cuándo reportar</h2>
+<p>Informá una incidencia cuando encontrás un problema durante la entrega: paquete dañado, dirección incorrecta, cliente ausente reiterado, etc. El staff recibe una <a href="/help/glosario">incidencia interna</a> vinculada al envío y le hace seguimiento.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/incidencias-repartidor/01-listado.png',
+    alt: 'Listado de Mis incidencias con estado, prioridad, tipo y origen de cada caso',
+    caption: 'Mis incidencias: el estado, la prioridad y el tipo de cada caso que reportaste o tenés asociado.'
+}) %>
+
+<h2>Cómo hacerlo</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Abrí un nuevo reporte</p>
+        <div class="help-steps__text">Desde la ruta o desde <a href="/incident">Mis incidencias</a>, creá una incidencia nueva.</div>
+        <%- include('../partials/figure', {
+            src: '/images/help/incidencias-repartidor/02-reportar.png',
+            alt: 'Formulario de reporte de incidencia con envío, sucursal, tipo, prioridad y descripción',
+            caption: 'Formulario de reporte: buscás el envío, elegís el tipo y describís el problema.'
+        }) %>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Seleccioná el envío y el tipo</p>
+        <div class="help-steps__text">Buscá el envío afectado por tracking, ID o destinatario, y elegí el tipo de incidencia más adecuado.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Describí y adjuntá evidencia</p>
+        <div class="help-steps__text">Redactá una descripción clara y sumá fotos si aplica (clave en casos de daño).</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Registrá el intento fallido si corresponde</p>
+        <div class="help-steps__text">Si no pudiste entregar, sumá el intento fallido desde <a href="/help/entregas-repartidor">Realizar entregas</a>.</div>
+    </li>
+</ol>
+
+<p>El operador o supervisor recibirá la incidencia y podrá hacer seguimiento. Vas a poder ver el estado en el listado de incidencias.</p>
+
+<div class="help-callout help-callout--warning">
+    <span class="help-callout__icon material-symbols-outlined">priority_high</span>
+    <div class="help-callout__body">No confundas <strong>incidencia</strong> con <strong>intento fallido</strong>: el intento fallido es para cuando no pudiste completar la entrega en esa parada; la incidencia es para problemas que requieren seguimiento formal.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Reporté incidencia pero no intento fallido
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Si no entregaste el paquete en esa visita, también debés registrar el intento fallido.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Usé incidencia para un ausente simple
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Un primer ausente suele resolverse con intento fallido. Reservá la incidencia para casos que requieren seguimiento formal.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No adjunté fotos en un daño
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Sin evidencia el staff tarda más en resolver. Fotografiá el paquete dañado apenas lo detectás.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/entregas-repartidor"><span class="material-symbols-outlined">task_alt</span>Realizar entregas</a></li>
+    <li><a href="/help/incidencias"><span class="material-symbols-outlined">report</span>Incidencias operativas</a></li>
+    <li><a href="/help/mi-ruteo"><span class="material-symbols-outlined">map</span>Mi Ruteo (inicio repartidor)</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

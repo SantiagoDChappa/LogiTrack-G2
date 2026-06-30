@@ -1,0 +1,93 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Como repartidor, tu inicio es <a href="/delivery">Mi Ruteo</a>: ruta activa, progreso e historial.</li>
+            <li>Tocá <strong>Seguir ruta</strong> para abrir el recorrido y empezar las entregas.</li>
+            <li>Si hay control de <a href="/help/ojo-patron">fatiga</a> pendiente, lo completás antes de arrancar.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Tu pantalla de inicio</h2>
+<p>Al ingresar como repartidor aterrizás en <a href="/delivery">Mi Ruteo</a>. Es tu centro de operaciones del día.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/mi-ruteo/01-mi-ruteo.png',
+    alt: 'Pantalla Mi Ruteo con la ruta activa, su progreso y el historial de rutas',
+    caption: 'Mi Ruteo: la ruta en curso con paradas y progreso, el historial y todos tus envíos asignados.'
+}) %>
+
+<p>De un vistazo ves:</p>
+<ul>
+    <li><strong>Ruta activa</strong> — la que tenés en curso, con progreso de paradas y kilómetros.</li>
+    <li><strong>Historial</strong> — rutas finalizadas recientes.</li>
+    <li><strong>Todos mis envíos asignados</strong> — el detalle completo de lo que tenés a cargo.</li>
+    <li>Un mensaje informativo si todavía no tenés ruta asignada.</li>
+</ul>
+
+<h2>Iniciar una ruta</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Entrá a Mi Ruteo</p>
+        <div class="help-steps__text">Al ingresar aterrizás directo en <a href="/delivery">Mi Ruteo</a>.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá tu asignación</p>
+        <div class="help-steps__text">Mirá si tenés una ruta activa o próximas rutas asignadas.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Pasá el control de fatiga</p>
+        <div class="help-steps__text">Si el sistema lo pide, completá el <a href="/help/ojo-patron">Ojo de Patrón</a> antes de salir.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Seguí la ruta</p>
+        <div class="help-steps__text">Tocá <strong>Seguir ruta</strong> para abrir el recorrido y empezar con las <a href="/help/entregas-repartidor">entregas</a>.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">tour</span>
+    <div class="help-callout__body">En Mi Ruteo tenés un ícono <strong>tour</strong> en la barra superior que muestra la ruta activa, próximas asignaciones y cómo iniciar el recorrido.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Aparezco como inhabilitado
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Puede ser un bloqueo por <a href="/help/ojo-patron">fatiga</a> o manual. Contactá a tu supervisor para destrabarlo.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No veo ninguna ruta
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Aún no te asignaron una. El despacho se hace desde <a href="/help/ruteo">Ruteo</a> en el backoffice.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El control de fatiga no me deja avanzar
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Respondé el cuestionario con atención. Si fallás repetidamente quedás bloqueado hasta la intervención del supervisor.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/entregas-repartidor"><span class="material-symbols-outlined">task_alt</span>Realizar entregas</a></li>
+    <li><a href="/help/incidencias-repartidor"><span class="material-symbols-outlined">report</span>Reportar incidencias en ruta</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

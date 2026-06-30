@@ -17,6 +17,8 @@
             addressSelected = false;
             clearChip();
             clearHidden();
+            const isPickup = document.querySelector('input[name="deliveryMode"]:checked')?.value === 'branch_pickup';
+            searchBox.required = !isPickup;
             schedule(this.value);
         });
 
@@ -36,12 +38,38 @@
                 clearChip();
                 clearHidden();
                 addressSelected = false;
+                const isPickup = document.querySelector('input[name="deliveryMode"]:checked')?.value === 'branch_pickup';
+                searchBox.required = !isPickup;
                 setValidationState('empty', 'Ingresá una dirección para buscar sugerencias.');
                 searchBox.focus();
                 window.addrValid = false;
             });
         }
+
+        // Re-render por error de validación: el server devuelve la dirección en los
+        // hidden (street/number/province/postal/lat/lng). Reconstruimos el chip y la
+        // validación para que la dirección NO se vea vacía y no haya que recargarla.
+        restoreFromHidden();
     });
+
+    // Reconstruye el estado "dirección seleccionada" desde los hidden ya cargados.
+    function restoreFromHidden() {
+        const street   = el('street')?.value;
+        const number   = el('number')?.value;
+        const province = el('province')?.value;
+        if (!street || !province) { return; }   // nada que restaurar
+
+        const postal = el('postal-code')?.value || '';
+        const main = [street, number].filter(Boolean).join(' ');
+        const sub  = postal ? `CP ${postal}` : '';
+        showChip(main, sub);
+
+        addressSelected = true;
+        window.addrValid = true;
+        const searchBox = el('address-search');
+        if (searchBox) { searchBox.value = ''; searchBox.required = false; }
+        setValidationState('valid', `Dirección cargada: <strong>${main}</strong>${sub ? ' — ' + sub : ''}`);
+    }
 
     // ── Debounce y búsqueda ────────────────────────────────────
     function schedule(q) {
@@ -123,18 +151,33 @@
         setHidden('address-lat', r.lat != null ? String(r.lat) : '');
         setHidden('address-lng', r.lng != null ? String(r.lng) : '');
 
+        // LGT-207 Esc.9/11 — si la dirección no trae CP, avisamos para carga manual.
+        var cpMissing = el('postal-code-missing');
+        if (cpMissing) { cpMissing.style.display = r.postal ? 'none' : ''; }
+        var cpField = el('postal-code');
+        if (cpField) {
+            // Notifica a phone-area.js para recomputar la característica sugerida.
+            cpField.dispatchEvent(new Event('input'));
+            if (!r.postal) { cpField.focus(); }
+        }
+
         // Muestra el chip usando la nomenclatura limpia del servidor
         const parts   = r.display_name.split(',').map(s => s.trim()).filter(Boolean);
         const mainLine = parts[0] || [r.street, r.number].filter(Boolean).join(' ');
         const subLine  = parts.slice(1, 3).join(', ') || [r.city, r.province_name].filter(Boolean).join(', ');
-        showChip(mainLine, subLine);
+        const cp       = r.postal || '';
+        // El CP viene del normalizador; lo mostramos para que el usuario lo verifique
+        const subWithCp = [subLine, cp ? `CP ${cp}` : ''].filter(Boolean).join(' · ');
+        showChip(mainLine, subWithCp);
 
         // Limpia el input y cierra el dropdown
-        el('address-search').value = '';
+        const searchBox = el('address-search');
+        searchBox.value = '';
+        searchBox.required = false;
         hideDropdown();
 
         // Marca la validación como correcta
-        setValidationState('valid', `Dirección seleccionada: <strong>${mainLine}${subLine ? ', ' + subLine : ''}</strong>`);
+        setValidationState('valid', `Dirección seleccionada: <strong>${mainLine}${subLine ? ', ' + subLine : ''}</strong>${cp ? ` — Código postal: <strong>${cp}</strong>` : ''}`);
 
         // Dispara la predicción (cambia el valor del province hidden)
         const provinceHidden = el('province');
@@ -166,6 +209,8 @@
         ['street', 'number', 'province', 'postal-code', 'address-lat', 'address-lng'].forEach(function (id) {
             setHidden(id, '');
         });
+        var cpMissing = el('postal-code-missing');
+        if (cpMissing) { cpMissing.style.display = 'none'; }
     }
 
     // ── Indicador de validación (comparte el div con address-validation.js) ──

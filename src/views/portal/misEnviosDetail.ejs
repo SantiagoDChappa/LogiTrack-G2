@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= shipment.trackingId %> - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/lista" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al listado
+                </a>
+                <form method="POST" action="/portal/mis-envios/salir" class="portal-mis-envios-logout-form">
+                    <button type="submit" class="portal-mis-envios-logout">
+                        <span class="material-symbols-outlined">logout</span>
+                        Cerrar sesión
+                    </button>
+                </form>
+            </div>
+
+            <%# Última Milla — acceso al mapa de seguimiento en vivo (sólo si hay ruta activa). %>
+            <% if (shipment.activeRouteId) { %>
+            <a href="/track/<%= encodeURIComponent(shipment.trackingId) %>/live" class="portal-live-cta"
+               style="display:flex;align-items:center;gap:.7rem;margin:0 0 1rem;padding:.9rem 1.1rem;border-radius:12px;
+                      background:var(--c-primary);color:#fff;text-decoration:none;font-weight:600;box-shadow:var(--shadow);">
+                <span class="material-symbols-outlined">my_location</span>
+                <span style="flex:1;">Seguir mi envío en vivo</span>
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+            </a>
+            <% } %>
+
+            <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
+
+            <%# LGT-182 — Devoluciones del envío %>
+            <% var _returns = typeof returns !== 'undefined' ? returns : []; %>
+            <div class="portal-incidents-card" style="margin-top:1rem;">
+                <h3 class="portal-incidents-card__title" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                    <span style="display:inline-flex;align-items:center;gap:.45rem;">
+                        <span class="material-symbols-outlined" style="color:var(--c-primary);">assignment_return</span>
+                        Devoluciones<% if (_returns.length) { %> <span class="portal-incidents-card__count">(<%= _returns.length %>)</span><% } %>
+                    </span>
+                    <% if (typeof canRequestReturn !== 'undefined' && canRequestReturn) { %>
+                        <a href="/portal/mis-envios/envio/<%= shipment.id %>/devolucion" class="portal-card-incident-cta-link">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem;">assignment_return</span>
+                            Solicitar devolución
+                        </a>
+                    <% } %>
+                </h3>
+
+                <% if (typeof returnError !== 'undefined' && returnError) { %>
+                    <div class="portal-mis-envios-alert portal-mis-envios-alert-error" style="margin-top:.75rem;">
+                        <span class="material-symbols-outlined">error</span>
+                        <%= returnError %>
+                    </div>
+                <% } %>
+
+                <% if (_returns.length === 0) { %>
+                    <div class="portal-incidents-empty">
+                        <span class="material-symbols-outlined">assignment_return</span>
+                        <p>Este envío no tiene devoluciones registradas.</p>
+                    </div>
+                <% } else { %>
+                    <div class="portal-incidents-list">
+                        <% _returns.forEach(function(r) { %>
+                            <a href="/portal/mis-envios/devolucion/<%= r.id %>" class="portal-incident-row">
+                                <span class="portal-incident-id">#<%= r.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= r.reasonLabel %></span>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= r.status.toLowerCase() %>"><%= r.statusLabel %></span>
+                                <span class="portal-incident-date"><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                                <span class="material-symbols-outlined portal-incident-arrow" aria-hidden="true">chevron_right</span>
+                            </a>
+                        <% }); %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </section>
+
+    <script src="/js/theme.js" defer></script>
+    <% if (shipment.mapStops && shipment.mapStops.length >= 1) { %>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    (function(){
+        const item = <%- JSON.stringify({ id: shipment.id, stops: shipment.mapStops || [], activeRouteId: shipment.activeRouteId || null }) %>;
+        const el = document.getElementById('portal-map-' + item.id);
+        if (!el || !item.stops.length) return;
+        const map = L.map(el).setView([item.stops[0].lat, item.stops[0].lng], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        const bounds = [];
+        item.stops.forEach((stop, idx) => {
+            const marker = L.marker([stop.lat, stop.lng]).addTo(map);
+            marker.bindPopup(stop.label || ('Punto ' + (idx + 1)));
+            bounds.push([stop.lat, stop.lng]);
+        });
+        if (bounds.length > 1) { map.fitBounds(bounds, { padding: [30, 30] }); }
+    })();
+    </script>
+    <% } %>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionar <%= shipment.trackingId %> - Mis envíos</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-detail-wrapper">
+            <div class="portal-mis-envios-detail-top">
+                <a href="/portal/mis-envios/envio/<%= shipment.id %>" class="portal-mis-envios-back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                    Volver al detalle
+                </a>
+            </div>
+
+            <div class="portal-mis-envios-header">
+                <span class="portal-incident-eyebrow">Gestión del envío</span>
+                <h1><%= shipment.trackingId %></h1>
+                <p class="portal-mis-envios-lead">Actualizá franja, modalidad, referencias o solicitá un cambio de dirección.</p>
+            </div>
+
+            <% if (error) { %>
+            <div class="portal-mis-envios-alert portal-mis-envios-alert-error">
+                <span class="material-symbols-outlined">error</span>
+                <%= error %>
+            </div>
+            <% } %>
+
+            <% if (!editable) { %>
+            <div class="portal-mis-envios-alert portal-mis-envios-alert-error">
+                <span class="material-symbols-outlined">lock</span>
+                El envío está en estado "<%= shipment.status.description %>" y ya no admite modificaciones desde el portal.
+            </div>
+            <% } else { %>
+
+            <form method="POST" action="/portal/mis-envios/envio/<%= shipment.id %>/gestion" class="portal-mis-envios-form portal-manage-form">
+                <div class="portal-manage-card">
+                    <h2>Franja horaria preferida</h2>
+                    <div class="portal-search-field">
+                        <label class="portal-search-label" for="timeWindowSelect">Elegí una franja</label>
+                        <select id="timeWindowSelect" class="portal-search-input-field">
+                            <option value="">— sin preferencia —</option>
+                            <% timeWindows.forEach(function(w) {
+                                const fromVal = String(w.fromTime).slice(0, 8);
+                                const toVal = String(w.toTime).slice(0, 8);
+                                const fromLabel = String(w.fromTime).slice(0, 5);
+                                const toLabel = String(w.toTime).slice(0, 5);
+                                const selected = String(shipment.expectedDeliveryFrom || '').slice(0, 8) === fromVal
+                                    && String(shipment.expectedDeliveryTo || '').slice(0, 8) === toVal;
+                            %>
+                            <option value="<%= fromVal %>|<%= toVal %>" <%= selected ? 'selected' : '' %>>
+                                <%= w.label %> (<%= fromLabel %> – <%= toLabel %>)
+                            </option>
+                            <% }); %>
+                        </select>
+                        <input type="hidden" name="windowFrom" id="windowFrom" value="<%= shipment.expectedDeliveryFrom ? String(shipment.expectedDeliveryFrom).slice(0, 8) : '' %>">
+                        <input type="hidden" name="windowTo" id="windowTo" value="<%= shipment.expectedDeliveryTo ? String(shipment.expectedDeliveryTo).slice(0, 8) : '' %>">
+                    </div>
+                </div>
+
+                <div class="portal-manage-card">
+                    <h2>Modalidad de entrega</h2>
+                    <label class="portal-manage-radio">
+                        <input type="radio" name="deliveryMode" value="home" <%= shipment.deliveryMode === 'home' ? 'checked' : '' %>>
+                        Envío a domicilio
+                    </label>
+                    <label class="portal-manage-radio">
+                        <input type="radio" name="deliveryMode" value="branch_pickup" <%= shipment.deliveryMode === 'branch_pickup' ? 'checked' : '' %>>
+                        Retiro por sucursal
+                    </label>
+                    <div class="portal-search-field" id="pickup-branch-section" style="<%= shipment.deliveryMode === 'branch_pickup' ? '' : 'display:none;' %>">
+                        <label class="portal-search-label" for="pickupBranchId">Sucursal de retiro</label>
+                        <select name="pickupBranchId" id="pickupBranchId" class="portal-search-input-field" <%= shipment.deliveryMode === 'branch_pickup' ? '' : 'disabled' %>>
+                            <option value="">— seleccionar —</option>
+                            <% branches.forEach(function(b) { %>
+                            <option value="<%= b.id %>" <%= shipment.pickupBranchId === b.id ? 'selected' : '' %>><%= b.name %> — <%= b.address || '' %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="portal-manage-card">
+                    <h2>Referencias de domicilio</h2>
+                    <p class="portal-manage-hint">Estos cambios se aplican de inmediato.</p>
+                    <div class="portal-manage-grid2">
+                        <div class="portal-search-field">
+                            <label class="portal-search-label">Timbre / Departamento</label>
+                            <input type="text" name="ringLabel" class="portal-search-input-field" maxlength="40" value="<%= shipment.address?.ringLabel || '' %>">
+                        </div>
+                        <div class="portal-search-field">
+                            <label class="portal-search-label">Piso / Depto</label>
+                            <input type="text" name="floorApt" class="portal-search-input-field" maxlength="40" value="<%= shipment.address?.floorApt || '' %>">
+                        </div>
+                    </div>
+                    <div class="portal-search-field">
+                        <label class="portal-search-label">Referencias para encontrar el domicilio</label>
+                        <textarea name="referencesTxt" class="portal-search-input-field" maxlength="500" rows="2"><%= shipment.address?.referencesTxt || '' %></textarea>
+                    </div>
+                    <div class="portal-search-field">
+                        <label class="portal-search-label">Portería / recepción</label>
+                        <input type="text" name="porterNote" class="portal-search-input-field" maxlength="255" value="<%= shipment.address?.porterNote || '' %>">
+                    </div>
+                    <div class="portal-search-field">
+                        <label class="portal-search-label">Restricciones / aclaraciones</label>
+                        <textarea name="restrictions" class="portal-search-input-field" maxlength="500" rows="2"><%= shipment.address?.restrictions || '' %></textarea>
+                    </div>
+                </div>
+
+                <div class="portal-manage-card">
+                    <h2>Cambio de dirección</h2>
+                    <p class="portal-manage-hint">Los cambios de calle, número o provincia quedan pendientes de revisión operativa.</p>
+                    <div class="portal-manage-grid2">
+                        <div class="portal-search-field">
+                            <label class="portal-search-label">Calle</label>
+                            <input type="text" name="street" class="portal-search-input-field" value="<%= shipment.address?.street || '' %>">
+                        </div>
+                        <div class="portal-search-field">
+                            <label class="portal-search-label">Número</label>
+                            <input type="text" name="number" class="portal-search-input-field" value="<%= shipment.address?.number || '' %>">
+                        </div>
+                    </div>
+                    <div class="portal-manage-grid2">
+                        <div class="portal-search-field">
+                            <label class="portal-search-label">Código postal</label>
+                            <input type="text" name="postalCode" class="portal-search-input-field" value="<%= shipment.address?.postalCode || '' %>">
+                        </div>
+                        <div class="portal-search-field">
+                            <label class="portal-search-label">Provincia</label>
+                            <select name="provinceId" class="portal-search-input-field">
+                                <option value="">— seleccionar —</option>
+                                <% provinces.forEach(function(p) { %>
+                                <option value="<%= p.id %>" <%= shipment.address?.provinceId === p.id ? 'selected' : '' %>><%= p.description %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="portal-search-panel-btn">
+                    <span class="material-symbols-outlined">save</span>
+                    Guardar cambios
+                </button>
+            </form>
+            <% } %>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/portal-manage-form.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,673 @@
+/* ============================================================
+   Shipment — Alta de envío (new.ejs)
+   Tokens alineados con docs/prompts/restyle-page.md
+   ============================================================ */
+:root {
+    --shp-bg:          #f0f2f5;
+    --shp-surface:     #ffffff;
+    --shp-surface-alt: #f8fafc;
+    --shp-blue:        #2563eb;
+    --shp-blue-dark:   #1a3566;
+    --shp-blue-soft:   #3b82f6;
+    --shp-amber:       #f59e0b;
+    --shp-amber-dark:  #d97706;
+    --shp-green:       #16a34a;
+    --shp-red:         #dc2626;
+    --shp-purple:      #7c3aed;
+    --shp-text:        #0f172a;
+    --shp-text-strong: #1a3566;
+    --shp-muted:       #64748b;
+    --shp-border:      rgba(15, 23, 42, .08);
+    --shp-border-soft: rgba(15, 23, 42, .05);
+    --shp-glass:       rgba(255, 255, 255, .72);
+    --shp-glass-brdr:  rgba(255, 255, 255, .55);
+    --shp-shadow-sm:   0 1px 2px rgba(15, 23, 42, .04);
+    --shp-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --shp-shadow-lg:   0 12px 32px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+    --shp-radius-sm:   8px;
+    --shp-radius-md:   12px;
+    --shp-radius-lg:   18px;
+    --shp-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+html[data-theme="dark"] {
+    --shp-bg:          #0b1220;
+    --shp-surface:     #111827;
+    --shp-surface-alt: #0f172a;
+    --shp-blue:        #60a5fa;
+    --shp-blue-dark:   #cbd5e1;
+    --shp-blue-soft:   #93c5fd;
+    --shp-text:        #e2e8f0;
+    --shp-text-strong: #f1f5f9;
+    --shp-muted:       #94a3b8;
+    --shp-border:      rgba(148, 163, 184, .18);
+    --shp-border-soft: rgba(148, 163, 184, .10);
+    --shp-glass:       rgba(17, 24, 39, .72);
+    --shp-glass-brdr:  rgba(148, 163, 184, .15);
+    --shp-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --shp-shadow-lg:   0 12px 32px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.3);
+    --shp-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+}
+
+/* main-content y page-header: respetar layout legacy (style.css/shipments.css). */
+
+/* ============================================================
+   Form container
+   ============================================================ */
+.form-new {
+    max-width: 1280px;
+    margin: 1rem auto 0;
+    padding: 0 clamp(1.25rem, 2.5vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-required-note {
+    margin: 0 0 .25rem;
+    font-size: .78rem;
+    color: var(--shp-muted);
+}
+
+.req { color: var(--shp-red); font-weight: 700; }
+
+.form-new form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Cada sección del form como card */
+.form-new .remitente,
+.form-new .destinatario,
+.form-new .direccion,
+.form-new .info-shipment,
+.form-new .modalidad-entrega,
+.form-new .retiro-sucursal {
+    background: var(--shp-surface);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-lg);
+    box-shadow: var(--shp-shadow-md);
+    padding: 1.4rem 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.25rem;
+    position: relative;
+}
+
+.form-new h3 {
+    grid-column: 1 / -1;
+    margin: 0 0 .25rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--shp-text-strong);
+    padding-bottom: .6rem;
+    border-bottom: 1px solid var(--shp-border-soft);
+}
+
+/* Campos */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.field label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--shp-muted);
+}
+
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="tel"],
+.field input[type="number"],
+.field input[type="date"],
+.field input[type="time"],
+.field select,
+.field textarea {
+    padding: .55rem .75rem;
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    background: var(--shp-surface);
+    color: var(--shp-text);
+    font-size: .9rem;
+    font-family: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+    outline: none;
+    border-color: var(--shp-blue);
+    box-shadow: var(--shp-ring);
+}
+
+.field input:disabled,
+.field input[readonly] {
+    background: var(--shp-surface-alt);
+    color: var(--shp-muted);
+    cursor: not-allowed;
+}
+
+.field-hint {
+    font-size: .78rem;
+    color: var(--shp-muted);
+    margin-top: .2rem;
+}
+
+/* Botón "Editar" dentro de remitente/destinatario */
+.btn-edit-persona {
+    grid-column: 1 / -1;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .4rem .85rem;
+    font-size: .8rem;
+    background: var(--shp-surface-alt);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    color: var(--shp-text-strong);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.btn-edit-persona:hover {
+    background: var(--shp-surface);
+    border-color: var(--shp-blue);
+}
+
+/* ============================================================
+   Modalidad de entrega — radios
+   ============================================================ */
+.modalidad-entrega { grid-template-columns: 1fr; }
+
+.modalidad-entrega .field {
+    flex-direction: row;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.modalidad-entrega .field label {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .55rem .9rem;
+    background: var(--shp-surface-alt);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    cursor: pointer;
+    text-transform: none;
+    font-size: .9rem;
+    color: var(--shp-text);
+    font-weight: 500;
+    letter-spacing: 0;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.modalidad-entrega .field label:hover { border-color: var(--shp-blue); }
+
+.modalidad-entrega input[type="radio"] { accent-color: var(--shp-blue); }
+
+/* ============================================================
+   Dirección — search + chip + validación
+   ============================================================ */
+.addr-full { grid-column: 1 / -1; }
+
+.addr-search-wrapper { position: relative; }
+
+#address-search {
+    width: 100%;
+    padding: .65rem .9rem;
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    background: var(--shp-surface);
+    color: var(--shp-text);
+    font-size: .95rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+#address-search:focus {
+    outline: none;
+    border-color: var(--shp-blue);
+    box-shadow: var(--shp-ring);
+}
+
+.addr-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--shp-surface);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    box-shadow: var(--shp-shadow-lg);
+    z-index: 50;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.addr-dropdown > div {
+    padding: .55rem .8rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--shp-border-soft);
+    font-size: .88rem;
+    color: var(--shp-text);
+    transition: background .12s ease;
+}
+
+.addr-dropdown > div:last-child { border-bottom: 0; }
+.addr-dropdown > div:hover { background: var(--shp-surface-alt); }
+
+.addr-selected-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+}
+
+.addr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .75rem;
+    background: linear-gradient(135deg, rgba(37,99,235,.12), rgba(59,130,246,.08));
+    border: 1px solid var(--shp-blue);
+    border-radius: 999px;
+    font-size: .85rem;
+    color: var(--shp-blue-dark);
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.addr-chip .material-symbols-outlined { font-size: 1.05rem; color: var(--shp-blue); }
+
+.addr-clear-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .4rem .75rem;
+    background: var(--shp-surface);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    color: var(--shp-muted);
+    font-size: .8rem;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+}
+
+.addr-clear-btn:hover { border-color: var(--shp-red); color: var(--shp-red); }
+
+.addr-validation-box {
+    padding: .7rem .9rem;
+    border-radius: var(--shp-radius-sm);
+    font-size: .85rem;
+    border: 1px solid transparent;
+}
+
+/* Cartel de ventana de retiro: hereda display:flex del .addr-validation-box de
+   shipments.css. Con texto multilínea (varios <strong>) el flex apilaba cada
+   fragmento en columnas; envolvemos el texto en .pickup-info-text (un solo hijo
+   flex) y alineamos el ícono arriba para que fluya como párrafo. */
+#pickup-info { align-items: flex-start; }
+#pickup-info .material-symbols-outlined { flex-shrink: 0; margin-top: 2px; }
+#pickup-info .pickup-info-text { flex: 1 1 auto; line-height: 1.5; }
+
+.addr-validation-box--empty {
+    background: var(--shp-surface-alt);
+    border-color: var(--shp-border-soft);
+    color: var(--shp-muted);
+}
+
+.addr-validation-box--ok {
+    background: linear-gradient(135deg, rgba(22,163,74,.10), rgba(22,163,74,.04));
+    border-color: rgba(22,163,74,.35);
+    color: #166534;
+}
+
+.addr-validation-box--warn {
+    background: linear-gradient(135deg, rgba(245,158,11,.12), rgba(245,158,11,.04));
+    border-color: rgba(245,158,11,.4);
+    color: #92400e;
+}
+
+.addr-validation-box--error {
+    background: linear-gradient(135deg, rgba(220,38,38,.12), rgba(220,38,38,.04));
+    border-color: rgba(220,38,38,.4);
+    color: #991b1b;
+}
+
+/* ============================================================
+   Predicción
+   ============================================================ */
+.pred-card {
+    background: linear-gradient(135deg, rgba(124,58,237,.08), rgba(59,130,246,.06));
+    border: 1px solid rgba(124,58,237,.25);
+    border-radius: var(--shp-radius-lg);
+    padding: 1.1rem 1.3rem;
+    box-shadow: var(--shp-shadow-sm);
+}
+
+.pred-card h3 {
+    margin: 0 0 .6rem;
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--shp-purple);
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    border: 0;
+    padding: 0;
+}
+
+.pred-card .material-symbols-outlined { font-size: 1.2rem; }
+
+/* ============================================================
+   Prioridad inicial
+   ============================================================ */
+.priority-box {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .8rem 1.1rem;
+    background: var(--shp-surface);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-md);
+    box-shadow: var(--shp-shadow-sm);
+}
+
+.priority-box-label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--shp-muted);
+    font-weight: 600;
+}
+
+.priority-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .25rem .7rem;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    border-radius: 999px;
+    text-transform: uppercase;
+}
+
+.priority-badge--none {
+    background: var(--shp-surface-alt);
+    color: var(--shp-muted);
+    border: 1px dashed var(--shp-border);
+}
+
+.priority-badge--low    { background: #dbeafe; color: #1e40af; }
+.priority-badge--normal { background: #dcfce7; color: #166534; }
+.priority-badge--high   { background: #fef3c7; color: #92400e; }
+.priority-badge--urgent {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(220,38,38,.35);
+}
+
+/* ============================================================
+   Acciones del formulario
+   ============================================================ */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .75rem;
+    padding-top: .5rem;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .65rem 1.3rem;
+    background: linear-gradient(135deg, var(--shp-blue), var(--shp-blue-soft));
+    color: #fff;
+    border: 0;
+    border-radius: var(--shp-radius-sm);
+    font-weight: 600;
+    font-size: .92rem;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(37,99,235,.3);
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(37,99,235,.45);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .6rem 1.2rem;
+    background: var(--shp-surface);
+    color: var(--shp-text-strong);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    font-weight: 500;
+    font-size: .9rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.btn-secondary:hover {
+    border-color: var(--shp-blue);
+    background: var(--shp-surface-alt);
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 960px) {
+    .form-new .remitente,
+    .form-new .destinatario,
+    .form-new .direccion,
+    .form-new .info-shipment,
+    .form-new .modalidad-entrega,
+    .form-new .retiro-sucursal {
+        grid-template-columns: 1fr;
+    }
+    .form-actions { flex-direction: column-reverse; }
+    .form-actions .btn-primary,
+    .form-actions .btn-secondary { width: 100%; justify-content: center; }
+    .btn-edit-persona { justify-self: stretch; }
+}
+
+/* LGT-207 — teléfono en un solo input que se autoformatea mientras se escribe. */
+.phone-display {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .65rem .85rem;
+    background: var(--color-bg);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md, 8px);
+    color: var(--color-text);
+    font-size: 1.05rem;
+    letter-spacing: .08em;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+.phone-display::placeholder { letter-spacing: normal; font-size: .92rem; color: var(--color-text-muted); }
+.phone-display:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+.phone-preview { font-size: .8rem; color: var(--color-text-secondary); margin-top: 4px; display: block; }
+
+/* ============================================================
+   Análisis ML post-submit — overlay
+   ============================================================ */
+#alta-ml-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: rgba(15, 23, 42, .55);
+    backdrop-filter: blur(3px);
+}
+
+.alta-ml__card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--shp-surface);
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-lg);
+    box-shadow: var(--shp-shadow-lg);
+    padding: 1.75rem 1.6rem;
+    text-align: center;
+    color: var(--shp-text);
+}
+
+.alta-ml__spinner {
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 1rem;
+    border: 4px solid var(--shp-border);
+    border-top-color: var(--shp-blue);
+    border-radius: 50%;
+    animation: alta-ml-spin 1s linear infinite;
+}
+
+@keyframes alta-ml-spin { to { transform: rotate(360deg); } }
+
+.alta-ml__title {
+    margin: 0 0 .5rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--shp-text-strong);
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    justify-content: center;
+}
+
+.alta-ml__title--warn { color: var(--shp-amber-dark); }
+.alta-ml__title .material-symbols-outlined { font-size: 1.3rem; }
+
+.alta-ml__msg {
+    margin: .25rem 0 .35rem;
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--shp-blue);
+    min-height: 1.4em;
+}
+
+.alta-ml__hint {
+    margin: 0;
+    font-size: .82rem;
+    color: var(--shp-muted);
+}
+
+.alta-ml__result {
+    text-align: left;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--shp-surface-alt);
+    border: 1px solid var(--shp-border-soft);
+    border-radius: var(--shp-radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.alta-ml__nopred {
+    margin: 0;
+    font-size: .88rem;
+    color: var(--shp-muted);
+}
+
+.alta-ml__datefield {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin-bottom: 1.1rem;
+}
+
+.alta-ml__datefield label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--shp-muted);
+}
+
+.alta-ml__datefield input[type="date"] {
+    padding: .55rem .75rem;
+    border: 1px solid var(--shp-border);
+    border-radius: var(--shp-radius-sm);
+    background: var(--shp-surface);
+    color: var(--shp-text);
+    font-size: .9rem;
+    font-family: inherit;
+}
+
+.alta-ml__datefield input[type="date"]:focus {
+    outline: none;
+    border-color: var(--shp-blue);
+    box-shadow: var(--shp-ring);
+}
+
+.alta-ml__datehint { font-size: .78rem; color: var(--shp-muted); }
+
+.alta-ml__actions {
+    display: flex;
+    gap: .6rem;
+    justify-content: flex-end;
+}
+
+.alta-ml__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .6rem 1.1rem;
+    border-radius: var(--shp-radius-sm);
+    font-size: .9rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.alta-ml__btn .material-symbols-outlined { font-size: 1.1rem; }
+
+.alta-ml__btn--ghost {
+    background: var(--shp-surface);
+    border-color: var(--shp-border);
+    color: var(--shp-text-strong);
+}
+.alta-ml__btn--ghost:hover { border-color: var(--shp-blue); background: var(--shp-surface-alt); }
+
+.alta-ml__btn--primary {
+    background: linear-gradient(135deg, var(--shp-blue), var(--shp-blue-soft));
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(37,99,235,.3);
+}
+.alta-ml__btn--primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,.45); }
+
+@media (max-width: 480px) {
+    .alta-ml__actions { flex-direction: column-reverse; }
+    .alta-ml__btn { width: 100%; justify-content: center; }
+}

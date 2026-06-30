@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Nueva devolución · envío <%= shipment.trackingId %> - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/incidents.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Nueva devolución</h1>
+            <div class="page-header__actions">
+                <a href="/shipment/detail/<%= shipment.id %>" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver al envío" aria-label="Volver al envío">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+            </div>
+        </div>
+
+        <% if (error) { %>
+            <div class="alert alert-error" role="alert"><%= error %></div>
+        <% } %>
+
+        <section class="incident-detail-grid">
+            <div class="incident-detail-card">
+                <h2>Envío <%= shipment.trackingId %></h2>
+                <p class="incident-description">
+                    Devolución del envío entregado, dentro de la ventana de <%= windowDays %> días.
+                    Al registrarla queda como incidencia de tipo Devolución, pendiente de revisión.
+                </p>
+
+                <form method="POST" action="/returns/new" class="incident-action-form" style="flex-direction:column;align-items:stretch;gap:1rem;max-width:560px;">
+                    <input type="hidden" name="shipmentId" value="<%= shipment.id %>">
+
+                    <div class="form-group" style="display:flex;flex-direction:column;gap:.35rem;">
+                        <label for="reason">Motivo de la devolución <span class="incident-required">*</span></label>
+                        <select name="reason" id="reason" required>
+                            <option value="">— elegí un motivo —</option>
+                            <% reasons.forEach(function (r) { %>
+                                <option value="<%= r.code %>" <%= form.reason === r.code ? 'selected' : '' %>><%= r.label %></option>
+                            <% }); %>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="reasonOtherWrap" style="display:<%= form.reason === 'OTRO' ? 'flex' : 'none' %>;flex-direction:column;gap:.35rem;">
+                        <label for="reasonOther">Detallá el motivo <span class="incident-required">*</span></label>
+                        <textarea name="reasonOther" id="reasonOther" rows="2" maxlength="2000"><%= form.reasonOther || '' %></textarea>
+                    </div>
+
+                    <div class="form-group" style="display:flex;flex-direction:column;gap:.35rem;">
+                        <label for="observations">Observaciones <span style="font-weight:400;opacity:.7;">(opcional)</span></label>
+                        <textarea name="observations" id="observations" rows="3" maxlength="2000" placeholder="Cualquier dato que sirva para gestionar la devolución."><%= form.observations || '' %></textarea>
+                    </div>
+
+                    <button type="submit" class="action-btn action-btn--lg buscar" style="align-self:flex-start;">
+                        <span class="material-symbols-outlined">assignment_return</span>
+                        Registrar devolución
+                    </button>
+                </form>
+            </div>
+        </section>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script>
+        (function () {
+            var sel = document.getElementById('reason');
+            var wrapBox = document.getElementById('reasonOtherWrap');
+            var other = document.getElementById('reasonOther');
+            if (!sel) { return; }
+            sel.addEventListener('change', function () {
+                var isOther = sel.value === 'OTRO';
+                wrapBox.style.display = isOther ? 'flex' : 'none';
+                if (isOther) { other.setAttribute('required', 'required'); } else { other.removeAttribute('required'); }
+            });
+        })();
+    </script>
+</body>
+</html>

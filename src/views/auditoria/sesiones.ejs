@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Auditoría · Log de sesiones - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+    <div class="audit-wrap">
+
+        <%- include('_header', { active: 'sesiones', pageTitle: 'Log de sesiones', pageDesc: 'Login, logout e intentos fallidos, con IP y dispositivo.' }) %>
+
+        <div class="audit-card">
+            <div class="audit-card-head">
+                <span class="material-symbols-outlined">login</span>
+                <h2>Log de sesiones</h2>
+                <span class="badge-count"><%= sessionCount %> registros</span>
+                <a href="/auditoria/export-csv?userId=<%= auditFilters.userId || '' %>&action=<%= auditFilters.action || '' %>&from=<%= auditFilters.from || '' %>&to=<%= auditFilters.to || '' %>" class="btn-filter" style="margin-left:auto">
+                    <span class="material-symbols-outlined">download</span> Exportar CSV
+                </a>
+            </div>
+            <div class="audit-card-body">
+                <form method="GET" action="/auditoria/sesiones" class="audit-filters">
+                    <div class="filter-group">
+                        <label>Usuario</label>
+                        <select name="userId">
+                            <option value="">Todos los usuarios</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.userId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Acción</label>
+                        <select name="action">
+                            <option value="">Todas</option>
+                            <option value="LOGIN"        <%= auditFilters.action === 'LOGIN'        ? 'selected' : '' %>>Login exitoso</option>
+                            <option value="LOGOUT"       <%= auditFilters.action === 'LOGOUT'       ? 'selected' : '' %>>Logout</option>
+                            <option value="LOGIN_FAILED" <%= auditFilters.action === 'LOGIN_FAILED' ? 'selected' : '' %>>Login fallido</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Desde</label>
+                        <input type="date" name="from" value="<%= auditFilters.from || '' %>">
+                    </div>
+                    <div class="filter-group">
+                        <label>Hasta</label>
+                        <input type="date" name="to" value="<%= auditFilters.to || '' %>">
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn-filter primary">
+                            <span class="material-symbols-outlined">filter_list</span> Filtrar
+                        </button>
+                        <a href="/auditoria/sesiones" class="btn-filter ghost">Limpiar</a>
+                    </div>
+                </form>
+
+                <div class="filter-divider"></div>
+
+                <% if (!loginLogs || loginLogs.length === 0) { %>
+                <div class="empty-state">
+                    <span class="material-symbols-outlined">search_off</span>
+                    No hay registros para los filtros seleccionados.
+                </div>
+                <% } else { %>
+                <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead>
+                            <tr><th>Fecha y hora</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>IP</th><th>Dispositivo</th></tr>
+                        </thead>
+                        <tbody>
+                            <% loginLogs.forEach(log => { %>
+                            <tr>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)">
+                                    <span data-ts="<%= new Date(log.createdAt).toISOString() %>" title="<%= new Date(log.createdAt).toLocaleString('es-AR') %>"><%= new Date(log.createdAt).toLocaleString('es-AR') %></span>
+                                </td>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= avatarColor(log.user?.fullName || log.email) %>"><%= initials(log.user?.fullName || log.email) %></span>
+                                        <div class="user-cell-info">
+                                            <strong><%= log.user?.fullName || log.email || '—' %></strong>
+                                            <% if (log.action === 'LOGIN_FAILED' && !log.user && log.email) { %>
+                                            <span class="user-cell-sub"><%= log.email %></span>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <% if (log.user?.roleId) { %>
+                                    <span class="badge-role"><%= roleLabels[log.user.roleId] || '—' %></span>
+                                    <% } else { %>
+                                    <span style="color:var(--color-text-secondary);font-size:.8rem">—</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (log.action === 'LOGIN') { %>
+                                    <span class="badge-login">
+                                        <span class="material-symbols-outlined">login</span> LOGIN
+                                    </span>
+                                    <% } else if (log.action === 'LOGOUT') { %>
+                                    <span class="badge-logout">
+                                        <span class="material-symbols-outlined">logout</span> LOGOUT
+                                    </span>
+                                    <% } else { %>
+                                    <span class="badge-failed">
+                                        <span class="material-symbols-outlined">block</span> FALLIDO
+                                    </span>
+                                    <% } %>
+                                </td>
+                                <td><code style="font-size:.8rem;background:var(--color-bg);padding:.1rem .4rem;border-radius:5px"><%= log.ip || '—' %></code></td>
+                                <td title="<%= log.userAgent || '' %>">
+                                    <%
+                                        const _ua = log.userAgent || '';
+                                        let _browser = '—', _os = '';
+                                        if (_ua.includes('Edg/'))           { _browser = 'Edge'; }
+                                        else if (_ua.includes('OPR/') || _ua.includes('Opera')) { _browser = 'Opera'; }
+                                        else if (_ua.includes('Chrome/'))   { _browser = 'Chrome'; }
+                                        else if (_ua.includes('Firefox/'))  { _browser = 'Firefox'; }
+                                        else if (_ua.includes('Safari/') && !_ua.includes('Chrome')) { _browser = 'Safari'; }
+                                        else if (_ua.includes('MSIE') || _ua.includes('Trident')) { _browser = 'IE'; }
+                                        if (_ua.includes('Android'))        { _os = 'Android'; }
+                                        else if (_ua.includes('iPhone') || _ua.includes('iPad')) { _os = 'iOS'; }
+                                        else if (_ua.includes('Windows NT')) { _os = 'Windows'; }
+                                        else if (_ua.includes('Mac OS X'))  { _os = 'Mac'; }
+                                        else if (_ua.includes('Linux'))     { _os = 'Linux'; }
+                                    %>
+                                    <% if (!_ua) { %>
+                                    <span style="color:var(--color-text-secondary)">—</span>
+                                    <% } else { %>
+                                    <span style="font-size:.8rem;display:inline-flex;align-items:center;gap:.3rem">
+                                        <span class="material-symbols-outlined" style="font-size:.95rem;color:var(--color-text-secondary)"><%= (_os === 'iOS' || _os === 'Android') ? 'smartphone' : 'computer' %></span>
+                                        <span><%= _browser %><% if (_os) { %> &middot; <span style="color:var(--color-text-secondary)"><%= _os %></span><% } %></span>
+                                    </span>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación sesiones -->
+                <% if (sessionPages > 1) { %>
+                <div class="pagination">
+                    <span class="pagination-info">Página <%= sessionPage %> de <%= sessionPages %> (<%= sessionCount %> registros)</span>
+                    <% const _sBase = '/auditoria/sesiones?userId=' + (auditFilters.userId||'') + '&action=' + (auditFilters.action||'') + '&from=' + (auditFilters.from||'') + '&to=' + (auditFilters.to||''); %>
+                    <a href="<%= _sBase %>&sessionPage=<%= sessionPage - 1 %>" class="btn-filter <%= sessionPage <= 1 ? 'ghost' : '' %>" <%- sessionPage <= 1 ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        <span class="material-symbols-outlined">chevron_left</span> Anterior
+                    </a>
+                    <a href="<%= _sBase %>&sessionPage=<%= sessionPage + 1 %>" class="btn-filter <%= sessionPage >= sessionPages ? 'ghost' : '' %>" <%- sessionPage >= sessionPages ? 'aria-disabled="true" style="pointer-events:none;opacity:.4"' : '' %>>
+                        Siguiente <span class="material-symbols-outlined">chevron_right</span>
+                    </a>
+                </div>
+                <% } %>
+                <% } %>
+            </div>
+        </div>
+
+    </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <%- include('_relativeTime') %>
+</body>
+</html>

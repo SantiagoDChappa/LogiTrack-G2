@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments-import.css">
+    <link rel="stylesheet" href="/css/shipments-restyle.css">
+    <title>Preview de importación - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Preview de importación</h1>
+            <div class="page-header__actions">
+                <a href="/shipment/import" class="action-btn action-btn--lg action-btn--tip-bottom cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                    <span class="material-symbols-outlined">close</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="import-wrapper">
+
+            <% if (analysis.aborted) { %>
+                <!-- Archivo rechazado -->
+                <div class="import-alert import-alert--error">
+                    <span class="material-symbols-outlined">block</span>
+                    <div class="alert-body">
+                        <strong>El archivo no se puede importar.</strong>
+                        <ul>
+                            <% analysis.rows.forEach(function(r) { %>
+                                <% (r.errors || []).forEach(function(e) { %>
+                                    <li><%= e.message %></li>
+                                <% }) %>
+                            <% }) %>
+                        </ul>
+                    </div>
+                </div>
+                <div class="import-actions" style="border-top:none">
+                    <a href="/shipment/import" class="action-btn action-btn--lg buscar" data-tooltip="Probar de nuevo" aria-label="Probar de nuevo">
+                        <span class="material-symbols-outlined">upload_file</span>
+                    </a>
+                </div>
+
+            <% } else { %>
+
+                <!-- Nombre de archivo + total -->
+                <div class="import-filename-display">
+                    <span class="material-symbols-outlined" style="font-size:1rem;color:var(--color-primary)">description</span>
+                    <code><%= filename %></code>
+                    <span style="color:var(--color-text-muted)">—</span>
+                    <strong><%= analysis.total %></strong> filas en total
+                </div>
+
+                <!-- Resumen estadístico -->
+                <div class="import-summary">
+                    <div class="import-stat import-stat--ok">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        <span class="import-stat__num"><%= analysis.summary.ok %></span>
+                        <span class="import-stat__label">Listas para importar</span>
+                    </div>
+                    <div class="import-stat import-stat--warn">
+                        <span class="material-symbols-outlined">content_copy</span>
+                        <span class="import-stat__num"><%= analysis.summary.duplicates %></span>
+                        <span class="import-stat__label">Duplicados</span>
+                    </div>
+                    <div class="import-stat import-stat--err">
+                        <span class="material-symbols-outlined">cancel</span>
+                        <span class="import-stat__num"><%= analysis.summary.invalid %></span>
+                        <span class="import-stat__label">Inválidas</span>
+                    </div>
+                </div>
+
+                <%
+                    const okRows      = analysis.rows.filter(r => r.status === 'ok');
+                    const dupRows     = analysis.rows.filter(r => r.status === 'duplicate');
+                    const invalidRows = analysis.rows.filter(r => r.status === 'invalid');
+                    const STATUS_LABELS = { 1: 'Pendiente', 2: 'En Tránsito', 3: 'En Sucursal', 4: 'Entregado', 5: 'Cancelado' };
+                    const STATUS_CLASS  = { 1: 'pendiente', 2: 'en-transito', 3: 'en-sucursal', 4: 'entregado', 5: 'cancelado' };
+                %>
+
+                <!-- Filas OK -->
+                <% if (okRows.length > 0) { %>
+                    <div class="import-card">
+                        <div class="import-section-head" style="margin-bottom:var(--space-4)">
+                            <h2 class="import-section-title">
+                                <span class="material-symbols-outlined" style="color:var(--color-success)">check_circle</span>
+                                Listas para importar (<%= okRows.length %>)
+                            </h2>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fila</th>
+                                        <th>Remitente</th>
+                                        <th>Destinatario</th>
+                                        <th>Dirección</th>
+                                        <th>Estado</th>
+                                        <th>Repartidor</th>
+                                        <th>Legacy ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% okRows.forEach(function(r) { %>
+                                        <tr>
+                                            <td class="tracking-id"><%= r.rowNumber %></td>
+                                            <td><%= r.data.senderName %> <small>(<%= r.data.senderDocument %>)</small></td>
+                                            <td><%= r.data.recipientName %> <small>(<%= r.data.recipientDocument %>)</small></td>
+                                            <td><%= r.data.street %> <%= r.data.number %></td>
+                                            <td>
+                                                <span class="status-badge status-badge--sm <%= STATUS_CLASS[r.data.statusId] || '' %>">
+                                                    <%= STATUS_LABELS[r.data.statusId] || r.data.statusId %>
+                                                </span>
+                                            </td>
+                                            <td><%= r.data.deliveryUserId ? '#' + r.data.deliveryUserId : '—' %></td>
+                                            <td class="tracking-id"><%= r.data.legacyTrackingId || '—' %></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Duplicados -->
+                <% if (dupRows.length > 0) { %>
+                    <div class="import-card">
+                        <div class="import-section-head" style="margin-bottom:var(--space-2)">
+                            <h2 class="import-section-title">
+                                <span class="material-symbols-outlined" style="color:var(--color-warning)">content_copy</span>
+                                Posibles duplicados (<%= dupRows.length %>)
+                            </h2>
+                        </div>
+                        <p class="import-hint" style="margin-bottom:var(--space-4)">
+                            Estas filas parecen coincidir con envíos existentes en el sistema o se repiten en este CSV.
+                            Por defecto se omiten; podés forzar la inserción si estás seguro.
+                        </p>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fila</th>
+                                        <th>Remitente</th>
+                                        <th>Destinatario</th>
+                                        <th>Dirección</th>
+                                        <th>Motivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% dupRows.forEach(function(r) { %>
+                                        <tr>
+                                            <td class="tracking-id"><%= r.rowNumber %></td>
+                                            <td><%= r.data.senderName %> <small>(<%= r.data.senderDocument %>)</small></td>
+                                            <td><%= r.data.recipientName %> <small>(<%= r.data.recipientDocument %>)</small></td>
+                                            <td><%= r.data.street %> <%= r.data.number %></td>
+                                            <td><%= r.duplicateOf.reason %></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Inválidas -->
+                <% if (invalidRows.length > 0) { %>
+                    <div class="import-card">
+                        <div class="import-section-head" style="margin-bottom:var(--space-2)">
+                            <h2 class="import-section-title">
+                                <span class="material-symbols-outlined" style="color:var(--color-danger)">cancel</span>
+                                Filas inválidas (<%= invalidRows.length %>)
+                            </h2>
+                        </div>
+                        <p class="import-hint" style="margin-bottom:var(--space-4)">
+                            Estas filas no se importan en ningún caso. Corregilas en el CSV y volvé a subirlo.
+                        </p>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fila</th>
+                                        <th>Campo</th>
+                                        <th>Mensaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% invalidRows.forEach(function(r) { %>
+                                        <% (r.errors || []).forEach(function(e) { %>
+                                            <tr>
+                                                <td class="tracking-id"><%= r.rowNumber %></td>
+                                                <td><code><%= e.field %></code></td>
+                                                <td><%= e.message %></td>
+                                            </tr>
+                                        <% }) %>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Acciones -->
+                <div class="import-actions">
+                    <a href="/shipment/import" class="action-btn action-btn--lg cancelar" data-tooltip="Cancelar" aria-label="Cancelar">
+                        <span class="material-symbols-outlined">close</span>
+                    </a>
+
+                    <% if (analysis.summary.duplicates > 0) { %>
+                        <form id="force-form" action="/shipment/import/commit" method="post" style="display:contents">
+                            <input type="hidden" name="previewId" value="<%= previewId %>">
+                            <input type="hidden" name="force" value="true">
+                            <button type="button" id="btn-force" class="action-btn action-btn--lg modificar" data-tooltip="Importar todo (<%= analysis.summary.ok + analysis.summary.duplicates %> filas)" aria-label="Importar todo (<%= analysis.summary.ok + analysis.summary.duplicates %> filas)">
+                                <span class="material-symbols-outlined">warning</span>
+                            </button>
+                        </form>
+                    <% } %>
+
+                    <% if (analysis.summary.ok > 0) { %>
+                        <form action="/shipment/import/commit" method="post" style="display:contents">
+                            <input type="hidden" name="previewId" value="<%= previewId %>">
+                            <input type="hidden" name="force" value="false">
+                            <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Importar válidas (<%= analysis.summary.ok %>)" aria-label="Importar válidas (<%= analysis.summary.ok %>)">
+                                <span class="material-symbols-outlined">check</span>
+                            </button>
+                        </form>
+                    <% } %>
+                </div>
+
+            <% } %>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const btn = document.getElementById('btn-force');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+                Swal.fire({
+                    icon:               'warning',
+                    title:              '¿Importar duplicados también?',
+                    text:               'Se crearán envíos que ya existen en el sistema o se repiten en este CSV. Esta acción no se puede deshacer.',
+                    showCancelButton:   true,
+                    confirmButtonText:  'Sí, importar todo',
+                    cancelButtonText:   'Cancelar',
+                    confirmButtonColor: '#d97706',
+                    background: isDark ? '#1e293b' : '#ffffff',
+                    color:      isDark ? '#f1f5f9' : '#1e293b',
+                }).then(function (result) {
+                    if (result.isConfirmed) document.getElementById('force-form').submit();
+                });
+            });
+        });
+    </script>
+</body>
+</html>

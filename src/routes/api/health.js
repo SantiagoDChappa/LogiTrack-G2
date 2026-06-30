@@ -1,15 +1,22 @@
-// En src/routes/health.js
-  const express = require('express');
-  const router = express.Router();
-  const sequelize = require('../../database/connection'); 
+const express = require('express');
+const router = express.Router();
+const sequelize = require('../../database/connection');
 
-  router.get('/health', async (req, res) => {
-      try {
-          await sequelize.authenticate();
-          res.json({ status: 'ok' });
-      } catch (err) {
-          res.status(500).json({ status: 'error' });
-      }
-  });
+// /api/health: chequeo completo (incluye DB). Para monitoring.
+router.get('/', async (req, res) => {
+    try {
+        await sequelize.authenticate();
+        res.json({ status: 'ok', database: 'connected' });
+    } catch {
+        res.status(500).json({ status: 'error', database: 'disconnected' });
+    }
+});
 
-  module.exports = router;
+// /api/health/ping: chequeo liviano (sin DB). Endpoint barato para uptime cron
+// externo que evita cold start en Render free (UptimeRobot, cron-job.org, etc.).
+router.get('/ping', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
+});
+
+module.exports = router;

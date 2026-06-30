@@ -2,7 +2,9 @@
 <html lang="es">
 <head>
     <%- include('../partials/head') %>
-    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/shipments-restyle.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/shipment-new.css?v=<%= assetVersion %>">
     <title>Nuevo Envío - LogiTrack</title>
 </head>
 <body>
@@ -13,60 +15,120 @@
         </div>
         <div class="form-new">
             <p class="form-required-note"><span class="req">*</span> Campo obligatorio</p>
-            <form action="" method="post">
+            <form action="" method="post" data-no-loader>
                 <div class="remitente">
                     <h3>Remitente</h3>
                     <div class="field">
                         <label for="sender-name">Nombre y Apellido <span class="req">*</span></label>
-                        <input id="sender-name" type="text" name="senderName" value="<%= body.senderName || '' %>" placeholder="Ej: Juan Pérez">
+                        <input id="sender-name" type="text" name="senderName" value="<%= body.senderName || '' %>" placeholder="Ej: Juan Pérez" maxlength="100" required>
                     </div>
                     <div class="field">
                         <label for="sender-document">Documento <span class="req">*</span></label>
-                        <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                        <input id="sender-document" type="text" name="senderDocument" value="<%= body.senderDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="sender-phone">Teléfono</label>
-                        <input id="sender-phone" type="tel" name="senderPhone" maxlength="10" value="<%= body.senderPhone || '' %>" placeholder="Ej: 1123456789">
+                        <label for="sender-phone-display">Teléfono <span class="req">*</span></label>
+                        <input id="sender-phone-display" class="phone-display" type="tel" inputmode="numeric" autocomplete="off" placeholder="Ej: 11 5456 5446 o 9 11 2384 2323">
+                        <input type="hidden" name="senderPhone" id="sender-phone" value="<%= body.senderPhone || '' %>">
+                        <span class="field-hint phone-preview" id="sender-phone-preview"></span>
                     </div>
                     <div class="field">
                         <label for="sender-email">Email</label>
-                        <input id="sender-email" type="email" name="senderEmail" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
+                        <input id="sender-email" type="email" name="senderEmail" maxlength="100" value="<%= body.senderEmail || '' %>" placeholder="Ej: juan@email.com">
                     </div>
-                    <button type="button" id="sender-edit">Editar</button>
+                    <button type="button" id="sender-edit" class="action-btn modificar btn-edit-persona" data-tooltip="Editar" aria-label="Editar remitente">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
                 </div>
 
                 <div class="destinatario">
                     <h3>Destinatario</h3>
                     <div class="field">
                         <label for="recipient-name">Nombre y Apellido <span class="req">*</span></label>
-                        <input id="recipient-name" type="text" name="recipientName" value="<%= body.recipientName || '' %>" placeholder="Ej: María García">
+                        <input id="recipient-name" type="text" name="recipientName" value="<%= body.recipientName || '' %>" placeholder="Ej: María García" maxlength="100" required>
                     </div>
                     <div class="field">
                         <label for="recipient-document">Documento <span class="req">*</span></label>
-                        <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11">
+                        <input id="recipient-document" type="text" name="recipientDocument" value="<%= body.recipientDocument || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
-                        <label for="recipient-phone">Teléfono</label>
-                        <input id="recipient-phone" type="tel" name="recipientPhone" maxlength="10" value="<%= body.recipientPhone || '' %>" placeholder="Ej: 1123456789">
+                        <label for="recipient-phone-display">Teléfono <span class="req">*</span></label>
+                        <input id="recipient-phone-display" class="phone-display" type="tel" inputmode="numeric" autocomplete="off" placeholder="Ej: 11 5456 5446 o 9 11 2384 2323">
+                        <input type="hidden" name="recipientPhone" id="recipient-phone" value="<%= body.recipientPhone || '' %>">
+                        <span class="field-hint phone-preview" id="recipient-phone-preview"></span>
                     </div>
                     <div class="field">
                         <label for="recipient-email">Email</label>
-                        <input id="recipient-email" type="email" name="recipientEmail" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
+                        <input id="recipient-email" type="email" name="recipientEmail" maxlength="100" value="<%= body.recipientEmail || '' %>" placeholder="Ej: maria@email.com">
                     </div>
-                    <button type="button" id="recipient-edit">Editar</button>
-
+                    <button type="button" id="recipient-edit" class="action-btn modificar btn-edit-persona" data-tooltip="Editar" aria-label="Editar destinatario">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
                 </div>
 
-                <div class="direccion">
+                <div class="modalidad-entrega">
+                    <h3>Modalidad de entrega <span class="req">*</span></h3>
+                    <div class="field" style="display:flex;gap:1.5rem;align-items:center;">
+                        <label style="display:flex;gap:0.5rem;align-items:center;font-weight:500;cursor:pointer;">
+                            <input type="radio" name="deliveryMode" value="home"
+                                <%= (body.deliveryMode === 'branch_pickup') ? '' : 'checked' %>>
+                            Envío a domicilio
+                        </label>
+                        <label style="display:flex;gap:0.5rem;align-items:center;font-weight:500;cursor:pointer;">
+                            <input type="radio" name="deliveryMode" value="branch_pickup"
+                                <%= (body.deliveryMode === 'branch_pickup') ? 'checked' : '' %>>
+                            Retiro por sucursal
+                        </label>
+                    </div>
+                </div>
+
+                <div class="retiro-sucursal" id="pickup-branch-section"
+                     data-retention-days="<%= typeof retentionDays !== 'undefined' ? retentionDays : 10 %>"
+                     style="<%= (body.deliveryMode === 'branch_pickup') ? '' : 'display:none;' %>">
+                    <h3>Sucursal de retiro</h3>
+                    <div class="field">
+                        <label for="pickup-province">Provincia / Zona</label>
+                        <select id="pickup-province">
+                            <option value="">Todas las provincias</option>
+                            <% provinces.forEach(p => { %>
+                                <option value="<%= p.id %>"><%= p.description %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="pickup-branch-id">Sucursal <span class="req">*</span></label>
+                        <select id="pickup-branch-id" name="pickupBranchId" data-initial="<%= body.pickupBranchId || '' %>">
+                            <option value="">Seleccione una sucursal</option>
+                            <% (pickupBranches || []).forEach(b => { %>
+                                <option value="<%= b.id %>" data-province="<%= b.provinceId %>"
+                                    data-postal="<%= b.postalCode || '' %>"
+                                    data-lat="<%= b.latitude != null ? b.latitude : '' %>"
+                                    data-lng="<%= b.longitude != null ? b.longitude : '' %>"
+                                    <%= String(body.pickupBranchId || '') === String(b.id) ? 'selected' : '' %>>
+                                    <%= b.name %> — <%= b.address %>
+                                </option>
+                            <% }) %>
+                        </select>
+                        <span class="field-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;">
+                            Solo se listan sucursales habilitadas para retiro.
+                        </span>
+                    </div>
+                    <!-- Ventana estimada de retiro (calculada al elegir la sucursal) -->
+                    <div id="pickup-info" class="addr-validation-box addr-validation-box--empty" role="status" aria-live="polite" style="margin-top:.5rem;">
+                        <span class="material-symbols-outlined" style="font-size:1rem">schedule</span>
+                        Elegí una sucursal para estimar la ventana de retiro.
+                    </div>
+                </div>
+
+                <div class="direccion" id="address-section" style="<%= (body.deliveryMode === 'branch_pickup') ? 'display:none;' : '' %>">
                     <h3>Dirección de entrega</h3>
 
                     <!-- Campos hidden enviados al servidor -->
                     <input type="hidden" id="street"      name="street"     value="<%= body.street || '' %>">
                     <input type="hidden" id="number"      name="number"     value="<%= body.number || '' %>">
                     <input type="hidden" id="province"    name="province"   value="<%= body.province || '' %>">
-                    <input type="hidden" id="postal-code" name="postalCode" value="<%= body.postalCode || '' %>">
-                    <input type="hidden" id="address-lat" name="addressLat" value="">
-                    <input type="hidden" id="address-lng" name="addressLng" value="">
+                    <input type="hidden" id="address-lat" name="addressLat" value="<%= body.addressLat || '' %>">
+                    <input type="hidden" id="address-lng" name="addressLng" value="<%= body.addressLng || '' %>">
 
                     <!-- Buscador unificado — ocupa todo el ancho -->
                     <div class="field addr-search-wrapper addr-full">
@@ -88,12 +150,26 @@
                     </div>
 
                     <!-- Validación — dentro de la sección, ocupa todo el ancho -->
-                    <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full"></div>
+                    <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full" role="status" aria-live="polite"></div>
+
+                    <!-- Aviso de zona peligrosa / no llegable (lo controla address-danger.js) -->
+                    <div id="address-danger-warning" class="addr-validation-box addr-validation-box--danger addr-full" role="alert" aria-live="assertive" hidden></div>
+                    <input type="hidden" id="danger-accepted" name="dangerAccepted" value="">
+                    <input type="hidden" id="danger-reachable" value="">
 
                     <!-- Piso/depto — siempre visible, posición fija -->
                     <div class="field">
                         <label for="floor-apartment">Piso y/o Depto <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
                         <input id="floor-apartment" type="text" name="floorApartment" value="<%= body.floorApartment || '' %>" placeholder="Ej: 3° B">
+                    </div>
+
+                    <!-- Código postal — autocompletado desde el normalizador, editable y cargable a mano (LGT-207 Esc.9/10/11) -->
+                    <div class="field">
+                        <label for="postal-code">Código postal <span style="font-weight:400;color:var(--color-text-secondary)">(autocompletado, editable)</span></label>
+                        <input id="postal-code" type="text" name="postalCode" maxlength="8" value="<%= body.postalCode || '' %>" placeholder="Ej: 1234 o B1234ABC" autocomplete="off">
+                        <span class="field-hint" id="postal-code-missing" role="alert" style="font-size:0.8rem;color:var(--color-warning,#b45309);margin-top:4px;display:none;">
+                            No detectamos el código postal de esta dirección. Ingresalo manualmente (no es obligatorio para continuar).
+                        </span>
                     </div>
                 </div>
 
@@ -101,31 +177,70 @@
                     <h3>Información del paquete</h3>
                     <div class="field">
                         <label for="shipment-type">Tipo de envío <span class="req">*</span></label>
-                        <select id="shipment-type" name="shipmentTypeId">
+                        <select id="shipment-type" name="shipmentTypeId" required>
                             <option value="">Seleccione un tipo de envío</option>
                             <% typesShipment.forEach(type => { %>
                                 <option value="<%= type.id %>" <%= body.shipmentTypeId == type.id ? 'selected' : '' %>><%= type.description %></option>
                             <% }) %>
                         </select>
                     </div>
+                    <div class="field" style="display:flex;align-items:center;gap:.5rem">
+                        <input type="checkbox" id="fragile" name="fragile" value="true" <%= body.fragile ? 'checked' : '' %>>
+                        <label for="fragile" style="margin:0">Paquete frágil (requiere manejo especial)</label>
+                    </div>
                     <div class="field">
                         <label for="weight-kg">Peso (kg) <span class="req">*</span></label>
-                        <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= body.weightKg || '' %>" placeholder="Ej: 1.5">
+                        <input id="weight-kg" type="number" name="weightKg" min="0.1" max="999" step="0.1" value="<%= body.weightKg || '' %>" placeholder="Ej: 1.5" required>
                     </div>
                     <div class="field">
                         <label for="package-qty">Cantidad de paquetes <span class="req">*</span></label>
-                        <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= body.packageQty || '' %>" placeholder="Ej: 3">
+                        <input id="package-qty" type="number" name="packageQty" min="1" max="999" step="1" value="<%= body.packageQty || '' %>" placeholder="Ej: 3" required>
+                    </div>
+                    <div class="field">
+                        <label for="volume-m3">Volumen (m³) <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></label>
+                        <input id="volume-m3" type="number" name="volumeM3" min="0.001" max="999" step="0.001" value="<%= body.volumeM3 || '' %>" placeholder="Ej: 0.05">
+                        <span class="field-hint" id="volume-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;"></span>
+                    </div>
+                    <div class="field">
+                        <label for="declared-value">Valor declarado de la mercadería ($) <span style="font-weight:400;color:var(--color-text-secondary)">(opcional, para el seguro)</span></label>
+                        <input id="declared-value" type="number" name="declaredValue" min="0" step="0.01" value="<%= body.declaredValue || '' %>" placeholder="Ej: 150000"
+                               data-seguro-pct="<%= typeof seguroPct !== 'undefined' ? seguroPct : 0 %>">
+                        <span class="field-hint" id="insurance-hint" style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;"></span>
                     </div>
                 </div>
 
-                <div id="prediction-widget" class="pred-card">
-                    <h3><span class="material-symbols-outlined">psychology</span> Predicción de entrega</h3>
-                    <div id="prediction-result"></div>
+                <div class="info-shipment">
+                    <h3>Ventana de entrega <span style="font-weight:400;color:var(--color-text-secondary)">(opcional)</span></h3>
+                    <!-- La fecha estimada la define el análisis del modelo al dar de alta
+                         (ver pantalla de análisis post-submit). Se guarda en este hidden. -->
+                    <input id="expected-date" type="hidden" name="expectedDeliveryDate" value="<%= body.expectedDeliveryDate || '' %>">
+                    <div class="field">
+                        <label for="expected-from">Desde</label>
+                        <input id="expected-from" type="time" name="expectedDeliveryFrom" value="<%= body.expectedDeliveryFrom || '' %>">
+                    </div>
+                    <div class="field">
+                        <label for="expected-to">Hasta</label>
+                        <input id="expected-to" type="time" name="expectedDeliveryTo" value="<%= body.expectedDeliveryTo || '' %>">
+                    </div>
+                </div>
+
+                <div id="cost-preview-widget" class="pred-card">
+                    <h3><span class="material-symbols-outlined">payments</span> Costo estimado del envío</h3>
+                    <div id="cost-preview-result"></div>
+                </div>
+
+                <div id="priority-conteiner" class="priority-box">
+                    <span class="priority-box-label">Prioridad inicial</span>
+                    <span id="initial-priority" class="priority-badge priority-badge--none">—</span>
                 </div>
 
                 <div class="form-actions">
-                    <a href="/shipment" class="btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn-primary">Guardar envío</button>
+                    <a href="/shipment" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar envío" aria-label="Guardar envío">
+                        <span class="material-symbols-outlined">save</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -133,13 +248,136 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>const serverErrors = <%- JSON.stringify(errors) %>;</script>
-    <script src="/js/new_shipment_popup.js" defer></script>
-    <script src="/js/theme.js" defer></script>
-    <script src="/js/ui.js" defer></script>
-    <script src="/js/prediction.js" defer></script>
-    <script src="/js/address-validation.js" defer></script>
-    <script src="/js/address-autocomplete.js" defer></script>
-    <script src="/js/document-format.js" defer></script>
-    <script src="/js/personaSugerencia.js" defer></script>
+    <script src="/js/new_shipment_popup.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/theme.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/ui.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/shipment-alta-ml.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/cost-preview.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/address-danger.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/address-validation.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/address-autocomplete.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/phone-format.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/document-format.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/personaSugerencia.js?v=<%= assetVersion %>" defer></script>
+    <script src="/js/priorityInitial.js?v=<%= assetVersion %>" defer></script>
+    <script>
+        function calcularVolumen() {
+            const peso = parseFloat(document.getElementById('weight-kg')?.value) || 0;
+            const cantidad = parseInt(document.getElementById('package-qty')?.value) || 0;
+            const volInput = document.getElementById('volume-m3');
+            const hint = document.getElementById('volume-hint');
+            if (peso > 0 && cantidad > 0) {
+                const estimado = (cantidad * peso * 0.004).toFixed(3);
+                hint.textContent = `Sugerido: ${estimado} m³ (basado en peso × cantidad)`;
+                if (!volInput.value) volInput.value = estimado;
+            }
+        }
+        document.getElementById('weight-kg')?.addEventListener('input', calcularVolumen);
+        document.getElementById('package-qty')?.addEventListener('input', calcularVolumen);
+
+        // Seguro de mercadería: muestra el importe estimado = valor declarado × % global.
+        (function setupInsuranceHint() {
+            const input = document.getElementById('declared-value');
+            const hint  = document.getElementById('insurance-hint');
+            if (!input || !hint) return;
+            const pct = parseFloat(input.dataset.seguroPct) || 0;
+            const fmt = (n) => '$' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const update = () => {
+                const val = parseFloat(input.value) || 0;
+                if (pct <= 0) { hint.textContent = 'El seguro está en 0% (configurable en Ajustes).'; return; }
+                if (val <= 0) { hint.textContent = `Seguro: ${pct}% del valor declarado.`; return; }
+                hint.textContent = `Seguro estimado: ${fmt(val * pct / 100)} (${pct}% de ${fmt(val)}).`;
+            };
+            input.addEventListener('input', update);
+            update();
+        })();
+
+        // Modalidad de entrega: toggle dirección vs sucursal de retiro
+        (function setupDeliveryMode() {
+            const radios = document.querySelectorAll('input[name="deliveryMode"]');
+            const addrSection = document.getElementById('address-section');
+            const pickupSection = document.getElementById('pickup-branch-section');
+            const addrSearch = document.getElementById('address-search');
+            const pickupSelect = document.getElementById('pickup-branch-id');
+            const pickupProvince = document.getElementById('pickup-province');
+
+            function applyMode(mode) {
+                const isPickup = mode === 'branch_pickup';
+                addrSection.style.display = isPickup ? 'none' : '';
+                pickupSection.style.display = isPickup ? '' : 'none';
+                if (addrSearch) { addrSearch.required = !isPickup; }
+                if (pickupSelect) { pickupSelect.required = isPickup; }
+            }
+
+            radios.forEach(r => r.addEventListener('change', e => applyMode(e.target.value)));
+
+            // Filtro sucursales por provincia (cliente, contra opciones renderizadas)
+            pickupProvince?.addEventListener('change', () => {
+                const pid = pickupProvince.value;
+                let firstVisible = null;
+                Array.from(pickupSelect.options).forEach(opt => {
+                    if (!opt.value) { opt.hidden = false; return; }
+                    const match = !pid || opt.dataset.province === pid;
+                    opt.hidden = !match;
+                    if (match && !firstVisible) { firstVisible = opt; }
+                });
+                if (pickupSelect.selectedOptions[0]?.hidden) {
+                    pickupSelect.value = '';
+                }
+            });
+
+            const initial = document.querySelector('input[name="deliveryMode"]:checked')?.value || 'home';
+            applyMode(initial);
+        })();
+
+        // Retiro por sucursal: estima la ventana de retiro (cuánto tiempo queda el
+        // paquete disponible en la sucursal). Días hábiles: llegada estimada +
+        // ventana de retención configurable (Ajustes → dias_retencion_sucursal).
+        (function setupPickupEstimate() {
+            const section = document.getElementById('pickup-branch-section');
+            const select  = document.getElementById('pickup-branch-id');
+            const box     = document.getElementById('pickup-info');
+            if (!section || !select || !box) { return; }
+
+            const LEAD_PICKUP_DAYS = 1; // hábiles hasta que llega a la sucursal
+            const retentionDays = parseInt(section.dataset.retentionDays, 10) || 10;
+
+            const isBusinessDay = (d) => { const w = d.getDay(); return w !== 0 && w !== 6; };
+            function addBusinessDays(from, days) {
+                const d = new Date(from); d.setHours(0, 0, 0, 0);
+                let added = 0;
+                while (added < Math.max(0, days)) { d.setDate(d.getDate() + 1); if (isBusinessDay(d)) { added++; } }
+                return d;
+            }
+            const fmt = (d) => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+            function setBox(state, html) {
+                box.className = 'addr-validation-box addr-validation-box--' + state;
+                box.innerHTML = html;
+            }
+
+            function update() {
+                if (!select.value) {
+                    setBox('empty', '<span class="material-symbols-outlined" style="font-size:1rem">schedule</span>' +
+                        '<span class="pickup-info-text">Elegí una sucursal para estimar la ventana de retiro.</span>');
+                    return;
+                }
+                const arrival = addBusinessDays(new Date(), LEAD_PICKUP_DAYS);
+                const until   = addBusinessDays(arrival, retentionDays);
+                setBox('valid',
+                    '<span class="material-symbols-outlined" style="font-size:1rem">storefront</span>' +
+                    '<span class="pickup-info-text">' +
+                    'Disponible para retiro <strong>desde el ' + fmt(arrival) + '</strong>, ' +
+                    'durante <strong>' + retentionDays + ' días hábiles</strong> (hasta el <strong>' + fmt(until) + '</strong>). ' +
+                    'Pasado ese plazo, el paquete vuelve al circuito de devolución.' +
+                    '</span>');
+            }
+
+            select.addEventListener('change', update);
+            document.querySelectorAll('input[name="deliveryMode"]').forEach(r =>
+                r.addEventListener('change', () => { if (r.value === 'branch_pickup' && r.checked) { update(); } }));
+            update();
+        })();
+    </script>
 </body>
 </html>

@@ -1,0 +1,115 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Los <a href="/transport">Transportes</a> son la flota: cada uno con conductor, capacidad y costo.</li>
+            <li>Las <a href="/zone">Zonas</a> definen la cobertura geográfica y qué envíos puede atender cada transporte.</li>
+            <li>Son <strong>prerequisito del ruteo</strong>: sin ellos, la optimización no puede asignar envíos.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Transportes</h2>
+<p>En <a href="/transport">Transportes</a> administrás los vehículos y motos de la flota. Cada transporte se asocia a un repartidor/conductor y define capacidad, costos y tipo de unidad.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/transportes-zonas/01-transportes.png',
+    alt: 'Listado de transportes con patente, peso y volumen máximo, costos, conductor, sucursal y estado',
+    caption: 'Transportes: cada unidad con patente, capacidad (peso/volumen), costos, conductor y estado habilitado/inhabilitado.'
+}) %>
+
+<ul>
+    <li>Alta, edición y baja de transportes.</li>
+    <li>Asignación de patente, tipo y repartidor responsable.</li>
+    <li>Estado activo/inactivo para incluir o excluir del ruteo.</li>
+</ul>
+
+<h2>Zonas</h2>
+<p>En <a href="/zone">Zonas</a> definís las zonas de cobertura geográfica. Cada zona agrupa códigos postales o áreas y determina qué envíos puede atender un transporte.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/transportes-zonas/02-zonas.png',
+    alt: 'Mapa de zonas de cobertura con provincias coloreadas y leyenda de zonas',
+    caption: 'Zonas: vista de mapa (o tabla) con las áreas de cobertura. Pasás el cursor por una provincia y hacés click para entrar a sus partidos.'
+}) %>
+
+<ul>
+    <li>Creación de zonas con nombre y área de cobertura.</li>
+    <li>Asociación de transportes a una o más zonas.</li>
+    <li>Impacto directo en qué envíos aparecen al optimizar rutas.</li>
+</ul>
+
+<div class="help-callout help-callout--important">
+    <span class="help-callout__icon material-symbols-outlined">priority_high</span>
+    <div class="help-callout__body">Sin transportes y zonas configurados, la optimización en <a href="/help/ruteo">Ruteo</a> no puede asignar envíos. Un transporte solo recibe envíos cuya dirección cae dentro de sus zonas asignadas.</div>
+</div>
+
+<h2>Paso a paso</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Creá las zonas</p>
+        <div class="help-steps__text">En <a href="/zone">Zonas</a>, según tu operación (por CP, barrio o región).</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Dá de alta los transportes</p>
+        <div class="help-steps__text">En <a href="/transport">Transportes</a>, con patente, tipo y repartidor asignado.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Asociá transporte y zonas</p>
+        <div class="help-steps__text">Cada transporte cubre una o más zonas.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Verificá que estén activos</p>
+        <div class="help-steps__text">Antes de ir a <a href="/route">Ruteo</a>, confirmá que los transportes estén habilitados.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Optimizá</p>
+        <div class="help-steps__text">Seleccioná envíos y el transporte correspondiente a su zona.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">schedule</span>
+    <div class="help-callout__body">Configurá transportes y zonas antes de la primera optimización del día. Es prerequisito para un ruteo eficiente.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Un envío no aparece al optimizar
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Su dirección puede quedar fuera de la zona del transporte seleccionado. Revisá la asignación zona–transporte.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El repartidor no tiene transporte
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Cada transporte debe tener conductor asignado; sin eso no puede despacharse la ruta.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Cambié zonas pero las rutas viejas no se actualizaron
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Las rutas ya despachadas mantienen su planificación. Los cambios aplican a optimizaciones nuevas.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/usuarios-ajustes"><span class="material-symbols-outlined">settings</span>Usuarios, sucursales y ajustes</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

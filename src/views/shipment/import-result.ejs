@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments-import.css">
+    <link rel="stylesheet" href="/css/shipments-restyle.css">
+    <title>Resultado de importación - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Resultado de la importación</h1>
+            <div class="page-header__actions">
+                <a href="/shipment/import/history" class="action-btn action-btn--lg action-btn--tip-bottom neutro" data-tooltip="Historial" aria-label="Historial">
+                    <span class="material-symbols-outlined">history</span>
+                </a>
+                <a href="/shipment" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver al listado" aria-label="Volver al listado">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="import-wrapper">
+
+            <% if (result.aborted) { %>
+                <!-- Importación rechazada -->
+                <div class="import-alert import-alert--error">
+                    <span class="material-symbols-outlined">block</span>
+                    <div class="alert-body">
+                        <strong>La importación fue rechazada.</strong>
+                        <ul>
+                            <% result.errors.forEach(function(e) { %>
+                                <li><%= e.message %></li>
+                            <% }) %>
+                        </ul>
+                    </div>
+                </div>
+                <div class="import-actions" style="border-top:none">
+                    <a href="/shipment/import" class="action-btn action-btn--lg buscar" data-tooltip="Probar de nuevo" aria-label="Probar de nuevo">
+                        <span class="material-symbols-outlined">upload_file</span>
+                    </a>
+                </div>
+
+            <% } else { %>
+
+                <!-- Resultado exitoso o parcial -->
+                <% const _allOk = result.imported.length > 0 && result.errors.length === 0; %>
+
+                <% if (_allOk) { %>
+                    <div class="import-card">
+                        <div class="import-success-banner">
+                            <div class="import-success-icon">
+                                <span class="material-symbols-outlined">check_circle</span>
+                            </div>
+                            <div>
+                                <h2 style="font-size:var(--font-size-xl);margin-bottom:var(--space-1)">¡Importación completada!</h2>
+                                <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">
+                                    Se crearon <strong><%= result.imported.length %></strong> envíos sin errores.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Resumen estadístico -->
+                <div class="import-summary">
+                    <div class="import-stat">
+                        <span class="material-symbols-outlined">table_rows</span>
+                        <span class="import-stat__num"><%= result.total %></span>
+                        <span class="import-stat__label">Filas procesadas</span>
+                    </div>
+                    <div class="import-stat import-stat--ok">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        <span class="import-stat__num"><%= result.imported.length %></span>
+                        <span class="import-stat__label">Envíos creados</span>
+                    </div>
+                    <div class="import-stat import-stat--err">
+                        <span class="material-symbols-outlined">cancel</span>
+                        <span class="import-stat__num"><%= result.errors.length %></span>
+                        <span class="import-stat__label">Errores</span>
+                    </div>
+                </div>
+
+                <!-- Envíos creados -->
+                <% if (result.imported.length > 0) { %>
+                    <div class="import-card">
+                        <div class="import-section-head" style="margin-bottom:var(--space-4)">
+                            <h2 class="import-section-title">
+                                <span class="material-symbols-outlined" style="color:var(--color-success)">check_circle</span>
+                                Envíos creados (<%= result.imported.length %>)
+                            </h2>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Tracking ID</th>
+                                        <th class="col-actions">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% result.imported.forEach(function(s, i) { %>
+                                        <tr>
+                                            <td class="tracking-id"><%= i + 1 %></td>
+                                            <td class="tracking-id"><%= s.trackingId %></td>
+                                            <td class="col-actions">
+                                                <a href="/shipment/detail/<%= s.id %>" class="action-btn detalle" data-tooltip="Ver detalle">
+                                                    <span class="material-symbols-outlined">info</span>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Filas con errores -->
+                <% if (result.errors.length > 0) { %>
+                    <div class="import-card">
+                        <div class="import-section-head" style="margin-bottom:var(--space-3)">
+                            <h2 class="import-section-title">
+                                <span class="material-symbols-outlined" style="color:var(--color-danger)">cancel</span>
+                                Filas con errores (<%= result.errors.length %>)
+                            </h2>
+                            <% if (reportId) { %>
+                                <a href="/shipment/import/report/<%= reportId %>" class="action-btn action-btn--lg neutro" download data-tooltip="Descargar reporte CSV" aria-label="Descargar reporte CSV">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                            <% } %>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fila</th>
+                                        <th>Campo</th>
+                                        <th>Mensaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% result.errors.forEach(function(e) { %>
+                                        <tr>
+                                            <td class="tracking-id"><%= e.row %></td>
+                                            <td><code><%= e.field %></code></td>
+                                            <td><%= e.message %></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Acciones -->
+                <div class="import-actions">
+                    <a href="/shipment/import" class="action-btn action-btn--lg neutro" data-tooltip="Importar otro archivo" aria-label="Importar otro archivo">
+                        <span class="material-symbols-outlined">upload_file</span>
+                    </a>
+                    <a href="/shipment" class="action-btn action-btn--lg buscar" data-tooltip="Ir al listado" aria-label="Ir al listado">
+                        <span class="material-symbols-outlined">list</span>
+                    </a>
+                </div>
+
+            <% } %>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

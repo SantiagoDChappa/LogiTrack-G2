@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Salida de Ruta - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/routes.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Salida de Ruta</h1>
+            <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </a>
+        </div>
+
+        <div class="page-update-wrapper">
+            <% if (error) { %>
+                <div class="update-card" style="border-left:4px solid var(--color-danger,#dc2626);">
+                    <h3><span class="material-symbols-outlined">error</span> <%= error %></h3>
+                </div>
+            <% } else if (success) { %>
+                <div class="update-card" style="border-left:4px solid #16a34a;">
+                    <h3><span class="material-symbols-outlined">check_circle</span> Ruta despachada</h3>
+                    <% if (summary) { %><p><%= decodeURIComponent(summary) %></p><% } %>
+                    <p>Los envíos asignados pasaron a <strong>En Tránsito</strong>.</p>
+                    <a href="/shipment/kanban" class="action-btn action-btn--lg buscar" data-tooltip="Ver Kanban" aria-label="Ver Kanban"><span class="material-symbols-outlined">view_kanban</span></a>
+                </div>
+            <% } else if (route) { %>
+                <div class="update-card">
+                    <h3><span class="material-symbols-outlined">local_shipping</span> Ruta #<%= route.id %></h3>
+                    <div class="detail-field"><span class="detail-label">Transporte</span><span class="detail-value"><%= route.transport ? route.transport.name : '-' %></span></div>
+                    <div class="detail-field"><span class="detail-label">Patente</span><span class="detail-value"><%= route.transport && route.transport.plate || '-' %></span></div>
+                    <div class="detail-field"><span class="detail-label">Conductor</span><span class="detail-value"><%= route.transport && route.transport.driver ? route.transport.driver.fullName : '-' %></span></div>
+                    <div class="detail-field"><span class="detail-label">Entregas</span><span class="detail-value"><%= (route.stops || []).filter(s => s.stopType === 'delivery').length %></span></div>
+
+                    <form method="POST" action="/route/scan/<%= route.id %>/dispatch" style="margin-top:var(--space-4)">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Confirmar salida (pasar envíos a En Tránsito)" aria-label="Confirmar salida (pasar envíos a En Tránsito)">
+                            <span class="material-symbols-outlined">play_arrow</span>
+                        </button>
+                    </form>
+                </div>
+            <% } %>
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

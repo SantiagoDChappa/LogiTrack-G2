@@ -8,7 +8,11 @@ server/.env
 
 # Logs
 *.log
+*.png
+# Capturas del centro de ayuda: se versionan a propósito (el manual las referencia)
+!public/images/help/**/*.png
 npm-debug.log*
+CLAUDE.MD
 
 # ML
 ml/.venv/
@@ -25,3 +29,8 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+.gemini/
+coverage/
+docs
+backups
+scripts

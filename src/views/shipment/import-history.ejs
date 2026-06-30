@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/shipments-import.css">
+    <link rel="stylesheet" href="/css/shipments-restyle.css">
+    <title>Historial de importes - LogiTrack</title>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Historial de importes</h1>
+            <a href="/shipment/import" class="action-btn action-btn--lg action-btn--tip-bottom crear" data-tooltip="Nueva importación" aria-label="Nueva importación">
+                <span class="material-symbols-outlined">upload_file</span>
+            </a>
+        </div>
+
+        <div class="import-wrapper" style="max-width:100%">
+            <% if (imports.length === 0) { %>
+                <div style="text-align:center;padding:var(--space-12) var(--space-6);color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:var(--space-4);opacity:.4">history</span>
+                    <p style="font-size:var(--font-size-sm)">No hay importaciones registradas todavía.</p>
+                    <a href="/shipment/import" class="btn-primary" style="margin-top:var(--space-4);display:inline-flex;align-items:center;gap:var(--space-2)">
+                        <span class="material-symbols-outlined">upload_file</span>Hacer primera importación
+                    </a>
+                </div>
+            <% } else { %>
+                <div class="table-wrapper">
+                    <table data-paginate="import-history">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Usuario</th>
+                                <th>Archivo</th>
+                                <th>Procesadas</th>
+                                <th>Importadas</th>
+                                <th>Duplicados</th>
+                                <th>Errores</th>
+                                <th>Forzado</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% imports.forEach(function(imp) { %>
+                                <tr>
+                                    <td>
+                                        <%= imp.createdAt
+                                            ? new Date(imp.createdAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+                                            : '-' %>
+                                    </td>
+                                    <td><%= imp.user ? imp.user.fullName : '-' %></td>
+                                    <td><%= imp.filename || '-' %></td>
+                                    <td><%= imp.totalRows %></td>
+                                    <td><%= imp.importedCount %></td>
+                                    <td><%= imp.duplicateCount || 0 %></td>
+                                    <td><%= imp.errorCount %></td>
+                                    <td><%= imp.forced ? 'Sí' : 'No' %></td>
+                                    <td>
+                                        <% if (imp.aborted) { %>
+                                            <span class="status-badge status-badge--sm cancelado">Abortado</span>
+                                        <% } else if (imp.errorCount === 0) { %>
+                                            <span class="status-badge status-badge--sm entregado">OK</span>
+                                        <% } else if (imp.importedCount === 0) { %>
+                                            <span class="status-badge status-badge--sm cancelado">Sin importar</span>
+                                        <% } else { %>
+                                            <span class="status-badge status-badge--sm en_transito">Parcial</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div><!-- /.import-wrapper -->
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

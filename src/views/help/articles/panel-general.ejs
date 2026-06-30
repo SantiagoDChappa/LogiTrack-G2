@@ -1,0 +1,94 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Al ingresar aterrizás en el <a href="/home">Panel general</a>: la foto del día de tu operación.</li>
+            <li>KPIs arriba, totales por estado, mapa de calor y actividad reciente.</li>
+            <li>Accesos rápidos para crear un envío o buscar por <a href="/help/glosario">tracking</a>/DNI.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Qué muestra</h2>
+<p>El panel de inicio (<a href="/home">/home</a>) resume la operación del día de un vistazo: indicadores clave, distribución por estado y la última actividad.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/panel-general/01-panel.png',
+    alt: 'Panel general con tarjetas de KPIs, totales por estado, mapa de calor y actividad reciente',
+    caption: 'Panel general: KPIs del día, total de envíos por estado, mapa de calor y entregas recientes.'
+}) %>
+
+<h2>Los indicadores</h2>
+<div class="help-flow">
+    <span class="help-badge"><span class="material-symbols-outlined">local_shipping</span>Envíos activos</span>
+    <span class="help-badge"><span class="material-symbols-outlined">task_alt</span>Entregas de hoy</span>
+    <span class="help-badge"><span class="material-symbols-outlined">warning</span>Alertas de demora</span>
+    <span class="help-badge"><span class="material-symbols-outlined">two_wheeler</span>Repartidores ocupados / disponibles</span>
+</div>
+<p>Más abajo vas a encontrar el <strong>total de envíos por estado</strong>, un <strong>mapa de calor</strong> de la actividad y las <strong>entregas completadas por día</strong>.</p>
+
+<h2>Paso a paso</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Ingresá al sistema</p>
+        <div class="help-steps__text">Aterrizás automáticamente en el Panel general (<a href="/home">/home</a>).</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Leé los KPIs del día</p>
+        <div class="help-steps__text">Envíos activos, entregas completadas y alertas de demora, de un vistazo.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá repartidores</p>
+        <div class="help-steps__text">Si hay repartidores con estado especial (ocupado, bloqueado por <a href="/help/glosario">fatiga</a>), hacé click para ver el detalle.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Usá los accesos rápidos</p>
+        <div class="help-steps__text">Creá un envío o abrí el listado completo en <a href="/help/envios">Envíos</a>.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">lightbulb</span>
+    <div class="help-callout__body">Supervisores y administradores también acceden desde acá a <a href="/help/reportes">reportes</a> y dashboards analíticos del menú lateral.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Los números no coinciden con el listado de envíos
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El panel muestra un resumen filtrado por sucursal y fecha; el listado puede tener filtros adicionales aplicados.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No veo la sección de repartidores
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Depende de tu rol: los operadores ven un subconjunto de información respecto a supervisores y administradores.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Alertas de demora sin acción clara
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Abrí el envío desde la alerta o buscalo por <a href="/help/glosario">tracking</a> para evaluar si requiere ruteo o una incidencia.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/envios"><span class="material-symbols-outlined">local_shipping</span>Gestión de envíos</a></li>
+    <li><a href="/help/reportes"><span class="material-symbols-outlined">bar_chart</span>Reportes y análisis</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/notificaciones"><span class="material-symbols-outlined">notifications</span>Notificaciones</a></li>
+</ul>

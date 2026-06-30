@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Optimización de Ruteo - LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/routes.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Diálogos lindos para el flujo de ruteo (con fallback a los nativos).
+        window.rtTheme = function () { return (localStorage.getItem('theme') || 'light') === 'dark'; };
+        window.rtConfirm = function (opts) {
+            opts = opts || {};
+            var dark = window.rtTheme();
+            if (window.Swal) {
+                return Swal.fire({
+                    title: opts.title || '¿Confirmás?',
+                    html: opts.html || opts.text || '',
+                    icon: opts.icon || 'question',
+                    showCancelButton: true,
+                    confirmButtonText: opts.confirmText || 'Aceptar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: dark ? '#3b82f6' : '#2563eb',
+                    cancelButtonColor: dark ? '#475569' : '#6b7280',
+                    background: dark ? '#1e293b' : '#ffffff',
+                    color: dark ? '#f1f5f9' : '#1e293b',
+                }).then(function (r) { return !!r.isConfirmed; });
+            }
+            return Promise.resolve(window.confirm(opts.text || opts.title || ''));
+        };
+        window.rtAlert = function (msg, icon) {
+            var dark = window.rtTheme();
+            if (window.Swal) {
+                return Swal.fire({
+                    html: msg, icon: icon || 'info', confirmButtonText: 'Aceptar',
+                    confirmButtonColor: dark ? '#3b82f6' : '#2563eb',
+                    background: dark ? '#1e293b' : '#ffffff', color: dark ? '#f1f5f9' : '#1e293b',
+                });
+            }
+            window.alert(typeof msg === 'string' ? msg.replace(/<[^>]+>/g, '') : msg);
+            return Promise.resolve();
+        };
+    </script>
+    <style>
+        /* Las tablas de envíos/transportes son anchas: que no se apretujen y scrolleen en pantallas chicas. */
+        #optimize-form .table-wrapper table { min-width: 760px; }
+        #optimize-form .table-wrapper th,
+        #optimize-form .table-wrapper td { white-space: nowrap; }
+        @media (max-width: 720px) {
+            #optimize-form .table-wrapper table { min-width: 640px; }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header route-optimize-header">
+            <h1>Optimizar Ruteo</h1>
+            <div style="display:flex;gap:var(--space-3);align-items:center;">
+                <%- include('../partials/page-help-btn', { helpModule: 'ruteo' }) %>
+                <a href="/route" class="action-btn action-btn--lg action-btn--tip-bottom volver" data-tooltip="Volver" aria-label="Volver">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="shipments-wrapper">
+
+            <% if (isAdmin) { %>
+            <form method="GET" action="/route/optimize" class="search-form">
+                <div class="search-fields">
+                    <div class="search-field">
+                        <label for="branchId">Sucursal</label>
+                        <select id="branchId" name="branchId" class="search-input" onchange="this.form.submit()">
+                            <option value="">— Elegir sucursal —</option>
+                            <% branches.forEach(b => { %>
+                                <option value="<%= b.id %>" <%= branchId === b.id ? 'selected' : '' %>><%= b.name %> (#<%= b.id %>)</option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+            </form>
+            <% } %>
+
+            <% if (!branchId) { %>
+                <div style="text-align:center;padding:var(--space-12) var(--space-6);color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:var(--space-4);opacity:.4">warehouse</span>
+                    <% if (isAdmin) { %>
+                        Seleccioná una sucursal para ver envíos y transportes disponibles.
+                    <% } else { %>
+                        Tu usuario no tiene sucursal asignada. Pedile al administrador que te asigne una en <strong>Ajustes → Asignación de sucursales</strong>, después cerrá sesión e iniciá de nuevo.
+                    <% } %>
+                </div>
+            <% } else if (shipments.length === 0) { %>
+                <div class="empty-row" style="padding:var(--space-8);text-align:center;color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:var(--space-2);opacity:.4">inventory_2</span>
+                    No hay envíos pendientes en esta sucursal.
+                </div>
+            <% } else if (transports.length === 0) { %>
+                <div class="empty-row" style="padding:var(--space-8);text-align:center;color:var(--color-text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:var(--space-2);opacity:.4">local_shipping</span>
+                    No hay transportes habilitados disponibles en esta sucursal.
+                </div>
+            <% } else { %>
+            <form id="optimize-form">
+
+                <!-- Envíos -->
+                <div class="update-card" id="route-optimize-shipments" style="margin-bottom:var(--space-5)">
+                    <h3><span class="material-symbols-outlined">inventory_2</span> Envíos pendientes (<%= shipments.length %>)</h3>
+                    <div class="table-wrapper" style="margin-top:var(--space-4)">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:2rem"><input type="checkbox" id="select-all-shipments"></th>
+                                    <th>Tracking</th>
+                                    <th>Prioridad</th>
+                                    <th>Destinatario</th>
+                                    <th>Zona</th>
+                                    <th>Peso (kg)</th>
+                                    <th>Volumen (m³)</th>
+                                    <th>CP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <%
+                                    const priLabels = { 1: 'Normal', 2: 'Express', 3: 'Urgente' };
+                                    const priCls    = { 1: 'inicial', 2: 'en_transito', 3: 'cancelado' };
+                                %>
+                                <% shipments.forEach(s => { %>
+                                    <% const pr = s.priority || 1; %>
+                                    <tr>
+                                        <td><input type="checkbox" name="shipmentIds" value="<%= s.id %>" class="ship-cb"></td>
+                                        <td class="tracking-id"><%= s.trackingId %></td>
+                                        <td><span class="status-badge status-badge--sm <%= priCls[pr] %>"><%= priLabels[pr] %></span></td>
+                                        <td><%= s.recipient ? s.recipient.fullName : '-' %></td>
+                                        <td><%= s.zone ? s.zone.name : '—' %></td>
+                                        <td><%= s.weightKg || '-' %></td>
+                                        <td><%= s.volumeM3 || '-' %></td>
+                                        <td class="tracking-id"><%= s.address ? s.address.postalCode : '-' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Transportes -->
+                <div class="update-card" id="route-optimize-transports" style="margin-bottom:var(--space-5)">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+                        <h3><span class="material-symbols-outlined">local_shipping</span> Transportes de la sucursal</h3>
+                        <button type="button" id="toggle-manual-tx" class="action-btn neutro" data-tooltip="Elegir transporte manualmente" aria-label="Elegir transporte manualmente">
+                            <span class="material-symbols-outlined">tune</span>
+                        </button>
+                    </div>
+                    <p id="tx-help-auto" style="font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
+                        Modo <strong>automático</strong>: el optimizador elige los transportes habilitados y libres. Los deshabilitados o con ruta activa se muestran como referencia.
+                    </p>
+                    <p id="tx-help-manual" style="display:none;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin:var(--space-2) 0 var(--space-4)">
+                        Modo <strong>manual</strong>: solo se considerarán los transportes tildados. Los no tildados quedan excluidos del optimizador.
+                    </p>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="tx-cb-col" style="display:none;width:2rem"><input type="checkbox" id="select-all-tx"></th>
+                                    <th>Nombre</th>
+                                    <th>Patente</th>
+                                    <th>Estado</th>
+                                    <th>Disponibilidad</th>
+                                    <th>Peso máx.</th>
+                                    <th>Vol. máx.</th>
+                                    <th>Costo fijo</th>
+                                    <th>$/km</th>
+                                    <th>Autonomía</th>
+                                    <th>Conductor</th>
+                                    <th>Zonas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% transports.forEach(t => { %>
+                                    <%
+                                        const isEnabled = !!t.enabled;
+                                        const ar = t.activeRoute;
+                                        const blocks = !!(ar && ar.blocks);
+                                        const usable = isEnabled && !blocks;
+                                        const rowStyle = usable ? '' : 'opacity:.6';
+                                    %>
+                                    <tr style="<%= rowStyle %>" data-tx-row="<%= t.id %>">
+                                        <td class="tx-cb-col" style="display:none">
+                                            <% if (usable) { %>
+                                                <input type="checkbox" class="tx-cb" name="transportIds" value="<%= t.id %>" checked>
+                                            <% } else { %>
+                                                <span style="color:var(--color-text-muted);font-size:.7rem">—</span>
+                                            <% } %>
+                                        </td>
+                                        <td><strong><%= t.name %></strong></td>
+                                        <td class="tracking-id"><%= t.plate || '-' %></td>
+                                        <td>
+                                            <% if (isEnabled) { %>
+                                                <span class="status-badge status-badge--sm entregado">✓ Habilitado</span>
+                                            <% } else { %>
+                                                <span class="status-badge status-badge--sm cancelado">✗ Deshabilitado</span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (!isEnabled) { %>
+                                                <span style="color:var(--color-text-muted);font-size:var(--font-size-xs)">—</span>
+                                            <% } else if (ar && ar.statusId === 2) { %>
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="El repartidor ya salió. Bloqueado hasta que termine.">
+                                                    🔒 Ruta #<%= ar.id %> (En tránsito)
+                                                </a>
+                                            <% } else if (ar && ar.piggybackable) { %>
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_sucursal" style="text-decoration:none;background:#fef3c7;color:#92400e" title="Tiene una ruta planificada. El optimizador puede sumar envíos si entran dentro de los umbrales configurados.">
+                                                    🔗 Ruta #<%= ar.id %> (Planificada · sumable)
+                                                </a>
+                                            <% } else if (ar) { %>
+                                                <a href="/route/<%= ar.id %>" class="status-badge status-badge--sm en_transito" style="text-decoration:none" title="Tiene una ruta planificada. Activar piggyback en Ajustes para permitir sumar envíos.">
+                                                    🔒 Ruta #<%= ar.id %> (Planificada)
+                                                </a>
+                                            <% } else { %>
+                                                <span class="status-badge status-badge--sm inicial">🟢 Libre</span>
+                                            <% } %>
+                                        </td>
+                                        <td><%= t.maxWeightKg %> kg</td>
+                                        <td><%= t.maxVolumeM3 %> m³</td>
+                                        <td><%= fmtMoney(t.fixedCost) %></td>
+                                        <td><%= fmtMoney(t.costPerKm) %></td>
+                                        <td><%= t.autonomyKm ? t.autonomyKm + ' km' : '—' %></td>
+                                        <td><%= t.driver ? t.driver.fullName : '-' %></td>
+                                        <td><%= (t.zones && t.zones.length) ? t.zones.map(z => z.name).join(', ') : 'Todas' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:var(--space-4);flex-wrap:wrap;padding-bottom:var(--space-6)">
+                    <div class="route-strategy">
+                        <label for="route-strategy" style="display:block;font-size:var(--font-size-xs);color:var(--color-text-secondary);margin-bottom:var(--space-1)">Estrategia de optimización</label>
+                        <select id="route-strategy" name="strategy" class="search-input">
+                            <option value="price">Menor precio (costo total)</option>
+                            <option value="time">Menor tiempo (ruta directa, vehículo más rápido)</option>
+                            <option value="balanced">Balanceado (costo y tiempo)</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="route-optimize-submit" class="action-btn action-btn--lg buscar" data-tooltip="Calcular ruta óptima" aria-label="Calcular ruta óptima">
+                        <span class="material-symbols-outlined">alt_route</span>
+                    </button>
+                </div>
+            </form>
+
+            <%- include('preview') %>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+    document.getElementById('select-all-shipments')?.addEventListener('change', e => {
+        document.querySelectorAll('.ship-cb').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    window.CURRENT_BRANCH_ID = <%= branchId ? branchId : 'null' %>;
+
+    // Toggle modo manual de transportes
+    let manualTxMode = false;
+    const allTxIds = Array.from(document.querySelectorAll('[data-tx-row]')).map(r => Number(r.dataset.txRow));
+    const toggleBtn = document.getElementById('toggle-manual-tx');
+    toggleBtn?.addEventListener('click', () => {
+        manualTxMode = !manualTxMode;
+        document.querySelectorAll('.tx-cb-col').forEach(el => { el.style.display = manualTxMode ? '' : 'none'; });
+        document.getElementById('tx-help-auto').style.display    = manualTxMode ? 'none' : '';
+        document.getElementById('tx-help-manual').style.display  = manualTxMode ? '' : 'none';
+        toggleBtn.innerHTML = manualTxMode
+            ? '<span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">auto_mode</span> Volver a modo automático'
+            : '<span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">tune</span> Elegir transporte manualmente';
+    });
+    document.getElementById('select-all-tx')?.addEventListener('change', e => {
+        document.querySelectorAll('.tx-cb').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    document.getElementById('optimize-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const shipmentIds = fd.getAll('shipmentIds');
+        if (shipmentIds.length === 0) {
+            window.rtAlert('Seleccioná al menos un envío.', 'warning');
+            return;
+        }
+        const body = {
+            shipmentIds,
+            branchId: window.CURRENT_BRANCH_ID,
+            strategy: document.getElementById('route-strategy')?.value || 'price',
+        };
+        if (manualTxMode) {
+            const selectedTx = fd.getAll('transportIds').map(Number);
+            if (selectedTx.length === 0) {
+                window.rtAlert('Modo manual activo: tildá al menos un transporte.', 'warning');
+                return;
+            }
+            body.excludeTransportIds = allTxIds.filter(id => !selectedTx.includes(id));
+        }
+        const res = await fetch('/route/optimize/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) { window.rtAlert(data.error || 'Error', 'error'); return; }
+        window.renderRoutePreview(data, { shipmentIds: shipmentIds.map(Number) });
+        setTimeout(() => {
+            document.getElementById('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,312 @@
+/* ============================================================
+   Header / Menu overlay — alineado a delivery/route.ejs
+   Carga DESPUÉS de header.css para refinar (no reemplaza).
+   ============================================================ */
+:root {
+    --mn-blue:        #2563eb;
+    --mn-blue-soft:   #3b82f6;
+    --mn-blue-dark:   #1a3566;
+    --mn-text-strong: #1a3566;
+    --mn-muted:       #64748b;
+    --mn-surface:     #ffffff;
+    --mn-surface-alt: #f8fafc;
+    --mn-border:      rgba(15, 23, 42, .08);
+    --mn-border-soft: rgba(15, 23, 42, .05);
+    --mn-glass:       rgba(255, 255, 255, .78);
+    --mn-glass-brdr:  rgba(255, 255, 255, .55);
+    --mn-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --mn-shadow-lg:   0 12px 32px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+    --mn-radius-sm:   8px;
+    --mn-radius-md:   12px;
+    --mn-radius-lg:   18px;
+    --mn-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+    --mn-sidebar-bg:  linear-gradient(180deg, #111827 0%, #0b1220 100%);
+    --mn-sidebar-accent: rgba(96, 165, 250, .14);
+}
+
+html[data-theme="dark"] {
+    --mn-text-strong: #f1f5f9;
+    --mn-muted:       #94a3b8;
+    --mn-surface:     #111827;
+    --mn-surface-alt: #0f172a;
+    --mn-border:      rgba(148, 163, 184, .18);
+    --mn-border-soft: rgba(148, 163, 184, .10);
+    --mn-glass:       rgba(17, 24, 39, .78);
+    --mn-glass-brdr:  rgba(148, 163, 184, .15);
+    --mn-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --mn-shadow-lg:   0 12px 32px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.3);
+    --mn-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+    --mn-sidebar-bg:  linear-gradient(180deg, #0f172a 0%, #060912 100%);
+    --mn-sidebar-accent: rgba(96, 165, 250, .18);
+}
+
+/* ============================================================
+   Sidebar (left-header) — gradient + glass border + better nav
+   ============================================================ */
+.left-header {
+    background: var(--mn-sidebar-bg) !important;
+    border-right: 1px solid rgba(148, 163, 184, .12);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, .12);
+}
+
+.left-header .logo {
+    padding: 1.4rem 1rem 1.15rem !important;
+    border-bottom: 1px solid rgba(148, 163, 184, .12) !important;
+    gap: .7rem;
+}
+
+.left-header .logo h1 {
+    font-weight: 700;
+    letter-spacing: -.02em;
+    background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.left-header .logo img {
+    filter: drop-shadow(0 2px 8px rgba(96, 165, 250, .35));
+    transition: transform .25s cubic-bezier(.22,1,.36,1);
+}
+
+.left-header .logo:hover img { transform: scale(1.05) rotate(-3deg); }
+
+.left-header .nav { padding: .9rem .55rem !important; }
+
+/* Incluye .nav-group-toggle: antes menu.css solo restyleaba los items normales
+   y los grupos desplegables quedaban con el estilo viejo de header.css (color/ícono
+   distintos). Ahora items y toggles comparten exactamente el mismo tamaño y estilo. */
+.left-header .nav ul,
+.left-header .nav-group-toggle {
+    border-radius: var(--mn-radius-md) !important;
+    padding: .6rem .8rem !important;
+    margin: 1px 0;
+    font-size: .88rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, .68) !important;
+    transition: background-color .18s ease, color .18s ease, transform .12s ease, box-shadow .18s ease;
+    position: relative;
+}
+
+.left-header .nav ul:hover,
+.left-header .nav-group-toggle:hover {
+    background-color: var(--mn-sidebar-accent) !important;
+    color: #fff !important;
+    transform: translateX(2px);
+}
+
+.left-header .nav ul.active {
+    background: linear-gradient(135deg, var(--mn-blue) 0%, var(--mn-blue-soft) 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .35), inset 0 1px 0 rgba(255,255,255,.15);
+    font-weight: 600;
+}
+
+.left-header .nav ul.active::before {
+    content: '';
+    position: absolute;
+    left: -.55rem;
+    top: 15%;
+    bottom: 15%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #93c5fd, #60a5fa);
+    box-shadow: 0 0 8px rgba(96, 165, 250, .6);
+}
+
+.left-header .nav ul .material-symbols-outlined,
+.left-header .nav-group-toggle > .material-symbols-outlined:first-child {
+    font-size: 1.15rem;
+    opacity: .9;
+}
+
+.left-header .theme-toggle {
+    border-top: 1px solid rgba(148, 163, 184, .12) !important;
+    padding: .9rem .55rem !important;
+}
+
+.left-header #btn-theme {
+    padding: .6rem .8rem !important;
+    border-radius: var(--mn-radius-md) !important;
+    font-weight: 500;
+    transition: background-color .18s ease, color .18s ease, transform .12s ease;
+}
+
+.left-header #btn-theme:hover {
+    background-color: var(--mn-sidebar-accent) !important;
+    color: #fff !important;
+    transform: translateX(2px);
+}
+
+/* ============================================================
+   Top header — glass + shadow
+   ============================================================ */
+.top-header {
+    background: var(--mn-glass) !important;
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border-bottom: 1px solid var(--mn-border) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.top-header > i {
+    color: var(--mn-muted) !important;
+    border-radius: var(--mn-radius-sm) !important;
+    transition: background-color .15s ease, color .15s ease, transform .12s ease;
+}
+
+.top-header > i:hover {
+    background-color: var(--mn-surface-alt) !important;
+    color: var(--mn-blue) !important;
+    transform: translateY(-1px);
+}
+
+/* User chip */
+.top-header .user {
+    border-left: 1px solid var(--mn-border) !important;
+    padding-left: clamp(.85rem, 1.2vw, 1.4rem) !important;
+    border-radius: 0;
+    transition: background-color .15s ease;
+}
+
+.top-header .user:hover { background-color: var(--mn-surface-alt); }
+
+.top-header .user .user-avatar {
+    background: linear-gradient(135deg, var(--mn-blue) 0%, var(--mn-blue-soft) 100%) !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, .35), inset 0 1px 0 rgba(255,255,255,.2);
+    font-weight: 700;
+}
+
+.top-header .user .user-name {
+    font-weight: 600 !important;
+    letter-spacing: -.005em;
+    color: var(--mn-text-strong) !important;
+}
+
+.top-header .user .user-role {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe) !important;
+    color: #1e40af !important;
+    font-weight: 700 !important;
+    font-size: .68rem !important;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .15rem .55rem !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(30, 64, 175, .12);
+}
+
+html[data-theme="dark"] .top-header .user .user-role {
+    background: linear-gradient(135deg, rgba(96, 165, 250, .18), rgba(59, 130, 246, .12)) !important;
+    color: #bfdbfe !important;
+    border-color: rgba(96, 165, 250, .25);
+}
+
+/* ============================================================
+   User dropdown — card style
+   ============================================================ */
+.user-dropdown {
+    background: var(--mn-surface) !important;
+    border: 1px solid var(--mn-border) !important;
+    border-radius: var(--mn-radius-lg) !important;
+    box-shadow: var(--mn-shadow-lg) !important;
+    overflow: hidden;
+    padding: .35rem;
+}
+
+.user-dropdown li { padding: .25rem !important; gap: 2px; }
+
+.user-dropdown ul {
+    border-radius: var(--mn-radius-sm) !important;
+    padding: .55rem .75rem !important;
+    font-weight: 500;
+    color: var(--mn-text-strong) !important;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.user-dropdown ul:hover {
+    background-color: var(--mn-surface-alt) !important;
+    color: var(--mn-blue) !important;
+}
+
+.user-dropdown ul.danger:hover {
+    background: linear-gradient(135deg, #fee2e2, #fecaca) !important;
+    color: #b91c1c !important;
+}
+
+html[data-theme="dark"] .user-dropdown ul.danger:hover {
+    background: linear-gradient(135deg, rgba(220, 38, 38, .18), rgba(185, 28, 28, .12)) !important;
+    color: #fca5a5 !important;
+}
+
+.user-dropdown .dropdown-divider {
+    background-color: var(--mn-border) !important;
+    margin: .35rem .25rem !important;
+}
+
+.user-dropdown ul .material-symbols-outlined { font-size: 1.05rem; opacity: .8; }
+
+/* ============================================================
+   Hamburger / close — subtle bg + focus ring
+   ============================================================ */
+.hamburger-btn {
+    border-radius: var(--mn-radius-sm) !important;
+    transition: background-color .15s ease, color .15s ease, transform .12s ease;
+}
+
+.hamburger-btn:hover { transform: translateY(-1px); }
+
+.hamburger-btn:focus-visible,
+.nav-close-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--mn-ring);
+}
+
+.nav-close-btn {
+    background: rgba(255, 255, 255, .08) !important;
+    border-radius: var(--mn-radius-sm) !important;
+    transition: background-color .15s ease, color .15s ease, transform .12s ease;
+}
+
+.nav-close-btn:hover {
+    background: rgba(255, 255, 255, .18) !important;
+    transform: scale(1.05);
+}
+
+/* Mobile logo */
+.logo-mobile span {
+    color: var(--mn-text-strong) !important;
+    letter-spacing: -.01em;
+}
+
+/* ============================================================
+   Nav overlay — darker + smoother
+   ============================================================ */
+.nav-overlay {
+    background-color: rgba(0, 0, 0, .55) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: opacity .28s cubic-bezier(.22,1,.36,1) !important;
+}
+
+/* Mobile drawer smoother slide */
+@media (max-width: 1024px) {
+    .left-header {
+        transition: transform .32s cubic-bezier(.22,1,.36,1) !important;
+        box-shadow: 4px 0 32px rgba(0, 0, 0, .35);
+    }
+}
+
+/* ============================================================
+   Top-header form (search) — focus ring estándar
+   ============================================================ */
+.top-header form input[type="text"] {
+    background-color: var(--mn-surface-alt) !important;
+    border: 1px solid var(--mn-border) !important;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.top-header form input[type="text"]:focus {
+    border-color: var(--mn-blue) !important;
+    box-shadow: var(--mn-ring) !important;
+    background-color: var(--mn-surface) !important;
+}

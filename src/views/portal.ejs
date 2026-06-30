@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= support.nombre %> - Seguimiento de Envios</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+
+    <nav class="portal-nav">
+        <a href="/" class="portal-brand">
+            <img src="/images/logo.png" alt="<%= support.nombre %>" class="portal-logo">
+            <span><%= support.nombre %></span>
+        </a>
+        <div class="portal-nav-right">
+            <a href="/portal/cotizar" class="portal-nav-link">
+                <span class="material-symbols-outlined">calculate</span>
+                Cotizar envío
+            </a>
+            <a href="/portal/mis-envios" class="portal-nav-link">
+                <span class="material-symbols-outlined">inventory_2</span>
+                Portal autogestivo
+            </a>
+            <button id="btn-theme" class="portal-theme-btn" aria-label="Cambiar tema">
+                <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
+                <span id="theme-label">Modo claro</span>
+            </button>
+            <a href="/login" class="portal-nav-login">
+                <span class="material-symbols-outlined">lock</span>
+                Acceso Empresas
+            </a>
+        </div>
+    </nav>
+
+    <section class="portal-hero">
+        <div class="portal-hero-wrapper">
+            <aside class="portal-search-panel">
+                <h2 class="portal-search-panel-title">Rastrear Envio</h2>
+                <form class="portal-search-form" id="portal-search-form" action="/" method="GET">
+                    <div class="portal-search-field">
+                        <label for="tracking" class="portal-search-label">Numero de Seguimiento</label>
+                        <input
+                            type="text"
+                            id="tracking"
+                            name="q"
+                            class="portal-search-input-field"
+                            placeholder="Ej: ENV-001"
+                            value="<%= /^\d+$/.test(query || '') ? '' : (query || '') %>"
+                            autocomplete="off"
+                            autofocus
+                        >
+                        <span class="portal-search-help">Formato: ENV-XXX</span>
+                    </div>
+
+                    <div class="portal-search-divider">O</div>
+
+                    <div class="portal-search-field">
+                        <label for="document" class="portal-search-label">DNI del Destinatario</label>
+                        <input
+                            type="text"
+                            id="document"
+                            name="q"
+                            class="portal-search-input-field"
+                            placeholder="Ej: 12345678"
+                            value="<%= /^\d+$/.test(query || '') ? (query || '') : '' %>"
+                            autocomplete="off"
+                        >
+                        <span class="portal-search-help">Sin puntos ni guiones</span>
+                    </div>
+
+                    <button type="submit" class="portal-search-panel-btn">
+                        <span class="material-symbols-outlined">search</span>
+                        Rastrear
+                    </button>
+                </form>
+            </aside>
+
+            <div class="portal-hero-content">
+                <p class="portal-hero-label">Zona de Seguimiento</p>
+                <h1 class="portal-hero-title">Seguimiento de Envios</h1>
+                <p class="portal-hero-sub">Ingresa tu numero de seguimiento o DNI del destinatario para rastrear tu paquete en tiempo real.</p>
+                <a href="/portal/cotizar" class="portal-hero-quote-btn">
+                    <span class="material-symbols-outlined">calculate</span>
+                    ¿Cuánto sale tu envío? Cotizalo
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <% if (typeof searched !== 'undefined' && searched) { %>
+    <section class="portal-results" id="portal-results-section">
+        <div class="portal-results-inner">
+
+            <% if (typeof error !== 'undefined' && error) { %>
+            <div class="portal-empty">
+                <span class="material-symbols-outlined portal-empty-icon">search_off</span>
+                <% if (searchType === 'dni') { %>
+                    <h2>No encontramos envios con el DNI <strong><%= query %></strong></h2>
+                    <p>Verifica que el numero de documento sea correcto e intenta de nuevo.</p>
+                <% } else { %>
+                    <h2>No encontramos envios con el codigo <strong><%= query %></strong></h2>
+                    <p>Verifica el numero de seguimiento e intenta de nuevo.</p>
+                <% } %>
+            </div>
+
+            <% } else { %>
+
+            <h2 class="portal-results-title">
+                <% if (shipments.length === 1) { %>
+                    Resultado para <strong><%= query %></strong>
+                <% } else { %>
+                    <%= shipments.length %> resultados para <strong><%= query %></strong>
+                <% } %>
+            </h2>
+
+            <div class="portal-cards">
+                <% shipments.forEach(function(s) { %>
+                <%
+                    const sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                    const statusLabels = {
+                        pendiente: 'Pendiente',
+                        asignado: 'Asignado',
+                        en_preparacion: 'En Preparacion',
+                        en_transito: 'En Transito',
+                        intento_fallido: 'Intento Fallido',
+                        paquete_fallido: 'Paquete Fallido',
+                        entregado: 'Entregado',
+                        cancelado: 'Cancelado',
+                        cancelada: 'Cancelada',
+                        retrasado: 'Retrasado',
+                        en_sucursal: 'En Sucursal',
+                        inicial: 'Inicial'
+                    };
+                    const statusLabel = statusLabels[sk] || s.status.description;
+
+                    const isCancelled = sk === 'cancelado' || sk === 'cancelada';
+                    const isDelayed = sk === 'retrasado';
+                %>
+                <div class="portal-card" id="portal-shipment-<%= s.id %>">
+                    <div class="portal-card-header">
+                        <div class="portal-card-tracking">
+                            <span class="portal-card-tracking-label">N de seguimiento</span>
+                            <span class="portal-card-tracking-id"><%= s.trackingId %></span>
+                        </div>
+                        <span class="portal-badge <%= sk %>"><%= statusLabel %></span>
+                    </div>
+
+                    <div class="portal-timeline">
+                        <% const timelineSteps = isCancelled
+                               ? ['pendiente', 'en_transito', 'en_sucursal', 'cancelado']
+                               : ['pendiente', 'en_transito', 'en_sucursal', 'entregado'];
+                           const timelineLabels = isCancelled
+                               ? ['Confirmado', 'En Transito', 'En Sucursal', 'Cancelado']
+                               : ['Confirmado', 'En Transito', 'En Sucursal', 'Entregado'];
+                           const timelineIcons = isCancelled
+                               ? ['check_circle', 'local_shipping', 'warehouse', 'cancel']
+                               : ['check_circle', 'local_shipping', 'warehouse', 'home'];
+                           const statusToStep = {
+                               pendiente: 'pendiente',
+                               confirmado: 'pendiente',
+                               inicial: 'pendiente',
+                               asignado: 'pendiente',
+                               en_preparacion: 'pendiente',
+                               en_transito: 'en_transito',
+                               en_sucursal: 'en_sucursal',
+                               intento_fallido: 'en_transito',
+                               paquete_fallido: 'en_transito',
+                               entregado: 'entregado',
+                               cancelado: 'cancelado',
+                               cancelada: 'cancelado'
+                           };
+                           const currentStep = statusToStep[sk] || 'pendiente';
+                           let activeIdx = timelineSteps.indexOf(currentStep);
+                           if (activeIdx === -1) activeIdx = isCancelled ? timelineSteps.length - 1 : (isDelayed ? 1 : 0);
+                           const stepDates = {};
+                           if (s.history) {
+                               s.history.forEach(function(h) {
+                                   const desc = h.toStatus.description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
+                                   const mapped = statusToStep[desc];
+                                   if (mapped && !stepDates[mapped]) {
+                                       stepDates[mapped] = new Date(h.changedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                                   }
+                               });
+                           }
+                        %>
+                        <% timelineSteps.forEach(function(step, i) { %>
+                        <% const stepClass = i < activeIdx ? 'done' : (i === activeIdx ? (isCancelled && i === timelineSteps.length - 1 ? 'cancelled' : 'active') : ''); %>
+                        <div class="portal-timeline-step <%= stepClass %>">
+                            <div class="portal-timeline-circle">
+                                <span class="material-symbols-outlined"><%= timelineIcons[i] %></span>
+                            </div>
+                            <% if (i < timelineSteps.length - 1) { %>
+                            <div class="portal-timeline-line <%= i < activeIdx ? 'done' : '' %>"></div>
+                            <% } %>
+                            <span class="portal-timeline-label"><%= timelineLabels[i] %></span>
+                            <span class="portal-timeline-date"><%= stepDates[step] ? stepDates[step] : (i <= activeIdx ? '' : 'Pendiente') %></span>
+                        </div>
+                        <% }); %>
+                    </div>
+
+                    <div class="portal-card-grid">
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Destinatario</span>
+                            <span class="portal-card-value"><%= s.recipient ? s.recipient.fullName : '—' %></span>
+                        </div>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Tipo de envio</span>
+                            <span class="portal-card-value"><%= s.shipmentType ? s.shipmentType.description : '-' %></span>
+                        </div>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Modalidad</span>
+                            <span class="portal-card-value">
+                                <%= s.deliveryMode === 'branch_pickup' ? 'Retiro por sucursal' : 'Envío a domicilio' %>
+                            </span>
+                        </div>
+                        <% if (s.deliveryMode === 'branch_pickup' && s.pickupBranch) { %>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Sucursal de retiro</span>
+                            <span class="portal-card-value">
+                                <strong><%= s.pickupBranch.name %></strong><br>
+                                <%= s.pickupBranch.address %>
+                                <% if (s.pickupBranch.phone) { %> · <%= s.pickupBranch.phone %><% } %>
+                            </span>
+                        </div>
+                        <% } else { %>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Destino</span>
+                            <span class="portal-card-value"><%= s.address.province ? s.address.province.description : '-' %></span>
+                        </div>
+                        <% } %>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Peso / Bultos</span>
+                            <span class="portal-card-value">
+                                <%= s.weightKg ? Number(s.weightKg).toFixed(2) + ' kg' : '-' %>
+                                <% if (s.packageQty) { %> · <%= s.packageQty %> bulto<%= s.packageQty > 1 ? 's' : '' %><% } %>
+                            </span>
+                        </div>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Fecha de ingreso</span>
+                            <span class="portal-card-value"><%= new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }) %></span>
+                        </div>
+                        <div class="portal-card-field">
+                            <span class="portal-card-label">Remitente</span>
+                            <span class="portal-card-value"><%= s.sender ? s.sender.fullName : '—' %></span>
+                        </div>
+                    </div>
+
+                    <!-- Última Milla: franja horaria de llegada (se rellena por JS si hay ETA). -->
+                    <div id="portal-eta-<%= s.id %>" class="portal-eta-box" style="display:none;margin-top:.75rem;padding:.85rem 1rem;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;">
+                        <span style="font-size:1.25rem;line-height:1;">🛵</span>
+                        <span class="portal-eta-text" style="margin-left:.5rem;font-weight:600;color:#1e3a8a;"></span>
+                    </div>
+
+                    <!-- Última Milla: chat con el repartidor (visible sólo si está abierto). -->
+                    <div id="portal-chat-<%= s.id %>" class="portal-chat-box" data-tracking="<%= s.trackingId %>" style="display:none;margin-top:.75rem;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+                        <div style="background:#1e3a8a;color:#fff;padding:.55rem .9rem;font-weight:600;font-size:.9rem;">💬 Chat con el repartidor</div>
+                        <div class="portal-chat-msgs" style="max-height:220px;overflow-y:auto;padding:.6rem .9rem;display:flex;flex-direction:column;gap:.4rem;background:#f8fafc;"></div>
+                        <form class="portal-chat-form" style="display:flex;gap:.4rem;padding:.6rem;border-top:1px solid #e2e8f0;">
+                            <input type="text" class="portal-chat-input" maxlength="1000" placeholder="Escribí un mensaje…" autocomplete="off" style="flex:1;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.9rem;">
+                            <button type="submit" style="padding:.5rem 1rem;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">Enviar</button>
+                        </form>
+                    </div>
+
+                    <% if (s.mapStops && s.mapStops.length >= 1) { %>
+                    <div class="portal-map-section">
+                        <span class="portal-history-title">Recorrido</span>
+                        <div id="portal-map-<%= s.id %>" class="portal-map" style="height:300px;border-radius:10px;overflow:hidden;border:1px solid var(--color-border, #e2e8f0);margin-top:.5rem;"></div>
+                    </div>
+                    <% } %>
+
+                    <% if (s.history && s.history.length > 0) { %>
+                    <div class="portal-history">
+                        <span class="portal-history-title">Historial de estados</span>
+                        <ul class="portal-history-list">
+                            <% s.history.forEach(function(h) { %>
+                            <li class="portal-history-item">
+                                <span class="portal-history-date"><%= new Date(h.changedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                                <% if (h.fromStatus) { %>
+                                    <span class="portal-history-from"><%= h.fromStatus.description %></span>
+                                    <span class="material-symbols-outlined portal-history-arrow">arrow_forward</span>
+                                <% } %>
+                                <span class="portal-history-to"><%= h.toStatus.description %></span>
+                                <% if (h.comment) { %><span class="portal-history-comment"><%= h.comment %></span><% } %>
+                            </li>
+                            <% }); %>
+                        </ul>
+                    </div>
+                    <% } %>
+
+                    <!-- US-E05: incidencias del envío — card estilo "detalle de envío" -->
+                    <% var _incs = (s.incidents && s.incidents.length) ? s.incidents : []; %>
+                    <div class="portal-incidents-card">
+                        <h3 class="portal-incidents-card__title">
+                            <span class="material-symbols-outlined">report</span>
+                            Incidencias de tu envío<% if (_incs.length) { %> <span class="portal-incidents-card__count">(<%= _incs.length %>)</span><% } %>
+                        </h3>
+                        <% if (_incs.length) { %>
+                        <div class="portal-incidents-list">
+                            <% _incs.forEach(function(inc) {
+                                var _sk = inc.statusLabel === 'Cerrada' ? 'closed' : (inc.statusLabel === 'En revisión' ? 'in_review' : 'open');
+                            %>
+                            <a href="/portal/mis-envios/incidencia/<%= inc.id %>" class="portal-incident-row">
+                                <span class="portal-incident-id">#<%= inc.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= inc.typeLabel %></span>
+                                    <% if (inc.resolutionLabel) { %><span class="portal-incident-resolution">Resolución: <%= inc.resolutionLabel %><% if (inc.closedAtLabel) { %> · <%= inc.closedAtLabel %><% } %></span><% } %>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= _sk %>"><%= inc.statusLabel %></span>
+                                <span class="portal-incident-date"><%= inc.createdAtLabel %></span>
+                                <span class="material-symbols-outlined portal-incident-arrow" aria-hidden="true">chevron_right</span>
+                            </a>
+                            <% }); %>
+                        </div>
+                        <small class="portal-incidents-card__hint">Tocá una incidencia para ver su detalle (te pedimos validar DNI + email).</small>
+                        <% } else { %>
+                        <div class="portal-incidents-empty">
+                            <span class="material-symbols-outlined">inbox</span>
+                            <p>Sin incidencias registradas para este envío.</p>
+                        </div>
+                        <% } %>
+                    </div>
+
+                    <!-- Devoluciones del envío -->
+                    <% var _rets = (s.returns && s.returns.length) ? s.returns : []; %>
+                    <% if (_rets.length) { %>
+                    <div class="portal-incidents-card" style="margin-top:.75rem;">
+                        <h3 class="portal-incidents-card__title">
+                            <span class="material-symbols-outlined" style="color:var(--c-primary);">assignment_return</span>
+                            Devoluciones <span class="portal-incidents-card__count">(<%= _rets.length %>)</span>
+                        </h3>
+                        <div class="portal-incidents-list">
+                            <% _rets.forEach(function(r) { %>
+                            <div class="portal-incident-row" style="cursor:default;">
+                                <span class="portal-incident-id">#<%= r.id %></span>
+                                <span class="portal-incident-main">
+                                    <span class="portal-incident-type"><%= r.reasonLabel %></span>
+                                </span>
+                                <span class="portal-incident-badge portal-incident-badge--<%= r.status.toLowerCase() %>"><%= r.statusLabel %></span>
+                                <span class="portal-incident-date"><%= new Date(r.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></span>
+                            </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <!-- US-C02: seguimiento de recuperación / reprogramación -->
+                    <% if (s.recovery && s.recovery.length > 0) { %>
+                    <div class="portal-history portal-recovery">
+                        <span class="portal-history-title">Seguimiento de recuperación</span>
+                        <ul class="portal-history-list">
+                            <% s.recovery.forEach(function(r) { %>
+                            <li class="portal-history-item">
+                                <span class="portal-history-date"><%= r.attemptDateLabel %></span>
+                                <span class="portal-history-to">Intento de entrega</span>
+                                <% if (r.reason) { %><span class="portal-history-comment">Motivo: <%= r.reason %></span><% } %>
+                                <% if (r.rescheduledDateLabel) { %><span class="portal-history-comment">Reprogramado para: <%= r.rescheduledDateLabel %></span>
+                                <% } else if (r.suggestedDateLabel) { %><span class="portal-history-comment">Fecha sugerida: <%= r.suggestedDateLabel %></span><% } %>
+                            </li>
+                            <% }); %>
+                        </ul>
+                    </div>
+                    <% } %>
+
+                    <!-- Reportar incidencia -->
+                    <div class="portal-card-incident-cta">
+                        <a href="/portal/incident/new?trackingId=<%= encodeURIComponent(s.trackingId) %>">
+                            <span class="material-symbols-outlined">report</span>
+                            Reportar incidencia
+                        </a>
+                    </div>
+                </div>
+                <% }); %>
+            </div>
+
+            <% } %>
+        </div>
+    </section>
+    <% } %>
+
+    <section class="portal-faq" id="portal-faq-section">
+        <div class="portal-faq-inner">
+            <div class="portal-faq-col">
+                <h2 class="portal-faq-title">Preguntas frecuentes</h2>
+
+                <details class="portal-faq-item">
+                    <summary>Como funciona el seguimiento?</summary>
+                    <p>Ingresa el numero de seguimiento que figura en tu comprobante de envio (formato ENV-XXX) o el DNI del destinatario. El sistema te mostrara el estado actualizado del paquete.</p>
+                </details>
+                <details class="portal-faq-item">
+                    <summary>Que significan los estados?</summary>
+                    <ul>
+                        <li><strong>Confirmado / Pendiente:</strong> El envio fue registrado en el sistema.</li>
+                        <li><strong>En Transito:</strong> El paquete esta en camino.</li>
+                        <li><strong>En Sucursal:</strong> El paquete llego a un centro de distribucion.</li>
+                        <li><strong>Entregado:</strong> El paquete fue recibido por el destinatario.</li>
+                        <li><strong>Retrasado:</strong> Hay una demora en la entrega.</li>
+                    </ul>
+                </details>
+                <details class="portal-faq-item">
+                    <summary>Donde encuentro mi numero de seguimiento?</summary>
+                    <p>El numero figura en el comprobante que te entrego el remitente o en el email de confirmacion. Tiene el formato <strong>ENV-001</strong>.</p>
+                </details>
+                <details class="portal-faq-item">
+                    <summary>Puedo buscar por DNI?</summary>
+                    <p>Si, ingresa el numero de documento del destinatario sin puntos ni guiones para ver todos los envios asociados.</p>
+                </details>
+            </div>
+
+<div class="portal-faq-col portal-contact" id="portal-support-section">
+                <h2 class="portal-faq-title">Contacto y soporte</h2>
+                <div class="portal-contact-item">
+                    <span class="material-symbols-outlined">support_agent</span>
+                    <div>
+                        <strong>Atencion al cliente</strong>
+                        <span><%= support.hours %></span>
+                    </div>
+                </div>
+                <% if (support.telefono) { %>
+                <div class="portal-contact-item">
+                    <span class="material-symbols-outlined">phone</span>
+                    <div>
+                        <strong>Teléfono</strong>
+                        <span><%= support.telefono %></span>
+                    </div>
+                </div>
+                <% } %>
+                <div class="portal-contact-item">
+                    <span class="material-symbols-outlined">mail</span>
+                    <div>
+                        <strong>Email</strong>
+                        <span><%= support.email %></span>
+                    </div>
+                </div>
+                <div class="portal-contact-item">
+                    <span class="material-symbols-outlined">business</span>
+                    <div>
+                        <strong>¿Sos empresa?</strong>
+                        <a href="/login">Accedé al panel empresarial</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <%- include('partials/portal-chatbot', { chatbotData }) %>
+
+    <footer class="portal-footer">
+        <div class="portal-footer-inner">
+            <div class="portal-footer-brand">
+                <img src="/images/logo.png" alt="<%= support.nombre %>" class="portal-logo">
+                <span><%= support.nombre %></span>
+            </div>
+            <div class="portal-footer-links">
+                <a href="#">Aviso de privacidad</a>
+                <a href="#">Términos y condiciones</a>
+                <a href="#">Sobre <%= support.nombre %></a>
+            </div>
+            <p class="portal-footer-copy">© <%= new Date().getFullYear() %> <%= support.nombre %>. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/portal-chatbot.js" defer></script>
+    <% if (typeof shipments !== 'undefined' && shipments && shipments.length) { %>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    (function(){
+        const data = <%- JSON.stringify(shipments.map(s => ({ id: s.id, trackingId: s.trackingId, stops: s.mapStops || [], activeRouteId: s.activeRouteId || null }))) %>;
+        data.forEach(item => {
+            // Última Milla: box de franja horaria. Vive aunque no haya mapa; se oculta si no
+            // hay ETA (envío sin ruta activa). Se recalcula solo: si el repartidor se atrasa,
+            // el texto cambia a disculpa + nuevo tope.
+            const etaBox = document.getElementById('portal-eta-' + item.id);
+            if (etaBox) {
+                const etaText = etaBox.querySelector('.portal-eta-text');
+                const updateEta = () => {
+                    fetch('/delivery/eta/shipment/' + item.id)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(e => {
+                            if (!e || !e.text) { etaBox.style.display = 'none'; return; }
+                            etaText.textContent = e.text;
+                            etaBox.style.display = 'block';
+                            etaBox.style.background = e.delayed ? '#fef3c7' : '#eff6ff';
+                            etaBox.style.borderColor = e.delayed ? '#fcd34d' : '#bfdbfe';
+                            etaText.style.color = e.delayed ? '#92400e' : '#1e3a8a';
+                        }).catch(() => {});
+                };
+                updateEta();
+                setInterval(updateEta, 20000);
+            }
+
+            // Última Milla: chat cliente↔repartidor. Polling cada 5s. Se muestra sólo si el
+            // chat está abierto; al cerrarse (entrega completada) deja de mostrarse.
+            const chatBox = document.getElementById('portal-chat-' + item.id);
+            if (chatBox) {
+                const tracking = chatBox.getAttribute('data-tracking');
+                const msgsEl = chatBox.querySelector('.portal-chat-msgs');
+                const form = chatBox.querySelector('.portal-chat-form');
+                const input = chatBox.querySelector('.portal-chat-input');
+                let lastId = 0;
+                const append = (m) => {
+                    const mine = m.role === 'CLIENT';
+                    const row = document.createElement('div');
+                    row.style.cssText = 'align-self:' + (mine ? 'flex-end' : 'flex-start') + ';max-width:80%;padding:.4rem .65rem;border-radius:10px;font-size:.88rem;background:' + (mine ? '#dbeafe' : '#fff') + ';border:1px solid ' + (mine ? '#bfdbfe' : '#e2e8f0') + ';';
+                    row.textContent = m.body;
+                    msgsEl.appendChild(row);
+                    if (m.id > lastId) lastId = m.id;
+                };
+                const poll = () => {
+                    fetch('/delivery/chat/track/' + encodeURIComponent(tracking) + '/messages?since=' + lastId)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(t => {
+                            if (!t) return;
+                            if (t.open) {
+                                chatBox.style.display = 'block';
+                                (t.messages || []).forEach(append);
+                                if (t.messages && t.messages.length) msgsEl.scrollTop = msgsEl.scrollHeight;
+                            } else {
+                                chatBox.style.display = 'none';
+                            }
+                        }).catch(() => {});
+                };
+                form.addEventListener('submit', (ev) => {
+                    ev.preventDefault();
+                    const body = input.value.trim();
+                    if (!body) return;
+                    input.value = '';
+                    fetch('/delivery/chat/track/' + encodeURIComponent(tracking) + '/messages', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ body }),
+                    }).then(r => r.ok ? r.json() : null).then(m => { if (m) { append(m); msgsEl.scrollTop = msgsEl.scrollHeight; } }).catch(() => {});
+                });
+                poll();
+                setInterval(poll, 5000);
+            }
+
+            if (!item.stops.length) return;
+            const el = document.getElementById('portal-map-' + item.id);
+            if (!el) return;
+            const map = L.map(el).setView([item.stops[0].lat, item.stops[0].lng], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+            const colors = { origin: '#16a34a', transit: '#2563eb', pod: '#dc2626', destination: '#94a3b8' };
+            const labels = { origin: 'Origen', transit: 'En transito', pod: 'Entregado', destination: 'Destino' };
+            const latlngs = [];
+            item.stops.forEach(s => {
+                L.circleMarker([s.lat, s.lng], { radius: 8, color: '#fff', weight: 2, fillColor: colors[s.type] || '#666', fillOpacity: 1 })
+                    .bindPopup('<b>' + (labels[s.type] || s.type) + '</b><br>' + (s.label || ''))
+                    .addTo(map);
+                latlngs.push([s.lat, s.lng]);
+            });
+            if (latlngs.length === 1) {
+                map.setView(latlngs[0], 13);
+                return;
+            }
+            const fallback = L.polyline(latlngs, { color: '#888', weight: 3, dashArray: '6 6', opacity: 0.5 }).addTo(map);
+            map.fitBounds(latlngs, { padding: [25,25] });
+            const coordsStr = latlngs.map(([la, ln]) => ln + ',' + la).join(';');
+            fetch('https://router.project-osrm.org/route/v1/driving/' + coordsStr + '?overview=full&geometries=geojson')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => {
+                    if (!d || !d.routes || !d.routes[0]) return;
+                    const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
+                    map.removeLayer(fallback);
+                    L.polyline(poly, { color: '#1e88e5', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(poly, { padding: [25,25] });
+                }).catch(() => {});
+
+            if (item.activeRouteId) {
+                let liveMarker = null;
+                const truckIcon = L.divIcon({
+                    html: '<div style="background:#f59e0b;border:3px solid #fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.4)">🚚</div>',
+                    className: '', iconSize: [28,28], iconAnchor: [14,14],
+                });
+                const updateLive = () => {
+                    fetch('/delivery/position/route/' + item.activeRouteId)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(p => {
+                            if (!p || !p.lat) return;
+                            if (liveMarker) liveMarker.setLatLng([p.lat, p.lng]);
+                            else liveMarker = L.marker([p.lat, p.lng], { icon: truckIcon }).addTo(map).bindPopup('Repartidor en camino');
+                        }).catch(() => {});
+                };
+                updateLive();
+                setInterval(updateLive, 20000);
+            }
+        });
+    })();
+    </script>
+    <% } %>
+</body>
+</html>

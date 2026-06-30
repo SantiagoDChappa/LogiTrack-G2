@@ -1,0 +1,92 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>El <a href="/shipment/kanban">Kanban</a> muestra los envíos en columnas según su estado.</li>
+            <li>Sirve para ver el flujo del día de un vistazo y detectar cuellos de botella.</li>
+            <li>Arrastrá una tarjeta a otra columna para cambiarle el estado.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Para qué sirve</h2>
+<p>El <a href="/shipment/kanban">Kanban</a> es la vista operativa de los envíos activos. Cada columna es un estado y cada tarjeta, un envío. De un vistazo ves dónde se acumula el trabajo del día.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/kanban/01-tablero.png',
+    alt: 'Tablero Kanban con columnas por estado (Pendiente, Asignado, En Preparación, En Tránsito) y tarjetas de envío',
+    caption: 'Tablero Kanban: contadores por estado arriba y las tarjetas de cada envío en su columna.'
+}) %>
+
+<h2>Cómo leer el tablero</h2>
+<ul>
+    <li><strong>Contadores superiores</strong> — cantidad de envíos en cada estado (Pendiente, Asignado, En Preparación, En Tránsito, etc.).</li>
+    <li><strong>Columnas</strong> — cada una es un estado; recorrelas de izquierda a derecha para seguir el flujo.</li>
+    <li><strong>Tarjetas</strong> — muestran el código de <a href="/help/glosario">tracking</a>, el destinatario y el repartidor asignado.</li>
+    <li><strong>Filtros</strong> — por sucursal, repartidor o búsqueda de tracking, y un toggle para mostrar intentos/paquetes fallidos.</li>
+</ul>
+
+<h2>Mover un envío de estado</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Abrí el Kanban</p>
+        <div class="help-steps__text">Entrá a <a href="/shipment/kanban">Kanban</a> desde el menú lateral.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Ubicá el envío</p>
+        <div class="help-steps__text">Usá los filtros (sucursal, repartidor o tracking) para encontrarlo rápido.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Arrastrá la tarjeta</p>
+        <div class="help-steps__text">Soltala en la columna del nuevo estado. El cambio queda registrado en la trazabilidad del envío.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Abrí el detalle si necesitás más</p>
+        <div class="help-steps__text">Tocá <strong>Ver detalle</strong> para acciones puntuales (asignar, cancelar, despachar).</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">tour</span>
+    <div class="help-callout__body">En el Kanban hay un ícono <strong>tour</strong> en la barra superior que recorre columnas, tarjetas y atajos de la vista.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Faltan envíos en el tablero
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Revisá el filtro de sucursal y la búsqueda activa. Los envíos en estados terminales (Entregado, Cancelado) no se muestran en el tablero operativo.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Necesito buscar o exportar muchos envíos
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El Kanban es una vista visual del pipeline, no para cargas masivas. Para búsquedas puntuales o exportación usá el listado de <a href="/help/envios">Envíos</a>.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Tengo envíos listos para salir a reparto
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Cuando una columna de envíos listos se acumula, pasá a <a href="/help/ruteo">Ruteo</a> para asignarlos a un transporte y despachar la ruta.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/envios"><span class="material-symbols-outlined">local_shipping</span>Gestión de envíos</a></li>
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/panel-general"><span class="material-symbols-outlined">dashboard</span>Panel general (Inicio)</a></li>
+</ul>

@@ -1,0 +1,120 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>La barra de búsqueda vive en el header, en cualquier pantalla.</li>
+            <li>Atajo: <strong>Ctrl + K</strong> (o <strong>Cmd + K</strong> en Mac) para enfocarla al instante.</li>
+            <li>Escribí <strong>2+ caracteres</strong> y los resultados se agrupan por tipo (envíos, incidencias, rutas…).</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Dónde está</h2>
+<p>La barra de búsqueda está en el header superior, junto a la campana de <a href="/help/notificaciones">notificaciones</a>. La tenés disponible desde cualquier pantalla.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/busqueda-universal/01-barra.png',
+    alt: 'Barra de búsqueda en el header superior de la aplicación',
+    caption: 'La búsqueda está siempre a mano en la barra superior. Usá Ctrl+K para enfocarla sin el mouse.'
+}) %>
+
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">keyboard</span>
+    <div class="help-callout__body">Atajo: <strong>Ctrl + K</strong> (Windows/Linux) o <strong>Cmd + K</strong> (Mac) enfoca la búsqueda desde cualquier pantalla.</div>
+</div>
+
+<h2>Qué podés buscar</h2>
+<p>Los resultados se agrupan por categoría (hasta 6 por tipo). Si hay más coincidencias, aparece <strong>Ver todos →</strong> para ir al listado filtrado de esa sección.</p>
+
+<ul>
+    <li><strong>Envíos</strong> — por código de <a href="/help/glosario">tracking</a>, <strong>legacy ID</strong> (importación CSV), nombre del destinatario o remitente.</li>
+    <li><strong>Incidencias</strong> — por número, código de envío asociado o <strong>tipo de incidencia</strong> (ej. daño, retraso).</li>
+    <li><strong>Rutas</strong> — por número de ruta o nombre del repartidor (supervisor, operador y administrador).</li>
+    <li><strong>Devoluciones</strong> — incidencias tipo <a href="/help/glosario">RETURN</a> vinculadas a envíos (supervisor y administrador).</li>
+    <li><strong>Modificaciones portal</strong> — solicitudes de cambio hechas por clientes (tracking, DNI, email o destinatario).</li>
+    <li><strong>Clientes portal</strong> — personas con envíos asociados por documento, email o nombre.</li>
+    <li><strong>Usuarios</strong> — por nombre, email o documento (administrador).</li>
+</ul>
+
+<%- include('../partials/figure', {
+    src: '/images/help/busqueda-universal/02-resultados.png',
+    alt: 'Panel de resultados de la búsqueda mostrando envíos agrupados con su estado',
+    caption: 'Resultados en vivo: cada ítem muestra el tipo, el estado y dónde coincidió tu búsqueda.'
+}) %>
+
+<h2>Paso a paso</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Enfocá la barra</p>
+        <div class="help-steps__text">Usá <strong>Ctrl+K</strong> o hacé click en el campo de búsqueda del header.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Escribí tu búsqueda</p>
+        <div class="help-steps__text">Al menos 2 caracteres: tracking, legacy ID, nombre, número de incidencia o ruta.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Elegí el resultado</p>
+        <div class="help-steps__text">Movéte con las flechas <strong>↑ ↓</strong> y abrí con <strong>Enter</strong>, o hacé click en el ítem.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">¿Hay más?</p>
+        <div class="help-steps__text">Si la categoría tiene más coincidencias, usá <strong>Ver todos →</strong> para el listado completo.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">shield_person</span>
+    <div class="help-callout__body">Los resultados respetan tu rol: un repartidor solo ve sus envíos, rutas e incidencias asignadas. Modificaciones y clientes del portal solo los ve el staff (supervisor, operador, admin).</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No aparecen resultados
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Verificá que escribiste al menos 2 caracteres y que el envío o incidencia está dentro de tu alcance (sucursal/rol).</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Encuentro el envío pero no puedo editarlo
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Algunos estados finales (<em>Entregado</em>, <em>Cancelado</em>) limitan las acciones disponibles.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Como repartidor no veo rutas de otros
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>La búsqueda respeta tu rol: solo verás envíos, rutas e incidencias asignadas a vos.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El legacy ID no encuentra nada
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El envío debe haberse importado con el campo <code>legacyTrackingId</code> completado en el CSV.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/envios"><span class="material-symbols-outlined">local_shipping</span>Gestión de envíos</a></li>
+    <li><a href="/help/incidencias"><span class="material-symbols-outlined">report</span>Incidencias operativas</a></li>
+    <li><a href="/help/modificaciones-portal"><span class="material-symbols-outlined">edit_note</span>Modificaciones del portal</a></li>
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

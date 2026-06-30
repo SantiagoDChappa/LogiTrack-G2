@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Volumen de Envíos por Período</title>
+    <link rel="stylesheet" href="/css/report.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Volumen de Envíos por Período</h1>
+            </div>
+
+            <!-- Formulario de rango de fechas -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/shipments-by-period" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/shipments-by-period" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/shipments-by-period/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                                <a href="/report/shipments-by-period/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="action-btn action-btn--lg neutro" data-tooltip="Exportar PDF" aria-label="Exportar PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% if (!error) { %>
+                <% if (hasQuery && totalShipments === 0) { %>
+                    <!-- Escenario 2: sin datos -->
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">inventory_2</span>
+                            <p>No se registraron envíos entre <strong><%= dateFrom %></strong> y <strong><%= dateTo %></strong>.</p>
+                        </div>
+                    </div>
+                <% } else if (totalShipments > 0) { %>
+                    <!-- Resumen total -->
+                    <div class="report-summary-banner">
+                        <span class="material-symbols-outlined">local_shipping</span>
+                        <span>Total de envíos en el período: <strong><%= totalShipments %></strong></span>
+                        <span class="period-label"><%= dateFrom %> → <%= dateTo %></span>
+                    </div>
+
+                    <div class="report-content-grid">
+                        <!-- Tabla -->
+                        <div class="report-card">
+                            <h2>Distribución por estado</h2>
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Estado</th>
+                                        <th class="text-right">Cantidad</th>
+                                        <th class="text-right">Porcentaje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% statusTotals.forEach(row => { %>
+                                        <% const key = row.status_label.toLowerCase().replace(/[\s-]+/g, '_'); %>
+                                        <% const pct = totalShipments > 0 ? (row.total / totalShipments * 100).toFixed(1) : '0.0'; %>
+                                        <tr>
+                                            <td>
+                                                <span class="status-badge <%= key %>"><%= row.status_label %></span>
+                                            </td>
+                                            <td class="text-right count-cell"><%= row.total %></td>
+                                            <td class="text-right pct-cell">
+                                                <div class="pct-bar-wrapper">
+                                                    <div class="pct-bar" style="width: <%= pct %>%"></div>
+                                                    <span><%= pct %>%</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td><strong>Total</strong></td>
+                                        <td class="text-right"><strong><%= totalShipments %></strong></td>
+                                        <td class="text-right"><strong>100%</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Gráficos -->
+                        <div class="charts-column">
+                            <div class="report-card chart-card">
+                                <h2>Envíos por estado</h2>
+                                <canvas id="chart-bar" height="220"></canvas>
+                            </div>
+                            <div class="report-card chart-card">
+                                <h2>Proporción por estado</h2>
+                                <canvas id="chart-doughnut" height="220"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <script>
+                    (function () {
+                        const statusTotals = <%- JSON.stringify(statusTotals) %>;
+                        const labels = statusTotals.map(r => r.status_label);
+                        const data   = statusTotals.map(r => r.total);
+
+                        const palette = [
+                            'rgba(59,130,246,0.8)',
+                            'rgba(34,197,94,0.8)',
+                            'rgba(249,115,22,0.8)',
+                            'rgba(168,85,247,0.8)',
+                            'rgba(234,179,8,0.8)',
+                            'rgba(239,68,68,0.8)',
+                            'rgba(20,184,166,0.8)',
+                            'rgba(99,102,241,0.8)',
+                        ];
+                        const colors = labels.map((_, i) => palette[i % palette.length]);
+
+                        const gridColor = 'rgba(148,163,184,0.12)';
+                        const tickColor = '#94a3b8';
+
+                        new Chart(document.getElementById('chart-bar').getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels,
+                                datasets: [{
+                                    label: 'Envíos',
+                                    data,
+                                    backgroundColor: colors,
+                                    borderRadius: 6,
+                                    borderSkipped: false,
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    x: { ticks: { color: tickColor }, grid: { display: false } },
+                                    y: { beginAtZero: true, ticks: { stepSize: 1, color: tickColor }, grid: { color: gridColor } }
+                                }
+                            }
+                        });
+
+                        new Chart(document.getElementById('chart-doughnut').getContext('2d'), {
+                            type: 'doughnut',
+                            data: {
+                                labels,
+                                datasets: [{
+                                    data,
+                                    backgroundColor: colors,
+                                    hoverOffset: 6,
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'bottom',
+                                        labels: { color: tickColor, padding: 12, boxWidth: 14 }
+                                    }
+                                }
+                            }
+                        });
+                    })();
+                    </script>
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        // Validación cliente: fecha inicio > fecha fin
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

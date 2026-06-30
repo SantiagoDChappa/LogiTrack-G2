@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Resumen de Ruta #<%= route.id %> - LogiTrack</title>
+    <style>
+    :root {
+        --sum-bg:        #f0f2f5;
+        --sum-surface:   #ffffff;
+        --sum-border:    rgba(15, 23, 42, .08);
+        --sum-text:      #0f172a;
+        --sum-text-strong: #1a3566;
+        --sum-muted:     #64748b;
+        --sum-muted-soft:#94a3b8;
+        --sum-shadow:    0 4px 16px rgba(15, 23, 42, .06);
+        --sum-shadow-lg: 0 8px 32px rgba(37, 99, 235, .3);
+        --sum-fail-bg:   #fef2f2;
+        --sum-fail-brdr: #fecaca;
+        --sum-fail-txt:  #991b1b;
+        --sum-btn-sec-bg:  #e2e8f0;
+        --sum-btn-sec-txt: #334155;
+        --sum-input-brdr:  #e2e8f0;
+    }
+    html[data-theme="dark"] {
+        --sum-bg:        #0b1220;
+        --sum-surface:   #111827;
+        --sum-border:    rgba(148, 163, 184, .18);
+        --sum-text:      #e2e8f0;
+        --sum-text-strong: #f1f5f9;
+        --sum-muted:     #94a3b8;
+        --sum-muted-soft:#64748b;
+        --sum-shadow:    0 4px 16px rgba(0,0,0,.45);
+        --sum-shadow-lg: 0 8px 32px rgba(37, 99, 235, .35);
+        --sum-fail-bg:   rgba(239, 68, 68, .12);
+        --sum-fail-brdr: rgba(239, 68, 68, .3);
+        --sum-fail-txt:  #fca5a5;
+        --sum-btn-sec-bg:  rgba(148, 163, 184, .14);
+        --sum-btn-sec-txt: #cbd5e1;
+        --sum-input-brdr:  rgba(148, 163, 184, .25);
+    }
+
+    body {
+        background: var(--sum-bg);
+        color: var(--sum-text);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        min-height: 100vh;
+    }
+
+    .summary-container {
+        max-width: 920px; margin: 24px auto;
+        padding: 0 clamp(12px, 3vw, 20px);
+    }
+
+    .summary-header {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        color: #fff;
+        padding: clamp(20px, 4vw, 32px);
+        border-radius: 20px;
+        box-shadow: var(--sum-shadow-lg);
+    }
+    .summary-header h1 {
+        margin: 0; font-weight: 800;
+        font-size: clamp(1.25rem, 4vw, 1.6rem);
+        letter-spacing: -0.02em; line-height: 1.15;
+    }
+    .summary-header .sub {
+        opacity: .9; margin-top: 4px;
+        font-size: clamp(.8rem, 2.6vw, .92rem);
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: clamp(8px, 2vw, 14px);
+        margin-top: clamp(16px, 3vw, 22px);
+    }
+    .kpi {
+        background: var(--sum-surface);
+        border: 1px solid var(--sum-border);
+        padding: clamp(12px, 2.5vw, 18px);
+        border-radius: 16px;
+        box-shadow: var(--sum-shadow);
+        min-width: 0;
+    }
+    .kpi .label {
+        font-size: clamp(.62rem, 1.8vw, .72rem);
+        font-weight: 700; color: var(--sum-muted);
+        text-transform: uppercase; letter-spacing: .08em;
+        line-height: 1.2;
+    }
+    .kpi .value {
+        font-size: clamp(1.25rem, 5vw, 1.7rem);
+        font-weight: 800; color: var(--sum-text-strong);
+        margin-top: 6px; line-height: 1.1;
+        word-break: break-word;
+    }
+    .kpi .value.green { color: #16a34a; }
+    .kpi .value.red   { color: #dc2626; }
+    .kpi .value.amber { color: #f59e0b; }
+    html[data-theme="dark"] .kpi .value.green { color: #4ade80; }
+    html[data-theme="dark"] .kpi .value.red   { color: #f87171; }
+    html[data-theme="dark"] .kpi .value.amber { color: #fbbf24; }
+    .kpi .hint {
+        font-size: clamp(.65rem, 1.8vw, .72rem);
+        color: var(--sum-muted-soft); margin-top: 4px;
+    }
+
+    .panel {
+        background: var(--sum-surface);
+        border: 1px solid var(--sum-border);
+        margin-top: 22px;
+        padding: clamp(16px, 3vw, 24px);
+        border-radius: 16px;
+        box-shadow: var(--sum-shadow);
+    }
+    .panel h2 {
+        margin: 0 0 12px;
+        font-size: clamp(1rem, 3vw, 1.1rem);
+        font-weight: 700; color: var(--sum-text-strong);
+    }
+    .panel p { color: var(--sum-muted); }
+
+    .failed-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+    .failed-item {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--sum-fail-bg);
+        border: 1px solid var(--sum-fail-brdr);
+        padding: 10px 12px; border-radius: 12px;
+        flex-wrap: wrap;
+    }
+    .failed-item .track {
+        font-weight: 700; color: var(--sum-fail-txt);
+        min-width: 80px; font-size: .9rem;
+    }
+    .failed-item .name {
+        flex: 1; min-width: 140px;
+        font-size: .88rem; color: var(--sum-text);
+    }
+    .scan-btn {
+        background: #16a34a; color: #fff !important;
+        border: none; padding: 8px 14px;
+        border-radius: 10px; cursor: pointer;
+        font-weight: 700; font-size: .82rem;
+        font-family: inherit;
+        white-space: nowrap;
+    }
+    .scan-btn:disabled, .scan-btn.done {
+        background: var(--sum-muted-soft); opacity: .7; cursor: default;
+    }
+
+    .scan-form {
+        display: flex; gap: 8px; margin-top: 14px;
+        flex-wrap: wrap;
+    }
+    .scan-form input {
+        flex: 1; min-width: 180px;
+        padding: 12px 14px; border-radius: 10px;
+        border: 1px solid var(--sum-input-brdr);
+        background: var(--sum-surface); color: var(--sum-text);
+        font-size: 1rem; font-family: inherit;
+        outline: none;
+    }
+    .scan-form input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,.18);
+    }
+    .scan-form button {
+        background: #2563eb; color: #fff;
+        border: none; padding: 0 18px; border-radius: 10px;
+        cursor: pointer; font-weight: 700; font-family: inherit;
+        min-height: 44px;
+    }
+
+    .actions {
+        margin-top: 22px;
+        display: flex; gap: 10px; flex-wrap: wrap;
+    }
+    .btn-action {
+        padding: 12px 20px; border-radius: 12px; border: none;
+        font-weight: 700; cursor: pointer; font-family: inherit;
+        text-decoration: none !important;
+        display: inline-flex; align-items: center; gap: 8px;
+        flex: 1 1 auto; justify-content: center;
+        min-width: 140px;
+    }
+    .btn-action.primary  {
+        background: #2563eb; color: #fff !important;
+        box-shadow: 0 4px 14px rgba(37,99,235,.3);
+    }
+    .btn-action.secondary {
+        background: var(--sum-btn-sec-bg);
+        color: var(--sum-btn-sec-txt) !important;
+    }
+
+    @media (max-width: 480px) {
+        .summary-container { margin: 12px auto; }
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        .actions .btn-action { width: 100%; }
+    }
+    </style>
+    <link rel="stylesheet" href="/css/delivery.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <div class="summary-container">
+        <div class="summary-header">
+            <h1>Resumen — Ruta #<%= route.id %></h1>
+            <div class="sub"><%= route.transport.name %> · <%= route.originBranch ? route.originBranch.name : '' %></div>
+
+            <div class="kpi-grid">
+                <div class="kpi"><div class="label">Entregadas</div><div class="value green"><%= deliveredCount %></div></div>
+                <div class="kpi"><div class="label">Fallidas</div><div class="value red"><%= failedCount %></div></div>
+                <div class="kpi"><div class="label">Postergadas</div><div class="value amber"><%= skippedCount %></div></div>
+                <div class="kpi"><div class="label">Km recorridos</div><div class="value"><%= km.toFixed(1) %></div></div>
+                <div class="kpi">
+                    <div class="label">Tiempo efectivo</div>
+                    <div class="value"><%= Math.floor(effectiveSec / 3600) %>h <%= Math.floor((effectiveSec % 3600) / 60) %>m</div>
+                    <div class="hint">Pausas: <%= Math.floor(pauseSec / 60) %>m</div>
+                </div>
+                <div class="kpi">
+                    <div class="label">Combustible</div>
+                    <div class="value"><%= fuelL.toFixed(1) %>L</div>
+                    <div class="hint">~$<%= fuelCost.toFixed(0) %></div>
+                </div>
+                <div class="kpi">
+                    <div class="label">Comisión</div>
+                    <div class="value green">$<%= commission.toFixed(0) %></div>
+                    <div class="hint"><%= deliveredCount %> × $<%= (deliveredCount ? (commission / deliveredCount).toFixed(0) : 0) %></div>
+                </div>
+            </div>
+        </div>
+
+        <% if (failedStops.length > 0) { %>
+        <div class="panel">
+            <h2>Devolución a sucursal</h2>
+            <p style="color:#64748b;font-size:.9rem;margin:0 0 12px">
+                Escaneá o ingresá el tracking de cada paquete no entregado al volver a la sucursal.
+            </p>
+            <ul class="failed-list" id="failed-list">
+                <% failedStops.forEach(s => { %>
+                    <li class="failed-item" data-tracking="<%= s.shipment.trackingId %>">
+                        <span class="track"><%= s.shipment.trackingId %></span>
+                        <span class="name"><%= s.shipment.recipient ? s.shipment.recipient.fullName : '' %> — <%= s.shipment.address ? (s.shipment.address.street + ' ' + s.shipment.address.number) : '' %></span>
+                        <button class="scan-btn" data-tracking="<%= s.shipment.trackingId %>">Marcar devuelto</button>
+                    </li>
+                <% }) %>
+            </ul>
+            <form class="scan-form" id="scan-form">
+                <input type="text" id="scan-input" placeholder="Escanear código (ENV-001)" autocomplete="off">
+                <button type="submit">Confirmar</button>
+            </form>
+        </div>
+        <% } %>
+
+        <div class="actions">
+            <a class="btn-action primary" href="/delivery">Volver al inicio</a>
+            <a class="btn-action secondary" href="/delivery/route/<%= route.id %>">Ver ruta</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+    const routeId = <%= route.id %>;
+
+    async function scanReturn(trackingId) {
+        if (!trackingId) return;
+        const res = await fetch(`/delivery/route/${routeId}/return-scan`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trackingId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { Swal.fire({ icon: 'error', title: 'No se pudo', text: data.error || 'Error' }); return false; }
+        const btn = document.querySelector(`.scan-btn[data-tracking="${trackingId}"]`);
+        if (btn) { btn.textContent = 'Devuelto ✓'; btn.classList.add('done'); btn.disabled = true; }
+        return true;
+    }
+
+    document.querySelectorAll('.scan-btn').forEach(b => {
+        b.addEventListener('click', () => scanReturn(b.dataset.tracking));
+    });
+    document.getElementById('scan-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('scan-input');
+        const ok = await scanReturn(input.value.trim());
+        if (ok) input.value = '';
+    });
+    </script>
+</body>
+</html>

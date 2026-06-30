@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <title>Acción de Entrega</title>
+    <style>
+        body {
+            background: var(--color-bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-6) var(--space-4);
+        }
+
+        .action-card {
+            width: 100%;
+            max-width: 480px;
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .action-header {
+            background: var(--color-primary);
+            padding: var(--space-6);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .action-header .material-symbols-outlined {
+            font-size: 2rem;
+            color: white;
+        }
+
+        .action-header-text h1 {
+            color: white;
+            font-size: var(--font-size-xl);
+            margin: 0;
+        }
+
+        .action-header-text p {
+            color: rgba(255,255,255,0.75);
+            font-size: var(--font-size-sm);
+            margin-top: var(--space-1);
+        }
+
+        .action-body {
+            padding: var(--space-6);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .action-tracking {
+            text-align: center;
+            font-size: var(--font-size-sm);
+            color: var(--color-text-secondary);
+            padding: var(--space-3);
+            background: var(--color-bg);
+            border-radius: var(--radius-sm);
+            border: 1.5px solid var(--color-border);
+        }
+
+        .action-tracking strong {
+            color: var(--color-primary);
+            font-size: var(--font-size-lg);
+            display: block;
+            margin-top: var(--space-1);
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-5);
+            border-radius: var(--radius-md);
+            border: 2px solid transparent;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all var(--transition);
+            width: 100%;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            text-decoration: none;
+        }
+
+        .action-btn-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .action-btn-icon .material-symbols-outlined {
+            font-size: 1.8rem;
+        }
+
+        .action-btn-text h3 {
+            font-size: var(--font-size-base);
+            margin: 0 0 var(--space-1);
+        }
+
+        .action-btn-text p {
+            font-size: var(--font-size-xs);
+            margin: 0;
+        }
+
+        .action-btn.success {
+            background: var(--color-success-bg);
+            border-color: var(--color-success);
+        }
+
+        .action-btn.success .action-btn-icon {
+            background: var(--color-success);
+        }
+
+        .action-btn.success .action-btn-icon .material-symbols-outlined {
+            color: white;
+        }
+
+        .action-btn.success h3 { color: var(--color-success); }
+        .action-btn.success p  { color: var(--color-success); opacity: 0.8; }
+
+        .action-btn.danger {
+            background: var(--color-danger-bg);
+            border-color: var(--color-danger);
+        }
+
+        .action-btn.danger .action-btn-icon {
+            background: var(--color-danger);
+        }
+
+        .action-btn.danger .action-btn-icon .material-symbols-outlined {
+            color: white;
+        }
+
+        .action-btn.danger h3 { color: var(--color-danger); }
+        .action-btn.danger p  { color: var(--color-danger); opacity: 0.8; }
+    </style>
+    <link rel="stylesheet" href="/css/delivery.css">
+</head>
+<body>
+
+<div class="action-card">
+    <div class="action-header">
+        <span class="material-symbols-outlined">qr_code_scanner</span>
+        <div class="action-header-text">
+            <h1>Acción de entrega</h1>
+            <p>¿Qué pasó con este envío?</p>
+        </div>
+    </div>
+
+    <div class="action-body">
+        <div class="action-tracking">
+            Envío escaneado
+            <strong><%= trackingCode %></strong>
+        </div>
+
+        <a href="/delivery/evidence/<%= trackingCode %>/pod" class="action-btn success">
+            <div class="action-btn-icon">
+                <span class="material-symbols-outlined">check_circle</span>
+            </div>
+            <div class="action-btn-text">
+                <h3>Entrega exitosa</h3>
+                <p>El destinatario recibió el paquete</p>
+            </div>
+        </a>
+
+        <a href="/delivery/failed/<%= trackingCode %>" class="action-btn danger">
+            <div class="action-btn-icon">
+                <span class="material-symbols-outlined">cancel</span>
+            </div>
+            <div class="action-btn-text">
+                <h3>Intento fallido</h3>
+                <p>No se pudo completar la entrega</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+</body>
+</html>

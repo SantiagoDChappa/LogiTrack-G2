@@ -1,0 +1,112 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Una incidencia es un caso formal de seguimiento de un problema de un envío.</li>
+            <li>Se gestionan en <a href="/incident">Incidencias</a>: filtrás, creás, asignás responsable y cerrás con resolución.</li>
+            <li>Pueden ser <a href="/help/glosario">externas</a> (las reporta el cliente) o <a href="/help/glosario">internas</a> (las crea el staff).</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Qué es una incidencia</h2>
+<p>Es el registro de un problema operativo vinculado a un envío: demora, daño, extravío, devolución, etc. Se gestiona en <a href="/incident">Incidencias</a>.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/incidencias/01-listado.png',
+    alt: 'Listado de incidencias con filtros por estado, origen, prioridad y resolución',
+    caption: 'Listado de incidencias: filtrá por estado, origen (externo/interno), prioridad o resolución; cada fila tiene su tracking y tipo.'
+}) %>
+
+<h2>Ciclo de vida</h2>
+<div class="help-flow">
+    <span class="help-flow__step">Abierta</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-flow__step">En revisión</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-flow__step">Cerrada (procedente / no procedente)</span>
+</div>
+
+<h2>Crear y seguir una incidencia</h2>
+<p>El alta pide el envío afectado, la sucursal y el responsable. Buscás el envío por tracking, ID o nombre del destinatario.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/incidencias/02-crear.png',
+    alt: 'Formulario de alta de incidencia con buscador de envío y selección de sucursal y usuario asignado',
+    caption: 'Alta de incidencia: identificás el envío, elegís la sucursal y asignás al responsable.'
+}) %>
+
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Filtrá el caso</p>
+        <div class="help-steps__text">En <a href="/incident">Incidencias</a> filtrá por estado, origen (externo/interno) o tipo.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Creá la incidencia</p>
+        <div class="help-steps__text">Usá el botón de alta o generala desde el detalle del envío afectado.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Asigná y completá el checklist</p>
+        <div class="help-steps__text">Asigná un responsable y completá el checklist según el tipo (daño, demora, extravío, etc.).</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Documentá</p>
+        <div class="help-steps__text">Agregá comentarios y evidencia (fotos, documentos) en el historial para mantener trazabilidad.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Cerrá con resolución</p>
+        <div class="help-steps__text">Marcá procedente o no procedente cuando el caso esté resuelto.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">tour</span>
+    <div class="help-callout__body">En Incidencias tenés un ícono <strong>tour</strong> en la barra superior para un recorrido por filtros, creación y seguimiento de casos.</div>
+</div>
+
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">undo</span>
+    <div class="help-callout__body">Las devoluciones del cliente se registran como incidencias tipo <a href="/help/glosario">RETURN</a> y siguen un flujo de resolución y checklist específicos.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿Incidencia o intento fallido?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El intento fallido es una acción del repartidor en ruta; la incidencia es un caso formal de seguimiento. Ver <a href="/help/incidencias-repartidor">Reportar incidencias en ruta</a>.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No veo las incidencias del portal
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Filtrá por origen «Externo»: las creadas por clientes tienen canal PORTAL.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Las devoluciones no siguen el flujo normal
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Las solicitudes tipo <a href="/help/glosario">RETURN</a> tienen resolución y checklist propios, distintos de una incidencia común.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/portal-cliente-staff"><span class="material-symbols-outlined">public</span>Portal del cliente (vista staff)</a></li>
+    <li><a href="/help/modificaciones-portal"><span class="material-symbols-outlined">edit_note</span>Modificaciones del portal</a></li>
+    <li><a href="/help/incidencias-repartidor"><span class="material-symbols-outlined">report</span>Reportar incidencias en ruta</a></li>
+    <li><a href="/help/notificaciones"><span class="material-symbols-outlined">notifications</span>Notificaciones</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
+</ul>

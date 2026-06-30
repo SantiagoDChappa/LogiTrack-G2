@@ -1,0 +1,206 @@
+// Ojo de Patrón — panel del supervisor/administrador.
+// US-6 (gestión de bloqueos), US-7 (config), US-8 (patrón), US-12 (purga), US-14 (RBAC).
+
+const fatigueSvc = require('../services/fatigue');
+const fatigueCfg = require('../services/fatigue/config');
+const notify = require('../services/fatigue/notify');
+const transportModel = require('../models/transport');
+const { RoleType } = require('../constants/enums');
+
+const isAdmin = (u) => u?.roleId === RoleType.ADMIN.id;
+const scopeBranch = (u) => (isAdmin(u) ? null : (u?.branchId || null));
+
+// GET /fatigue — rutas bloqueadas de la sucursal + patrón recurrente.
+exports.index = async (req, res) => {
+    const u = res.locals.currentUser;
+    const branchId = scopeBranch(u);
+    const blocked = await fatigueSvc.listBlocked(branchId); // ya filtra por sucursal
+    const reviews = await fatigueSvc.listReview(branchId); // avisos sin bloqueo (autoBlock off)
+    const cfg = await fatigueCfg.getConfig(branchId);
+
+    const { FatiguePatternCounter } = require('../models/fatiguePatternCounter');
+    const counters = await FatiguePatternCounter.findAll({ order: [['blockedCount', 'DESC']], limit: 50 });
+    const disabledRaw = (await fatigueSvc.listDisabledDrivers()).map(d => d.toJSON());
+    const transports = await transportModel.getEnabledForBranch(branchId);
+
+    const blockedJson = blocked.map(b => b.toJSON());
+    const reviewsJson = reviews.map(r => r.toJSON());
+
+    // Mapa id→{fullName, branchId}. Los modelos de patrón/inhabilitados no tienen
+    // sucursal: se scopea por la sucursal del usuario. Supervisor: solo la suya.
+    // Admin (branchId === null): ve todo.
+    const candidateIds = [...new Set([
+        ...blockedJson.map(b => b.userId),
+        ...reviewsJson.map(r => r.userId),
+        ...disabledRaw.map(d => d.userId),
+        ...counters.map(c => c.userId),
+    ].filter(Boolean))];
+    const { User } = require('../models/user');
+    const users = candidateIds.length
+        ? await User.findAll({ where: { id: candidateIds }, attributes: ['id', 'fullName', 'branchId'] })
+        : [];
+    const nameById = {}; const branchById = {};
+    for (const x of users) { nameById[x.id] = x.fullName; branchById[x.id] = x.branchId; }
+    const inScope = (uid) => branchId === null || branchById[uid] === branchId;
+
+    const patterns = [];
+    for (const c of counters.filter(c => inScope(c.userId))) {
+        const p = await fatigueSvc.patternStatus(c.userId, cfg);
+        patterns.push({ ...p, driverName: nameById[c.userId] || null });
+    }
+    const disabledDrivers = disabledRaw
+        .filter(d => inScope(d.userId))
+        .map(d => ({ ...d, driverName: nameById[d.userId] || null }));
+
+    res.render('fatigue/index', {
+        blocked: blockedJson.map(b => ({ ...b, driverName: nameById[b.userId] || null })),
+        reviews: reviewsJson
+            .filter(r => inScope(r.userId))
+            .map(r => ({ ...r, driverName: nameById[r.userId] || null })),
+        patterns,
+        isAdmin: isAdmin(u),
+        cfg,
+        transports: transports.map(t => ({ id: t.id, name: t.name, driverName: t.driver?.fullName || null })),
+        disabledDrivers,
+    });
+};
+
+// POST /fatigue/driver/restore — restablecer transportista inhabilitado (LGT-195 Esc.7/8).
+exports.restoreDriver = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'El restablecimiento es exclusivo del Supervisor' });
+    }
+    const { userId, kind } = req.body;
+    if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
+    try {
+        await fatigueSvc.restoreDriver({ userId: Number(userId), actorId: u.id, kind });
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/driver/disable — inhabilitar transportista a raíz de un aviso sin bloqueo (LGT-193).
+// Exclusivo del Supervisor de la sucursal (el Admin solo configura).
+exports.disableDriver = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'La inhabilitación es exclusiva del Supervisor' });
+    }
+    const { userId, checkId } = req.body;
+    if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
+    try {
+        await fatigueSvc.disableDriver({ userId: Number(userId), reason: 'REVIEW_DECISION', branchId: u.branchId });
+        if (checkId) { await fatigueSvc.resolveReview({ checkId: Number(checkId), actorId: u.id, note: 'Inhabilitado por el supervisor' }); }
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/:checkId/review-resolve — descartar un aviso sin bloqueo (decisión tomada).
+exports.resolveReview = async (req, res) => {
+    const u = res.locals.currentUser;
+    const { FatigueCheck } = require('../models/fatigueCheck');
+    const check = await FatigueCheck.findByPk(req.params.checkId);
+    if (!check) { return res.status(404).json({ error: 'Aviso no encontrado' }); }
+    if (!isAdmin(u) && check.branchId !== u.branchId) {
+        return res.status(403).json({ error: 'No autorizado: la ruta es de otra sucursal' });
+    }
+    try {
+        await fatigueSvc.resolveReview({ checkId: check.id, actorId: u.id, note: req.body.note });
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/reassign — reasignar ruta bloqueada a otro transporte (LGT-193/190).
+// Exclusivo del Supervisor de la sucursal de origen (Esc.10): el Admin no gestiona.
+exports.reassign = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'La reasignación es exclusiva del Supervisor de la sucursal de origen' });
+    }
+    const { routeId, transportId } = req.body;
+    if (!routeId || !transportId) { return res.status(400).json({ error: 'Faltan datos (ruta y transporte)' }); }
+    try {
+        const r = await fatigueSvc.reassignRoute({
+            routeId: Number(routeId), newTransportId: Number(transportId),
+            actorId: u.id, actorBranchId: u.branchId,
+        });
+        res.json({ ok: true, ...r });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/:checkId/release — liberar con motivo (US-6).
+exports.release = async (req, res) => {
+    const u = res.locals.currentUser;
+    const { FatigueCheck } = require('../models/fatigueCheck');
+    const check = await FatigueCheck.findByPk(req.params.checkId);
+    if (!check) { return res.status(404).json({ error: 'Chequeo no encontrado' }); }
+    if (!isAdmin(u) && check.branchId !== u.branchId) {
+        return res.status(403).json({ error: 'No autorizado: la ruta es de otra sucursal' });
+    }
+    const { reason, detail } = req.body;
+    const VALID = ['falso_positivo', 'autorizado_descanso', 'otro'];
+    if (!VALID.includes(reason)) { return res.status(400).json({ error: 'Motivo inválido' }); }
+    // Esc.5: motivo "Otro" exige descripción de al menos 10 caracteres.
+    if (reason === 'otro' && (!detail || detail.trim().length < 10)) {
+        return res.status(400).json({ error: 'La descripción es obligatoria (mínimo 10 caracteres)' });
+    }
+    await fatigueSvc.release({ checkId: check.id, actorId: u.id, reason, detail });
+    res.json({ ok: true });
+};
+
+// POST /fatigue/:checkId/keep — mantener bloqueada (US-6).
+exports.keep = async (req, res) => {
+    const u = res.locals.currentUser;
+    await notify.audit('KEEP_BLOCKED', { actorId: u.id, checkId: Number(req.params.checkId) });
+    res.json({ ok: true });
+};
+
+// GET /fatigue/config — formulario de parámetros (US-7, solo admin).
+exports.configPage = async (req, res) => {
+    if (!isAdmin(res.locals.currentUser)) { return res.status(403).send('Solo administradores'); }
+    const cfg = await fatigueCfg.getConfig(null);
+    res.render('fatigue/config', { cfg, defaults: fatigueCfg.DEFAULTS, errors: [], saved: req.query.saved === '1' });
+};
+
+// POST /fatigue/config — guardar parámetros (US-7, solo admin).
+exports.saveConfig = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (!isAdmin(u)) { return res.status(403).send('Solo administradores'); }
+    const errors = [];
+    for (const param of Object.keys(fatigueCfg.DEFAULTS)) {
+        let value = req.body[param];
+        if (fatigueCfg.BOOL_PARAMS.includes(param)) { value = req.body[param] ? 'true' : 'false'; }
+        if (value === undefined || value === '') { continue; }
+        try { await fatigueCfg.setParam(param, value, { branchId: null, actorId: u.id }); }
+        catch (e) { errors.push(e.message); }
+    }
+    if (errors.length) {
+        const cfg = await fatigueCfg.getConfig(null);
+        return res.status(400).render('fatigue/config', { cfg, defaults: fatigueCfg.DEFAULTS, errors, saved: false });
+    }
+    res.redirect('/fatigue/config?saved=1');
+};
+
+// POST /fatigue/pattern/review — marcar patrón recurrente revisado/descartado (LGT-197).
+// Gestión operativa exclusiva del Supervisor; el Admin solo configura parámetros.
+exports.reviewPattern = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (isAdmin(u)) {
+        return res.status(403).json({ error: 'La gestión del patrón es exclusiva del Supervisor' });
+    }
+    const { userId, status, note } = req.body;
+    if (!userId) { return res.status(400).json({ error: 'Falta el transportista' }); }
+    try {
+        await fatigueSvc.reviewPattern({ userId: Number(userId), actorId: u.id, status, note });
+        res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+};
+
+// POST /fatigue/purge — purga manual por retención (US-12, solo admin).
+exports.purge = async (req, res) => {
+    const u = res.locals.currentUser;
+    if (!isAdmin(u)) { return res.status(403).json({ error: 'Solo administradores' }); }
+    const cfg = await fatigueCfg.getConfig(null);
+    const n = await fatigueSvc.purgeExpired(cfg.retentionDays);
+    res.json({ ok: true, purged: n });
+};

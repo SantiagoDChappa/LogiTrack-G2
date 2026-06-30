@@ -4,10 +4,11 @@
     <%- include('../partials/head') %>
     <title>Nuevo Usuario - LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/users.css">
 </head>
 <body>
     <%- include('../partials/header') %>
-    <main class="main-content">
+    <main class="main-content users-module">
         <div class="page-header">
             <h1>Alta de usuario</h1>
         </div>
@@ -18,62 +19,25 @@
                     <sub>Los campos marcados con * son obligatorios</sub>
                     <div class="field">
                         <label for="fullName">Nombre y Apellido <span style="color: red;">*</span></label>
-                        <input id="fullName"  type="text" name="fullName" value="<%= body.fullName || '' %>">
+                        <input id="fullName"  type="text" name="fullName" value="<%= body.fullName || '' %>" maxlength="100" required>
                     </div>
                     <div class="field">
                         <label for="document">Documento <span style="color: red;">*</span></label>
-                        <input id="document"  type="number" minlength="8" name="document" value="<%= body.document || '' %>">
+                        <input id="document" type="text" name="document" value="<%= body.document || '' %>" placeholder="Ej: 12.345.678" data-doc-format maxlength="11" required>
                     </div>
                     <div class="field">
                         <label for="email">Email <span style="color: red;">*</span></label>
-                        <input id="email" type="email" name="email" value="<%= body.email || '' %>">
+                        <input id="email" type="email" name="email" value="<%= body.email || '' %>" maxlength="100" required>
                     </div>
 
-                    <div class="field">
-                        <label for="password">Contraseña <span style="color: red;">*</span></label>
-                        <div class="password-wrapper">
-                            <div class="password-input-row">
-                                <input id="password"  type="text"  name="password" autocomplete="new-password">
-                                <!--
-                                <button type="button" class="toggle-password" id="togglePassword" tabindex="-1">
-                                    <span class="material-symbols-outlined" id="toggleIcon">visibility</span>
-                                </button>
-                                -->
-                            </div>
-
-                            <div class="strength-bar-wrapper" id="strengthBar">
-                                <div class="strength-segments" id="strengthSegments">
-                                    <div class="strength-segment"></div>
-                                    <div class="strength-segment"></div>
-                                    <div class="strength-segment"></div>
-                                </div>
-                                <span class="strength-label" id="strengthLabel"></span>
-                            </div>
-
-                            <div class="password-rules" id="passwordRules">
-                                <div class="rule" id="rule-length">
-                                    <span class="material-symbols-outlined">cancel</span>
-                                    Mínimo 10 caracteres
-                                </div>
-                                <div class="rule" id="rule-upper">
-                                    <span class="material-symbols-outlined">cancel</span>
-                                    Al menos una mayúscula
-                                </div>
-                                <div class="rule" id="rule-number">
-                                    <span class="material-symbols-outlined">cancel</span>
-                                    Al menos un número
-                                </div>
-                                <div class="rule" id="rule-symbol">
-                                    <span class="material-symbols-outlined">cancel</span>
-                                    Al menos un símbolo (!@#$%...)
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="field" style="font-size:.82rem;color:var(--color-text-secondary);background:var(--color-bg);border:1px solid var(--color-border);border-radius:8px;padding:.6rem .75rem">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">info</span>
+                        El sistema generará una <strong>contraseña temporal</strong> al crear el usuario. Se mostrará una sola vez para que se la pases; deberá cambiarla en su primer ingreso.
+                    </p>
 
                     <div class="field">
                         <label for="roleId">Rol <span style="color: red;">*</span></label>
-                        <select id="roleId" name="roleId">
+                        <select id="roleId" name="roleId" required onchange="toggleBranchField(this.value)">
                             <option value="">Seleccione un rol </option>
                             <% roleTypes.forEach(role => { %>
                                 <option value="<%= role.id %>" <%= body.roleId == role.id ? 'selected' : '' %>>
@@ -82,11 +46,25 @@
                             <% }); %>
                         </select>
                     </div>
+
+                    <div class="field" id="branch-field" style="display:<%= [1,2,3].includes(Number(body.roleId)) ? 'block' : 'none' %>">
+                        <label for="branchId">Sucursal <span style="color:red">*</span></label>
+                        <select id="branchId" name="branchId">
+                            <option value="">Seleccione una sucursal</option>
+                            <% (branches || []).forEach(b => { %>
+                                <option value="<%= b.id %>" <%= body.branchId == b.id ? 'selected' : '' %>><%= b.name %></option>
+                            <% }); %>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-actions">
-                    <a href="/user" class="btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn-primary">Guardar usuario</button>
+                    <a href="/user" class="action-btn action-btn--lg volver" data-tooltip="Volver" aria-label="Volver">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar usuario" aria-label="Guardar usuario">
+                        <span class="material-symbols-outlined">save</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -97,64 +75,7 @@
     <script src="/js/new_shipment_popup.js" defer></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
-    <script>
-        const passwordInput  = document.getElementById('password');
-        const toggleBtn      = document.getElementById('togglePassword');
-        const toggleIcon     = document.getElementById('toggleIcon');
-        const strengthBar    = document.getElementById('strengthBar');
-        const strengthSegs   = document.getElementById('strengthSegments');
-        const strengthLabel  = document.getElementById('strengthLabel');
-        const rulesContainer = document.getElementById('passwordRules');
-
-        const rules = {
-            length: { el: document.getElementById('rule-length'), test: v => v.length >= 10 },
-            upper:  { el: document.getElementById('rule-upper'),  test: v => /[A-Z]/.test(v) },
-            number: { el: document.getElementById('rule-number'), test: v => /[0-9]/.test(v) },
-            symbol: { el: document.getElementById('rule-symbol'), test: v => /[^A-Za-z0-9]/.test(v) },
-        };
-
-        const levels = [
-            { label: '',           cls: ''          },
-            { label: 'Insegura',   cls: 'strength-1' },
-            { label: 'Segura',     cls: 'strength-2' },
-            { label: 'Muy segura', cls: 'strength-3' },
-        ];
-
-        function updateRule(key, value) {
-            const { el, test } = rules[key];
-            const ok = test(value);
-            el.classList.toggle('ok', ok);
-            el.querySelector('.material-symbols-outlined').textContent = ok ? 'check_circle' : 'cancel';
-        }
-
-        function updateStrength(passed) {
-            strengthSegs.className = 'strength-segments';
-            if (passed === 0) {
-                strengthLabel.textContent = '';
-                return;
-            }
-            const lvl = passed <= 1 ? 1 : passed <= 3 ? 2 : 3;
-            strengthSegs.classList.add(levels[lvl].cls);
-            strengthLabel.textContent  = levels[lvl].label;
-            strengthLabel.className    = `strength-label ${levels[lvl].cls}`;
-        }
-
-        passwordInput.addEventListener('input', () => {
-            const val = passwordInput.value;
-
-            let passed = 0;
-            for (const key of Object.keys(rules)) {
-                updateRule(key, val);
-                if (rules[key].test(val)) passed++;
-            }
-            updateStrength(passed);
-        });
-
-  //      toggleBtn.addEventListener('click', () => {
-  //          const isPassword = passwordInput.type === 'password';
- //           passwordInput.type    = isPassword ? 'text' : 'password';
- //           toggleIcon.textContent = isPassword ? 'visibility_off' : 'visibility';
-//        });
-    </script>
+    <script>function toggleBranchField(v){var show=['1','2','3'].includes(String(v));document.getElementById('branch-field').style.display=show?'block':'none';}</script>
+    <script src="/js/document-format.js" defer></script>
 </body>
 </html>

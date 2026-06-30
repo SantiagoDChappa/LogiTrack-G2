@@ -1,0 +1,27 @@
+<% if (typeof modifications !== 'undefined' && modifications && modifications.length) { %>
+<div class="portal-history portal-modifications-history">
+    <span class="portal-history-title">Historial de modificaciones</span>
+    <div class="portal-mis-envios-table-wrap">
+        <table class="portal-mis-envios-table portal-modifications-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% modifications.forEach(function(m) { %>
+                <tr>
+                    <td><%= new Date(m.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></td>
+                    <td><%= m.typeLabel %></td>
+                    <td><span class="portal-mod-status portal-mod-status-<%= m.statusKey %>"><%= m.statusLabel %></span></td>
+                    <td><%= m.summary %></td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+</div>
+<% } %>

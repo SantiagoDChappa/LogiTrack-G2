@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <%- include('partials/head') %>
-    <link rel="stylesheet" href="/css/login.css">
-    <title>LogiTrack — Iniciar sesión</title>
+    <link rel="stylesheet" href="/css/login.css?v=<%= assetVersion %>">
+    <title><%= nombreEmpresa %> — Iniciar sesión</title>
 </head>
 <body>
 
@@ -18,13 +18,34 @@
 
             <!-- Logo -->
             <div class="login-brand">
-                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
-                <h1>LogiTrack</h1>
+                <img src="<%= typeof logoEmpresa !== 'undefined' ? logoEmpresa : '/images/logo.png' %>" alt="<%= nombreEmpresa %>" class="login-logo">
+                <h1><%= nombreEmpresa %></h1>
                 <p>Sistema de gestión de envíos</p>
+            </div>
+
+            <!-- Acceso rápido DEV -->
+            <div style="margin-bottom:1rem">
+                <label style="display:block;font-size:.78rem;font-weight:600;color:var(--color-text-secondary);margin-bottom:4px">
+                    <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle">science</span>
+                    Cuenta de prueba
+                </label>
+                <select id="dev-accounts" style="width:100%;padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font-size:.85rem;font-family:inherit;cursor:pointer">
+                    <option value="">— Seleccioná una cuenta —</option>
+                    <% (typeof devAccounts !== 'undefined' && devAccounts ? devAccounts : []).forEach(function (grupo) { %>
+                    <optgroup label="<%= grupo.label %>">
+                        <% grupo.accounts.forEach(function (cuenta) { %>
+                        <option value="<%= cuenta.email %>"><%= cuenta.name %></option>
+                        <% }); %>
+                    </optgroup>
+                    <% }); %>
+                </select>
             </div>
 
             <!-- Formulario -->
             <form class="login-form" action="/login" method="post">
+                <% if (locals.returnTo) { %>
+                <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                <% } %>
 
                 <div class="login-field">
                     <label for="user-email">Correo electrónico</label>
@@ -46,6 +67,7 @@
                         name="password"
                         placeholder="••••••••"
                         autocomplete="current-password"
+                        data-pw-toggle
                         required
                     >
                 </div>
@@ -62,9 +84,10 @@
                         <input type="checkbox" name="remember">
                         <span>Recordar sesión</span>
                     </label>
-                    <a href="#" class="login-forgot">¿Olvidaste tu contraseña?</a>
+                    <a href="/account/password/forgot" class="login-forgot">¿Olvidaste tu contraseña?</a>
                 </div>
 
+                <input type="hidden" name="returnTo" value="<%= locals.returnTo || '' %>">
                 <button type="submit" class="login-btn">Ingresar</button>
 
             </form>
@@ -77,7 +100,19 @@
         </div>
     </div>
 
+    <a href="/" class="login-back-btn" aria-label="Volver">
+        <span class="material-symbols-outlined">arrow_back</span>
+    </a>
+
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <script src="/js/password-ui.js" defer></script>
+    <script>
+    document.getElementById('dev-accounts').addEventListener('change', function () {
+        if (!this.value) return;
+        document.getElementById('user-email').value = this.value;
+        document.getElementById('password').value = 'Test1234!';
+    });
+    </script>
 </body>
 </html>

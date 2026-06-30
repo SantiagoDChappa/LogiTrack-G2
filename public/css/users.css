@@ -1,0 +1,325 @@
+/* ============================================================
+   Users — design tokens (alineados con incidents.css / route.ejs)
+   Scoped bajo .users-module para no romper otros listados.
+   ============================================================ */
+.users-module {
+    --usr-bg:          #f0f2f5;
+    --usr-surface:     #ffffff;
+    --usr-surface-alt: #f8fafc;
+    --usr-blue:        #2563eb;
+    --usr-blue-dark:   #1a3566;
+    --usr-blue-soft:   #3b82f6;
+    --usr-amber:       #f59e0b;
+    --usr-green:       #16a34a;
+    --usr-red:         #dc2626;
+    --usr-purple:      #7c3aed;
+    --usr-text:        #0f172a;
+    --usr-text-strong: #1a3566;
+    --usr-muted:       #64748b;
+    --usr-border:      rgba(15, 23, 42, .08);
+    --usr-border-soft: rgba(15, 23, 42, .05);
+    --usr-glass:       rgba(255, 255, 255, .72);
+    --usr-glass-brdr:  rgba(255, 255, 255, .55);
+    --usr-shadow-sm:   0 1px 2px rgba(15, 23, 42, .04);
+    --usr-shadow-md:   0 6px 24px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+    --usr-shadow-lg:   0 12px 32px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+    --usr-radius-sm:   8px;
+    --usr-radius-md:   12px;
+    --usr-radius-lg:   18px;
+    --usr-ring:        0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+html[data-theme="dark"] .users-module {
+    --usr-bg:          #0b1220;
+    --usr-surface:     #111827;
+    --usr-surface-alt: #0f172a;
+    --usr-blue:        #60a5fa;
+    --usr-blue-dark:   #cbd5e1;
+    --usr-blue-soft:   #93c5fd;
+    --usr-text:        #e2e8f0;
+    --usr-text-strong: #f1f5f9;
+    --usr-muted:       #94a3b8;
+    --usr-border:      rgba(148, 163, 184, .18);
+    --usr-border-soft: rgba(148, 163, 184, .10);
+    --usr-glass:       rgba(17, 24, 39, .72);
+    --usr-glass-brdr:  rgba(148, 163, 184, .15);
+    --usr-shadow-md:   0 6px 24px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.3);
+    --usr-shadow-lg:   0 12px 32px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.3);
+    --usr-ring:        0 0 0 3px rgba(96, 165, 250, .22);
+}
+
+/* ============================================================
+   Page header (override shipments.css cuando vive en users-module)
+   ============================================================ */
+.users-module .page-header {
+    padding: 1.25rem clamp(1.25rem, 2.5vw, 2rem) .5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.users-module .page-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: var(--usr-text-strong);
+}
+
+/* ============================================================
+   Filtros — glass card (estilo incidencia-listado)
+   ============================================================ */
+.users-module .search-form {
+    margin: 1rem clamp(1.25rem, 2.5vw, 2rem) 0;
+    padding: 1rem 1.25rem;
+    background: var(--usr-glass);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border: 1px solid var(--usr-glass-brdr);
+    border-radius: var(--usr-radius-lg);
+    box-shadow: var(--usr-shadow-md);
+}
+
+.users-module .search-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem 1rem;
+    align-items: flex-end;
+}
+
+.users-module .search-field {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    min-width: 160px;
+    flex: 1 1 160px;
+}
+
+.users-module .search-field label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--usr-muted);
+}
+
+.users-module .search-input {
+    padding: .55rem .75rem;
+    border: 1px solid var(--usr-border);
+    border-radius: var(--usr-radius-sm);
+    background: var(--usr-surface);
+    color: var(--usr-text);
+    font-size: .9rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.users-module .search-input::placeholder { color: var(--usr-muted); opacity: .7; }
+
+.users-module .search-input:hover { border-color: rgba(15,23,42,.18); }
+
+.users-module .search-input:focus {
+    outline: none;
+    border-color: var(--usr-blue);
+    box-shadow: var(--usr-ring);
+}
+
+.users-module .search-btn {
+    align-self: flex-end;
+}
+
+/* ============================================================
+   Tabla
+   ============================================================ */
+.users-module .shipments-wrapper {
+    padding: 0;
+}
+
+.users-module .table-wrapper {
+    margin: 1rem clamp(1.25rem, 2.5vw, 2rem);
+    padding: 0;
+    background: var(--usr-surface);
+    border: 1px solid var(--usr-border);
+    border-radius: var(--usr-radius-md);
+    box-shadow: var(--usr-shadow-sm);
+    overflow: hidden;
+}
+
+.users-module .table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+    margin: 0;
+}
+
+.users-module .table-wrapper th,
+.users-module .table-wrapper td {
+    padding: .85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--usr-border-soft);
+    font-size: .9rem;
+    color: var(--usr-text);
+}
+
+.users-module .table-wrapper tr:last-child td { border-bottom: 0; }
+
+.users-module .table-wrapper th {
+    background: var(--usr-surface-alt);
+    font-weight: 600;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--usr-muted);
+    border-bottom: 1px solid var(--usr-border);
+}
+
+.users-module .table-wrapper tbody tr { transition: background-color .12s ease; }
+.users-module .table-wrapper tbody tr:hover { background: var(--usr-surface-alt); }
+
+.users-module .empty-row {
+    text-align: center;
+    padding: 2.5rem 1.5rem !important;
+    color: var(--usr-muted);
+    font-size: .9rem;
+}
+
+.users-module .empty-row .material-symbols-outlined {
+    display: block;
+    margin: 0 auto .5rem;
+    font-size: 2rem;
+    opacity: .5;
+}
+
+/* ============================================================
+   Status badges — pill style con hue por rol/estado
+   ============================================================ */
+.users-module .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    background: #e2e8f0;
+    color: #0f172a;
+    border: 1px solid transparent;
+}
+
+/* Estados de alta/baja (reusa clases que el view ya emite) */
+.users-module .status-badge.entregado { background: #d1fae5; color: #065f46; border-color: rgba(6, 95, 70, .15); }
+.users-module .status-badge.retrasado { background: #fee2e2; color: #991b1b; border-color: rgba(153, 27, 27, .15); }
+
+/* Roles — controller mapea via ROLE_CLASSES a classes tipo status:
+   SUPERVISOR + ADMIN → en_sucursal (purple)
+   OPERATOR           → en_transito (blue)
+   DELIVERY           → pendiente   (amber) */
+.users-module .status-badge.en_sucursal { background: #ede9fe; color: #5b21b6; border-color: rgba(91, 33, 182, .15); }
+.users-module .status-badge.en_transito { background: #dbeafe; color: #1e40af; border-color: rgba(30, 64, 175, .15); }
+.users-module .status-badge.pendiente   { background: #fef3c7; color: #92400e; border-color: rgba(146, 64, 14, .15); }
+
+/* ============================================================
+   Acciones (íconos en celda)
+   ============================================================ */
+.users-module .col-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.users-module .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: .25rem;
+    border: 1px solid var(--usr-border);
+    border-radius: var(--usr-radius-sm);
+    background: var(--usr-surface);
+    color: var(--usr-muted);
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color .15s ease, color .15s ease, background .15s ease, transform .12s ease;
+    position: relative;
+}
+
+.users-module .action-btn .material-symbols-outlined { font-size: 1.05rem; }
+
+.users-module .action-btn:hover {
+    transform: translateY(-1px);
+    background: var(--usr-surface-alt);
+}
+
+.users-module .action-btn.modificar:hover { border-color: var(--usr-blue);  color: var(--usr-blue); }
+.users-module .action-btn.eliminar:hover  { border-color: var(--usr-red);   color: var(--usr-red); }
+
+/* CTAs "grandes" del formulario (Guardar / Dar de baja / Volver): conservan el color
+   semántico del sistema en vez del estilo neutro de los íconos de la tabla, que de otro
+   modo los pinta de gris (el override de .users-module .action-btn ganaba por orden de carga). */
+.users-module .action-btn--lg.guardar  { background: var(--color-success-bg); color: var(--color-success); border-color: transparent; }
+.users-module .action-btn--lg.eliminar { background: var(--btn-eliminar-bg);  color: var(--btn-eliminar-text); border-color: transparent; }
+.users-module .action-btn--lg.volver   { background: var(--color-surface-alt); color: var(--color-text-secondary); border-color: transparent; }
+.users-module .action-btn--lg.guardar:hover  { background: var(--color-success-bg); color: var(--color-success); border-color: transparent; filter: brightness(.95); }
+.users-module .action-btn--lg.eliminar:hover { background: var(--btn-eliminar-bg);  color: var(--btn-eliminar-text); border-color: transparent; filter: brightness(.95); }
+.users-module .action-btn--lg.volver:hover   { background: var(--color-surface-alt); color: var(--color-text-secondary); border-color: transparent; filter: brightness(.95); }
+
+.users-module .action-btn[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 50%;
+    transform: translateX(50%);
+    background: var(--usr-text-strong);
+    color: #fff;
+    padding: .2rem .5rem;
+    border-radius: 6px;
+    font-size: .7rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s ease;
+}
+
+.users-module .action-btn[data-tooltip]:hover::after { opacity: 1; }
+
+/* ============================================================
+   Botón "Alta" en page-header + botón Buscar
+   ============================================================ */
+.users-module .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem 1.1rem;
+    background: linear-gradient(135deg, var(--usr-blue), var(--usr-blue-soft));
+    color: #fff;
+    border: 1px solid var(--usr-blue);
+    border-radius: var(--usr-radius-sm);
+    font-weight: 600;
+    font-size: .9rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .25);
+}
+
+.users-module .btn-primary:hover {
+    filter: brightness(1.04);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
+}
+
+.users-module .btn-primary:active { transform: translateY(0); }
+
+.users-module .btn-primary .material-symbols-outlined { font-size: 1.05rem; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 960px) {
+    .users-module .search-fields { flex-direction: column; align-items: stretch; }
+    .users-module .search-field  { min-width: auto; }
+    .users-module .table-wrapper { overflow-x: auto; }
+    .users-module .table-wrapper table { min-width: 720px; }
+}

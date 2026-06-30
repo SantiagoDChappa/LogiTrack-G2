@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('partials/head') %>
+    <link rel="stylesheet" href="/css/login.css">
+    <title>Verificación en dos pasos — LogiTrack</title>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-brand">
+                <img src="/images/logo.png" alt="LogiTrack" class="login-logo">
+                <h1>LogiTrack</h1>
+                <p>Verificación en dos pasos</p>
+            </div>
+            <p style="font-size:.88rem;color:var(--color-text-secondary);margin-bottom:1rem">
+                Ingresá el código de 6 dígitos de tu app de autenticación. Si no tenés acceso, podés usar un código de respaldo.
+            </p>
+            <form class="login-form" action="/login/2fa" method="post">
+                <div class="login-field">
+                    <label for="token">Código</label>
+                    <input id="token" name="token" inputmode="numeric" autocomplete="one-time-code" maxlength="14" required autofocus>
+                </div>
+                <label class="login-remember" style="margin:.25rem 0 .5rem">
+                    <input type="checkbox" name="remember_device">
+                    <span>Recordar este dispositivo por 30 días</span>
+                </label>
+                <% if (locals.error) { %>
+                <div class="login-error"><span class="material-symbols-outlined">error</span><%= error %></div>
+                <% } %>
+                <button type="submit" class="login-btn">Verificar</button>
+            </form>
+            <div class="login-support"><a href="/login">Cancelar</a></div>
+        </div>
+    </div>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

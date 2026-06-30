@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmá tu acceso - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="stylesheet" href="/css/incidents.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-incident-section">
+        <div class="portal-incident-wrapper portal-incident-success">
+            <div class="portal-incident-success-body">
+                <span class="portal-incident-eyebrow">Confirmación pendiente</span>
+                <span class="material-symbols-outlined portal-incident-success-icon" style="color:#f59e0b">mark_email_unread</span>
+                <h1>Ingresá tu código de acceso</h1>
+
+                <p class="portal-incident-success-lead">
+                    Te enviamos un <strong>código de 6 dígitos</strong> a <strong><%= email %></strong> para acceder a tus envíos de forma segura.
+                </p>
+
+                <p class="portal-incident-success-copy">
+                    El código expira <strong><%= new Date(expiresAt).toLocaleString('es-AR') %></strong>.
+                    Si no encontrás el mail, revisá tu carpeta de spam.
+                </p>
+
+                <% if (typeof error !== 'undefined' && error) { %>
+                <div class="alert alert-error" style="text-align:left; margin-top:1rem;">
+                    <%= error %>
+                </div>
+                <% } %>
+
+                <% if ((typeof mailDelivered === 'undefined' || !mailDelivered) && typeof devCode !== 'undefined' && devCode) { %>
+                <div class="alert alert-error" style="text-align:left; margin-top:1rem;">
+                    <strong>Modo desarrollo:</strong> SMTP no configurado. Código de prueba:
+                    <strong style="letter-spacing:.2em;font-size:1.2em;"><%= devCode %></strong>
+                </div>
+                <% } %>
+
+                <form method="POST" action="/portal/mis-envios/confirm" class="portal-access-form">
+                    <input type="hidden" name="email" value="<%= email %>">
+                    <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
+                    <input type="hidden" name="expiresAt" value="<%= expiresAt %>">
+                    <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+                        autocomplete="one-time-code" placeholder="000000" class="portal-access-code-input">
+                    <button type="submit" class="btn-primary portal-access-confirm">Confirmar acceso</button>
+                </form>
+
+                <div class="portal-access-secondary">
+                    <form method="POST" action="/portal/mis-envios/acceso">
+                        <input type="hidden" name="email" value="<%= email %>">
+                        <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
+                        <button type="submit" class="portal-access-resend">
+                            <span class="material-symbols-outlined">refresh</span>
+                            Reenviar código
+                        </button>
+                    </form>
+                    <a href="/portal/mis-envios" class="portal-access-back">Volver</a>
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

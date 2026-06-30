@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="/css/settings.css">
+    <title>Control de fatiga - LogiTrack</title>
+    <style>
+        .fb-meta { color: var(--color-text-secondary); font-size: var(--font-size-sm); margin: 0; }
+        .fb-section-title { margin: var(--space-6) 0 var(--space-3); font-size: var(--font-size-lg); }
+        .fb-empty {
+            color: var(--color-text-secondary); font-size: var(--font-size-sm);
+            padding: var(--space-4); background: var(--color-surface-alt);
+            border: 1px dashed var(--color-border); border-radius: var(--radius-md);
+        }
+        .fb-card { border-left: 5px solid var(--color-border); margin-bottom: var(--space-3); }
+        .fb-card.blocked { border-left-color: #dc2626; }
+        .fb-card.review { border-left-color: #f59e0b; }
+        .fb-card.disabled { border-left-color: #d97706; }
+        .fb-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+        .fb-card-title { margin: 0; font-size: var(--font-size-md); }
+        .fb-score-badge {
+            display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap;
+            background: #fee2e2; color: #b91c1c; font-weight: 700;
+            padding: .25rem .7rem; border-radius: 999px; font-size: var(--font-size-sm);
+        }
+        .fb-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-3) 0; }
+        .fb-chip {
+            font-size: var(--font-size-xs); font-weight: 600; padding: .2rem .6rem;
+            border-radius: 999px; background: var(--color-surface-alt);
+            border: 1px solid var(--color-border); color: var(--color-text-secondary);
+        }
+        .fb-actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+        .fb-select {
+            padding: .4rem .6rem; border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-sm); background: var(--color-surface);
+            color: var(--color-text); font-size: var(--font-size-sm);
+        }
+        .btn-sm { padding: .35rem .75rem; font-size: var(--font-size-sm); }
+        /* Botones del modal de motivo */
+        .fb-reason {
+            display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+            width: 100%; text-align: left; cursor: pointer;
+            padding: .8rem 1rem; border: 1.5px solid var(--color-border);
+            border-radius: var(--radius-md); background: var(--color-surface);
+            color: var(--color-text); font-size: var(--font-size-base); font-weight: 600;
+            transition: border-color .15s, background .15s;
+        }
+        .fb-reason:hover { border-color: var(--color-primary); background: var(--color-primary-light); }
+        .fb-reason small { font-weight: 400; color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="page-header fatigue-page-header">
+            <h1>👁 Ojo de Patrón — Control de fatiga</h1>
+            <div class="page-header__actions">
+                <%- include('../partials/page-help-btn', { helpModule: 'ojo-patron' }) %>
+            <% if (isAdmin) { %>
+                <a href="/fatigue/config" class="btn-secondary">
+                    <span class="material-symbols-outlined">tune</span>Configuración
+                </a>
+            <% } %>
+            </div>
+        </div>
+
+        <div class="settings-content">
+            <p class="fb-meta">
+                Umbral actual: <b><%= cfg.thresholdPct %>%</b> ·
+                Bloqueo automático: <b><%= cfg.autoBlock ? 'sí' : 'no' %></b>
+            </p>
+
+            <!-- Rutas bloqueadas -->
+            <section id="fatigue-blocked-section">
+                <h2 class="fb-section-title">Rutas bloqueadas por fatiga</h2>
+                <% if (!blocked.length) { %>
+                    <p class="fb-empty">No hay rutas bloqueadas por fatiga.</p>
+                <% } %>
+                <% blocked.forEach(b => { %>
+                    <div class="update-card fb-card blocked" id="check-<%= b.id %>">
+                        <div class="fb-card-head">
+                            <div>
+                                <h3 class="fb-card-title">Ruta #<%= b.routeId %></h3>
+                                <p class="fb-meta"><%= b.driverName || ('Transportista #' + b.userId) %> (#<%= b.userId %>) · <%= new Date(b.createdAt).toLocaleString('es-AR') %></p>
+                            </div>
+                            <span class="fb-score-badge">Fatiga: <%= b.threshold %>/<%= b.score %></span>
+                        </div>
+                        <div class="fb-chips">
+                            <span class="status-badge status-badge--sm cancelado">Bloqueada</span>
+                            <span class="fb-chip">Prueba: <%= b.method || '—' %></span>
+                        </div>
+                        <div class="fb-actions">
+                            <button class="btn-primary btn-sm" onclick="release(<%= b.id %>)">Liberar con motivo</button>
+                            <% if (!isAdmin) { %>
+                                <button class="btn-secondary btn-sm" onclick="reassign(<%= b.routeId %>)">Reasignar a otro transportista</button>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }) %>
+            </section>
+
+            <!-- Avisos sin bloqueo (autoBlock OFF + no apto): salió igual, decidir qué hacer -->
+            <section id="fatigue-review-section">
+                <h2 class="fb-section-title">Avisos de fatiga sin bloqueo</h2>
+                <% if (!reviews || !reviews.length) { %>
+                    <p class="fb-empty">No hay avisos pendientes. (Aparecen cuando un transportista no supera el control pero el bloqueo automático está desactivado.)</p>
+                <% } %>
+                <% (reviews || []).forEach(rv => { %>
+                    <div class="update-card fb-card review" id="review-<%= rv.id %>">
+                        <div class="fb-card-head">
+                            <div>
+                                <h3 class="fb-card-title">Ruta #<%= rv.routeId %> — salió a ruta</h3>
+                                <p class="fb-meta"><%= rv.driverName || ('Transportista #' + rv.userId) %> (#<%= rv.userId %>) · <%= new Date(rv.createdAt).toLocaleString('es-AR') %></p>
+                            </div>
+                            <span class="fb-score-badge">Fatiga: <%= rv.threshold %>/<%= rv.score %></span>
+                        </div>
+                        <div class="fb-chips">
+                            <span class="status-badge status-badge--sm pendiente">No superó · sin bloqueo</span>
+                            <span class="fb-chip">Prueba: <%= rv.method || '—' %></span>
+                        </div>
+                        <div class="fb-actions">
+                            <% if (!isAdmin) { %>
+                                <button class="btn-primary btn-sm" onclick="disableDriverReview(<%= rv.userId %>, <%= rv.id %>)">Inhabilitar transportista</button>
+                                <button class="btn-secondary btn-sm" onclick="reassign(<%= rv.routeId %>)">Reasignar ruta</button>
+                            <% } %>
+                            <button class="btn-secondary btn-sm" onclick="resolveReview(<%= rv.id %>)">Descartar aviso</button>
+                        </div>
+                    </div>
+                <% }) %>
+            </section>
+
+            <!-- Transportistas inhabilitados (solo supervisor) -->
+            <% if (!isAdmin) { %>
+            <section>
+                <h2 class="fb-section-title">Transportistas inhabilitados</h2>
+                <% if (!disabledDrivers || !disabledDrivers.length) { %>
+                    <p class="fb-empty">No hay transportistas inhabilitados.</p>
+                <% } %>
+                <% (disabledDrivers || []).forEach(d => { %>
+                    <div class="update-card fb-card disabled" id="drv-<%= d.userId %>">
+                        <div class="fb-card-head">
+                            <div>
+                                <h3 class="fb-card-title"><%= d.driverName || ('Transportista #' + d.userId) %></h3>
+                                <p class="fb-meta">#<%= d.userId %> · Desde <%= d.disabledAt ? new Date(d.disabledAt).toLocaleString('es-AR') : '—' %></p>
+                            </div>
+                            <span class="fb-chip">Motivo: <%= d.reason || '—' %></span>
+                        </div>
+                        <div class="fb-actions">
+                            <button class="btn-primary btn-sm" onclick="restoreDriver(<%= d.userId %>, 'consent')">Restablecer consentimiento</button>
+                            <button class="btn-secondary btn-sm" onclick="restoreDriver(<%= d.userId %>, 'test')">Restablecer prueba</button>
+                        </div>
+                    </div>
+                <% }) %>
+            </section>
+            <% } %>
+
+            <!-- Patrón recurrente -->
+            <section>
+                <h2 class="fb-section-title">Patrón de fatiga recurrente</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Transportista</th>
+                                <th>Bloqueos (ventana <%= cfg.patternWindowDays %>d)</th>
+                                <th>Total histórico</th>
+                                <th>Patrón</th>
+                                <th>Revisión</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!patterns.length) { %>
+                                <tr><td colspan="5" class="fb-meta">Sin eventos registrados.</td></tr>
+                            <% } %>
+                            <% patterns.forEach(p => { %>
+                                <tr id="pat-<%= p.userId %>">
+                                    <td><%= p.driverName || ('Transportista #' + p.userId) %> <span class="fb-meta">(#<%= p.userId %>)</span></td>
+                                    <td><%= p.windowCount %> / <%= p.threshold %></td>
+                                    <td><%= p.totalBlocked %></td>
+                                    <td>
+                                        <span class="status-badge status-badge--sm <%= p.recurrent ? 'cancelado' : 'entregado' %>">
+                                            <%= p.recurrent ? '⚠ Recurrente' : 'Normal' %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <% if (p.recurrent && !isAdmin && (p.reviewStatus === 'PENDING' || p.reviewStatus === 'NONE')) { %>
+                                            <button class="btn-secondary btn-sm" onclick="reviewPattern(<%= p.userId %>, 'REVIEWED')">Revisado</button>
+                                            <button class="btn-secondary btn-sm" onclick="reviewPattern(<%= p.userId %>, 'DISCARDED')">Descartar</button>
+                                        <% } else if (p.reviewStatus && p.reviewStatus !== 'NONE') { %>
+                                            <%= p.reviewStatus === 'REVIEWED' ? '✔ Revisado' : (p.reviewStatus === 'DISCARDED' ? 'Descartado' : 'Pendiente') %>
+                                        <% } else { %>
+                                            —
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+    // Swal respeta el tema oscuro automáticamente.
+    (function () {
+        const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+        const origFire = Swal.fire.bind(Swal);
+        Swal.fire = function (...args) {
+            const opts = (args.length === 1 && typeof args[0] === 'object') ? args[0] : null;
+            if (opts && isDark()) {
+                opts.background = opts.background || '#1e293b';
+                opts.color = opts.color || '#f1f5f9';
+            }
+            return opts ? origFire(opts) : origFire(...args);
+        };
+    })();
+
+    const toastOk = (title) => Swal.fire({ icon: 'success', title, toast: true, position: 'top-end', timer: 2200, showConfirmButton: false });
+    const toastErr = (title) => Swal.fire({ icon: 'error', title, toast: true, position: 'top-end', timer: 3200, showConfirmButton: false });
+
+    // Modal con 3 botones para elegir el motivo de liberación. Devuelve la clave o null.
+    function elegirMotivo() {
+        return new Promise((resolve) => {
+            let picked = null;
+            Swal.fire({
+                title: 'Liberar ruta bloqueada',
+                html: `<p style="margin:0 0 12px;color:inherit;font-size:.9rem">Elegí el motivo de la liberación:</p>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        <button type="button" class="fb-reason" data-r="falso_positivo">✅ Falso positivo<small>La ruta queda apta, sin nueva prueba</small></button>
+                        <button type="button" class="fb-reason" data-r="autorizado_descanso">😴 Autorizado con descanso<small>El conductor debe rehacer la prueba</small></button>
+                        <button type="button" class="fb-reason" data-r="otro">✏️ Otro motivo<small>Requiere una descripción</small></button>
+                    </div>`,
+                showConfirmButton: false, showCancelButton: true, cancelButtonText: 'Cancelar',
+                didOpen: () => {
+                    document.querySelectorAll('.fb-reason').forEach(b => {
+                        b.addEventListener('click', () => { picked = b.dataset.r; Swal.close(); });
+                    });
+                },
+            }).then(() => resolve(picked));
+        });
+    }
+
+    async function release(id) {
+        const reason = await elegirMotivo();
+        if (!reason) { return; }
+        let detail = '';
+        if (reason === 'otro') {
+            const res = await Swal.fire({
+                title: 'Describí el motivo',
+                input: 'textarea',
+                inputPlaceholder: 'Mínimo 10 caracteres…',
+                inputAttributes: { 'aria-label': 'Descripción del motivo' },
+                showCancelButton: true, confirmButtonText: 'Liberar', cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#16a34a',
+                inputValidator: (v) => (!v || v.trim().length < 10) ? 'La descripción debe tener al menos 10 caracteres.' : undefined,
+            });
+            if (!res.isConfirmed) { return; }
+            detail = res.value;
+        }
+        const r = await fetch('/fatigue/' + id + '/release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason, detail }) });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { document.getElementById('check-' + id)?.remove(); toastOk('Ruta liberada'); }
+        else { toastErr(data.error || 'No se pudo liberar.'); }
+    }
+
+    // Transportes habilitados de la sucursal (admin: de todas). El backend valida.
+    const TRANSPORTS = <%- JSON.stringify(transports || []) %>;
+
+    async function reassign(routeId) {
+        if (!TRANSPORTS.length) {
+            toastErr('No hay transportes disponibles en tu sucursal para reasignar.');
+            return;
+        }
+        const inputOptions = {};
+        TRANSPORTS.forEach(t => { inputOptions[t.id] = t.name + (t.driverName ? ' — ' + t.driverName : ''); });
+        const res = await Swal.fire({
+            title: 'Reasignar a otro transportista',
+            text: 'Elegí el transporte que tomará la ruta.',
+            input: 'select', inputOptions, inputPlaceholder: 'Elegí un transporte…',
+            showCancelButton: true, confirmButtonText: 'Reasignar', cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#16a34a',
+            inputValidator: (v) => (!v ? 'Elegí un transporte.' : undefined),
+        });
+        if (!res.isConfirmed) { return; }
+        const r = await fetch('/fatigue/reassign', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ routeId, transportId: res.value }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) {
+            await Swal.fire({ icon: 'success', title: 'Ruta reasignada',
+                text: 'El nuevo conductor deberá rehacer consentimiento y prueba.', confirmButtonColor: '#16a34a' });
+            location.reload();
+        } else { toastErr(data.error || 'No se pudo reasignar.'); }
+    }
+
+    async function disableDriverReview(userId, checkId) {
+        const res = await Swal.fire({
+            icon: 'warning', title: 'Inhabilitar transportista',
+            text: 'No podrá iniciar nuevas rutas hasta que lo restablezcas. ¿Confirmás?',
+            showCancelButton: true, confirmButtonText: 'Inhabilitar', cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#dc2626',
+        });
+        if (!res.isConfirmed) { return; }
+        const r = await fetch('/fatigue/driver/disable', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, checkId }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { document.getElementById('review-' + checkId)?.remove(); toastOk('Transportista inhabilitado'); }
+        else { toastErr(data.error || 'No se pudo inhabilitar.'); }
+    }
+
+    async function resolveReview(checkId) {
+        const r = await fetch('/fatigue/' + checkId + '/review-resolve', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note: 'Descartado desde el panel' }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { document.getElementById('review-' + checkId)?.remove(); toastOk('Aviso descartado'); }
+        else { toastErr(data.error || 'No se pudo descartar.'); }
+    }
+
+    async function restoreDriver(userId, kind) {
+        const r = await fetch('/fatigue/driver/restore', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, kind }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { document.getElementById('drv-' + userId)?.remove(); toastOk('Transportista restablecido'); }
+        else { toastErr(data.error || 'No se pudo restablecer.'); }
+    }
+
+    async function reviewPattern(userId, status) {
+        let note = '';
+        if (status === 'DISCARDED') {
+            const res = await Swal.fire({
+                title: 'Descartar patrón', input: 'textarea',
+                inputPlaceholder: 'Motivo de descarte (opcional)…',
+                showCancelButton: true, confirmButtonText: 'Descartar', cancelButtonText: 'Cancelar',
+            });
+            if (!res.isConfirmed) { return; }
+            note = res.value || '';
+        }
+        const r = await fetch('/fatigue/pattern/review', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, status, note }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) { location.reload(); } else { toastErr(data.error || 'No se pudo registrar la revisión.'); }
+    }
+    </script>
+</body>
+</html>

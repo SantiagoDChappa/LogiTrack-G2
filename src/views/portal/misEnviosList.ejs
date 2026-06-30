@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis envíos - <%= support.nombre %></title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body>
+    <%- include('../partials/portal-nav', { support }) %>
+
+    <section class="portal-mis-envios-section">
+        <div class="portal-mis-envios-wrapper portal-mis-envios-list-wrapper">
+            <div class="portal-mis-envios-list-header">
+                <div>
+                    <span class="portal-incident-eyebrow">Tus envíos</span>
+                    <h1>Mis envíos</h1>
+                    <p class="portal-mis-envios-lead">Consultá el estado, el detalle y las acciones disponibles sobre cada envío.</p>
+                </div>
+                <form method="POST" action="/portal/mis-envios/salir">
+                    <button type="submit" class="portal-mis-envios-logout">
+                        <span class="material-symbols-outlined">logout</span>
+                        Cerrar sesión
+                    </button>
+                </form>
+            </div>
+
+            <% const currentList = tab === 'historical' ? historical : active; %>
+            <% const totalCount = active.length + historical.length; %>
+
+            <% if (totalCount === 0) { %>
+            <div class="portal-empty">
+                <span class="material-symbols-outlined portal-empty-icon">inventory_2</span>
+                <h2>No se encontraron envíos vinculados</h2>
+                <p>No hay envíos asociados a tu identidad en este momento.</p>
+                <a href="/portal/mis-envios" class="btn-primary">Volver a identificarme</a>
+            </div>
+            <% } else { %>
+            <div class="portal-mis-envios-tabs">
+                <a href="/portal/mis-envios/lista?tab=active" class="portal-mis-envios-tab <%= tab !== 'historical' ? 'active' : '' %>">
+                    Activos (<%= active.length %>)
+                </a>
+                <a href="/portal/mis-envios/lista?tab=historical" class="portal-mis-envios-tab <%= tab === 'historical' ? 'active' : '' %>">
+                    Históricos (<%= historical.length %>)
+                </a>
+            </div>
+
+            <% if (currentList.length === 0) { %>
+            <div class="portal-empty portal-empty-compact">
+                <span class="material-symbols-outlined portal-empty-icon">inbox</span>
+                <h2>No hay envíos en esta categoría</h2>
+                <p>Probá la otra pestaña para ver <%= tab === 'historical' ? 'envíos activos' : 'envíos históricos' %>.</p>
+            </div>
+            <% } else { %>
+            <div class="portal-mis-envios-table-wrap">
+                <table class="portal-mis-envios-table">
+                    <thead>
+                        <tr>
+                            <th>Seguimiento</th>
+                            <th>Destinatario</th>
+                            <th>Estado</th>
+                            <th>Fecha de alta</th>
+                            <th>Modalidad</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% currentList.forEach(function(s) {
+                            const sk = s.status.description.toLowerCase().replace(/[\s-]+/g, '_');
+                        %>
+                        <tr>
+                            <td><strong><%= s.trackingId %></strong></td>
+                            <td><%= s.recipient ? s.recipient.fullName : '—' %></td>
+                            <td><span class="portal-badge <%= sk %>"><%= s.status ? s.status.description : 'Sin estado' %></span></td>
+                            <td><%= new Date(s.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+                            <td><%= s.deliveryMode === 'branch_pickup' ? 'Retiro por sucursal' : 'Envío a domicilio' %></td>
+                            <td>
+                                <a href="/portal/mis-envios/envio/<%= s.id %>" class="portal-mis-envios-link">
+                                    Ver detalle
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+            <% } %>
+        </div>
+    </section>
+    <script src="/js/theme.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Entregas a Tiempo</title>
+    <link rel="stylesheet" href="/css/report.css">
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Entregas a Tiempo</h1>
+            </div>
+
+            <!-- Formulario -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/on-time-deliveries" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Fecha de inicio</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Fecha de fin</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="segmentBy">Segmentar por</label>
+                            <select id="segmentBy" name="segmentBy" class="filter-select">
+                                <option value=""           <%= segmentBy === ''             ? 'selected' : '' %>>Sin segmentación</option>
+                                <option value="deliveryUser" <%= segmentBy === 'deliveryUser' ? 'selected' : '' %>>Repartidor</option>
+                                <option value="zone"        <%= segmentBy === 'zone'          ? 'selected' : '' %>>Zona</option>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/report/on-time-deliveries" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                            <% if (!error) { %>
+                                <a href="/report/on-time-deliveries/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=csv" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                                <a href="/report/on-time-deliveries/export?<%= exportQuery %><%= exportQuery ? '&' : '' %>format=pdf" class="action-btn action-btn--lg neutro" data-tooltip="Exportar PDF" aria-label="Exportar PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% if (!error && summary !== null) { %>
+                <% if (summary.total === 0) { %>
+                    <!-- Escenario 2: sin datos suficientes -->
+                    <div class="report-card">
+                        <div class="report-empty-state">
+                            <span class="material-symbols-outlined">inventory_2</span>
+                            <p>No existen entregas finalizadas en el período <strong><%= dateFrom %></strong> → <strong><%= dateTo %></strong> con plazo estimado registrado.</p>
+                            <p class="empty-hint">Solo se consideran envíos entregados que tenían fecha de entrega estimada configurada.</p>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <%
+                        const pctOnTime = summary.total > 0
+                            ? Math.round(summary.on_time / summary.total * 100)
+                            : 0;
+                        const pctLate = 100 - pctOnTime;
+                    %>
+
+                    <!-- Tarjetas resumen -->
+                    <div class="ot-summary-grid">
+                        <div class="ot-kpi-card ot-kpi--main">
+                            <div class="ot-kpi-gauge">
+                                <svg viewBox="0 0 120 120" class="gauge-svg">
+                                    <circle cx="60" cy="60" r="50" fill="none" stroke="var(--ot-gauge-track)" stroke-width="12"/>
+                                    <circle cx="60" cy="60" r="50" fill="none"
+                                        stroke="var(--ot-gauge-fill)"
+                                        stroke-width="12"
+                                        stroke-linecap="round"
+                                        stroke-dasharray="<%= Math.round(314 * pctOnTime / 100) %> 314"
+                                        transform="rotate(-90 60 60)"/>
+                                </svg>
+                                <div class="gauge-label">
+                                    <span class="gauge-pct"><%= pctOnTime %>%</span>
+                                    <span class="gauge-sub">a tiempo</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ot-kpi-card">
+                            <span class="material-symbols-outlined ot-icon ot-icon--blue">local_shipping</span>
+                            <div class="ot-kpi-info">
+                                <span class="ot-kpi-label">Total entregas</span>
+                                <span class="ot-kpi-value"><%= summary.total %></span>
+                            </div>
+                        </div>
+                        <div class="ot-kpi-card">
+                            <span class="material-symbols-outlined ot-icon ot-icon--green">check_circle</span>
+                            <div class="ot-kpi-info">
+                                <span class="ot-kpi-label">A tiempo</span>
+                                <span class="ot-kpi-value ot-value--green"><%= summary.on_time %></span>
+                            </div>
+                        </div>
+                        <div class="ot-kpi-card">
+                            <span class="material-symbols-outlined ot-icon ot-icon--red">cancel</span>
+                            <div class="ot-kpi-info">
+                                <span class="ot-kpi-label">Con demora</span>
+                                <span class="ot-kpi-value ot-value--red"><%= summary.late %></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <% if (segments.length > 0) { %>
+                        <%
+                            const segTitle = segmentBy === 'deliveryUser' ? 'Repartidor' : 'Zona';
+                        %>
+                        <div class="report-content-grid">
+                            <!-- Tabla de segmentación -->
+                            <div class="report-card">
+                                <h2>Detalle por <%= segTitle %></h2>
+                                <table class="report-table">
+                                    <thead>
+                                        <tr>
+                                            <th><%= segTitle %></th>
+                                            <th class="text-right">Total</th>
+                                            <th class="text-right">A tiempo</th>
+                                            <th class="text-right">Demora</th>
+                                            <th class="text-right">% A tiempo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% segments.forEach(seg => { %>
+                                            <% const sp = seg.total > 0 ? (seg.on_time / seg.total * 100).toFixed(1) : '0.0'; %>
+                                            <tr>
+                                                <td><%= seg.label %></td>
+                                                <td class="text-right count-cell"><%= seg.total %></td>
+                                                <td class="text-right"><span class="ot-badge ot-badge--green"><%= seg.on_time %></span></td>
+                                                <td class="text-right"><span class="ot-badge ot-badge--red"><%= seg.total - seg.on_time %></span></td>
+                                                <td class="text-right">
+                                                    <div class="pct-bar-wrapper">
+                                                        <div class="pct-bar pct-bar--green" style="width: <%= sp %>%"></div>
+                                                        <span><%= sp %>%</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Gráfico de barras horizontal por segmento -->
+                            <div class="report-card chart-card">
+                                <h2>% A tiempo por <%= segTitle %></h2>
+                                <canvas id="chart-segments" height="260"></canvas>
+                            </div>
+                        </div>
+
+                        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                        <script>
+                        (function () {
+                            const segments = <%- JSON.stringify(segments) %>;
+                            const labels   = segments.map(s => s.label);
+                            const pcts     = segments.map(s => s.total > 0 ? +(s.on_time / s.total * 100).toFixed(1) : 0);
+
+                            new Chart(document.getElementById('chart-segments').getContext('2d'), {
+                                type: 'bar',
+                                data: {
+                                    labels,
+                                    datasets: [
+                                        {
+                                            label: 'A tiempo (%)',
+                                            data: pcts,
+                                            backgroundColor: pcts.map(p => p >= 80
+                                                ? 'rgba(34,197,94,0.75)'
+                                                : p >= 60
+                                                    ? 'rgba(249,115,22,0.75)'
+                                                    : 'rgba(239,68,68,0.75)'),
+                                            borderRadius: 6,
+                                            borderSkipped: false,
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: ctx => ` ${ctx.raw}% a tiempo`
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            min: 0, max: 100,
+                                            ticks: { color: '#94a3b8', callback: v => v + '%' },
+                                            grid: { color: 'rgba(148,163,184,0.12)' }
+                                        },
+                                        y: {
+                                            ticks: { color: '#94a3b8' },
+                                            grid: { display: false }
+                                        }
+                                    }
+                                }
+                            });
+                        })();
+                        </script>
+                    <% } else if (segmentBy) { %>
+                        <div class="report-card">
+                            <div class="report-empty-state">
+                                <span class="material-symbols-outlined">manage_search</span>
+                                <p>No hay datos de segmentación disponibles para este período.</p>
+                            </div>
+                        </div>
+                    <% } %>
+                <% } %>
+            <% } %>
+
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

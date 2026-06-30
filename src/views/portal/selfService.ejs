@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Autogestión de Envío — LogiTrack</title>
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <style>
+        body { background: var(--color-bg); color: var(--color-text); }
+        .self-wrap { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        .self-wrap h1 { color: var(--color-text); }
+        .self-intro { color: var(--color-text-secondary); }
+        .card {
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+        }
+        .card h2 { margin: 0 0 .75rem; font-size: 1.1rem; color: var(--color-text); }
+        .card-hint { color: var(--color-text-secondary); font-size: .85rem; margin-top: 0; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+        label { display: block; font-size: .85rem; margin: .5rem 0 .25rem; color: var(--color-text-secondary); font-weight: 600; }
+        .radio-row { display: flex; align-items: center; gap: .5rem; font-weight: 500; color: var(--color-text); }
+        input, select, textarea {
+            width: 100%; padding: .55rem .65rem; border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm); font-family: inherit; font-size: .95rem;
+            background: var(--color-surface); color: var(--color-text);
+        }
+        input[type="radio"] { width: auto; accent-color: var(--color-primary); }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); }
+        input::placeholder, textarea::placeholder { color: var(--color-text-muted); }
+        textarea { resize: vertical; min-height: 60px; }
+        .btn {
+            background: var(--color-primary); color: var(--color-text-inverse); border: none;
+            padding: .7rem 1.2rem; border-radius: var(--radius-md); font-weight: 600; cursor: pointer;
+        }
+        .btn:hover { background: var(--color-primary-dark); }
+        .btn[disabled] { background: var(--color-text-muted); cursor: not-allowed; }
+        .ok { background: var(--color-primary-light); color: var(--color-primary-dark); padding: .6rem .8rem; border-radius: var(--radius-sm); margin-bottom: 1rem; }
+        .lock { background: var(--color-surface-alt); color: var(--color-text-secondary); border: 1px solid var(--color-border); padding: .6rem .8rem; border-radius: var(--radius-sm); margin-bottom: 1rem; }
+        .pill { display:inline-block; padding: 2px 8px; border-radius: var(--radius-full); background: var(--color-primary-light); color: var(--color-primary-dark); font-size:.75rem; font-weight:700; }
+        /* Caja de fecha estimada (recalculada según la modalidad elegida) */
+        .eta-box {
+            margin-top: 1rem; padding: .8rem 1rem; border-radius: var(--radius-md);
+            background: var(--color-surface-alt); border: 1px solid var(--color-border);
+        }
+        .eta-box .eta-label { font-size: .8rem; font-weight: 700; letter-spacing: .02em; color: var(--color-text-secondary); text-transform: uppercase; }
+        .eta-box .eta-date { font-size: 1.05rem; font-weight: 700; color: var(--color-text); margin-top: .15rem; }
+        .eta-box .eta-note { font-size: .8rem; color: var(--color-text-secondary); margin-top: .25rem; }
+        /* Tarjeta de demora destacada */
+        .eta-express { border-color: var(--color-primary); box-shadow: 0 2px 12px rgba(37,99,235,.12); }
+        .eta-express h2 { color: var(--color-primary); }
+        .eta-box--express { background: var(--color-primary-light, rgba(37,99,235,.08)); border-color: var(--color-primary); }
+        .eta-box--express .eta-date { color: var(--color-primary-dark, var(--color-primary)); font-size: 1.25rem; }
+        /* Popup "Formulario entregado" (autocontenido, sin librerías) */
+        .se-pop-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
+        .se-pop-backdrop.is-open { display: flex; }
+        .se-pop { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 14px; max-width: 440px; width: 100%; padding: 2rem 1.75rem; text-align: center; box-shadow: 0 18px 48px rgba(15,23,42,.3); }
+        .se-pop__icon { width: 64px; height: 64px; border-radius: 50%; background: #dcfce7; color: #16a34a; display: inline-flex; align-items: center; justify-content: center; font-size: 2.2rem; margin-bottom: 1rem; }
+        .se-pop h3 { margin: 0 0 .5rem; font-size: 1.3rem; letter-spacing: .03em; }
+        .se-pop p { color: var(--color-text-secondary); font-size: .92rem; margin: .25rem 0; }
+        .se-pop .btn { margin-top: 1.25rem; }
+    </style>
+</head>
+<body>
+    <div class="self-wrap">
+        <h1>Tu envío <span class="pill"><%= shipment.trackingId %></span></h1>
+        <p class="self-intro">Hola <%= shipment.recipient?.fullName || 'destinatario' %> — desde acá podés ajustar la franja horaria y modalidad de entrega, y dejarle al repartidor referencias de tu domicilio.</p>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="lock"><%= error %></div>
+        <% } %>
+        <% if (saved) { %>
+            <div class="ok">
+                <% if (pendingCount > 0 && appliedCount > 0) { %>
+                    Algunos cambios se aplicaron de inmediato y otros quedaron pendientes de revisión operativa.
+                <% } else if (pendingCount > 0) { %>
+                    Tu solicitud quedó pendiente de revisión operativa. Te notificaremos novedades.
+                <% } else { %>
+                    Cambios guardados. Te notificaremos novedades.
+                <% } %>
+            </div>
+        <% } %>
+        <% if (!editable) { %>
+            <div class="lock">El envío está en estado "<%= shipment.status?.description %>" y ya no admite cambios desde autogestión.</div>
+        <% } %>
+
+        <%# Demora: nueva fecha estimada recalculada con prioridad express. El destinatario
+            puede aceptar esperar esa fecha (se persiste en el envío) sin tocar nada más. %>
+        <% if (typeof expressEtaLabel !== 'undefined' && expressEtaLabel) { %>
+            <div class="card eta-express">
+                <h2><span class="material-symbols-outlined" style="vertical-align:-4px">local_shipping</span> Tu envío tuvo una demora</h2>
+                <p class="card-hint">Recalculamos con prioridad <strong>express</strong> la fecha de entrega más pronta posible para tu envío:</p>
+                <div class="eta-box eta-box--express">
+                    <div class="eta-label">Nueva fecha estimada (express)</div>
+                    <div class="eta-date"><%= expressEtaLabel %></div>
+                    <div class="eta-note">
+                        <%= expressEtaSource === 'ml'
+                            ? 'Calculada con nuestro modelo predictivo de entregas.'
+                            : 'Estimación rápida según la modalidad express.' %>
+                    </div>
+                </div>
+                <% if (editable) { %>
+                    <form id="acceptDateForm" method="POST" action="/portal/self/<%= shipment.portalToken %>">
+                        <input type="hidden" name="action" value="accept_new_date">
+                        <input type="hidden" name="newExpectedDate" value="<%= expressEtaIso %>">
+                        <button class="btn" type="submit" id="acceptDateBtn" style="margin-top:1rem">
+                            Acepto esperar esta nueva fecha
+                        </button>
+                    </form>
+                <% } %>
+            </div>
+        <% } %>
+
+        <form method="POST" action="/portal/self/<%= shipment.portalToken %>">
+            <div class="card">
+                <h2>Franja horaria preferida</h2>
+                <label for="timeWindowSelect">Elegí una franja</label>
+                <select id="timeWindowSelect" <%= editable ? '' : 'disabled' %>>
+                    <option value="">— sin preferencia —</option>
+                    <% timeWindows.forEach(w => {
+                        const fromVal = String(w.fromTime).slice(0, 8);
+                        const toVal = String(w.toTime).slice(0, 8);
+                        const fromLabel = String(w.fromTime).slice(0, 5);
+                        const toLabel = String(w.toTime).slice(0, 5);
+                        const selected = String(shipment.expectedDeliveryFrom || '').slice(0, 8) === fromVal
+                            && String(shipment.expectedDeliveryTo || '').slice(0, 8) === toVal;
+                    %>
+                        <option value="<%= fromVal %>|<%= toVal %>" <%= selected ? 'selected' : '' %>>
+                            <%= w.label %> (<%= fromLabel %> – <%= toLabel %>)
+                        </option>
+                    <% }) %>
+                </select>
+                <input type="hidden" name="windowFrom" id="windowFrom" value="<%= shipment.expectedDeliveryFrom ? String(shipment.expectedDeliveryFrom).slice(0, 8) : '' %>">
+                <input type="hidden" name="windowTo" id="windowTo" value="<%= shipment.expectedDeliveryTo ? String(shipment.expectedDeliveryTo).slice(0, 8) : '' %>">
+            </div>
+
+            <div class="card">
+                <h2>Modalidad de entrega</h2>
+                <label class="radio-row">
+                    <input type="radio" name="deliveryMode" value="home" <%= shipment.deliveryMode === 'home' ? 'checked' : '' %> <%= editable ? '' : 'disabled' %>>
+                    Envío a domicilio
+                </label>
+                <label class="radio-row">
+                    <input type="radio" name="deliveryMode" value="branch_pickup" <%= shipment.deliveryMode === 'branch_pickup' ? 'checked' : '' %> <%= editable ? '' : 'disabled' %>>
+                    Retiro por sucursal
+                </label>
+                <div id="pickup-branch-section" style="<%= shipment.deliveryMode === 'branch_pickup' ? '' : 'display:none;' %>">
+                    <label for="pickupBranchId">Sucursal de retiro</label>
+                    <select name="pickupBranchId" id="pickupBranchId" <%= editable && shipment.deliveryMode === 'branch_pickup' ? '' : 'disabled' %>>
+                        <option value="">— ninguna —</option>
+                        <% branches.forEach(b => { %>
+                            <option value="<%= b.id %>" <%= shipment.pickupBranchId === b.id ? 'selected' : '' %>><%= b.name %> — <%= b.address || '' %></option>
+                        <% }) %>
+                    </select>
+                </div>
+
+                <!-- Fecha estimada recalculada en vivo según la modalidad elegida -->
+                <div class="eta-box"
+                     data-eta-home="<%= typeof etaHomeLabel !== 'undefined' ? etaHomeLabel : '' %>"
+                     data-eta-pickup="<%= typeof etaPickupLabel !== 'undefined' ? etaPickupLabel : '' %>">
+                    <div class="eta-label" id="etaLabel">Entrega estimada</div>
+                    <div class="eta-date" id="etaDate">—</div>
+                    <div class="eta-note" id="etaNote">Si elegís retiro por sucursal podés tenerlo antes.</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Referencias de domicilio</h2>
+                <p class="card-hint">Ayudá al repartidor con detalles del domicilio.</p>
+                <div class="grid2">
+                    <div>
+                        <label>Timbre / Departamento</label>
+                        <input type="text" name="ringLabel" value="<%= shipment.address?.ringLabel || '' %>" maxlength="40" <%= editable ? '' : 'disabled' %>>
+                    </div>
+                    <div>
+                        <label>Piso / Depto</label>
+                        <input type="text" name="floorApt" value="<%= shipment.address?.floorApt || '' %>" maxlength="40" <%= editable ? '' : 'disabled' %>>
+                    </div>
+                </div>
+                <label>Referencias para encontrar el domicilio</label>
+                <textarea name="referencesTxt" maxlength="500" <%= editable ? '' : 'disabled' %>><%= shipment.address?.referencesTxt || '' %></textarea>
+                <label>¿Recibe portería?</label>
+                <input type="text" name="porterNote" value="<%= shipment.address?.porterNote || '' %>" placeholder="Ej: portería 24hs, dejar con Juan" maxlength="255" <%= editable ? '' : 'disabled' %>>
+                <label>Restricciones / aclaraciones</label>
+                <textarea name="restrictions" maxlength="500" <%= editable ? '' : 'disabled' %>><%= shipment.address?.restrictions || '' %></textarea>
+            </div>
+
+            <button class="btn" type="submit" <%= editable ? '' : 'disabled' %>>Guardar cambios</button>
+        </form>
+    </div>
+    <!-- Popup de confirmación al aceptar la nueva fecha por demora -->
+    <div class="se-pop-backdrop" id="sePopBackdrop" role="dialog" aria-modal="true" aria-labelledby="sePopTitle">
+        <div class="se-pop">
+            <div class="se-pop__icon">✓</div>
+            <h3 id="sePopTitle">FORMULARIO ENTREGADO</h3>
+            <p>Registramos que vas a esperar la nueva fecha estimada de entrega.</p>
+            <p><strong id="sePopDate"></strong></p>
+            <p>Actualizamos tu envío con esta fecha. ¡Gracias!</p>
+            <a href="/portal" class="btn">Ir al portal</a>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        var form = document.getElementById('acceptDateForm');
+        if (!form) { return; }
+        var backdrop = document.getElementById('sePopBackdrop');
+        var popDate  = document.getElementById('sePopDate');
+        var btn      = document.getElementById('acceptDateBtn');
+        var prettyDate = <%- JSON.stringify(typeof expressEtaLabel !== 'undefined' ? expressEtaLabel : '') %>;
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            btn.disabled = true;
+            btn.textContent = 'Procesando...';
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(new FormData(form)).toString()
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                if (res.ok && res.data && res.data.ok) {
+                    if (popDate) { popDate.textContent = prettyDate || res.data.newDate || ''; }
+                    backdrop.classList.add('is-open');
+                    return;
+                }
+                btn.disabled = false;
+                btn.textContent = 'Acepto esperar esta nueva fecha';
+                window.ltAlert({ icon: 'error', title: 'No se pudo registrar', text: (res.data && res.data.error) || 'No se pudo registrar la nueva fecha. Intentá de nuevo.' });
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.textContent = 'Acepto esperar esta nueva fecha';
+                window.ltAlert({ icon: 'error', title: 'Error de red', text: 'Intentá de nuevo.' });
+            });
+        });
+    })();
+    </script>
+    <script src="/js/portal-manage-form.js" defer></script>
+</body>
+</html>

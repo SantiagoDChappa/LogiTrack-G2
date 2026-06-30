@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Cambios guardados — LogiTrack</title>
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <style>
+        .self-wrap { max-width: 720px; margin: 2rem auto; padding: 0 1rem; text-align: center; }
+        .icon { font-size: 3rem; color: #16a34a; margin-bottom: 1rem; }
+        .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#e0e7ff; color:#3730a3; font-size:.75rem; font-weight:700; }
+        .card { background: var(--surface, #fff); border: 1px solid #e5e7eb; border-radius: 12px; padding: 2rem 1.5rem; margin-top: 2rem; }
+        .ok { background: #dcfce7; color: #166534; padding: .8rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-weight: 600; }
+        .sub { color: #64748b; font-size: .9rem; margin-top: .5rem; }
+        .btn { display:inline-block; margin-top: 1.5rem; background: #2563eb; color: #fff; text-decoration: none; padding: .7rem 1.4rem; border-radius: 10px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="self-wrap">
+        <div class="card">
+            <div class="icon">✓</div>
+            <h1>Envío <span class="pill"><%= trackingId %></span></h1>
+            <div class="ok">
+                <% if (typeof accepted !== 'undefined' && accepted) { %>
+                    <strong>FORMULARIO ENTREGADO.</strong> Registramos que vas a esperar la nueva fecha estimada de entrega y actualizamos tu envío.
+                <% } else if (pendingCount > 0 && appliedCount > 0) { %>
+                    Algunos cambios se aplicaron de inmediato y otros quedaron pendientes de revisión operativa.
+                <% } else if (pendingCount > 0) { %>
+                    Tu solicitud quedó pendiente de revisión operativa. Te notificaremos novedades.
+                <% } else { %>
+                    Cambios guardados correctamente.
+                <% } %>
+            </div>
+            <p class="sub">Este enlace ya no es válido. Si necesitás hacer más cambios, contactá con soporte.</p>
+            <a href="/portal" class="btn">Ir al portal</a>
+        </div>
+    </div>
+</body>
+</html>

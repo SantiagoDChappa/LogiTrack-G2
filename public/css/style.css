@@ -11,11 +11,13 @@
 
   --color-bg:             #f0f2f5;
   --color-surface:        #ffffff;
+  --color-surface-alt:    #f8fafc;
   --color-border:         #e2e8f0;
 
   --color-text:           #1e293b;
   --color-text-secondary: #64748b;
-  --color-text-muted:     #94a3b8;
+  /* LGT-217 — antes #94a3b8 (~2.8:1, no cumplía AA). #5b6573 da ~5:1 sobre blanco. */
+  --color-text-muted:     #5b6573;
   --color-text-inverse:   #ffffff;
 
   --color-success:        #16a34a;
@@ -41,6 +43,14 @@
   --badge-delayed-text:    #9a3412;
   --badge-initial-bg:      #f1f5f9;
   --badge-initial-text:    #475569;
+  --badge-assigned-bg:        #cffafe;
+  --badge-assigned-text:      #155e75;
+  --badge-preparing-bg:       #fed7aa;
+  --badge-preparing-text:     #9a3412;
+  --badge-package-failed-bg:  #ffe4e6;
+  --badge-package-failed-text:#9f1239;
+  --badge-failed-attempt-bg:  #fef08a;
+  --badge-failed-attempt-text:#854d0e;
 
   --btn-modificar-bg:      #fef3c7;
   --btn-modificar-text:    #b45309;
@@ -48,6 +58,8 @@
   --btn-detalle-text:      #15803d;
   --btn-eliminar-bg:       #fee2e2;
   --btn-eliminar-text:     #b91c1c;
+  --btn-estado-bg:         #dbeafe;
+  --btn-estado-text:       #1d4ed8;
 
   --font-family:     'Inter', system-ui, -apple-system, sans-serif;
   --font-size-xs:    0.75rem;
@@ -100,11 +112,13 @@
 
   --color-bg:             #0f172a;
   --color-surface:        #1e293b;
+  --color-surface-alt:    #273548;
   --color-border:         #334155;
 
   --color-text:           #f1f5f9;
   --color-text-secondary: #94a3b8;
-  --color-text-muted:     #475569;
+  /* LGT-217 — antes #475569 (~1.9:1 sobre surface oscura, casi ilegible). #9aa6b6 da ~6:1. */
+  --color-text-muted:     #9aa6b6;
   --color-text-inverse:   #0f172a;
 
   --color-success-bg:     #14532d;
@@ -126,6 +140,14 @@
   --badge-delayed-text:    #fdba74;
   --badge-initial-bg:      #1e293b;
   --badge-initial-text:    #94a3b8;
+  --badge-assigned-bg:        #164e63;
+  --badge-assigned-text:      #67e8f9;
+  --badge-preparing-bg:       #7c2d12;
+  --badge-preparing-text:     #fdba74;
+  --badge-package-failed-bg:  #881337;
+  --badge-package-failed-text:#fda4af;
+  --badge-failed-attempt-bg:  #713f12;
+  --badge-failed-attempt-text:#fde047;
 
   --btn-modificar-bg:      #451a03;
   --btn-modificar-text:    #fcd34d;
@@ -133,6 +155,8 @@
   --btn-detalle-text:      #86efac;
   --btn-eliminar-bg:       #450a0a;
   --btn-eliminar-text:     #fca5a5;
+  --btn-estado-bg:         #1e3a5f;
+  --btn-estado-text:       #93c5fd;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -260,6 +284,17 @@ textarea::placeholder {
   font-weight: var(--font-weight-regular);
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-text) !important;
+  caret-color: var(--color-text);
+  border-color: var(--color-border) !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -343,7 +378,11 @@ button {
   background: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  /* overflow-x: auto permite scroll horizontal de tablas anchas en mobile
+     en vez de cortarlas. -webkit-overflow-scrolling para inercia en iOS. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .shipments-table {
@@ -417,7 +456,6 @@ button {
 
 .page-wrapper {
   max-width: 1100px;
-  margin-top: -410px; /* 🔥 clave */
 }
 
 .search-form {

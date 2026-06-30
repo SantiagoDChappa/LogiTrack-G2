@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <%- include('../partials/head') %>
     <link rel="stylesheet" href="/css/shipments.css">
@@ -7,17 +8,18 @@
     <style>
         .settings-content {
             padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-6);
         }
-
         .settings-card {
             background: var(--color-surface);
             border: 1px solid var(--color-border);
             border-radius: var(--radius-md);
             padding: var(--space-6);
             box-shadow: var(--shadow-sm);
-            max-width: 900px;
+            max-width: 1100px;
         }
-
         .settings-card-title {
             font-size: var(--font-size-base);
             font-weight: var(--font-weight-semibold);
@@ -29,19 +31,50 @@
             align-items: center;
             gap: var(--space-2);
         }
-
         .settings-card-title .material-symbols-outlined {
             font-size: 1.1rem;
             color: var(--color-primary);
         }
-
         .settings-subtitle {
             font-size: var(--font-size-sm);
             color: var(--color-text-secondary);
             margin-bottom: var(--space-5);
             line-height: 1.5;
         }
-
+        #form-notification-config {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            margin-top: var(--space-4);
+        }
+        .notification-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 16px;
+            border: 1px solid #dcdcdc;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .notification-item:hover {
+            background-color: #f1f3f5;
+            border-color: #bdbdbd;
+        }
+        .notification-item span {
+            color: #333;
+        }
+        .notification-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
         .settings-actions {
             display: flex;
             justify-content: flex-end;
@@ -49,8 +82,6 @@
             border-top: 1px solid var(--color-border);
             margin-top: var(--space-5);
         }
-
-        /* Reutiliza la grid de direccion de new.ejs */
         .settings-addr {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -61,8 +92,130 @@
         .settings-addr .span-full {
             grid-column: 1 / -1;
         }
+        .branch-select {
+            width: 100%;
+            min-width: 180px;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-surface);
+            color: var(--color-text);
+            font-size: var(--font-size-sm);
+        }
+
+        /* === Editor interactivo de plantillas de email === */
+        .tplm-backdrop { display:none; position:fixed; inset:0; z-index:200;
+            background:rgba(15,23,42,.6); backdrop-filter:blur(4px);
+            align-items:center; justify-content:center; padding:1rem; }
+        .tplm-dialog { background:var(--color-bg,#fff); border:1px solid var(--color-border,#e2e8f0);
+            border-radius:14px; box-shadow:0 18px 48px rgba(0,0,0,.32);
+            width:min(1320px,97vw); height:min(760px,93vh); display:flex; flex-direction:column; overflow:hidden; }
+        .tplm-head { display:flex; align-items:flex-start; justify-content:space-between;
+            padding:1rem 1.25rem; border-bottom:1px solid var(--color-border); }
+        .tplm-title { margin:0; font-size:1.05rem; }
+        .tplm-event { font-size:.8rem; color:var(--color-text-secondary); }
+        .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
+            display:inline-flex; padding:.2rem; border-radius:6px; }
+        .tplm-close:hover { background:var(--color-surface-alt); color:var(--color-text); }
+        .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
+            padding:1.1rem 1.25rem; overflow:hidden; }
+        .tplm-editor { display:contents; }
+        .tplm-col { display:flex; flex-direction:column; gap:.85rem; min-width:0; min-height:0; overflow:auto; }
+        .tplm-col-body { gap:.6rem; }
+        .tplm-col-body .field { flex:1; display:flex; flex-direction:column; min-height:0; }
+        .tplm-col-body .tplm-textarea { flex:1; min-height:240px; }
+        .tplm-row { display:flex; align-items:center; gap:.75rem; }
+        .tplm-label { font-size:.8rem; font-weight:600; color:var(--color-text-secondary); }
+        .tplm-segmented { display:inline-flex; border:1px solid var(--color-border); border-radius:999px; overflow:hidden; }
+        .tplm-segmented button { display:inline-flex; align-items:center; gap:.35rem; border:none;
+            background:transparent; color:var(--color-text-secondary); padding:.4rem .9rem; cursor:pointer; font:inherit; font-size:.85rem; }
+        .tplm-segmented button .material-symbols-outlined { font-size:1.05rem; }
+        .tplm-segmented button.is-active { background:var(--color-primary,#2563eb); color:#fff; }
+        .tplm-chips { display:flex; flex-wrap:wrap; gap:.4rem; }
+        .tplm-chip { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.78rem;
+            background:var(--color-surface-alt); color:var(--color-primary,#2563eb);
+            border:1px solid var(--color-border,#dbe1ea); border-radius:999px;
+            padding:.25rem .6rem; cursor:grab; transition:all .12s ease; }
+        .tplm-chip:hover { background:var(--color-primary,#2563eb); color:#fff; }
+        .tplm-chip:active { cursor:grabbing; }
+        .tplm-chip--link { background:rgba(124,58,237,.10); color:#7c3aed; border-color:rgba(124,58,237,.25); }
+        .tplm-chip--link:hover { background:#7c3aed; color:#fff; }
+        .tplm-chip--var { background:rgba(22,163,74,.10); color:#16a34a; border-color:rgba(22,163,74,.25); }
+        .tplm-chip--var:hover { background:#16a34a; color:#fff; }
+        .tplm-chip-group { display:flex; flex-wrap:wrap; gap:.35rem; align-items:center; margin-bottom:.3rem; }
+        .tplm-chip-group-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-secondary); margin-right:.25rem; min-width:5rem; }
+        /* Selector de variante */
+        .tplm-variant-row { gap:.5rem; }
+        .tplm-variant-select { flex:1; padding:.4rem .6rem; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; }
+        .tplm-icon-action { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text-secondary); cursor:pointer; }
+        .tplm-icon-action:hover { color:var(--color-primary,#2563eb); border-color:var(--color-primary,#2563eb); }
+        .tplm-icon-action--danger:hover { color:#dc2626; border-color:#dc2626; }
+        .tplm-icon-action .material-symbols-outlined { font-size:1.1rem; }
+        /* ABM cards (variables / snippets) */
+        .abm-list { display:flex; flex-direction:column; gap:.5rem; }
+        .abm-row { display:flex; align-items:center; gap:.5rem; }
+        .abm-form { display:flex; align-items:center; gap:.5rem; flex:1; flex-wrap:wrap; }
+        .abm-in { padding:.4rem .6rem; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; font-size:.85rem; min-width:7rem; }
+        .abm-in--key { font-family:ui-monospace,Menlo,Consolas,monospace; max-width:11rem; }
+        .abm-in--grow { flex:1; min-width:9rem; }
+        .abm-add { margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--color-border); flex-wrap:wrap; }
+        .abm-snip { border:1px solid var(--color-border); border-radius:10px; padding:.6rem .7rem; display:flex; gap:.5rem; align-items:flex-start; }
+        .abm-snip-form { flex:1; display:flex; flex-direction:column; gap:.4rem; min-width:0; }
+        .abm-snip-head { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+        .abm-snip-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; color:var(--color-text-secondary); }
+        .abm-badge { font-size:.68rem; background:var(--color-surface-alt); color:var(--color-text-secondary); border:1px solid var(--color-border); border-radius:999px; padding:.1rem .5rem; }
+        .tplm-hint { display:block; margin-top:.4rem; font-size:.78rem; color:var(--color-text-secondary); line-height:1.4; }
+        .tplm-ph-desc { display:flex; align-items:flex-start; gap:.45rem; margin-top:.5rem;
+            padding:.5rem .65rem; border:1px solid var(--color-border); border-radius:8px;
+            background:var(--color-surface-alt); color:var(--color-text-secondary);
+            font-size:.8rem; line-height:1.35; box-sizing:border-box;
+            height:3.6rem; overflow:auto; transition:border-color .15s ease; }
+        .tplm-ph-desc-text { display:block; }
+        .tplm-ph-desc.is-active { border-color:var(--color-primary,#2563eb); color:var(--color-text); }
+        .tplm-ph-desc .material-symbols-outlined { font-size:1.05rem; flex:none; }
+        .tplm-ph-desc strong { font-family:ui-monospace,Menlo,Consolas,monospace; }
+        .tplm-ph-desc em { color:var(--color-text-secondary); font-style:italic; }
+        .tplm-snippets { display:flex; flex-wrap:wrap; gap:.4rem; }
+        .tplm-snip { display:inline-flex; align-items:center; gap:.35rem; font-size:.8rem;
+            background:var(--color-surface-alt); color:var(--color-text);
+            border:1px solid var(--color-border,#dbe1ea); border-radius:8px;
+            padding:.35rem .7rem; cursor:pointer; transition:all .12s ease; }
+        .tplm-snip:hover { border-color:var(--color-primary,#2563eb); color:var(--color-primary,#2563eb); }
+        .tplm-snip .material-symbols-outlined { font-size:1.05rem; }
+        .tplm-textarea { font-family:ui-monospace,Menlo,Consolas,monospace; resize:vertical;
+            width:100%; line-height:1.5; }
+        .tplm-test { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+            padding-top:.6rem; border-top:1px dashed var(--color-border); }
+        .tplm-test input { flex:1 1 200px; }
+        .tplm-test-msg { font-size:.82rem; color:var(--color-text-secondary); }
+        .tplm-test-msg.ok  { color:#16a34a; }
+        .tplm-test-msg.err { color:#dc2626; }
+        /* Lienzo de vista previa: claro por defecto, oscuro en data-theme=dark */
+        .tplm-preview { --pv-bg:#ffffff; --pv-text:#0f172a; --pv-muted:#64748b; --pv-border:#e2e8f0;
+            display:flex; flex-direction:column; min-width:0;
+            border:1px solid var(--color-border); border-radius:10px; background:var(--pv-bg); overflow:hidden; }
+        [data-theme="dark"] .tplm-preview { --pv-bg:#0f172a; --pv-text:#e2e8f0; --pv-muted:#94a3b8; --pv-border:rgba(148,163,184,.18); }
+        .tplm-preview-head { display:flex; align-items:center; gap:.4rem; padding:.6rem .8rem;
+            border-bottom:1px solid var(--pv-border); font-size:.82rem; font-weight:600; color:var(--pv-muted); background:var(--pv-bg); }
+        .tplm-preview-head small { font-weight:400; margin-left:auto; }
+        .tplm-preview-head .material-symbols-outlined { font-size:1.05rem; }
+        .tplm-preview-subject { padding:.6rem .8rem; font-weight:600; border-bottom:1px solid var(--pv-border);
+            color:var(--pv-text); white-space:pre-wrap; word-break:break-word; }
+        .tplm-preview-body { flex:1; min-height:240px; background:var(--pv-bg); display:flex; }
+        .tplm-preview-body pre { flex:1; min-height:0; margin:0; padding:.8rem; overflow:auto;
+            white-space:pre-wrap; word-break:break-word;
+            color:var(--pv-text); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.85rem; }
+        .tplm-preview-body iframe { flex:1; min-height:0; width:100%; border:none; background:var(--pv-bg); display:none; }
+        .tplm-foot { display:flex; justify-content:flex-end; gap:.6rem;
+            padding:.85rem 1.25rem; border-top:1px solid var(--color-border); }
+        .tplm-preview { min-height:0; overflow:auto; }
+        @media (max-width:1100px) { .tplm-body { grid-template-columns:1fr 1fr; overflow:auto; }
+            .tplm-col, .tplm-preview { overflow:visible; } }
+        @media (max-width:760px) { .tplm-body { grid-template-columns:1fr; } }
     </style>
+    <link rel="stylesheet" href="/css/settings.css">
 </head>
+
 <body>
     <%- include('../partials/header') %>
     <main class="main-content">
@@ -70,7 +223,36 @@
             <h1>Ajustes</h1>
         </div>
 
+        <!-- LGT-174: cada categoría es su propia página (navegada desde el menú superior) -->
+        <div class="settings-layout">
         <div class="settings-content">
+
+            <span class="settings-anchor" id="sec-general"></span>
+            <style>
+                /* LGT-174: organización de ajustes por categorías */
+                .settings-category {
+                    display: flex; align-items: center; gap: .75rem;
+                    margin: 2.25rem 0 1rem; padding-bottom: .6rem;
+                    border-bottom: 2px solid var(--color-border);
+                    scroll-margin-top: 90px;
+                }
+                .settings-category:first-of-type { margin-top: .25rem; }
+                .settings-category > .material-symbols-outlined {
+                    font-size: 1.6rem; color: var(--color-primary);
+                    background: var(--color-primary-light); border-radius: var(--radius-md);
+                    padding: .35rem; flex-shrink: 0;
+                }
+                .settings-category h3 { margin: 0; font-size: var(--font-size-lg); }
+                .settings-category p  { margin: .1rem 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+            </style>
+
+            <% if (activeSection === 'general') { %>
+            <section class="settings-category" id="cat-general">
+                <span class="material-symbols-outlined">tune</span>
+                <div><h3>General</h3><p>Datos base y parámetros operativos del sistema.</p></div>
+            </section>
+
+            <!-- Card 1: Dirección de origen -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
                     <span class="material-symbols-outlined">location_on</span>
@@ -80,26 +262,17 @@
                     Esta dirección representa la sucursal o punto de partida de todos los envíos.
                     Se usa para calcular la distancia real hasta el destino y mejorar la predicción del modelo de ML.
                 </p>
-
                 <form method="POST" action="/setting">
-
-                    <!-- Campos hidden: ID para el autocomplete, name para el POST -->
                     <input type="hidden" id="street"      name="origin_street"      value="<%= settings.origin_street      || '' %>">
                     <input type="hidden" id="number"      name="origin_number"      value="<%= settings.origin_number      || '' %>">
                     <input type="hidden" id="province"    name="origin_province_id" value="<%= settings.origin_province_id || '' %>">
                     <input type="hidden" id="postal-code" name="origin_postal_code" value="<%= settings.origin_postal_code || '' %>">
-
                     <div class="settings-addr">
-
-                        <!-- Buscador unificado -->
                         <div class="field addr-search-wrapper addr-full">
                             <label for="address-search">Dirección completa <span class="req">*</span></label>
-                            <input id="address-search" type="text" autocomplete="off"
-                                   placeholder="Ej: Av. Corrientes 1234, Buenos Aires">
+                            <input id="address-search" type="text" autocomplete="off" placeholder="Ej: Av. Corrientes 1234, Buenos Aires">
                             <div id="address-dropdown" class="addr-dropdown" style="display:none;"></div>
                         </div>
-
-                        <!-- Chip de dirección seleccionada -->
                         <div class="addr-selected-row addr-full" id="addr-selected-row" style="display:none;">
                             <div id="address-chip" class="addr-chip">
                                 <span class="material-symbols-outlined">pin_drop</span>
@@ -109,67 +282,2063 @@
                                 <span class="material-symbols-outlined">close</span> Cambiar
                             </button>
                         </div>
-
-                        <!-- Resultado de validación -->
-                        <div id="address-validation-result"
-                             class="addr-validation-box addr-validation-box--empty addr-full"></div>
-
+                        <div id="address-validation-result" class="addr-validation-box addr-validation-box--empty addr-full"></div>
                     </div>
-
                     <div class="settings-actions">
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
                             <span class="material-symbols-outlined">save</span>
-                            Guardar ajustes
                         </button>
                     </div>
                 </form>
             </div>
+
+            <!-- Fecha y hora: zona horaria + formato 12/24 hs -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Fecha y hora
+                </h2>
+                <p class="settings-subtitle">
+                    Zona horaria y formato con que se muestran todas las fechas del sistema (historial, notificaciones, envíos).
+                    El servidor guarda en UTC; acá se ajusta solo la visualización.
+                </p>
+                <form method="POST" action="/setting/datetime">
+                    <div class="field" style="max-width:420px">
+                        <label for="display_timezone">Zona horaria</label>
+                        <select id="display_timezone" name="display_timezone">
+                            <% timezones.forEach(function(tz) { %>
+                                <option value="<%= tz.id %>" <%= params.display_timezone === tz.id ? 'selected' : '' %>><%= tz.label %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="field" style="margin-top:.75rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" name="clock_24h" <%= params.clock_24h ? 'checked' : '' %>>
+                            Formato 24 horas (ej: 14:30). Sin tildar usa 12 hs (02:30 p. m.).
+                        </label>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar fecha y hora" aria-label="Guardar fecha y hora">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- LGT-173: Colores de estados -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">format_color_fill</span>
+                    Colores de estados
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el color de cada estado de envío. Se aplica en los listados, el detalle y el seguimiento. Dejá tildado "Color del tema" para usar el predeterminado.
+                </p>
+                <form method="POST" action="/setting/status-colors">
+                    <div class="status-colors-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem">
+                        <% (statusColorList || []).forEach(function(st) { %>
+                            <% var _scolor = st.color || '#64748b'; %>
+                            <div class="status-color-row" style="display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-alt)">
+                                <input type="color" name="status_color_<%= st.id %>" value="<%= _scolor %>"
+                                       style="width:38px;height:38px;border:none;background:none;cursor:pointer;flex-shrink:0"
+                                       data-status-preview="<%= st.id %>">
+                                <div style="flex:1;min-width:0">
+                                    <span class="status-badge" id="status-preview-<%= st.id %>"
+                                          style="background-color:<%= _scolor %>22;color:<%= _scolor %>"><%= st.description %></span>
+                                    <label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;font-size:var(--font-size-xs);text-transform:none;font-weight:500;color:var(--color-text-secondary)">
+                                        <input type="checkbox" name="default_<%= st.id %>" <%= st.color ? '' : 'checked' %> style="width:auto">
+                                        Color del tema
+                                    </label>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar colores
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    document.querySelectorAll('[data-status-preview]').forEach(function (inp) {
+                        var id = inp.getAttribute('data-status-preview');
+                        var badge = document.getElementById('status-preview-' + id);
+                        var chk = inp.closest('.status-color-row').querySelector('input[type="checkbox"]');
+                        inp.addEventListener('input', function () {
+                            badge.style.backgroundColor = inp.value + '22';
+                            badge.style.color = inp.value;
+                            if (chk) chk.checked = false;
+                        });
+                    });
+                </script>
+            </div>
+
+            <!-- Colores de estados de incidencias -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">format_color_fill</span>
+                    Colores de estados de incidencias
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el color de cada estado de incidencia. Se aplica en los listados y el detalle de incidencias. Dejá tildado "Color del tema" para usar el predeterminado.
+                </p>
+                <form method="POST" action="/setting/incident-status-colors">
+                    <div class="status-colors-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem">
+                        <% (incidentStatusColorList || []).forEach(function(st) { %>
+                            <% var _icolor = st.color || st.defaultColor; %>
+                            <div class="status-color-row" style="display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-alt)">
+                                <input type="color" name="incident_status_color_<%= st.code %>" value="<%= _icolor %>"
+                                       style="width:38px;height:38px;border:none;background:none;cursor:pointer;flex-shrink:0"
+                                       data-incident-status-preview="<%= st.code %>">
+                                <div style="flex:1;min-width:0">
+                                    <span class="status-badge" id="incident-status-preview-<%= st.code %>"
+                                          style="display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.78rem;font-weight:600;background-color:<%= _icolor %>22;color:<%= _icolor %>"><%= st.label %></span>
+                                    <label style="display:flex;align-items:center;gap:.35rem;margin-top:.4rem;font-size:var(--font-size-xs);text-transform:none;font-weight:500;color:var(--color-text-secondary)">
+                                        <input type="checkbox" name="default_<%= st.code %>" <%= st.color ? '' : 'checked' %> style="width:auto">
+                                        Color del tema
+                                    </label>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar colores
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    document.querySelectorAll('[data-incident-status-preview]').forEach(function (inp) {
+                        var code = inp.getAttribute('data-incident-status-preview');
+                        var badge = document.getElementById('incident-status-preview-' + code);
+                        var chk = inp.closest('.status-color-row').querySelector('input[type="checkbox"]');
+                        inp.addEventListener('input', function () {
+                            badge.style.backgroundColor = inp.value + '22';
+                            badge.style.color = inp.value;
+                            if (chk) chk.checked = false;
+                        });
+                    });
+                </script>
+            </div>
+
+            <!-- Card 2: Parámetros del sistema -->
+            <!-- LGT-172: Identidad visual (nombre + logo de la empresa) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">palette</span>
+                    Identidad visual
+                </h2>
+                <p class="settings-subtitle">
+                    Personalizá el nombre y el logo de tu organización. Se aplican en el encabezado, el login, las notificaciones y el portal público.
+                </p>
+                <form method="POST" action="/setting/identity" enctype="multipart/form-data">
+                    <div class="settings-addr">
+                        <div class="field span-full">
+                            <label for="nombre_empresa">Nombre de la empresa <span class="req">*</span></label>
+                            <input type="text" id="nombre_empresa" name="nombre_empresa" maxlength="100" value="<%= params.nombre_empresa %>" required>
+                            <small style="color:var(--color-text-secondary)">Aparece en notificaciones y portal público.</small>
+                        </div>
+
+                        <div class="field span-full">
+                            <label for="logo">Logo institucional</label>
+                            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                                <img id="logo-preview"
+                                     src="<%= params.logo_empresa || '/images/logo.png' %>"
+                                     alt="Logo actual"
+                                     style="height:56px;width:auto;max-width:180px;object-fit:contain;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:6px">
+                                <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+                            </div>
+                            <small style="color:var(--color-text-secondary)">PNG, JPG, SVG o WEBP. Máximo 2&nbsp;MB. Dejá el campo vacío para conservar el logo actual.</small>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="btn-primary">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar identidad
+                        </button>
+                    </div>
+                </form>
+                <script>
+                    (function () {
+                        var input = document.getElementById('logo');
+                        var preview = document.getElementById('logo-preview');
+                        if (!input || !preview) return;
+
+                        var ALLOWED = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+                        var MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+
+                        function logoPopup(message) {
+                            var overlay = document.createElement('div');
+                            overlay.setAttribute('role', 'alertdialog');
+                            overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+                            var box = document.createElement('div');
+                            box.style.cssText = 'background:var(--color-surface,#fff);color:var(--color-text,#1a1a1a);border:1px solid var(--color-border,#ddd);border-radius:var(--radius-md,8px);padding:1.25rem 1.5rem;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.2);text-align:center';
+                            box.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:.5rem;margin-bottom:.5rem;font-weight:600">'
+                                + '<span class="material-symbols-outlined" style="color:var(--color-danger,#d32f2f)">error</span>Logo no válido</div>'
+                                + '<p style="margin:0 0 1rem;color:var(--color-text-secondary,#555)"></p>';
+                            box.querySelector('p').textContent = message;
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'btn-primary';
+                            btn.textContent = 'Entendido';
+                            function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
+                            function onKey(e) { if (e.key === 'Escape') close(); }
+                            btn.addEventListener('click', close);
+                            overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+                            document.addEventListener('keydown', onKey);
+                            box.appendChild(btn);
+                            overlay.appendChild(box);
+                            document.body.appendChild(overlay);
+                            btn.focus();
+                        }
+
+                        function reset() {
+                            input.value = '';
+                            preview.src = '<%= params.logo_empresa || '/images/logo.png' %>';
+                        }
+
+                        input.addEventListener('change', function () {
+                            var file = this.files && this.files[0];
+                            if (!file) return;
+                            if (ALLOWED.indexOf(file.type) === -1) {
+                                reset();
+                                logoPopup('El archivo no cumple el formato permitido. Subí una imagen PNG, JPG, SVG o WEBP.');
+                                return;
+                            }
+                            if (file.size > MAX_BYTES) {
+                                reset();
+                                logoPopup('El archivo supera el tamaño máximo de 2 MB. Subí una imagen más liviana.');
+                                return;
+                            }
+                            preview.src = URL.createObjectURL(file);
+                        });
+                    })();
+                </script>
+            </div>
+
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">tune</span>
+                    Parámetros del sistema
+                </h2>
+                <p class="settings-subtitle">
+                    Configurá el comportamiento general del sistema. Estos valores afectan el flujo de envíos, notificaciones y entregas.
+                </p>
+                <form method="POST" action="/setting/params">
+                    <div class="settings-addr">
+
+                        <div class="field">
+                            <label for="max_intentos_fallidos">Máximo de intentos fallidos <span class="req">*</span></label>
+                            <input type="number" id="max_intentos_fallidos" name="max_intentos_fallidos" min="1" max="10" value="<%= params.max_intentos_fallidos %>" required>
+                            <small style="color:var(--color-text-secondary)">Entre 1 y 10. Después de este número el envío se cancela automáticamente.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="dias_expiracion_envio">Días para expiración de envío <span class="req">*</span></label>
+                            <input type="number" id="dias_expiracion_envio" name="dias_expiracion_envio" min="1" max="365" value="<%= params.dias_expiracion_envio %>" required>
+                            <small style="color:var(--color-text-secondary)">Entre 1 y 365. Días desde la creación hasta que un envío pendiente expira.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="return_window_days">Ventana de devolución (días) <span class="req">*</span></label>
+                            <input type="number" id="return_window_days" name="return_window_days" min="1" max="365" value="<%= params.return_window_days %>" required>
+                            <small style="color:var(--color-text-secondary)">Entre 1 y 365. Días desde la entrega dentro de los cuales el cliente puede solicitar una devolución.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="horario_entrega_inicio">Inicio de ventana de entrega <span class="req">*</span></label>
+                            <input type="time" id="horario_entrega_inicio" name="horario_entrega_inicio" value="<%= params.horario_entrega_inicio %>" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="horario_entrega_fin">Fin de ventana de entrega <span class="req">*</span></label>
+                            <input type="time" id="horario_entrega_fin" name="horario_entrega_fin" value="<%= params.horario_entrega_fin %>" required>
+                            <small style="color:var(--color-text-secondary)">El horario de fin debe ser posterior al de inicio.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="peso_maximo_envio">Peso máximo por envío (kg) <span class="req">*</span></label>
+                            <input type="number" id="peso_maximo_envio" name="peso_maximo_envio" min="1" max="999" step="0.1" value="<%= params.peso_maximo_envio %>" required>
+                            <small style="color:var(--color-text-secondary)">Peso máximo permitido por envío.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="cantidad_maxima_paquetes">Cantidad máxima de paquetes <span class="req">*</span></label>
+                            <input type="number" id="cantidad_maxima_paquetes" name="cantidad_maxima_paquetes" min="1" max="999" value="<%= params.cantidad_maxima_paquetes %>" required>
+                            <small style="color:var(--color-text-secondary)">Límite de paquetes por envío.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="costo_base_envio">Costo base de envío ($) <span class="req">*</span></label>
+                            <input type="number" id="costo_base_envio" name="costo_base_envio" min="0" step="0.01" value="<%= params.costo_base_envio %>" required>
+                            <small style="color:var(--color-text-secondary)">Costo base para calcular el precio de un envío estándar.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="seguro_pct">Seguro de mercadería (%) <span class="req">*</span></label>
+                            <input type="number" id="seguro_pct" name="seguro_pct" min="0" max="100" step="0.01" value="<%= params.seguro_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
+                        </div>
+
+        <div class="field">
+                            <label for="costo_por_km">Costo por km de distancia ($) <span class="req">*</span></label>
+                            <input type="number" id="costo_por_km" name="costo_por_km" min="0" max="9999" step="0.01" value="<%= params.costo_por_km %>" required>
+                            <small style="color:var(--color-text-secondary)">Se multiplica por la distancia en línea recta entre la sucursal de origen y el destino. 0 = sin recargo por distancia.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_express_pct">Recargo envío Express (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_express_pct" name="recargo_express_pct" min="0" max="500" step="0.01" value="<%= params.recargo_express_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra para envíos de tipo "Express". 0 = sin recargo.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_fragil_pct">Recargo paquete frágil (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_fragil_pct" name="recargo_fragil_pct" min="0" max="500" step="0.01" value="<%= params.recargo_fragil_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el envío se marca como "Paquete frágil". 0 = sin recargo.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_zona_peligrosa_pct">Recargo zona peligrosa (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_zona_peligrosa_pct" name="recargo_zona_peligrosa_pct" min="0" max="500" step="0.01" value="<%= params.recargo_zona_peligrosa_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el destino cae en una zona marcada como peligrosa (y llegable). Se valida por coordenadas/CP del destino. 0 = sin recargo. Las zonas se marcan en el mapa de Zonas.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="dias_retencion_sucursal">Retención en sucursal (días hábiles) <span class="req">*</span></label>
+                            <input type="number" id="dias_retencion_sucursal" name="dias_retencion_sucursal" min="1" max="90" step="1" value="<%= params.dias_retencion_sucursal %>" required>
+                            <small style="color:var(--color-text-secondary)">Días hábiles que el paquete queda disponible para retiro en la sucursal antes de volver al circuito de devolución. Se usa para estimar la ventana de retiro en el alta de envío.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="horas_cancelacion_pago_pendiente">Cancelar si no se paga, después de (horas) <span class="req">*</span></label>
+                            <input type="number" id="horas_cancelacion_pago_pendiente" name="horas_cancelacion_pago_pendiente" min="1" max="720" step="1" value="<%= params.horas_cancelacion_pago_pendiente %>" required>
+                            <small style="color:var(--color-text-secondary)">Envíos con "Pago antes de despachar" que sigan sin cobrarse pasado este plazo se cancelan solos y se le avisa al cliente. Default: 48 horas.</small>
+                        </div>
+
+                        <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
+
+                        <div class="field">
+                            <label for="telefono_soporte">Teléfono de soporte</label>
+                            <input type="text" id="telefono_soporte" name="telefono_soporte" maxlength="20" value="<%= params.telefono_soporte %>">
+                            <small style="color:var(--color-text-secondary)">Visible en el portal público.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="email_soporte">Email de soporte</label>
+                            <input type="email" id="email_soporte" name="email_soporte" maxlength="100" value="<%= params.email_soporte %>">
+                            <small style="color:var(--color-text-secondary)">Visible en el portal público.</small>
+                        </div>
+
+                        <div class="field span-full">
+                            <label>Notificaciones activas</label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" name="notificaciones_activas" value="true" <%= params.notificaciones_activas === 'true' ? 'checked' : '' %>>
+                                <span>Habilitar notificaciones automáticas al cliente</span>
+                            </label>
+                        </div>
+
+                        <!-- Procesos automáticos -->
+                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
+                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">schedule</span>
+                                Procesos automáticos
+                            </label>
+                            <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
+                                Programá los procesos en horarios de baja actividad para reducir costos de infraestructura en AWS.
+                            </small>
+                            <div style="margin-top:var(--space-3);padding:12px 16px;background:rgba(37,99,235,0.06);border-left:3px solid var(--color-primary);border-radius:6px;font-size:0.82rem;color:var(--color-text-secondary);line-height:1.6">
+                                <strong style="color:var(--color-text);display:block;margin-bottom:4px">
+                                    <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">cloud</span>
+                                    ¿Por qué configurar el horario?
+                                </strong>
+                                En infraestructura cloud (AWS Lambda, EC2, etc.) el costo se calcula por uso.
+                                Programar procesos pesados como reportes automáticos, notificaciones masivas y revisión de prioridades
+                                en horarios de <strong>baja actividad</strong> (ej: 02:00 a 05:00 hs) permite reducir significativamente
+                                los costos operativos, ya que estos procesos no compiten con el tráfico de usuarios activos.
+                                Por ejemplo, si el sistema corre en una instancia EC2 bajo demanda, ejecutar tareas en horario pico
+                                puede costar hasta <strong>3 veces más</strong> que en horario nocturno.
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_revisar_expirados_hora">Revisar pedidos expirados</label>
+                            <input type="time" id="proceso_revisar_expirados_hora" name="proceso_revisar_expirados_hora" value="<%= params.proceso_revisar_expirados_hora %>">
+                            <small style="color:var(--color-text-secondary)">Cancela envíos pendientes que superaron el límite de días.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_revisar_prioridades_hora">Revisar prioridades de envío</label>
+                            <input type="time" id="proceso_revisar_prioridades_hora" name="proceso_revisar_prioridades_hora" value="<%= params.proceso_revisar_prioridades_hora %>">
+                            <small style="color:var(--color-text-secondary)">Recalcula prioridades según peso, distancia y tiempo de espera.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_generar_reportes_hora">Generación de reportes automáticos</label>
+                            <input type="time" id="proceso_generar_reportes_hora" name="proceso_generar_reportes_hora" value="<%= params.proceso_generar_reportes_hora %>">
+                            <small style="color:var(--color-text-secondary)">Genera y almacena reportes diarios de operaciones.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="proceso_notificaciones_hora">Envío de notificaciones pendientes</label>
+                            <input type="time" id="proceso_notificaciones_hora" name="proceso_notificaciones_hora" value="<%= params.proceso_notificaciones_hora %>">
+                            <small style="color:var(--color-text-secondary)">Procesa y envía notificaciones acumuladas al cliente.</small>
+                        </div>
+
+                    </div>
+
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar parámetros" aria-label="Guardar parámetros">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+
+                <%# Ejecución manual: form aparte (NO anidar dentro del form de parámetros,
+                    los forms anidados rompen el botón Guardar). %>
+                <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-4);">
+                    <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">bolt</span>
+                        Ejecución manual
+                    </label>
+                    <small style="color:var(--color-text-secondary);margin-bottom:var(--space-3);display:block">
+                        Disparar el análisis de demoras ahora, sin esperar al horario programado.
+                    </small>
+                    <form method="POST" action="/setting/trigger-delay-detection" style="margin-top:var(--space-2)">
+                        <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                            <span class="material-symbols-outlined" style="font-size:1.1rem">play_arrow</span>
+                            Ejecutar detección de demoras ahora
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card: Ejecutar procesos manualmente (sin esperar al horario programado) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">play_circle</span>
+                    Ejecutar procesos ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Ejecutá manualmente un proceso en este momento, sin esperar al horario programado arriba. Útil para pruebas o para forzar el procesamiento.
+                </p>
+                <div style="display:flex;flex-direction:column;gap:.6rem">
+                    <% var _procs = [
+                        { id: 'expirados',      label: 'Revisar pedidos expirados', hint: 'Cancela envíos pendientes que superaron el límite de días.' },
+                        { id: 'demoras',        label: 'Detección de demoras',      hint: 'Avisa al cliente de envíos con demora significativa (y recuperaciones).' },
+                        { id: 'notificaciones', label: 'Envío de notificaciones pendientes', hint: 'Procesa y envía la cola de emails acumulados.' }
+                    ]; %>
+                    <% _procs.forEach(function(p) { %>
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                        <div>
+                            <strong><%= p.label %></strong>
+                            <small style="display:block;color:var(--color-text-secondary)"><%= p.hint %></small>
+                        </div>
+                        <form method="POST" action="/setting/run-process/<%= p.id %>" style="margin:0">
+                            <button type="submit" class="action-btn modificar" data-tooltip="Ejecutar ahora" aria-label="Ejecutar ahora">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>
+                        </form>
+                    </div>
+                    <% }); %>
+                </div>
+            </div>
+
+            <!-- Card: Notificaciones por evento (destinatarios + templates) -->
+            <% } %>
+
+            <% if (activeSection === 'cobros') { %>
+            <!-- Card: Configuración de cobros (CBU/alias de la empresa + medios habilitados) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">account_balance</span>
+                    Configuración de cobros
+                </h2>
+                <p class="settings-subtitle">
+                    Datos bancarios de la empresa (referencia interna para el operador/supervisor al coordinar una transferencia) y qué medios de pago están habilitados.
+                </p>
+                <form method="POST" action="/setting/cobros">
+                    <input type="hidden" name="_section" value="cobros">
+                    <div class="settings-addr">
+                        <div class="field">
+                            <label for="cbu_empresa">CBU</label>
+                            <input type="text" id="cbu_empresa" name="cbu_empresa" maxlength="30" value="<%= params.cbu_empresa %>" placeholder="0000000000000000000000">
+                        </div>
+                        <div class="field">
+                            <label for="alias_empresa">Alias</label>
+                            <input type="text" id="alias_empresa" name="alias_empresa" maxlength="40" value="<%= params.alias_empresa %>" placeholder="mi.empresa.cobros">
+                        </div>
+                        <div class="field">
+                            <label for="titular_empresa">Titular</label>
+                            <input type="text" id="titular_empresa" name="titular_empresa" maxlength="120" value="<%= params.titular_empresa %>">
+                        </div>
+                        <div class="field">
+                            <label for="banco_empresa">Banco</label>
+                            <input type="text" id="banco_empresa" name="banco_empresa" maxlength="60" value="<%= params.banco_empresa %>">
+                        </div>
+
+                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
+                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                                Medios de pago habilitados
+                            </label>
+                            <small style="color:var(--color-text-secondary);display:block;margin-bottom:var(--space-2)">
+                                Si se deshabilita un medio, deja de aparecer como opción para el operador/supervisor (y Mercado Pago deja de mostrarse en el link de pago del cliente).
+                            </small>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+                                <input type="checkbox" name="medio_pago_mercadopago_habilitado" value="true" <%= params.medio_pago_mercadopago_habilitado ? 'checked' : '' %>>
+                                <span>Mercado Pago</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+                                <input type="checkbox" name="medio_pago_efectivo_habilitado" value="true" <%= params.medio_pago_efectivo_habilitado ? 'checked' : '' %>>
+                                <span>Efectivo</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" name="medio_pago_transferencia_habilitado" value="true" <%= params.medio_pago_transferencia_habilitado ? 'checked' : '' %>>
+                                <span>Transferencia</span>
+                            </label>
+                        </div>
+
+                        <div class="field span-full">
+                            <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem">save</span>
+                                Guardar configuración de cobros
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <% } %>
+
+            <% if (activeSection === 'comunicaciones') { %>
+            <span class="settings-anchor" id="sec-comunicaciones"></span>
+            <section class="settings-category" id="cat-comunicaciones">
+                <span class="material-symbols-outlined">mark_email_read</span>
+                <div><h3>Comunicaciones</h3><p>Notificaciones por evento, incidencias y pruebas de email.</p></div>
+            </section>
+
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">mark_email_read</span>
+                    Notificaciones por evento
+                </h2>
+                <p class="settings-subtitle">
+                    Por cada evento podés elegir si se notifica, a quién (destinatario / remitente / ambos / un email personalizado) y editar el texto del email.
+                </p>
+                <form method="POST" action="/setting/notification-config">
+                    <%
+                        // Agrupacion semantica por evento. Los codigos que no matchean caen en "Otros".
+                        const sectionFor = (code) => {
+                            if (code === 'FATIGUE_DRIVER_DISABLED_CONSENT') { return null; } // gestionado en card aparte
+                            if (code === 'PORTAL_CLIENT_ACCESS')            { return null; } // card propia
+                            if (code === 'SHIPMENT_INCIDENT' || code === 'INCIDENT_STATUS_CHANGE') { return 'incidencias'; }
+                            if (code === 'SHIPMENT_PACKAGE_DAMAGED') { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_PACKAGE_FAILED')) { return 'incidencias'; }
+                            if (code.startsWith('SHIPMENT_'))               { return 'envios'; }
+                            if (code.startsWith('ROUTE_'))                  { return 'rutas'; }
+                            return 'otros';
+                        };
+                        const SECTION_META = {
+                            envios:      { title: 'Envíos',     icon: 'local_shipping', desc: 'Cambios de estado del envío y avisos accionables al cliente.' },
+                            incidencias: { title: 'Incidencias', icon: 'report',         desc: 'Aperturas, cambios de estado y resoluciones de incidencias (incluye paquete fallido por motivo).' },
+                            rutas:       { title: 'Rutas',       icon: 'route',          desc: 'Eventos de las rutas de reparto.' },
+                            otros:       { title: 'Otros',       icon: 'mail',           desc: 'Notificaciones varias.' }
+                        };
+                        const grouped = { envios: [], incidencias: [], rutas: [], otros: [] };
+                        notifConfig.forEach(c => {
+                            const sec = sectionFor(c.eventCode);
+                            if (sec) { grouped[sec].push(c); }
+                        });
+                    %>
+                    <% ['envios','incidencias','rutas','otros'].forEach(secKey => {
+                        const items = grouped[secKey];
+                        if (!items || items.length === 0) { return; }
+                        const meta = SECTION_META[secKey];
+                    %>
+                        <div class="notif-section-group" style="margin-bottom:1.25rem;padding:1rem 1.1rem;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:10px;">
+                            <h3 style="display:flex;align-items:center;gap:.5rem;margin:0 0 .5rem;font-size:1rem;color:var(--color-text,#0f172a);">
+                                <span class="material-symbols-outlined" style="font-size:1.2rem;color:var(--inc-blue,#2563eb);"><%= meta.icon %></span>
+                                <%= meta.title %>
+                                <span style="margin-left:auto;font-size:.78rem;font-weight:500;color:var(--color-text-secondary,#64748b);"><%= items.length %> plantilla<%= items.length === 1 ? '' : 's' %></span>
+                            </h3>
+                            <p style="margin:0 0 .8rem;font-size:.82rem;color:var(--color-text-secondary,#64748b);"><%= meta.desc %></p>
+                            <div style="display:flex;flex-direction:column;gap:.5rem;">
+                                <% items.forEach(config => { %>
+                                    <div class="notif-config-row" style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:.6rem 1rem;align-items:center">
+                                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-weight:600">
+                                            <input type="checkbox" name="enabled_<%= config.eventCode %>"
+                                                <%= config.enabled ? 'checked' : '' %>>
+                                            <%= config.description %>
+                                        </label>
+                                        <select name="mode_<%= config.eventCode %>" data-event="<%= config.eventCode %>" class="notif-mode-select">
+                                            <option value="recipient" <%= config.recipientMode === 'recipient' ? 'selected' : '' %>>Destinatario del envío</option>
+                                            <option value="sender"    <%= config.recipientMode === 'sender'    ? 'selected' : '' %>>Remitente</option>
+                                            <option value="both"      <%= config.recipientMode === 'both'      ? 'selected' : '' %>>Ambos</option>
+                                            <option value="custom"    <%= config.recipientMode === 'custom'    ? 'selected' : '' %>>Email personalizado</option>
+                                        </select>
+                                        <input type="email" name="custom_<%= config.eventCode %>"
+                                            placeholder="email@dominio.com"
+                                            value="<%= config.customEmail || '' %>"
+                                            data-event="<%= config.eventCode %>"
+                                            class="notif-custom-input"
+                                            <%= config.recipientMode === 'custom' ? '' : 'disabled' %>>
+                                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                                            data-event="<%= config.eventCode %>"
+                                            data-description="<%= config.description %>"
+                                            data-subject="<%= templatesByEvent[config.eventCode]?.subject || '' %>"
+                                            data-body="<%= templatesByEvent[config.eventCode]?.body || '' %>"
+                                            data-format="<%= templatesByEvent[config.eventCode]?.format || 'text' %>"
+                                            data-tooltip="Editar mail" aria-label="Editar mail">
+                                            <span class="material-symbols-outlined">edit_note</span>
+                                        </button>
+                                        <%# LGT-219 — canales por evento (multi-selección). %>
+                                        <% var _ch = config.channels || ['email']; %>
+                                        <div style="grid-column:1/-1;display:flex;gap:1.1rem;align-items:center;font-size:.84rem;flex-wrap:wrap;border-top:1px dashed var(--color-border,#e2e8f0);padding-top:.5rem;">
+                                            <span style="opacity:.7;">Canales:</span>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="in-app" <%= _ch.includes('in-app') ? 'checked' : '' %>> In-app</label>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="email" <%= _ch.includes('email') ? 'checked' : '' %>> Email</label>
+                                            <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;"><input type="checkbox" name="channels_<%= config.eventCode %>" value="sms" <%= _ch.includes('sms') ? 'checked' : '' %>> SMS</label>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    <% }) %>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones" aria-label="Guardar notificaciones">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Mail de acceso al portal cliente (Mis Envíos) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">mail_lock</span>
+                    Mail de acceso al portal (Mis Envíos)
+                </h2>
+                <p class="settings-subtitle">
+                    Mail de confirmación que recibe el cliente al pedir acceso a sus envíos desde el portal público.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar) porque sin él el cliente no puede ingresar.
+                    Placeholders disponibles: <code>{{codigo}}</code> (código de 6 dígitos) y <code>{{ttlHoras}}</code> (validez en horas).
+                </p>
+                <% if (templatesByEvent['PORTAL_CLIENT_ACCESS']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla de confirmación de acceso</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="PORTAL_CLIENT_ACCESS"
+                        data-description="Mail de acceso al portal (Mis Envíos)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
+                    mientras tanto se usa el texto por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Mail de pago de factura (link de pago simulado) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">payments</span>
+                    Mail de pago de factura
+                </h2>
+                <p class="settings-subtitle">
+                    Mail que recibe el remitente con el link de pago simulado al generarse la factura del envío.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar).
+                    Placeholders: <code>{{empresaNombre}}</code> <code>{{invoiceNumber}}</code> <code>{{senderName}}</code>
+                    <code>{{trackingCode}}</code> <code>{{totalAmount}}</code> <code>{{payUrl}}</code>.
+                </p>
+                <% if (templatesByEvent['INVOICE_PAYMENT_LINK']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla del mail de pago</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="INVOICE_PAYMENT_LINK"
+                        data-description="Mail de pago de factura (link de pago simulado)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>086</code> y <code>087</code> para poder editarla;
+                    mientras tanto se usa el HTML por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Aviso al Supervisor por rechazo de consentimiento de fatiga (LGT-195) -->
+            <% var fatigueNotif = (notifConfig || []).find(function(c){ return c.eventCode === 'FATIGUE_DRIVER_DISABLED_CONSENT'; }); %>
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">notifications_active</span>
+                    Aviso de transportista inhabilitado por fatiga
+                </h2>
+                <p class="settings-subtitle">
+                    Cuando un transportista rechaza el consentimiento del control de fatiga
+                    <strong>tantas veces como esté parametrizado</strong> (Ajustes → Ojo de Patrón → "Rechazos permitidos"),
+                    queda inhabilitado y se envía un email a <strong>todos los Supervisores de la sucursal asignada al transportista</strong>
+                    y a los administradores. Podés activar/desactivar el aviso y editar la plantilla del email.
+                </p>
+                <% if (!fatigueNotif) { %>
+                <p style="color:var(--color-text-secondary)">
+                    El evento aún no está cargado. Corré las migraciones <code>045</code> y <code>046</code> para parametrizarlo;
+                    mientras tanto se envía con el texto por defecto si ocurre la inhabilitación.
+                </p>
+                <% } else { %>
+                <form method="POST" action="/setting/fatigue-consent-notification">
+                    <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:600">
+                            <input type="checkbox" name="enabled" <%= fatigueNotif.enabled ? 'checked' : '' %>>
+                            Enviar email al Supervisor cuando el transportista queda inhabilitado
+                        </label>
+                        <% if (templatesByEvent['FATIGUE_DRIVER_DISABLED_CONSENT']) { %>
+                        <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                            data-event="FATIGUE_DRIVER_DISABLED_CONSENT"
+                            data-description="Aviso de transportista inhabilitado por fatiga"
+                            data-tooltip="Editar mail" aria-label="Editar mail">
+                            <span class="material-symbols-outlined">edit_note</span>
+                        </button>
+                        <% } %>
+                    </div>
+                    <p style="font-size:.8rem;color:var(--color-text-secondary);margin-top:.5rem">
+                        Placeholders disponibles: <code>{{transportistaNombre}}</code>, <code>{{transportistaId}}</code>,
+                        <code>{{sucursalNombre}}</code>, <code>{{sucursalId}}</code>, <code>{{rutaId}}</code>,
+                        <code>{{rechazos}}</code>, <code>{{maxRechazos}}</code>, <code>{{motivoInhabilitacion}}</code>.
+                    </p>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar configuración" aria-label="Guardar configuración">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+                <% } %>
+            </div>
+
+            <!-- Card: Notificaciones de incidencias (destinatarios internos) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">report</span>
+                    Notificaciones de incidencias
+                </h2>
+                <p class="settings-subtitle">
+                    Elegí quiénes reciben un email cuando se registra una nueva incidencia interna. Se pueden combinar destinatarios por rol y emails personalizados.
+                </p>
+                <form method="POST" action="/setting/incident-notification">
+                    <div class="notif-toggle-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.5rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifySupervisorBranch" <%= incidentNotif.notifySupervisorBranch ? 'checked' : '' %>>
+                            <span>Supervisor de la sucursal del usuario asignado</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyAssignedOperator" <%= incidentNotif.notifyAssignedOperator ? 'checked' : '' %>>
+                            <span>Operador asignado a la incidencia</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyAdmins" <%= incidentNotif.notifyAdmins ? 'checked' : '' %>>
+                            <span>Todos los administradores</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" name="notifyReporter" <%= incidentNotif.notifyReporter ? 'checked' : '' %>>
+                            <span>Usuario que reportó la incidencia (copia)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;grid-column:1/-1">
+                            <input type="checkbox" name="notifyShipmentRecipient" <%= incidentNotif.notifyShipmentRecipient ? 'checked' : '' %>>
+                            <span>Destinatario del envío (template según tipo: <code>SHIPMENT_DELAYED</code>, <code>SHIPMENT_PACKAGE_FAILED</code> o <code>SHIPMENT_INCIDENT</code>)</span>
+                        </label>
+                    </div>
+
+                    <fieldset style="margin-top:1rem;padding:.8rem 1rem;border:1px solid var(--color-border,#e5e7eb);border-radius:8px;">
+                        <legend style="padding:0 .5rem;font-size:.85rem;font-weight:600;color:var(--color-text-secondary);">Filtro por tipo de incidencia (aplica solo si "Destinatario del envío" está activo)</legend>
+                        <div class="notif-type-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem 1rem;margin-top:.4rem;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDelay" <%= incidentNotif.notifyOnDelay !== false ? 'checked' : '' %>>
+                                <span>Demoras</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnDamage" <%= incidentNotif.notifyOnDamage !== false ? 'checked' : '' %>>
+                                <span>Paquete dañado</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                                <input type="checkbox" name="notifyOnGeneric" <%= incidentNotif.notifyOnGeneric !== false ? 'checked' : '' %>>
+                                <span>Otros tipos (genérico)</span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div class="field" style="margin-top:1rem">
+                        <label for="incident_notif_custom">Emails personalizados extra</label>
+                        <input type="text" id="incident_notif_custom" name="customEmails"
+                               value="<%= incidentNotif.customEmails || '' %>"
+                               placeholder="ej: ops@logitrack.com, calidad@logitrack.com">
+                        <small style="color:var(--color-text-secondary)">Separar por coma, espacio o punto y coma. Se ignoran direcciones inválidas.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar notificaciones de incidencias" aria-label="Guardar notificaciones de incidencias">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Prueba de notificaciones por email (PR68) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">forward_to_inbox</span>
+                    Prueba de notificaciones por email
+                </h2>
+                <p class="settings-subtitle">
+                    Enviá un mail de prueba a uno o varios destinatarios para verificar la configuración sin generar eventos reales.
+                    Podés usar el template de un evento o escribir uno libre. Los placeholders se resuelven con datos de ejemplo.
+                </p>
+                <form method="POST" action="/setting/test-shipment-notification">
+                    <div class="field" style="max-width:520px">
+                        <label for="emailRecipients">Emails de destinatarios</label>
+                        <input type="text" id="emailRecipients" name="emailRecipients"
+                            placeholder="correo1@dominio.com, correo2@dominio.com" required>
+                        <small style="color:var(--color-text-secondary)">Separar por coma. Se ignoran direcciones inválidas.</small>
+                    </div>
+                    <div class="field" style="max-width:520px">
+                        <label for="shipmentEventCode">Evento (opcional)</label>
+                        <select id="shipmentEventCode" name="shipmentEventCode">
+                            <option value="">— Sin evento (uso el texto de abajo) —</option>
+                            <% notifConfig.forEach(config => { %>
+                                <option value="<%= config.eventCode %>"><%= config.description || config.eventCode %></option>
+                            <% }) %>
+                        </select>
+                        <small style="color:var(--color-text-secondary)">Si elegís un evento, usa el template predeterminado de ese evento.</small>
+                    </div>
+                    <div class="field">
+                        <label for="template">Template libre (opcional)</label>
+                        <input type="text" name="template" id="template"
+                            placeholder="Hola {{fullName}}, tu envío {{trackingCode}} cambió de estado.">
+                        <small style="color:var(--color-text-secondary)">Si no elegís evento, se usa este texto como cuerpo.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
+                            <span class="material-symbols-outlined">send</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Envío manual de la cola de emails -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">outbox</span>
+                    Enviar cola de emails ahora
+                </h2>
+                <p class="settings-subtitle">
+                    Procesa y envía <strong>inmediatamente</strong> todos los emails pendientes en la cola, sin esperar al proceso automático programado.
+                    Los que fallen quedan reprogramados para reintento.
+                </p>
+                <form method="POST" action="/setting/flush-email-queue">
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Enviar pendientes ahora" aria-label="Enviar pendientes ahora">
+                            <span class="material-symbols-outlined">outbox</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Email de prueba (override) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">science</span>
+                    Email de prueba (override)
+                </h2>
+                <p class="settings-subtitle">
+                    Si se configura un email aquí, los <strong>envíos de prueba</strong> (botón "Enviar prueba" del editor) se redirigen a esta dirección. Las notificaciones reales (destinatario/remitente/parametrizado) <strong>no</strong> se ven afectadas: siempre van al destinatario configurado. Dejar vacío para no redirigir.
+                </p>
+                <form method="POST" action="/setting/test-email-override">
+                    <div class="field" style="max-width:520px">
+                        <label for="test_email_override">Email override (vacío = desactivado)</label>
+                        <input type="email" id="test_email_override" name="test_email_override"
+                            value="<%= params.test_email_override %>" placeholder="ej: dev@tudominio.com">
+                        <small style="color:var(--color-text-secondary)">El asunto recibirá un prefijo <code>[TEST → destinatarios reales]</code>.</small>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar override" aria-label="Guardar override">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Proveedores de email (SendGrid / Resend) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">alternate_email</span>
+                    Proveedores de email
+                </h2>
+                <p class="settings-subtitle">
+                    Orden de envío (se prueba en orden hasta que uno funcione): <strong>Mailjet → SendGrid → Resend</strong>.
+                    Mailjet va primero si está configurado (remitente único, no requiere dominio). El toggle de abajo activa/desactiva Resend.
+                </p>
+                <p class="settings-subtitle" style="margin-top:-.25rem">
+                    Estado:
+                    Mailjet <strong style="color:<%= emailProviders.mailjet ? '#16a34a' : '#dc2626' %>"><%= emailProviders.mailjet ? 'configurado' : 'no configurado' %></strong>
+                    · SendGrid <strong style="color:<%= emailProviders.sendgrid ? '#16a34a' : '#dc2626' %>"><%= emailProviders.sendgrid ? 'configurado' : 'no configurado' %></strong>
+                    · Resend <strong style="color:<%= emailProviders.resend ? '#16a34a' : '#dc2626' %>"><%= emailProviders.resend ? 'configurado' : 'no configurado' %></strong>
+                </p>
+                <% if (!emailProviders.sendgrid) { %>
+                <p class="settings-subtitle" style="color:#b45309">
+                    ⚠ SendGrid no está configurado. Si apagás Resend, <strong>no saldrá ningún email</strong> (salvo SMTP en local).
+                </p>
+                <% } %>
+                <form method="POST" action="/setting/email-providers">
+                    <div class="field" style="margin-top:.75rem">
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+                            <input type="checkbox" name="email_resend_enabled" <%= params.email_resend_enabled ? 'checked' : '' %>>
+                            Usar Resend como respaldo si SendGrid falla. Sin tildar: enviar solo por SendGrid.
+                        </label>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar proveedores" aria-label="Guardar proveedores">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Variables de notificación (ABM) -->
+            <% } %>
+            <% if (activeSection === 'plantillas') { %>
+            <span class="settings-anchor" id="sec-plantillas"></span>
+            <section class="settings-category" id="cat-plantillas">
+                <span class="material-symbols-outlined">smart_button</span>
+                <div><h3>Plantillas y contenido</h3><p>Variables y bloques reutilizables para los emails.</p></div>
+            </section>
+
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">data_object</span>
+                    Variables de notificación
+                </h2>
+                <p class="settings-subtitle">
+                    Variables con valor fijo reutilizables en cualquier plantilla (ej. <code>{{empresaTelefono}}</code>). Se reemplazan al enviar y aparecen como chips en el editor.
+                </p>
+                <div class="abm-list">
+                    <% (customVariables || []).forEach(v => { %>
+                        <div class="abm-row">
+                            <form method="POST" action="/setting/notification-variable/<%= v.id %>" class="abm-form">
+                                <input type="text" name="key"   value="<%= v.key %>"   placeholder="clave" class="abm-in abm-in--key" required>
+                                <input type="text" name="label" value="<%= v.label %>" placeholder="etiqueta" class="abm-in" required>
+                                <input type="text" name="value" value="<%= v.value %>" placeholder="valor" class="abm-in abm-in--grow">
+                                <input type="text" name="description" value="<%= v.description || '' %>" placeholder="descripción" class="abm-in">
+                                <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                            </form>
+                            <form method="POST" action="/setting/notification-variable/<%= v.id %>/delete">
+                                <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar" aria-label="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                            </form>
+                        </div>
+                    <% }) %>
+                </div>
+                <form method="POST" action="/setting/notification-variable" class="abm-row abm-add">
+                    <input type="text" name="key"   placeholder="clave (ej: empresaTelefono)" class="abm-in abm-in--key" required>
+                    <input type="text" name="label" placeholder="etiqueta" class="abm-in" required>
+                    <input type="text" name="value" placeholder="valor" class="abm-in abm-in--grow">
+                    <input type="text" name="description" placeholder="descripción (opcional)" class="abm-in">
+                    <button type="submit" class="action-btn crear" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button>
+                </form>
+            </div>
+
+            <!-- Card: Bloques de email (snippets, ABM) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">smart_button</span>
+                    Bloques de email
+                </h2>
+                <p class="settings-subtitle">
+                    Botones y bloques reutilizables que aparecen en "Bloques rápidos" del editor. Definí la versión HTML y la de texto; pueden usar placeholders. Los predefinidos no se borran.
+                </p>
+                <div class="abm-list">
+                    <% (emailSnippets || []).forEach(s => { %>
+                        <div class="abm-snip">
+                            <form method="POST" action="/setting/email-snippet/<%= s.id %>" class="abm-snip-form">
+                                <div class="abm-snip-head">
+                                    <input type="text" name="label" value="<%= s.label %>" placeholder="etiqueta" class="abm-in" required>
+                                    <input type="text" name="icon" value="<%= s.icon || '' %>" placeholder="ícono (material symbol)" class="abm-in abm-in--key">
+                                    <% if (s.builtin) { %><span class="abm-badge">predefinido</span><% } %>
+                                    <button type="submit" class="action-btn guardar" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                </div>
+                                <label class="abm-snip-label">HTML</label>
+                                <textarea name="html" rows="2" class="abm-in tplm-textarea"><%= s.html %></textarea>
+                                <label class="abm-snip-label">Texto</label>
+                                <textarea name="text" rows="2" class="abm-in tplm-textarea"><%= s.text %></textarea>
+                            </form>
+                            <% if (!s.builtin) { %>
+                                <form method="POST" action="/setting/email-snippet/<%= s.id %>/delete" class="abm-snip-del">
+                                    <button type="submit" class="tplm-icon-btn tplm-icon-btn--danger" title="Eliminar" aria-label="Eliminar"><span class="material-symbols-outlined">delete</span></button>
+                                </form>
+                            <% } %>
+                        </div>
+                    <% }) %>
+                </div>
+                <form method="POST" action="/setting/email-snippet" class="abm-snip abm-add">
+                    <div class="abm-snip-head">
+                        <input type="text" name="label" placeholder="etiqueta del bloque" class="abm-in" required>
+                        <input type="text" name="icon" placeholder="ícono (ej: link)" class="abm-in abm-in--key">
+                        <button type="submit" class="action-btn crear" data-tooltip="Agregar bloque" aria-label="Agregar bloque"><span class="material-symbols-outlined">add</span></button>
+                    </div>
+                    <textarea name="html" rows="2" class="abm-in tplm-textarea" placeholder="Versión HTML (ej: <a href=&quot;{{trackingUrl}}&quot;>Ver envío</a>)"></textarea>
+                    <textarea name="text" rows="2" class="abm-in tplm-textarea" placeholder="Versión texto (ej: Seguí tu envío: {{trackingUrl}})"></textarea>
+                </form>
+            </div>
+            <% } %>
+
+            <%/* El modal de edición de templates y su JS viven con la sección Comunicaciones,
+                 que es donde están los botones "editar mail" y los selects de destinatario. */%>
+            <% if (activeSection === 'comunicaciones') { %>
+            <!-- Modal: Editar template de email (interactivo) -->
+            <div id="tpl-modal-backdrop" class="tplm-backdrop">
+                <div class="tplm-dialog">
+                    <header class="tplm-head">
+                        <div>
+                            <h3 class="tplm-title">Editar email</h3>
+                            <span class="tplm-event" id="tpl-modal-event"></span>
+                        </div>
+                        <button type="button" class="tplm-close" id="tpl-modal-cancel" aria-label="Cerrar">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </header>
+
+                    <div class="tplm-body">
+                        <form id="tpl-modal-form" method="POST" action="" class="tplm-editor">
+                            <input type="hidden" name="format" id="tpl-modal-format" value="text">
+
+                            <div class="tplm-col tplm-col-controls">
+                            <div class="tplm-row tplm-variant-row">
+                                <span class="tplm-label">Variante</span>
+                                <select id="tpl-variant-select" class="tplm-variant-select"></select>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-new" title="Nueva variante" aria-label="Nueva variante"><span class="material-symbols-outlined">add</span></button>
+                                <button type="button" class="tplm-icon-action" id="tpl-variant-default" title="Marcar como predeterminada" aria-label="Marcar como predeterminada"><span class="material-symbols-outlined">star</span></button>
+                                <button type="button" class="tplm-icon-action tplm-icon-action--danger" id="tpl-variant-delete" title="Eliminar variante" aria-label="Eliminar variante"><span class="material-symbols-outlined">delete</span></button>
+                            </div>
+
+                            <div class="tplm-row">
+                                <span class="tplm-label">Formato</span>
+                                <div class="tplm-segmented" id="tpl-format-toggle">
+                                    <button type="button" data-format="text" class="is-active">
+                                        <span class="material-symbols-outlined">subject</span> Texto
+                                    </button>
+                                    <button type="button" data-format="html">
+                                        <span class="material-symbols-outlined">code</span> HTML
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="tpl-modal-name">Nombre de la variante</label>
+                                <input type="text" id="tpl-modal-name" name="name" maxlength="80" placeholder="Ej: Principal">
+                            </div>
+
+                            <div class="field">
+                                <label for="tpl-modal-subject">Asunto</label>
+                                <input type="text" id="tpl-modal-subject" name="subject" required>
+                            </div>
+
+                            <div class="field">
+                                <label>Placeholders <small>(click para insertar · o arrastrá al texto)</small></label>
+                                <div class="tplm-chips" id="tpl-placeholders"></div>
+                                <div class="tplm-ph-desc" id="tpl-ph-desc">
+                                    <span class="material-symbols-outlined">touch_app</span>
+                                    <span class="tplm-ph-desc-text">Pasá el cursor o tabulá sobre un placeholder para ver qué inserta.</span>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label>Bloques rápidos <small>(insertan contenido listo según el formato)</small></label>
+                                <div class="tplm-snippets" id="tpl-snippets"></div>
+                            </div>
+                            </div><!-- /tplm-col-controls -->
+
+                            <div class="tplm-col tplm-col-body">
+                            <div class="field">
+                                <label for="tpl-modal-body">Cuerpo del mensaje</label>
+                                <textarea id="tpl-modal-body" name="body" rows="10" required class="tplm-textarea"></textarea>
+                            </div>
+
+                            <div class="tplm-test">
+                                <input type="email" id="tpl-modal-test-email" placeholder="email@dominio.com para enviar prueba">
+                                <button type="button" class="action-btn buscar" id="tpl-modal-test-btn" data-tooltip="Enviar prueba" aria-label="Enviar prueba">
+                                    <span class="material-symbols-outlined">send</span>
+                                </button>
+                                <span class="tplm-test-msg" id="tpl-modal-test-msg"></span>
+                            </div>
+                            </div><!-- /tplm-col-body -->
+                        </form>
+
+                        <div class="tplm-preview">
+                            <div class="tplm-preview-head">
+                                <span class="material-symbols-outlined">visibility</span> Vista previa
+                                <small>datos de ejemplo</small>
+                            </div>
+                            <div class="tplm-preview-subject" id="tpl-preview-subject"></div>
+                            <div class="tplm-preview-body">
+                                <pre id="tpl-preview-text"></pre>
+                                <iframe id="tpl-preview-html" title="Vista previa HTML" sandbox=""></iframe>
+                            </div>
+                        </div>
+                    </div>
+
+                    <footer class="tplm-foot">
+                        <button type="button" class="action-btn action-btn--lg cancelar" id="tpl-modal-cancel2" data-tooltip="Cancelar" aria-label="Cancelar">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                        <button type="submit" form="tpl-modal-form" class="action-btn action-btn--lg guardar" data-tooltip="Guardar mail" aria-label="Guardar mail">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </footer>
+                </div>
+            </div>
+
+            <script id="tpl-data" type="application/json"><%- JSON.stringify({
+                placeholderGroups,
+                customVariables: (customVariables||[]).map(v => ({ key:v.key, label:v.label, value:v.value, description:v.description })),
+                snippets: (emailSnippets||[]).map(s => ({ key:s.key, label:s.label, icon:s.icon, html:s.html, text:s.text })),
+                templatesByEvent,
+                sampleVars
+            }) %></script>
+            <script>
+                (function setupNotifConfig() {
+                    const DATA = JSON.parse(document.getElementById('tpl-data').textContent || '{}');
+                    const PH_GROUPS  = DATA.placeholderGroups || {};
+                    const CUSTOM_VARS= DATA.customVariables || [];
+                    const SNIPPETS   = DATA.snippets || [];
+                    const TPL        = DATA.templatesByEvent || {};
+                    const SAMPLE     = DATA.sampleVars || {};
+
+                    document.querySelectorAll('.notif-mode-select').forEach(sel => {
+                        sel.addEventListener('change', e => {
+                            const ev = e.target.dataset.event;
+                            const input = document.querySelector('.notif-custom-input[data-event="' + ev + '"]');
+                            if (!input) return;
+                            input.disabled = e.target.value !== 'custom';
+                            if (input.disabled) input.value = '';
+                        });
+                    });
+
+                    const fillSample = (s) => String(s || '').replace(/\{\{\s*([\w]+)\s*\}\}/g, (m, k) => (SAMPLE[k] !== undefined ? SAMPLE[k] : m));
+                    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+                    const backdrop = document.getElementById('tpl-modal-backdrop');
+                    const form     = document.getElementById('tpl-modal-form');
+                    const eventLbl = document.getElementById('tpl-modal-event');
+                    const nameIn   = document.getElementById('tpl-modal-name');
+                    const subject  = document.getElementById('tpl-modal-subject');
+                    const body     = document.getElementById('tpl-modal-body');
+                    const formatIn = document.getElementById('tpl-modal-format');
+                    const toggle   = document.getElementById('tpl-format-toggle');
+                    const pvSubject= document.getElementById('tpl-preview-subject');
+                    const pvText   = document.getElementById('tpl-preview-text');
+                    const pvHtml   = document.getElementById('tpl-preview-html');
+                    const variantSel = document.getElementById('tpl-variant-select');
+                    const chipsBox = document.getElementById('tpl-placeholders');
+                    const snipsBox = document.getElementById('tpl-snippets');
+                    let currentEvent = '';
+
+                    function setFormat(fmt) {
+                        formatIn.value = fmt;
+                        toggle.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b.dataset.format === fmt));
+                        renderPreview();
+                    }
+
+                    function renderPreview() {
+                        const fmt = formatIn.value;
+                        pvSubject.textContent = fillSample(subject.value) || '(sin asunto)';
+                        const filled = fillSample(body.value);
+                        if (fmt === 'html') {
+                            pvText.style.display = 'none';
+                            pvHtml.style.display = 'block';
+                            const isFullDoc = /<!doctype/i.test(filled) || /<html[\s>]/i.test(filled);
+                            if (isFullDoc) {
+                                pvHtml.srcdoc = filled;
+                            } else {
+                                const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+                                const pv = dark ? { bg:'#0f172a', fg:'#e2e8f0' } : { bg:'#ffffff', fg:'#0f172a' };
+                                pvHtml.srcdoc = '<!doctype html><meta charset="utf-8"><body style="font-family:system-ui,sans-serif;margin:12px;background:' + pv.bg + ';color:' + pv.fg + '">' + filled + '</body>';
+                            }
+                        } else {
+                            pvHtml.style.display = 'none';
+                            pvText.style.display = 'block';
+                            pvText.textContent = filled || '(sin contenido)';
+                        }
+                    }
+
+                    function insertText(str) {
+                        const start = body.selectionStart ?? body.value.length;
+                        const end   = body.selectionEnd   ?? body.value.length;
+                        body.value = body.value.slice(0, start) + str + body.value.slice(end);
+                        const pos = start + str.length;
+                        body.focus();
+                        body.setSelectionRange(pos, pos);
+                        renderPreview();
+                    }
+
+                    // ---- Panel descriptivo del placeholder ----
+                    const phDescBox  = document.getElementById('tpl-ph-desc');
+                    const phDescText = phDescBox.querySelector('.tplm-ph-desc-text');
+                    const phDefault  = phDescText.textContent;
+                    const showDesc = (chip) => {
+                        const sample = SAMPLE[chip.dataset.key];
+                        phDescText.innerHTML = '<strong>' + escapeHtml(chip.dataset.token) + '</strong> — ' + escapeHtml(chip.dataset.desc || '')
+                            + (sample ? ' <em>Ej.: ' + escapeHtml(String(sample).slice(0, 60)) + '</em>' : '');
+                        phDescBox.classList.add('is-active');
+                    };
+                    const clearDesc = () => { phDescText.textContent = phDefault; phDescBox.classList.remove('is-active'); };
+
+                    // ---- Construir chips de placeholders (catálogo + variables custom) ----
+                    function buildChips() {
+                        chipsBox.innerHTML = '';
+                        const groups = Object.assign({}, PH_GROUPS);
+                        if (CUSTOM_VARS.length) {
+                            groups['Variables'] = CUSTOM_VARS.map(v => ({ token: v.key, label: v.label, description: v.description || ('Valor: ' + v.value), group: 'Variables' }));
+                        }
+                        Object.keys(groups).forEach(group => {
+                            const wrap = document.createElement('div');
+                            wrap.className = 'tplm-chip-group';
+                            wrap.innerHTML = '<span class="tplm-chip-group-label">' + escapeHtml(group) + '</span>';
+                            groups[group].forEach(p => {
+                                const token = '{{' + p.token + '}}';
+                                const b = document.createElement('button');
+                                b.type = 'button';
+                                b.className = 'tplm-chip' + (group === 'Enlaces' ? ' tplm-chip--link' : (group === 'Variables' ? ' tplm-chip--var' : ''));
+                                b.draggable = true;
+                                b.textContent = token;
+                                b.dataset.token = token;
+                                b.dataset.key = p.token;
+                                b.dataset.desc = p.description || '';
+                                b.addEventListener('click', () => insertText(token));
+                                b.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', token));
+                                b.addEventListener('mouseenter', () => showDesc(b));
+                                b.addEventListener('focus', () => showDesc(b));
+                                b.addEventListener('mouseleave', clearDesc);
+                                b.addEventListener('blur', clearDesc);
+                                wrap.appendChild(b);
+                            });
+                            chipsBox.appendChild(wrap);
+                        });
+                    }
+
+                    // ---- Construir bloques rápidos (snippets) ----
+                    function buildSnippets() {
+                        snipsBox.innerHTML = '';
+                        SNIPPETS.forEach(s => {
+                            const b = document.createElement('button');
+                            b.type = 'button';
+                            b.className = 'tplm-snip';
+                            b.innerHTML = (s.icon ? '<span class="material-symbols-outlined">' + escapeHtml(s.icon) + '</span> ' : '') + escapeHtml(s.label);
+                            b.addEventListener('click', () => {
+                                const content = formatIn.value === 'html' ? (s.html || '') : (s.text || '');
+                                insertText((body.value && !body.value.endsWith('\n') ? '\n' : '') + content + '\n');
+                            });
+                            snipsBox.appendChild(b);
+                        });
+                    }
+
+                    body.addEventListener('dragover', e => e.preventDefault());
+                    body.addEventListener('drop', e => {
+                        e.preventDefault();
+                        const token = e.dataTransfer.getData('text/plain');
+                        if (token) { insertText(token); }
+                    });
+                    toggle.querySelectorAll('button').forEach(b => b.addEventListener('click', () => setFormat(b.dataset.format)));
+                    subject.addEventListener('input', renderPreview);
+                    body.addEventListener('input', renderPreview);
+
+                    // ---- Variantes ----
+                    function loadVariant(v) {
+                        if (!v) { // nueva variante
+                            form.action = '/setting/email-template/variant/' + currentEvent;
+                            nameIn.value = ''; subject.value = ''; body.value = '';
+                            setFormat('text');
+                            return;
+                        }
+                        form.action = '/setting/email-template/update/' + v.id;
+                        nameIn.value = v.name || '';
+                        subject.value = v.subject || '';
+                        body.value = v.body || '';
+                        setFormat(v.format === 'html' ? 'html' : 'text');
+                    }
+
+                    function fillVariantSelect(selectedId) {
+                        const list = TPL[currentEvent] || [];
+                        variantSel.innerHTML = '';
+                        list.forEach(v => {
+                            const o = document.createElement('option');
+                            o.value = String(v.id);
+                            o.textContent = v.name + (v.isDefault ? ' ★' : '');
+                            variantSel.appendChild(o);
+                        });
+                        if (selectedId != null) { variantSel.value = String(selectedId); }
+                    }
+
+                    variantSel.addEventListener('change', () => {
+                        const list = TPL[currentEvent] || [];
+                        const v = list.find(x => String(x.id) === variantSel.value);
+                        loadVariant(v);
+                    });
+
+                    document.getElementById('tpl-variant-new').addEventListener('click', () => {
+                        variantSel.value = '';
+                        loadVariant(null);
+                        nameIn.focus();
+                    });
+
+                    const postForm = (action) => {
+                        const f = document.createElement('form');
+                        f.method = 'POST'; f.action = action;
+                        document.body.appendChild(f); f.submit();
+                    };
+                    document.getElementById('tpl-variant-default').addEventListener('click', () => {
+                        if (variantSel.value) { postForm('/setting/email-template/default/' + variantSel.value); }
+                    });
+                    document.getElementById('tpl-variant-delete').addEventListener('click', async () => {
+                        const list = TPL[currentEvent] || [];
+                        if (!variantSel.value) { return; }
+                        if (list.length <= 1) { await window.ltAlert({ icon: 'warning', title: 'No se puede eliminar', text: 'Es la única variante del evento.' }); return; }
+                        if (await window.ltConfirm({ title: '¿Eliminar esta variante?', confirmButtonColor: '#dc2626' })) { postForm('/setting/email-template/delete/' + variantSel.value); }
+                    });
+
+                    // ---- Abrir modal ----
+                    buildChips();
+                    buildSnippets();
+                    document.querySelectorAll('.notif-edit-tpl-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            currentEvent = btn.dataset.event;
+                            eventLbl.textContent = btn.dataset.description;
+                            const list = TPL[currentEvent] || [];
+                            const def = list.find(v => v.isDefault) || list[0] || null;
+                            fillVariantSelect(def ? def.id : null);
+                            loadVariant(def);
+                            document.getElementById('tpl-modal-test-msg').textContent = '';
+                            backdrop.style.display = 'flex';
+                        });
+                    });
+
+                    const close = () => { backdrop.style.display = 'none'; };
+                    document.getElementById('tpl-modal-cancel').addEventListener('click', close);
+                    document.getElementById('tpl-modal-cancel2').addEventListener('click', close);
+                    // No cerrar al hacer click fuera del popup: solo con la X o Cancelar.
+
+                    document.getElementById('tpl-modal-test-btn').addEventListener('click', async () => {
+                        const msg = document.getElementById('tpl-modal-test-msg');
+                        const to  = document.getElementById('tpl-modal-test-email').value.trim();
+                        msg.className = 'tplm-test-msg';
+                        msg.textContent = 'Enviando...';
+                        try {
+                            const r = await fetch('/setting/email-template/' + currentEvent + '/test', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ testEmail: to, subject: subject.value, body: body.value, format: formatIn.value })
+                            });
+                            const data = await r.json();
+                            if (data.ok) { msg.classList.add('ok'); msg.textContent = '✓ Enviado'; }
+                            else { msg.classList.add('err'); msg.textContent = data.error || 'Error'; }
+                        } catch { msg.classList.add('err'); msg.textContent = 'Error de red'; }
+                    });
+                })();
+            </script>
+
+            <!-- Card 3: Optimización de ruteo -->
+            <% } %>
+            <% if (activeSection === 'ruteo') { %>
+            <span class="settings-anchor" id="sec-ruteo"></span>
+            <section class="settings-category" id="cat-ruteo">
+                <span class="material-symbols-outlined">local_shipping</span>
+                <div><h3>Ruteo y sucursales</h3><p>Optimización de rutas y asignación de sucursales.</p></div>
+            </section>
+
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">alt_route</span>
+                    Optimización de ruteo · Sumar a rutas pendientes
+                </h2>
+                <p class="settings-subtitle">
+                    Cuando un transporte tiene una ruta <strong>Planificada</strong> (todavía no salió), el optimizador puede evaluar si un envío nuevo cabe en esa ruta sin disparar el costo.
+                </p>
+                <form method="POST" action="/setting/route-optimizer">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4) var(--space-5)">
+                        <div class="field" style="grid-column:1/-1">
+                            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer">
+                                <input type="checkbox" name="piggyback_enabled" value="on" <%= routeOpt.piggyback_enabled ? 'checked' : '' %>>
+                                <strong>Permitir sumar envíos a rutas pendientes (piggyback)</strong>
+                            </label>
+                        </div>
+                        <div class="field">
+                            <label for="piggyback_max_extra_pct">Desvío máximo permitido (%)</label>
+                            <input type="number" id="piggyback_max_extra_pct" name="piggyback_max_extra_pct" min="0" max="100" step="1" value="<%= routeOpt.piggyback_max_extra_pct %>">
+                        </div>
+                        <div class="field">
+                            <label for="piggyback_max_extra_km">Desvío máximo absoluto (km)</label>
+                            <input type="number" id="piggyback_max_extra_km" name="piggyback_max_extra_km" min="0" max="500" step="1" value="<%= routeOpt.piggyback_max_extra_km %>">
+                        </div>
+                        <div class="field">
+                            <label for="piggyback_max_extra_cost_pct">Costo extra máximo (%)</label>
+                            <input type="number" id="piggyback_max_extra_cost_pct" name="piggyback_max_extra_cost_pct" min="0" max="100" step="1" value="<%= routeOpt.piggyback_max_extra_cost_pct %>">
+                        </div>
+                        <div class="field" style="grid-column:1/-1;padding-top:var(--space-3);border-top:1px solid var(--color-border)">
+                            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer">
+                                <input type="checkbox" name="urgent_combine_enabled" value="on" <%= routeOpt.urgent_combine_enabled ? 'checked' : '' %>>
+                                <strong>Combinar envíos urgentes cercanos en un mismo transporte</strong>
+                            </label>
+                        </div>
+                        <div class="field">
+                            <label for="urgent_combine_max_km">Distancia máxima entre urgentes (km)</label>
+                            <input type="number" id="urgent_combine_max_km" name="urgent_combine_max_km" min="0" max="200" step="1" value="<%= routeOpt.urgent_combine_max_km %>">
+                        </div>
+                        <div class="field">
+                            <label for="cluster_merge_radius_km">Radio para agrupar envíos (km)</label>
+                            <input type="number" id="cluster_merge_radius_km" name="cluster_merge_radius_km" min="0" max="500" step="1" value="<%= routeOpt.cluster_merge_radius_km %>">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card ETA: Última Milla — avisos de llegada -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Última Milla — avisos de llegada
+                </h2>
+                <p class="settings-subtitle">
+                    Cómo se calcula la franja horaria que ve el cliente en el portal y cuándo se le avisa que el repartidor está por llegar.
+                </p>
+                <form method="POST" action="/setting/eta-settings">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4) var(--space-5)">
+                        <div class="field">
+                            <label for="eta_proximity_km">Aviso "ya casi llego" — distancia (km)</label>
+                            <input type="number" id="eta_proximity_km" name="eta_proximity_km" min="0.1" max="2" step="0.1" value="<%= params.eta_proximity_km %>">
+                            <span class="field-hint" style="font-size:.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;">
+                                Por GPS: cuando el repartidor entra en este radio de la próxima parada, se manda el mail con el mapa en vivo. Máx 2 km.
+                            </span>
+                        </div>
+                        <div class="field">
+                            <label for="eta_proximity_minutes">Franja "ya casi llego" — anticipación (min)</label>
+                            <input type="number" id="eta_proximity_minutes" name="eta_proximity_minutes" min="1" max="60" step="1" value="<%= params.eta_proximity_minutes %>">
+                        </div>
+                        <div class="field">
+                            <label for="eta_format">Formato de la hora mostrada</label>
+                            <select id="eta_format" name="eta_format">
+                                <option value="range" <%= params.eta_format === 'range' ? 'selected' : '' %>>Franja (entre 20:35 y 20:55)</option>
+                                <option value="exact" <%= params.eta_format === 'exact' ? 'selected' : '' %>>Hora exacta (20:35)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="eta_range_margin_minutes">Margen de la franja (min)</label>
+                            <input type="number" id="eta_range_margin_minutes" name="eta_range_margin_minutes" min="1" max="120" step="1" value="<%= params.eta_range_margin_minutes %>">
+                        </div>
+                        <div class="field">
+                            <label for="eta_avg_speed_kmh">Velocidad promedio asumida (km/h)</label>
+                            <input type="number" id="eta_avg_speed_kmh" name="eta_avg_speed_kmh" min="5" max="120" step="1" value="<%= params.eta_avg_speed_kmh %>">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card 4: Asignación de sucursales -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">store</span>
+                    Asignación de sucursales a usuarios
+                </h2>
+                <p class="settings-subtitle">
+                    Asigná una sucursal a cada usuario. Los usuarios sin sucursal asignada aparecen con "Sin sucursal".
+                </p>
+                <% if (branches.length === 0) { %>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">No hay sucursales cargadas en el sistema.</p>
+                <% } else if (users.length === 0) { %>
+                    <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">No hay usuarios registrados en el sistema.</p>
+                <% } else { %>
+                <form method="POST" action="/setting/assign-branch">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre y Apellido</th>
+                                <th>Documento</th>
+                                <th>Email</th>
+                                <th>Rol</th>
+                                <th>Sucursal asignada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% const roleLabels = { 1: 'Supervisor', 2: 'Operador', 3: 'Repartidor', 4: 'Administrador' }; %>
+                            <% users.forEach(user => { %>
+                            <tr>
+                                <td><%= user.fullName %></td>
+                                <td><%= user.document %></td>
+                                <td><%= user.email %></td>
+                                <td><span class="status-badge"><%= roleLabels[user.roleId] || '-' %></span></td>
+                                <td>
+                                    <input type="hidden" name="userId[]" value="<%= user.id %>">
+                                    <select name="branchId[]" class="branch-select">
+                                        <option value="">— Sin sucursal —</option>
+                                        <% branches.forEach(branch => { %>
+                                            <option value="<%= branch.id %>" <%= user.branchId === branch.id ? 'selected' : '' %>><%= branch.name %></option>
+                                        <% }); %>
+                                    </select>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="settings-actions">
+                    <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
+                        <span class="material-symbols-outlined">save</span>
+                    </button>
+                </div>
+                </form>
+                <% } %>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Motivos de intento fallido configurables -->
+            <% } %>
+            <% if (activeSection === 'catalogos') { %>
+            <span class="settings-anchor" id="sec-catalogos"></span>
+            <section class="settings-category" id="cat-catalogos">
+                <span class="material-symbols-outlined">category</span>
+                <div><h3>Catálogos operativos</h3><p>Motivos, tipos de incidencia y franjas horarias editables.</p></div>
+            </section>
+
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">cancel</span>
+                    Motivos de intento fallido
+                </h2>
+                <p class="settings-subtitle">Catálogo editable de motivos que ve el repartidor al marcar entrega fallida. <code>creates_incident=on</code> abre incidencia automática; <code>max_attempts_override</code> reemplaza el tope global solo para ese motivo.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>Código</th><th>Etiqueta</th><th>Días reintento</th><th>Activo</th><th>Crea incidencia</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        <% (failedReasons || []).forEach(r => { %>
+                        <tr>
+                            <form method="POST" action="/setting/failed-reason/<%= r.id %>">
+                                <td><code><%= r.code %></code></td>
+                                <td><input type="text" name="label" value="<%= r.label %>" required></td>
+                                <td><input type="number" name="retryDays" min="0" max="30" value="<%= r.retryDays %>" style="width:70px"></td>
+                                <td><input type="checkbox" name="active" <%= r.active ? 'checked' : '' %>></td>
+                                <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar este motivo?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/failed-reason">
+                                <td><input type="text" name="code" placeholder="codigo_snake" required></td>
+                                <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
+                                <td><input type="number" name="retryDays" min="0" max="30" value="1" style="width:70px"></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><input type="checkbox" name="createsIncident"></td>
+                                <td><button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Tipos de incidencia configurables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">report</span>
+                    Tipos de incidencia
+                </h2>
+                <p class="settings-subtitle">Categorías que ve el usuario al reportar una incidencia desde el portal o el chatbot.</p>
+                <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Código</th><th>Etiqueta</th><th>Activo</th><th></th></tr></thead>
+                    <tbody>
+                        <% (incidentTypes || []).forEach(t => { %>
+                        <tr>
+                            <form method="POST" action="/setting/incident-type/<%= t.id %>">
+                                <td><code><%= t.code %></code></td>
+                                <td><input type="text" name="label" value="<%= t.description %>" required></td>
+                                <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
+                                <td>
+                                    <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Desactivar este tipo?" data-confirm-color="#dc2626" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
+                                </td>
+                            </form>
+                        </tr>
+                        <% }) %>
+                        <tr>
+                            <form method="POST" action="/setting/incident-type">
+                                <td><input type="text" name="code" placeholder="CODIGO" required></td>
+                                <td><input type="text" name="label" placeholder="Etiqueta visible" required></td>
+                                <td><input type="checkbox" name="active" checked></td>
+                                <td><button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button></td>
+                            </form>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Franjas horarias habilitadas globalmente -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Franjas horarias de entrega
+                </h2>
+                <p class="settings-subtitle">Bloques horarios que el destinatario puede elegir en autogestión del portal y que se muestran en alta de envío.</p>
+                <style>
+                    .tw-list { display:flex; flex-direction:column; gap:.5rem; }
+                    .tw-row {
+                        display:grid;
+                        grid-template-columns: 1.4fr .8fr .8fr auto auto;
+                        gap:.5rem;
+                        align-items:center;
+                        padding:.5rem .75rem;
+                        background: var(--color-surface-alt);
+                        border:1px solid var(--color-border, #e2e8f0);
+                        border-radius:8px;
+                    }
+                    .tw-row input[type="text"], .tw-row input[type="time"] {
+                        padding:.4rem .55rem; font-size:.85rem; height:34px;
+                        border:1px solid var(--color-border, #cbd5e1); border-radius:6px;
+                        background: var(--color-surface, #fff); color: var(--color-text);
+                        width:100%; box-sizing:border-box;
+                    }
+                    .tw-row label.tw-active {
+                        display:flex; align-items:center; gap:.3rem;
+                        font-size:.8rem; color: var(--color-text-secondary);
+                        white-space:nowrap;
+                    }
+                    .tw-row .tw-actions { display:flex; gap:.3rem; }
+                    .tw-row .tw-actions button {
+                        padding:.35rem .65rem; font-size:.8rem; height:34px;
+                    }
+                    .tw-row.tw-new { border-style:dashed; background:transparent; }
+                    @media (max-width: 720px) {
+                        .tw-row { grid-template-columns: 1fr 1fr; }
+                        .tw-row .tw-actions { grid-column:1/-1; justify-content:flex-end; }
+                    }
+                </style>
+                <div class="tw-list">
+                    <% (timeWindows || []).forEach(w => { %>
+                        <form method="POST" action="/setting/time-window/<%= w.id %>" class="tw-row">
+                            <input type="text" name="label" value="<%= w.label %>" required>
+                            <input type="time" name="fromTime" value="<%= String(w.fromTime).slice(0,5) %>" required>
+                            <input type="time" name="toTime" value="<%= String(w.toTime).slice(0,5) %>" required>
+                            <label class="tw-active">
+                                <input type="checkbox" name="active" <%= w.active ? 'checked' : '' %>> Activo
+                            </label>
+                            <div class="tw-actions">
+                                <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar esta franja?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                            </div>
+                        </form>
+                    <% }) %>
+                    <form method="POST" action="/setting/time-window" class="tw-row tw-new">
+                        <input type="text" name="label" placeholder="Ej: Mañana" required>
+                        <input type="time" name="fromTime" required>
+                        <input type="time" name="toTime" required>
+                        <label class="tw-active">
+                            <input type="checkbox" name="active" checked> Activo
+                        </label>
+                        <div class="tw-actions">
+                            <button class="action-btn crear" type="submit" name="_action" value="create" data-tooltip="Agregar" aria-label="Agregar"><span class="material-symbols-outlined">add</span></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sprint 3 - 2.5: Mensajes estándar parametrizables -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">edit_note</span>
+                    Mensajes estándar
+                </h2>
+                <p class="settings-subtitle">Textos reutilizables (reprogramación, próxima entrega, devuelto). Soportan placeholders <code>{{date}}</code>, <code>{{branch}}</code>, <code>{{eta}}</code>.</p>
+                <% (stdMessages || []).forEach(m => { %>
+                <form method="POST" action="/setting/standard-message/<%= m.code %>" style="margin-bottom:1rem">
+                    <label style="font-weight:600"><%= m.label %> <code style="font-size:.75rem;color:#64748b">(<%= m.code %>)</code></label>
+                    <textarea name="body" rows="2" style="width:100%;margin-top:.25rem;padding:.5rem;border:1px solid #cbd5e1;border-radius:6px"><%= m.body %></textarea>
+                    <button class="action-btn action-btn--lg guardar" type="submit" style="margin-top:.25rem" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                </form>
+                <% }) %>
+            </div>
+
+            <!-- Card 5: Historial de cambios -->
+            <% } %>
+
+            <% if (activeSection === 'incidencias') { %>
+            <span class="settings-anchor" id="sec-incidencias"></span>
+            <section class="settings-category" id="cat-incidencias">
+                <span class="material-symbols-outlined">report</span>
+                <div><h3>Incidencias</h3><p>Demoras, plantillas de gestión y tipos de incidencia.</p></div>
+            </section>
+
+            <!-- Card: Parámetros de demora (LGT-160) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Demora significativa
+                </h2>
+                <p class="settings-subtitle">Cuándo se considera que un envío está demorado y cada cuánto se recuerda.</p>
+                <form method="POST" action="/setting/incident-params">
+                    <div class="settings-addr">
+                        <div class="field">
+                            <label for="delay_threshold_pct">Umbral (% de la duración del viaje)</label>
+                            <input type="number" id="delay_threshold_pct" name="delay_threshold_pct" min="1" max="100"
+                                   value="<%= settings.delay_threshold_pct || '15' %>">
+                        </div>
+                        <div class="field">
+                            <label for="delay_reminder_days">Intervalo de recordatorio (días)</label>
+                            <input type="number" id="delay_reminder_days" name="delay_reminder_days" min="1" max="365"
+                                   value="<%= settings.delay_reminder_days || '1' %>">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="action-btn action-btn--lg guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card: Plantillas de checklist -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">checklist</span>
+                    Plantillas de gestión (checklist)
+                </h2>
+                <p class="settings-subtitle">Pasos de resolución por tipo de incidencia.</p>
+                <a class="btn-primary" href="/incident/config/templates" style="display:inline-flex;align-items:center;gap:.4rem;text-decoration:none;width:auto">
+                    <span class="material-symbols-outlined">open_in_new</span> Administrar plantillas
+                </a>
+            </div>
+
+            <!-- Card: Tipos de incidencia (catálogo) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">category</span>
+                    Tipos de incidencia
+                </h2>
+                <p class="settings-subtitle">Catálogo de tipos disponibles.</p>
+                <div class="incident-type-grid">
+                    <% (incidentTypes || []).forEach(t => { %>
+                    <div class="incident-type<%= t.active === false ? ' is-inactive' : '' %>">
+                        <span class="material-symbols-outlined incident-type-ico">label</span>
+                        <div class="incident-type-text">
+                            <code class="incident-type-code"><%= t.code %></code>
+                            <span class="incident-type-desc"><%= t.description %></span>
+                        </div>
+                        <% if (t.active === false) { %><span class="incident-type-badge">inactivo</span><% } %>
+                    </div>
+                    <% }) %>
+                    <% if (!incidentTypes || !incidentTypes.length) { %>
+                    <p style="color:var(--color-text-secondary);grid-column:1/-1;margin:0">Sin tipos cargados.</p>
+                    <% } %>
+                </div>
+                <style>
+                    .incident-type-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                        gap: .6rem;
+                    }
+                    .incident-type {
+                        display: flex; align-items: center; gap: .65rem;
+                        padding: .6rem .75rem;
+                        border: 1px solid var(--color-border);
+                        border-radius: var(--radius-md);
+                        background: var(--color-surface-alt);
+                        transition: border-color .15s ease, transform .15s ease;
+                    }
+                    .incident-type:hover { border-color: var(--color-primary); transform: translateY(-1px); }
+                    .incident-type-ico {
+                        font-size: 1.2rem; color: var(--color-primary);
+                        background: var(--color-primary-light);
+                        border-radius: var(--radius-sm); padding: .3rem; flex-shrink: 0;
+                    }
+                    .incident-type-text { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+                    .incident-type-code {
+                        font-family: ui-monospace, Menlo, Consolas, monospace;
+                        font-size: .78rem; font-weight: 600;
+                        color: var(--color-text); letter-spacing: .02em;
+                    }
+                    .incident-type-desc { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+                    .incident-type-badge {
+                        margin-left: auto; flex-shrink: 0;
+                        font-size: .68rem; text-transform: uppercase; letter-spacing: .04em;
+                        color: var(--color-text-secondary);
+                        background: var(--color-surface); border: 1px solid var(--color-border);
+                        border-radius: 999px; padding: .1rem .5rem;
+                    }
+                    .incident-type.is-inactive { opacity: .55; }
+                    .incident-type.is-inactive .incident-type-ico { color: var(--color-text-secondary); background: var(--color-border); }
+                </style>
+            </div>
+            <% } %>
+
+            <% if (activeSection === 'auditoria') { %>
+            <span class="settings-anchor" id="sec-auditoria"></span>
+            <style>
+                .audit-action-badge { font-size:.75rem;font-weight:600;padding:.15rem .5rem;border-radius:999px;display:inline-block; }
+                .audit-action-login  { background:#d1fae5;color:#065f46; }
+                .audit-action-logout { background:var(--color-surface);color:var(--color-text-secondary);border:1px solid var(--color-border); }
+            </style>
+            <section class="settings-category" id="cat-auditoria">
+                <span class="material-symbols-outlined">manage_search</span>
+                <div><h3>Auditoría y trazabilidad</h3><p>Registro de sesiones, acciones y cambios de configuración.</p></div>
+            </section>
+
+            <%
+                const _activeNow = (activeUsers || []).filter(l => {
+                    // Filtra el último login por usuario, descarta los que luego hicieron logout
+                    return true;
+                });
+                const _activeByUser = {};
+                for (const l of _activeNow) {
+                    const uid = l.userId;
+                    if (!_activeByUser[uid]) { _activeByUser[uid] = l; }
+                }
+                const _activeList = Object.values(_activeByUser);
+            %>
+
+            <!-- Usuarios activos -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">group</span>
+                    Usuarios activos (últimas 8 h)
+                </h2>
+                <% if (_activeList.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">Ningún usuario registró actividad reciente.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Usuario</th><th>Email</th><th>Último ingreso</th><th>IP</th></tr></thead>
+                        <tbody>
+                            <% _activeList.forEach(l => { %>
+                            <tr>
+                                <td><%= l.user?.fullName || '—' %></td>
+                                <td><%= l.user?.email || '—' %></td>
+                                <td><%= new Date(l.createdAt).toLocaleString('es-AR') %></td>
+                                <td><code><%= l.ip || '—' %></code></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Filtros + Export -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">filter_list</span>
+                    Log de sesiones
+                </h2>
+                <form method="GET" action="/setting/auditoria" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end;margin-bottom:1rem;">
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Usuario</label>
+                        <select name="userId" style="min-width:160px">
+                            <option value="">Todos</option>
+                            <% users.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= (auditFilters.userId == u.id) ? 'selected' : '' %>><%= u.fullName %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Acción</label>
+                        <select name="action">
+                            <option value="">Todas</option>
+                            <option value="LOGIN"  <%= auditFilters.action === 'LOGIN'  ? 'selected' : '' %>>Login</option>
+                            <option value="LOGOUT" <%= auditFilters.action === 'LOGOUT' ? 'selected' : '' %>>Logout</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Desde</label>
+                        <input type="date" name="from" value="<%= auditFilters.from || '' %>">
+                    </div>
+                    <div>
+                        <label style="font-size:var(--font-size-sm);display:block;margin-bottom:.2rem">Hasta</label>
+                        <input type="date" name="to" value="<%= auditFilters.to || '' %>">
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Filtrar</button>
+                    <a href="/setting/auditoria" class="btn btn-ghost">Limpiar</a>
+                    <a href="/setting/auditoria/export-csv?<%= new URLSearchParams(auditFilters).toString() %>" class="btn btn-secondary" style="margin-left:auto">
+                        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle">download</span>
+                        Exportar CSV
+                    </a>
+                </form>
+
+                <% if (!loginLogs || loginLogs.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay registros para los filtros seleccionados.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Usuario</th>
+                                <th>Acción</th>
+                                <th>IP</th>
+                                <th>Dispositivo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% loginLogs.forEach(log => { %>
+                            <tr>
+                                <td><%= new Date(log.createdAt).toLocaleString('es-AR') %></td>
+                                <td><%= log.user?.fullName || '—' %></td>
+                                <td>
+                                    <span class="audit-action-badge audit-action-<%= log.action.toLowerCase() %>">
+                                        <%= log.action %>
+                                    </span>
+                                </td>
+                                <td><code><%= log.ip || '—' %></code></td>
+                                <td style="font-size:.75rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= log.userAgent || '' %>">
+                                    <%= log.userAgent ? log.userAgent.slice(0, 60) + (log.userAgent.length > 60 ? '…' : '') : '—' %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+
+            <!-- Historial de cambios de configuración -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">history</span>
+                    Historial de cambios de configuración
+                </h2>
+                <p class="settings-subtitle">Últimos 50 cambios realizados por administradores.</p>
+                <% if (settingLogs.length === 0) { %>
+                    <p style="color:var(--color-text-secondary);font-size:var(--font-size-sm)">No hay cambios registrados.</p>
+                <% } else { %>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Usuario</th>
+                                <th>Parámetro</th>
+                                <th>Valor anterior</th>
+                                <th>Valor nuevo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% settingLogs.forEach(log => { %>
+                            <tr>
+                                <td><%= new Date(log.changedAt).toLocaleString('es-AR') %></td>
+                                <td><%= log.user ? log.user.fullName : 'Sistema' %></td>
+                                <td><code><%= log.key %></code></td>
+                                <td><%= log.oldValue || '—' %></td>
+                                <td><strong><%= log.newValue || '—' %></strong></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
+            </div>
+            <% } %>
         </div>
+        </div><!-- /.settings-layout -->
     </main>
+
+    <% const _currentProv = provinces.find(p => p.id == settings.origin_province_id); %>
+    <script id="setting-addr-data" type="application/json"><%- JSON.stringify({
+        street: settings.origin_street || null,
+        number: settings.origin_number || null,
+        prov:   _currentProv ? _currentProv.description : ''
+    }) %></script>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/address-autocomplete.js" defer></script>
     <script>
-        // ── Mostrar dirección actual si ya hay una guardada ────────────────────
-        <% if (settings.origin_street && settings.origin_number) { %>
-        document.addEventListener('DOMContentLoaded', function () {
-            const street  = '<%= (settings.origin_street  || '').replace(/'/g, "\\'") %>';
-            const number  = '<%= (settings.origin_number  || '').replace(/'/g, "\\'") %>';
-            <%
-                const _currentProv = provinces.find(p => p.id == settings.origin_province_id);
-            %>
-            const prov    = '<%= _currentProv ? _currentProv.description.replace(/'/g, "\\'") : "" %>';
-            const mainLine = street + ' ' + number;
-            const subLine  = prov;
+        const _addr = JSON.parse(document.getElementById('setting-addr-data').textContent);
+        if (_addr.street && _addr.number) {
+            document.addEventListener('DOMContentLoaded', function () {
+                const mainLine = _addr.street + ' ' + _addr.number;
+                const subLine  = _addr.prov;
+                const row  = document.getElementById('addr-selected-row');
+                const text = document.getElementById('addr-chip-text');
+                if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' — ' + subLine : '');
+                if (row)  row.style.display = 'flex';
+                const box = document.getElementById('address-validation-result');
+                if (box) {
+                    box.className = 'addr-validation-box addr-validation-box--valid addr-full';
+                    box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
+                }
+                window.addrValid = true;
+            });
+        }
 
-            const row  = document.getElementById('addr-selected-row');
-            const text = document.getElementById('addr-chip-text');
-            if (text) text.innerHTML = '<strong>' + mainLine + '</strong>' + (subLine ? ' \u2014 ' + subLine : '');
-            if (row)  row.style.display = 'flex';
-
-            const box = document.getElementById('address-validation-result');
-            if (box) {
-                box.className = 'addr-validation-box addr-validation-box--valid addr-full';
-                box.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">check_circle</span> Origen actual: <strong>' + mainLine + (subLine ? ', ' + subLine : '') + '</strong>';
-            }
-            window.addrValid = true;
-        });
-        <% } %>
-
-        // ── SweetAlert al guardar con éxito ────────────────────────────────────
-        if (new URLSearchParams(window.location.search).get('success') === '1') {
+        const _qs = new URLSearchParams(window.location.search);
+        const _param = _qs.get('success');
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc' || _param === 'cobros') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            const _titles = {
+                '1': 'Ajustes guardados',
+                '2': 'Sucursal asignada correctamente',
+                '3': 'Configuración de ruteo guardada',
+                '4': 'Parámetros guardados correctamente',
+                'cobros': 'Configuración de cobros guardada'
+            };
+            let _title = _titles[_param];
+            let _text;
+            if (_param === 'flush') {
+                const _sent = parseInt(_qs.get('sent') || '0', 10);
+                const _retried = parseInt(_qs.get('retried') || '0', 10);
+                _title = _sent > 0 ? `${_sent} email(s) enviado(s)` : 'No había emails pendientes';
+                _text = _retried > 0 ? `${_retried} quedaron reprogramados para reintento.` : undefined;
+            }
+            if (_param === 'proc') {
+                _title = 'Proceso ejecutado';
+                _text = _qs.get('detail') || undefined;
+            }
             Swal.fire({
                 icon: 'success',
-                title: 'Ajustes guardados',
+                title: _title,
+                text: _text,
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
                 background: isDark ? '#1e293b' : '#ffffff',
                 color:      isDark ? '#f1f5f9' : '#1e293b',
-            }).then(() => { history.replaceState(null, '', '/setting'); });
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
+        }
+
+        // CP-CNNF04: error de variables inválidas en plantilla (mensaje dinámico en ?msg).
+        const _err = _qs.get('error');
+        if (_err === 'tpl_vars') {
+            const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
+            Swal.fire({
+                icon: 'error',
+                title: 'Variables no válidas',
+                text: _qs.get('msg') || 'La plantilla usa variables que no existen.',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: isDark ? '#3b82f6' : '#2563eb',
+                background: isDark ? '#1e293b' : '#ffffff',
+                color:      isDark ? '#f1f5f9' : '#1e293b',
+            }).then(() => { history.replaceState(null, '', window.location.pathname); });
         }
     </script>
 </body>
+
 </html>

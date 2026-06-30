@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Análisis de Demoras</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <style>
+        .dash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem; margin-bottom:1rem; }
+        .dash-kpi { background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1.2rem 1.4rem; cursor:default; }
+        .dash-kpi__label { font-size:.78rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.4rem; }
+        .dash-kpi__value { font-size:2rem; font-weight:700; line-height:1; }
+        .dash-kpi__value--sm { font-size:1.5rem; font-weight:700; line-height:1; }
+        .dash-kpi__pct { font-size:.75rem; color:var(--color-text-muted); margin-top:.3rem; }
+        .dash-kpi__value--warn { color:#e07b00; }
+        .dash-kpi__value--ok { color:var(--color-success,#2e7d32); }
+        .dash-kpi__value--danger { color:var(--color-danger,#c62828); }
+        .kpi-tip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%;
+                   background:var(--color-border,#e2e8f0); color:var(--color-text-muted,#64748b); font-size:.62rem; font-weight:700;
+                   cursor:help; margin-left:.35rem; vertical-align:middle; position:relative; flex-shrink:0; }
+        .kpi-tip::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+                          background:#1e293b; color:#f1f5f9; font-size:.72rem; font-weight:400; text-transform:none; letter-spacing:0;
+                          padding:.55rem .75rem; border-radius:6px; width:230px; white-space:normal; line-height:1.45;
+                          opacity:0; pointer-events:none; transition:opacity .15s; z-index:200; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+        .kpi-tip:hover::after { opacity:1; }
+        .kpi-tip::before { content:''; position:absolute; bottom:calc(100% + 2px); left:50%; transform:translateX(-50%);
+                           border:5px solid transparent; border-top-color:#1e293b; opacity:0; pointer-events:none; transition:opacity .15s; }
+        .kpi-tip:hover::before { opacity:1; }
+        .status-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.75rem; }
+        .status-chip { padding:.28rem .75rem; border-radius:20px; border:1.5px solid var(--color-border); background:var(--color-surface);
+                       font-size:.76rem; font-weight:500; cursor:pointer; transition:all .15s; color:var(--color-text-muted); }
+        .status-chip.active { background:var(--color-primary,#1d4ed8); color:#fff; border-color:var(--color-primary,#1d4ed8); opacity:1; }
+        .status-chip:not(.active) { opacity:.5; }
+        .status-chip:hover { opacity:1; }
+        .dash-hint { font-size:.85rem; color:var(--color-text-muted); margin:.25rem 0 1rem; }
+
+        /* Overdue severity badges */
+        .ot-badge--orange  { background:rgba(249,115,22,.12); color:#ea580c; }
+        .ot-badge--red-dark { background:rgba(153,27,27,.15); color:#991b1b; font-weight:700; }
+
+        /* Sin asignar badge */
+        .badge-unassigned { display:inline-flex; align-items:center; gap:.22rem; padding:.15rem .5rem; border-radius:99px;
+                            font-size:.76rem; font-weight:600; background:rgba(245,158,11,.1); color:#d97706; vertical-align:middle; }
+        .badge-unassigned .material-symbols-outlined { font-size:.9rem; }
+
+        /* Pill selector */
+        .pill-group { display:inline-flex; border:1px solid var(--color-border); border-radius:99px; overflow:hidden; }
+        .pill-btn { padding:.22rem .7rem; font-size:.8rem; font-weight:500; background:var(--color-surface);
+                    color:var(--color-text-muted); border:none; cursor:pointer; transition:background .15s,color .15s; }
+        .pill-btn.active { background:var(--color-primary,#1d4ed8); color:#fff; }
+        .pill-btn:hover:not(.active) { background:var(--color-bg,#f8fafc); }
+
+        /* Progress bar under KPI */
+        .kpi-progress-track { height:4px; background:var(--color-border); border-radius:2px; margin-top:.75rem; overflow:hidden; }
+        .kpi-progress-fill  { height:100%; border-radius:2px; transition:width .4s; }
+
+        /* OTIF ring */
+        .otif-ring { position:relative; width:88px; height:88px; border-radius:50%;
+                     background:conic-gradient(var(--ring-fill,#dc2626) calc(var(--pct,0)*1%), var(--color-border,#e2e8f0) 0);
+                     display:flex; align-items:center; justify-content:center; margin:.5rem auto .2rem; }
+        .otif-ring__inner { width:70px; height:70px; border-radius:50%; background:var(--color-surface);
+                             display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+        /* Section dividers */
+        .dash-section-divider { display:flex; align-items:center; gap:.75rem; margin:1.75rem 0 .8rem; }
+        .dash-section-divider::before { content:''; flex:1; height:1px; background:var(--color-border); }
+        .dash-section-divider__label { font-size:.76rem; font-weight:700; text-transform:uppercase;
+                                        letter-spacing:.06em; color:var(--color-text-muted); white-space:nowrap; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Análisis de Demoras</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/dashboard/operaciones" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= dateFrom %>" required>
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= dateTo %>" required>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <% if (hasQuery) { %>
+                                <a href="/dashboard/operaciones" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% if (error) { %>
+                        <div class="report-alert report-alert--error">
+                            <span class="material-symbols-outlined">error</span>
+                            <%= error %>
+                        </div>
+                    <% } %>
+                </form>
+            </div>
+
+            <% if (!error) { %>
+            <%
+                const statusCls = { 4:'dash-kpi__value--ok', 5:'dash-kpi__value--danger', 8:'dash-kpi__value--danger', 9:'dash-kpi__value--warn', 10:'dash-kpi__value--warn' };
+
+                function fmtDate(str) {
+                    if (!str) return '—';
+                    const parts = String(str).slice(0, 10).split('-');
+                    return parts[2] + '/' + parts[1] + '/' + parts[0];
+                }
+
+                function overdueCls(days) {
+                    if (days >= 14) return 'ot-badge--red-dark';
+                    if (days >= 8)  return 'ot-badge--red';
+                    if (days >= 4)  return 'ot-badge--orange';
+                    return 'ot-badge--amber';
+                }
+            %>
+
+            <!-- 1. Resumen rápido -->
+            <%
+                const otifPct      = kpis.otif_pct !== null ? kpis.otif_pct : null;
+                const ringColor    = otifPct === null ? '#94a3b8' : otifPct >= 85 ? '#16a34a' : otifPct >= 70 ? '#d97706' : '#dc2626';
+                const ringPct      = otifPct !== null ? otifPct : 0;
+                const otifValCls   = otifPct !== null && otifPct >= 85 ? 'dash-kpi__value--ok' : otifPct !== null && otifPct >= 70 ? 'dash-kpi__value--warn' : 'dash-kpi__value--danger';
+                const delayPct     = kpis.total > 0 ? Math.round(kpis.delayed_count / kpis.total * 100) : 0;
+            %>
+            <div class="dash-kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:1.5rem;">
+
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        Envíos en el período
+                        <span class="kpi-tip" data-tip="Total de envíos creados en el período seleccionado. Incluye todos los estados.">?</span>
+                    </div>
+                    <div class="dash-kpi__value"><%= kpis.total %></div>
+                    <div class="dash-kpi__pct"><%= dateFrom %> — <%= dateTo %></div>
+                </div>
+
+                <div class="dash-kpi">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        Con demora activa
+                        <span class="kpi-tip" data-tip="Envíos del período que siguen en tránsito y ya superaron su fecha de entrega comprometida. Requieren atención inmediata.">?</span>
+                    </div>
+                    <div class="dash-kpi__value <%= kpis.delayed_count > 0 ? 'dash-kpi__value--danger' : 'dash-kpi__value--ok' %>"><%= kpis.delayed_count %></div>
+                    <% if (kpis.total > 0) { %>
+                        <div class="dash-kpi__pct"><%= delayPct %>% del total</div>
+                        <div class="kpi-progress-track">
+                            <div class="kpi-progress-fill" style="width:<%= delayPct %>%;background:<%= kpis.delayed_count > 0 ? '#dc2626' : '#16a34a' %>;"></div>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="dash-kpi" style="text-align:center;">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;justify-content:center;gap:.3rem;">
+                        OTIF
+                        <span class="kpi-tip" data-tip="On Time In Full: porcentaje de envíos del período entregados antes o en su fecha comprometida. Verde ≥ 85%, Amarillo 70–84%, Rojo < 70%.">?</span>
+                    </div>
+                    <div class="otif-ring" style="--pct:<%= ringPct %>;--ring-fill:<%= ringColor %>;">
+                        <div class="otif-ring__inner">
+                            <span class="<%= otifValCls %>" style="font-size:1.45rem;font-weight:700;line-height:1;">
+                                <%= otifPct !== null ? otifPct + '%' : '—' %>
+                            </span>
+                        </div>
+                    </div>
+                    <% if (kpis.otif_delivered > 0) { %><div class="dash-kpi__pct"><%= kpis.otif_on_time %>/<%= kpis.otif_delivered %> entregas</div><% } %>
+                </div>
+
+            </div>
+
+            <!-- 2. Distribución del período -->
+            <% if (statusSummary.length > 0) { %>
+            <div class="dash-section-divider"><span class="dash-section-divider__label">Distribución por estado</span></div>
+            <p style="font-size:.72rem;color:var(--color-text-muted);margin:-.4rem 0 .6rem;opacity:.7;">Clic para mostrar u ocultar</p>
+            <div class="status-chips" id="status-chips">
+                <% statusSummary.forEach(s => { %>
+                <button type="button" class="status-chip active" data-status-id="<%= s.statusId %>"><%= s.status_label %></button>
+                <% }) %>
+            </div>
+            <div class="dash-kpi-grid" id="status-kpi-grid">
+                <% statusSummary.forEach(s => {
+                    const pct = kpis.total > 0 ? Math.round(s.total / kpis.total * 100) : 0;
+                %>
+                <div class="dash-kpi" data-status-id="<%= s.statusId %>">
+                    <div class="dash-kpi__label" style="display:flex;align-items:center;gap:.3rem;">
+                        <%= s.status_label %>
+                        <span class="kpi-tip" data-tip="Envíos creados en el período que están actualmente en estado '<%= s.status_label %>'. Representa el <%= pct %>% del total.">?</span>
+                    </div>
+                    <div class="dash-kpi__value--sm <%= statusCls[s.statusId] || '' %>"><%= s.total %></div>
+                    <div class="dash-kpi__pct"><%= pct %>%</div>
+                </div>
+                <% }) %>
+            </div>
+            <% } %>
+
+            <!-- 3. Alertas activas -->
+            <div class="dash-section-divider" style="margin-top:1.75rem;"><span class="dash-section-divider__label">Alertas activas</span></div>
+            <p class="dash-hint">Las demoras reflejan el estado de hoy — envíos del período que aún no fueron entregados.</p>
+            <% if (delayedShipments.length > 0) { %>
+            <div class="report-card">
+                <div class="dp-table-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                    <h2>Envíos con demora activa <span class="dash-alert-badge"><%= kpis.delayed_count %> alerta<%= kpis.delayed_count !== 1 ? 's' : '' %></span></h2>
+                    <label style="font-size:.8rem;color:var(--color-text-muted);display:flex;align-items:center;gap:.5rem;">
+                        Mostrar
+                        <div class="pill-group" id="delayed-limit-pills">
+                            <button type="button" class="pill-btn" data-limit="10">10</button>
+                            <button type="button" class="pill-btn" data-limit="15">15</button>
+                            <button type="button" class="pill-btn" data-limit="25">25</button>
+                            <button type="button" class="pill-btn" data-limit="50">50</button>
+                        </div>
+                    </label>
+                </div>
+                <p id="delayed-limit-note" style="font-size:.8rem;color:var(--color-text-muted);margin:.5rem 0 .75rem;text-align:center;"></p>
+                <table class="report-table" id="delayed-table">
+                    <thead>
+                        <tr>
+                            <th>Tracking</th>
+                            <th>Zona</th>
+                            <th>Repartidor</th>
+                            <th class="text-right">Fecha comprometida <span class="kpi-tip" data-tip="Fecha límite de entrega acordada con el cliente al momento de crear el envío.">?</span></th>
+                            <th class="text-right">Días de atraso <span class="kpi-tip" data-tip="Cantidad de días transcurridos desde la fecha comprometida hasta hoy sin que el envío haya sido entregado.">?</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% delayedShipments.forEach(s => { %>
+                        <tr>
+                            <td>
+                                <a href="/shipment/detail/<%= s.id %>" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.2rem;">
+                                    <%= s.trackingId %>
+                                    <span class="material-symbols-outlined" style="font-size:.85rem;opacity:.45;vertical-align:middle;">open_in_new</span>
+                                </a>
+                            </td>
+                            <td><%= s.zone_name || '—' %></td>
+                            <td>
+                                <% if (s.driver_name) { %>
+                                    <%= s.driver_name %>
+                                <% } else { %>
+                                    <span class="badge-unassigned">
+                                        <span class="material-symbols-outlined">warning</span>Sin asignar
+                                    </span>
+                                <% } %>
+                            </td>
+                            <td class="text-right"><%= fmtDate(s.expectedDeliveryDate) %></td>
+                            <td class="text-right">
+                                <span class="ot-badge <%= overdueCls(s.days_overdue) %>">+<%= s.days_overdue %> día<%= s.days_overdue !== 1 ? 's' : '' %></span>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } else { %>
+            <div class="report-card" style="text-align:center;padding:2rem 1.5rem;color:var(--color-text-muted);">
+                <span class="material-symbols-outlined" style="font-size:2.2rem;display:block;margin-bottom:.5rem;color:var(--color-success,#2e7d32);">check_circle</span>
+                Sin envíos con demora activa en el período seleccionado.
+            </div>
+            <% } %>
+
+            <!-- 4. Análisis de demoras -->
+            <% if (delayedByZone.length > 0 || delayedBySeverity.length > 0 || delayedByStatus.length > 0) { %>
+            <div class="dash-section-divider" style="margin-top:1.75rem;"><span class="dash-section-divider__label">Análisis de demoras activas</span></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;align-items:start;">
+                <% if (delayedByZone.length > 0) { %>
+                <div class="report-card" style="display:flex;flex-direction:column;">
+                    <h2>Demoras por zona
+                        <span class="kpi-tip" data-tip="Top 5 zonas con más envíos vencidos. Azul = tiene repartidor asignado. Rojo = sin asignar — problema de gestión, no de entrega.">?</span>
+                    </h2>
+                    <div style="position:relative;height:260px;margin-top:1rem;flex:1;">
+                        <canvas id="delayed-zone-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+                <% if (delayedBySeverity.length > 0) { %>
+                <div class="report-card" style="display:flex;flex-direction:column;">
+                    <h2>Severidad de demoras
+                        <span class="kpi-tip" data-tip="Distribución de envíos vencidos según cuántos días llevan de atraso. Muestra si el problema es reciente o crónico.">?</span>
+                    </h2>
+                    <div style="position:relative;height:260px;margin-top:1rem;flex:1;">
+                        <canvas id="delayed-severity-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+                <% if (delayedByStatus.length > 0) { %>
+                <div class="report-card" style="display:flex;flex-direction:column;">
+                    <h2>¿En qué etapa se frenan?
+                        <span class="kpi-tip" data-tip="En qué estado está el envío vencido. 'En Tránsito' = el repartidor salió pero no entregó. 'Asignado' o 'En Preparación' = nunca llegó al repartidor.">?</span>
+                    </h2>
+                    <div style="position:relative;height:260px;margin-top:1rem;flex:1;">
+                        <canvas id="delayed-status-chart"></canvas>
+                    </div>
+                </div>
+                <% } %>
+            </div>
+            <% } %>
+
+            <!-- 5. Tendencia semanal -->
+            <% if (delayedTrend.length > 0) { %>
+            <div class="report-card" style="margin-top:1rem;">
+                <h2>Demoras activas por semana de creación
+                    <span class="kpi-tip" data-tip="Envíos que actualmente tienen demora activa, agrupados por la semana en que fueron creados. Permite detectar qué lote de envíos concentra más problemas.">?</span>
+                </h2>
+                <p class="dash-hint">Cada barra representa envíos creados esa semana que hoy siguen sin entregarse.</p>
+                <div style="position:relative;height:180px;margin-top:1rem;">
+                    <canvas id="delayed-trend-chart"></canvas>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- 6. Tendencias estructurales -->
+            <% if (topFailingZones.length > 0) { %>
+            <div class="dash-section-divider" style="margin-top:1.75rem;"><span class="dash-section-divider__label">Tendencias estructurales</span></div>
+            <div class="report-card">
+                <h2>Top zonas con mayor tasa de fallo
+                    <span class="kpi-tip" data-tip="Zonas con más intentos de entrega fallidos en el período. 'Fallo' = intento que no se concretó (el envío fue devuelto o reprogramado). La tasa se calcula sobre el total de envíos asignados a esa zona.">?</span>
+                </h2>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Zona</th>
+                            <th class="text-right">Envíos <span class="kpi-tip" data-tip="Total de envíos asignados a la zona en el período seleccionado.">?</span></th>
+                            <th class="text-right">Intentos fallidos <span class="kpi-tip" data-tip="Cantidad de veces que se intentó entregar un envío sin éxito. Un mismo envío puede acumular varios intentos fallidos.">?</span></th>
+                            <th class="text-right">Tasa <span class="kpi-tip" data-tip="Intentos fallidos dividido el total de envíos de la zona. Puede superar el 100% si los envíos acumulan múltiples intentos sin entrega.">?</span></th>
+                            <th class="text-right">Intensidad <span class="kpi-tip" data-tip="Clasificación según la tasa de fallo: Alta ≥ 15%, Media 8–14%, Baja < 8%.">?</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% topFailingZones.forEach(z => { %>
+                            <%
+                                const cls = z.failure_rate >= 15 ? 'ot-badge--red' : z.failure_rate >= 8 ? 'ot-badge--amber' : 'ot-badge--green';
+                                const lbl = z.failure_rate >= 15 ? 'Alta' : z.failure_rate >= 8 ? 'Media' : 'Baja';
+                            %>
+                        <tr>
+                            <td><%= z.zone_name %></td>
+                            <td class="text-right"><%= z.total_shipments %></td>
+                            <td class="text-right"><span class="ot-badge <%= cls %>"><%= z.failed_attempts %></span></td>
+                            <td class="text-right"><%= z.failure_rate %>%</td>
+                            <td class="text-right"><span class="ot-badge <%= cls %>"><%= lbl %></span></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+            <% } %>
+
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script>
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value, to = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                if (!this.querySelector('.report-alert')) {
+                    const a = document.createElement('div');
+                    a.className = 'report-alert report-alert--error';
+                    a.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', a);
+                }
+                return;
+            }
+            const btn = this.querySelector('button[type="submit"]');
+            if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
+        });
+
+        (function () {
+            const isDark = document.documentElement.dataset.theme === 'dark' || document.body.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+            const gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+
+            const barLabelPlugin = {
+                id: 'barLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    chart.data.datasets.forEach((dataset, i) => {
+                        chart.getDatasetMeta(i).data.forEach((bar, index) => {
+                            const value = dataset.data[index];
+                            if (!value) return;
+                            ctx.save();
+                            ctx.fillStyle = textColor;
+                            ctx.font = 'bold 11px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText(value, bar.x, bar.y - 4);
+                            ctx.restore();
+                        });
+                    });
+                }
+            };
+
+            /* Demoras por zona — top 5 */
+            const zoneCanvas = document.getElementById('delayed-zone-chart');
+            if (zoneCanvas) {
+                const raw = <%- JSON.stringify(delayedByZone) %>.slice(0, 5);
+                new Chart(zoneCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: raw.map(r => r.zone_name),
+                        datasets: [
+                            { label: 'Con repartidor', data: raw.map(r => r.con_repartidor), backgroundColor: 'rgba(59,130,246,.7)', borderRadius: 6, maxBarThickness: 28 },
+                            { label: 'Sin asignar',    data: raw.map(r => r.sin_asignar),    backgroundColor: 'rgba(198,40,40,.7)',  borderRadius: 6, maxBarThickness: 28 },
+                        ],
+                    },
+                    options: {
+                        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        layout: { padding: { right: 8 } },
+                        plugins: {
+                            legend: { position: 'top', labels: { color: textColor, font: { size: 11 }, boxWidth: 10, padding: 12 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x} envíos`,
+                                    afterBody: (items) => {
+                                        if (!items.length) return [];
+                                        const idx = items[0].dataIndex;
+                                        const total = (raw[idx].con_repartidor || 0) + (raw[idx].sin_asignar || 0);
+                                        return [`Total zona: ${total}`];
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: { stacked: true, ticks: { color: textColor, stepSize: 1, font: { size: 11 } }, grid: { color: gridColor } },
+                            y: { stacked: true, ticks: { color: textColor, font: { size: 11 } }, grid: { display: false } },
+                        },
+                    },
+                });
+            }
+
+            /* ¿En qué etapa se frenan? */
+            const statusCanvas = document.getElementById('delayed-status-chart');
+            if (statusCanvas) {
+                const st = <%- JSON.stringify(delayedByStatus) %>;
+                const stColors = { 2: 'rgba(59,130,246,.8)', 6: 'rgba(249,115,22,.8)', 7: 'rgba(139,92,246,.8)' };
+                const stTotal = st.reduce((s, r) => s + r.total, 0);
+                const bodyColor = isDark ? '#e2e8f0' : '#1e293b';
+                new Chart(statusCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: st.map(r => r.status_label),
+                        datasets: [{
+                            data: st.map(r => r.total),
+                            backgroundColor: st.map(r => stColors[r.statusId] || 'rgba(148,163,184,.7)'),
+                            borderWidth: 0,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        layout: { padding: { top: 8, bottom: 4 } },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: textColor, font: { size: 11 }, padding: 16, boxWidth: 10, boxHeight: 10 } },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} envíos` } },
+                        },
+                        cutout: '72%',
+                    },
+                    plugins: [{
+                        id: 'centerText',
+                        afterDraw(chart) {
+                            const meta = chart.getDatasetMeta(0);
+                            if (!meta.data.length) return;
+                            const { ctx } = chart;
+                            const cx = meta.data[0].x, cy = meta.data[0].y;
+                            ctx.save();
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = bodyColor;
+                            ctx.font = 'bold 1.5rem sans-serif';
+                            ctx.fillText(stTotal, cx, cy - 9);
+                            ctx.font = '.68rem sans-serif';
+                            ctx.fillStyle = textColor;
+                            ctx.fillText('demorados', cx, cy + 11);
+                            ctx.restore();
+                        }
+                    }],
+                });
+            }
+
+            /* Demoras por semana de creación */
+            const trendCanvas = document.getElementById('delayed-trend-chart');
+            if (trendCanvas) {
+                const tr = <%- JSON.stringify(delayedTrend) %>;
+                new Chart(trendCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: tr.map(r => {
+                            const d = new Date(r.week_start + 'T12:00:00');
+                            return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+                        }),
+                        datasets: [{
+                            label: 'Envíos demorados',
+                            data: tr.map(r => r.delayed),
+                            backgroundColor: 'rgba(198,40,40,.7)',
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        layout: { padding: { top: 20 } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} envío${ctx.parsed.y !== 1 ? 's' : ''} demorado${ctx.parsed.y !== 1 ? 's' : ''}` } },
+                        },
+                        scales: {
+                            x: { ticks: { color: textColor }, grid: { display: false } },
+                            y: { display: false },
+                        },
+                    },
+                    plugins: [barLabelPlugin],
+                });
+            }
+
+            /* Severidad de demoras */
+            const sevCanvas = document.getElementById('delayed-severity-chart');
+            if (sevCanvas) {
+                const sev = <%- JSON.stringify(delayedBySeverity) %>;
+                const sevTotal = sev.reduce((acc, r) => acc + r.total, 0);
+                const sevColors = ['rgba(234,179,8,.85)','rgba(249,115,22,.85)','rgba(239,68,68,.85)','rgba(153,27,27,.9)'];
+                new Chart(sevCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: sev.map(r => r.banda),
+                        datasets: [{
+                            label: 'Envíos',
+                            data: sev.map(r => r.total),
+                            backgroundColor: sev.map((_, i) => sevColors[i] || sevColors[3]),
+                            borderRadius: 8,
+                            maxBarThickness: 56,
+                        }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        layout: { padding: { top: 28, left: 8, right: 8, bottom: 4 } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => {
+                                        const pct = sevTotal > 0 ? Math.round(ctx.parsed.y / sevTotal * 100) : 0;
+                                        return ` ${ctx.parsed.y} envíos (${pct}% del total demorado)`;
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: { ticks: { color: textColor, font: { size: 11 } }, grid: { display: false } },
+                            y: { display: false },
+                        },
+                    },
+                    plugins: [barLabelPlugin],
+                });
+            }
+        })();
+
+        /* Pill selector de límite */
+        (function () {
+            const SEL_KEY = 'sup_delayed_limit';
+            const pills      = document.querySelectorAll('#delayed-limit-pills .pill-btn');
+            const note       = document.getElementById('delayed-limit-note');
+            const tbody      = document.querySelector('#delayed-table tbody');
+            if (!pills.length || !tbody) return;
+            const totalLoaded = tbody.querySelectorAll('tr').length;
+            const totalReal   = <%= kpis.delayed_count %>;
+            const saved = Number(localStorage.getItem(SEL_KEY)) || 10;
+
+            const applyLimit = (limit) => {
+                tbody.querySelectorAll('tr').forEach((tr, i) => {
+                    tr.style.display = i < limit ? '' : 'none';
+                });
+                const showing = Math.min(limit, totalLoaded);
+                note.textContent = totalReal > showing
+                    ? `Mostrando los ${showing} más críticos de ${totalReal} envíos con demora.`
+                    : '';
+                pills.forEach(p => p.classList.toggle('active', Number(p.dataset.limit) === limit));
+            };
+
+            applyLimit(saved);
+
+            document.getElementById('delayed-limit-pills').addEventListener('click', e => {
+                const btn = e.target.closest('.pill-btn');
+                if (!btn) return;
+                const v = Number(btn.dataset.limit);
+                localStorage.setItem(SEL_KEY, v);
+                applyLimit(v);
+            });
+        })();
+
+        /* Toggle de estados */
+        (function () {
+            const STORAGE_KEY = 'sup_hidden_statuses';
+            const chips = document.getElementById('status-chips');
+            const grid  = document.getElementById('status-kpi-grid');
+            if (!chips || !grid) return;
+            const hidden = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+            const apply = () => {
+                chips.querySelectorAll('.status-chip').forEach(chip => {
+                    const id = Number(chip.dataset.statusId);
+                    const isHidden = hidden.has(id);
+                    chip.classList.toggle('active', !isHidden);
+                    const card = grid.querySelector(`.dash-kpi[data-status-id="${id}"]`);
+                    if (card) card.style.display = isHidden ? 'none' : '';
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify([...hidden]));
+            };
+            apply();
+            chips.addEventListener('click', e => {
+                const chip = e.target.closest('.status-chip');
+                if (!chip) return;
+                const id = Number(chip.dataset.statusId);
+                hidden.has(id) ? hidden.delete(id) : hidden.add(id);
+                apply();
+            });
+        })();
+    </script>
+</body>
+</html>

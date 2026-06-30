@@ -1,0 +1,276 @@
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+    .incident-feedback-container {
+        backdrop-filter: blur(4px);
+    }
+    .incident-feedback-popup {
+        width: min(32rem, calc(100vw - 2rem));
+        padding: 0;
+        overflow: hidden;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        box-shadow: var(--shadow-lg);
+    }
+    .incident-feedback-html {
+        margin: 0 !important;
+        padding: 0 !important;
+        text-align: left !important;
+    }
+    .incident-feedback-shell {
+        color: var(--color-text);
+    }
+    .incident-feedback-head {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-4);
+        padding: var(--space-5);
+        border-bottom: 1px solid var(--color-border);
+        background: var(--color-surface);
+    }
+    .incident-feedback-mark {
+        flex: 0 0 auto;
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: var(--radius-md);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--color-warning-bg);
+        color: var(--color-warning);
+    }
+    .incident-feedback-shell--error .incident-feedback-mark {
+        background: var(--color-danger-bg);
+        color: var(--color-danger);
+    }
+    .incident-feedback-shell--success .incident-feedback-mark {
+        background: var(--color-success-bg);
+        color: var(--color-success);
+    }
+    .incident-feedback-shell--info .incident-feedback-mark {
+        background: var(--color-info-bg);
+        color: var(--color-info);
+    }
+    .incident-feedback-mark .material-symbols-outlined {
+        font-size: 1.45rem;
+        line-height: 1;
+        font-variation-settings: "FILL" 1;
+    }
+    .incident-feedback-copy {
+        min-width: 0;
+    }
+    .incident-feedback-badge {
+        margin-bottom: var(--space-2);
+    }
+    .incident-feedback-title {
+        margin: 0;
+        font-size: var(--font-size-xl);
+        font-weight: var(--font-weight-bold);
+        line-height: var(--line-height-tight);
+        color: var(--color-text);
+    }
+    .incident-feedback-subtitle {
+        margin: var(--space-2) 0 0;
+        font-size: var(--font-size-sm);
+        line-height: var(--line-height-normal);
+        color: var(--color-text-secondary);
+    }
+    .incident-feedback-body {
+        display: grid;
+        gap: var(--space-3);
+        padding: var(--space-5);
+        background: var(--color-surface);
+    }
+    .incident-feedback-note {
+        margin: 0;
+        padding: var(--space-4);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--color-border);
+        background: var(--color-surface-alt);
+        color: var(--color-text-secondary);
+        font-size: var(--font-size-sm);
+        line-height: var(--line-height-normal);
+    }
+    .incident-feedback-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: var(--space-2);
+    }
+    .incident-feedback-list li {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: start;
+        gap: var(--space-3);
+        padding: .8rem .9rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--color-border);
+        background: var(--color-surface-alt);
+        color: var(--color-text);
+        font-size: var(--font-size-sm);
+        line-height: var(--line-height-normal);
+    }
+    .incident-feedback-list .material-symbols-outlined {
+        font-size: 1rem;
+        line-height: 1.2;
+        color: var(--color-primary);
+        margin-top: 1px;
+    }
+    .incident-feedback-actions {
+        margin: 0 !important;
+        padding: 0 var(--space-5) var(--space-5) !important;
+        justify-content: flex-end !important;
+    }
+    .incident-feedback-confirm {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 8.5rem;
+        padding: .55rem 1rem !important;
+        border: 1px solid transparent !important;
+        border-radius: var(--radius-sm) !important;
+        background: var(--color-primary) !important;
+        color: var(--color-text-inverse) !important;
+        font-family: var(--font-family) !important;
+        font-size: var(--font-size-sm) !important;
+        font-weight: var(--font-weight-semibold) !important;
+        line-height: 1 !important;
+        box-shadow: none !important;
+        transition: background-color var(--transition), transform var(--transition) !important;
+    }
+    .incident-feedback-confirm:hover {
+        background: var(--color-primary-dark) !important;
+        transform: translateY(-1px);
+    }
+    .incident-feedback-confirm:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, .22);
+        outline-offset: 2px;
+    }
+    @media (max-width: 520px) {
+        .incident-feedback-head,
+        .incident-feedback-body {
+            padding: var(--space-4);
+        }
+        .incident-feedback-actions {
+            padding: 0 var(--space-4) var(--space-4) !important;
+        }
+        .incident-feedback-head {
+            gap: var(--space-3);
+        }
+        .incident-feedback-mark {
+            width: 2.4rem;
+            height: 2.4rem;
+        }
+        .incident-feedback-confirm {
+            width: 100%;
+        }
+    }
+</style>
+<script>
+(function () {
+    if (window.showIncidentFeedback) { return; }
+
+    const ICON_MAP = {
+        warning: { glyph: 'warning', label: 'Validación', badge: 'badge badge--warning' },
+        error:   { glyph: 'error', label: 'Atención', badge: 'badge badge--danger' },
+        success: { glyph: 'task_alt', label: 'Confirmado', badge: 'badge badge--success' },
+        info:    { glyph: 'info', label: 'Información', badge: 'badge badge--info' }
+    };
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, function (char) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char];
+        });
+    }
+
+    function stripTags(value) {
+        return String(value ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function buildBody(opts) {
+        if (opts.html) { return opts.html; }
+
+        const parts = [];
+        if (opts.text || opts.intro) {
+            parts.push('<p class="incident-feedback-note">' + escapeHtml(opts.text || opts.intro) + '</p>');
+        }
+        if (Array.isArray(opts.items) && opts.items.length) {
+            parts.push(
+                '<ul class="incident-feedback-list">'
+                + opts.items.map(function (item) {
+                    return ''
+                        + '<li>'
+                        + '<span class="material-symbols-outlined">subdirectory_arrow_right</span>'
+                        + '<span>' + escapeHtml(item) + '</span>'
+                        + '</li>';
+                }).join('')
+                + '</ul>'
+            );
+        }
+        return parts.join('');
+    }
+
+    function buildMarkup(opts, tone) {
+        const config = ICON_MAP[tone] || ICON_MAP.warning;
+        return ''
+            + '<div class="incident-feedback-shell incident-feedback-shell--' + tone + '">'
+            + '  <div class="incident-feedback-head">'
+            + '    <div class="incident-feedback-mark"><span class="material-symbols-outlined">' + config.glyph + '</span></div>'
+            + '    <div class="incident-feedback-copy">'
+            + '      <span class="' + config.badge + ' incident-feedback-badge">' + config.label + '</span>'
+            + '      <h2 class="incident-feedback-title">' + escapeHtml(opts.title || 'Revisá este dato') + '</h2>'
+            + '      <p class="incident-feedback-subtitle">' + escapeHtml(opts.subtitle || 'Hay un dato que necesitamos completar antes de continuar.') + '</p>'
+            + '    </div>'
+            + '  </div>'
+            + '  <div class="incident-feedback-body">' + buildBody(opts) + '</div>'
+            + '</div>';
+    }
+
+    window.showIncidentFeedback = function (opts) {
+        // La validación frenó la acción: ocultá el loader global si quedó visible,
+        // así no queda "Cargando…" colgado detrás del aviso.
+        if (typeof window.hidePageLoader === 'function') { window.hidePageLoader(); }
+        const input = Object.assign({}, opts || {});
+        const tone = input.icon || 'warning';
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            return window.Swal.fire({
+                title: '',
+                icon: undefined,
+                html: buildMarkup(input, tone),
+                confirmButtonText: input.confirmButtonText || 'Entendido',
+                buttonsStyling: false,
+                customClass: {
+                    container: 'incident-feedback-container',
+                    popup: 'incident-feedback-popup',
+                    htmlContainer: 'incident-feedback-html',
+                    actions: 'incident-feedback-actions',
+                    confirmButton: 'incident-feedback-confirm'
+                },
+                backdrop: 'rgba(15, 23, 42, 0.32)',
+                showCloseButton: false,
+                focusConfirm: true
+            });
+        }
+
+        const pieces = [];
+        if (input.title) { pieces.push(input.title); }
+        if (input.subtitle) { pieces.push(input.subtitle); }
+        if (input.text) { pieces.push(input.text); }
+        if (input.intro) { pieces.push(input.intro); }
+        if (Array.isArray(input.items) && input.items.length) {
+            pieces.push(input.items.join(', '));
+        }
+        if (input.html) { pieces.push(stripTags(input.html)); }
+        window.alert(pieces.filter(Boolean).join('\n\n'));
+        return Promise.resolve();
+    };
+})();
+</script>

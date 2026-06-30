@@ -1,0 +1,118 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>La <strong>campana</strong> del header avisa con un badge cuántas alertas sin leer tenés.</li>
+            <li>En el <a href="/notifications">Centro de notificaciones</a> ves el historial completo.</li>
+            <li>Al tocar una notificación, te lleva directo al envío, incidencia o ruta relacionada.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>La campana del header</h2>
+<p>En la barra superior está la campana de notificaciones. El badge rojo indica cuántas alertas tenés sin leer.</p>
+<ul>
+    <li>Hacé click en la campana para ver las últimas notificaciones en un panel desplegable.</li>
+    <li>Usá <strong>Marcar todas como leídas</strong> para limpiar el contador.</li>
+    <li>El enlace <strong>Ver todas</strong> te lleva al centro completo.</li>
+</ul>
+
+<h2>Centro de notificaciones</h2>
+<p>En <a href="/notifications">Notificaciones</a> ves el historial completo de alertas con fecha, título y enlace al recurso relacionado. Al hacer click en una, el sistema te redirige al detalle correspondiente.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/notificaciones/01-centro.png',
+    alt: 'Centro de notificaciones mostrando el historial de alertas',
+    caption: 'Centro de notificaciones: el historial de alertas. Cuando no tenés ninguna pendiente, aparece vacío.'
+}) %>
+
+<h2>Tipos de alerta</h2>
+<div class="help-glossary">
+    <div class="help-glossary__item">
+        <p class="help-glossary__term"><span class="material-symbols-outlined">local_shipping</span>Envíos</p>
+        <p class="help-glossary__def">Cambios de estado, demoras, intentos fallidos, paquete dañado.</p>
+    </div>
+    <div class="help-glossary__item">
+        <p class="help-glossary__term"><span class="material-symbols-outlined">report_problem</span>Incidencias</p>
+        <p class="help-glossary__def">Nuevas incidencias internas, cambios de estado, devoluciones (<a href="/help/glosario">RETURN</a>).</p>
+    </div>
+    <div class="help-glossary__item">
+        <p class="help-glossary__term"><span class="material-symbols-outlined">route</span>Rutas</p>
+        <p class="help-glossary__def">Cancelaciones, interrupciones, bloqueos por <a href="/help/glosario">fatiga</a>.</p>
+    </div>
+    <div class="help-glossary__item">
+        <p class="help-glossary__term"><span class="material-symbols-outlined">undo</span>Retornos</p>
+        <p class="help-glossary__def">Devoluciones y envíos que vuelven a sucursal.</p>
+    </div>
+</div>
+<p>Además de las notificaciones in-app, el sistema puede enviar emails según la configuración en Ajustes → Comunicaciones.</p>
+
+<h2>Paso a paso</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Mirá el badge</p>
+        <div class="help-steps__text">Cuando aparece un número en la campana, tenés alertas sin leer.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Abrí el resumen</p>
+        <div class="help-steps__text">Hacé click en la campana para ver las últimas alertas.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Saltá al recurso</p>
+        <div class="help-steps__text">Seleccioná una notificación para ir directo al envío, incidencia o ruta relacionada.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá el historial</p>
+        <div class="help-steps__text">Para el detalle completo, entrá al <a href="/notifications">Centro de notificaciones</a>.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Mantené el panel ordenado</p>
+        <div class="help-steps__text">Marcá como leídas las que ya atendiste.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">monitor_heart</span>
+    <div class="help-callout__body">Las alertas de fatiga (<a href="/help/ojo-patron">Ojo de Patrón</a>) y los bloqueos de ruta también llegan por notificaciones a supervisores y administradores.</div>
+</div>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El badge no se actualiza
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Recargá la página: las notificaciones se consultan periódicamente mientras estás logueado.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Esperaba un email y no llegó
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Verificá que el evento tenga el canal email activo en Ajustes → Comunicaciones.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        La notificación no abre el recurso correcto
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>El envío o incidencia pudo cambiar de estado. Buscalo con la <a href="/help/busqueda-universal">búsqueda rápida</a>.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/incidencias"><span class="material-symbols-outlined">report_problem</span>Incidencias operativas</a></li>
+    <li><a href="/help/ojo-patron"><span class="material-symbols-outlined">monitor_heart</span>Ojo de Patrón (fatiga)</a></li>
+    <li><a href="/help/envios"><span class="material-symbols-outlined">inventory_2</span>Gestión de envíos</a></li>
+    <li><a href="/help/usuarios-ajustes"><span class="material-symbols-outlined">settings</span>Usuarios, sucursales y ajustes</a></li>
+</ul>

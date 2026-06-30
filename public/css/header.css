@@ -28,6 +28,67 @@
   font-size: 1.2rem;
 }
 
+/* ===== NAV GROUP (Reportes collapsible) ===== */
+
+.nav-group { width: 100%; }
+
+.nav-group-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.6rem;
+    width: 100%;
+    box-sizing: border-box;
+    background: none;
+    border: none;
+    appearance: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    line-height: 1.2;
+    margin: 0;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    transition: background-color var(--transition), color var(--transition);
+    list-style: none;
+}
+
+.nav-group-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.nav-group-toggle .material-symbols-outlined {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.nav-group-arrow {
+    margin-left: auto;
+    font-size: 1.1rem !important;
+    transition: transform 0.2s ease;
+}
+
+.nav-group.open .nav-group-arrow {
+    transform: rotate(180deg);
+}
+
+.nav-group-items {
+    display: none;
+    flex-direction: column;
+    padding-left: 0.75rem;
+    border-left: 2px solid rgba(255,255,255,0.08);
+    margin-left: 1.25rem;
+    margin-top: 2px;
+}
+
+.nav-group.open .nav-group-items {
+    display: flex;
+}
+
 /* ===== HAMBURGER & MOBILE LOGO ===== */
 
 .hamburger-btn {
@@ -101,7 +162,11 @@ header {
 
 .left-header {
   width: 220px;
-  min-height: 100vh;
+  /* Altura exacta del viewport (no min-height) para que el nav interno pueda scrollear
+     cuando el menú es más alto que la pantalla. Antes los ítems de abajo (submenú de
+     Reportes) quedaban inaccesibles. */
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--color-sidebar);
   display: flex;
   flex-direction: column;
@@ -146,7 +211,18 @@ header {
 .left-header .nav {
   padding: 0.75rem 0.5rem;
   flex: 1;
+  /* min-height:0 permite que el área de navegación se achique y scrollee dentro del
+     flex column; el logo (arriba) y el theme-toggle (abajo) quedan siempre visibles. */
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
+
+/* Scrollbar fina y discreta para el menú lateral */
+.left-header .nav::-webkit-scrollbar { width: 6px; }
+.left-header .nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 3px; }
+.left-header .nav:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); }
 
 .left-header .nav li {
   display: flex;
@@ -167,6 +243,9 @@ header {
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 500;
+  /* Mismo interlineado que .nav-group-toggle (1.2): así los items normales y los
+     grupos desplegables quedan exactamente del mismo alto y estilo. */
+  line-height: 1.2;
   color: rgba(255, 255, 255, 0.6);
   list-style: none;
   transition: background-color var(--transition), color var(--transition);
@@ -193,7 +272,7 @@ header {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-#btn-theme {
+.left-header #btn-theme {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -210,22 +289,22 @@ header {
   transition: background-color var(--transition), color var(--transition);
 }
 
-#btn-theme:hover {
+.left-header #btn-theme:hover {
   background-color: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
-#btn-theme #theme-icon {
+.left-header #btn-theme #theme-icon {
   font-size: 1.2rem;
   flex-shrink: 0;
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-#btn-theme.spinning #theme-icon {
+.left-header #btn-theme.spinning #theme-icon {
   transform: rotate(360deg);
 }
 
-#btn-theme #theme-label {
+.left-header #btn-theme #theme-label {
   font-family: var(--font-family);
 }
 
@@ -252,6 +331,11 @@ header {
 }
 
 .top-header > i {
+  margin-left: auto;
+}
+
+/* LGT-218: la campana abre el grupo derecho (campana + perfil) y lo empuja al extremo. */
+.top-header .notif-bell {
   margin-left: auto;
 }
 
@@ -463,12 +547,14 @@ header {
     font-size: 1.25rem;
   }
 
-  .left-header .nav ul {
+  .left-header .nav ul,
+  .nav-group-toggle {
     font-size: 1rem;
     padding: 0.7rem 1rem;
   }
 
-  .left-header .nav ul .material-symbols-outlined {
+  .left-header .nav ul .material-symbols-outlined,
+  .nav-group-toggle .material-symbols-outlined {
     font-size: 1.3rem;
   }
 }
@@ -495,13 +581,15 @@ header {
     font-size: 1.45rem;
   }
 
-  .left-header .nav ul {
+  .left-header .nav ul,
+  .nav-group-toggle {
     font-size: 1.1rem;
     padding: 0.85rem 1.1rem;
     gap: 0.75rem;
   }
 
-  .left-header .nav ul .material-symbols-outlined {
+  .left-header .nav ul .material-symbols-outlined,
+  .nav-group-toggle .material-symbols-outlined {
     font-size: 1.5rem;
   }
 }
@@ -551,7 +639,9 @@ header {
     top: 0;
     left: 0;
     width: 240px;
-    min-height: 100vh;
+    /* Altura exacta para que el nav scrollee dentro del drawer (menú largo) */
+    height: 100vh;
+    height: 100dvh;
     z-index: 100;
     transform: translateX(-100%);
     transition: transform 0.25s ease;

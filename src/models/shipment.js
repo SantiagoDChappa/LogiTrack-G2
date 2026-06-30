@@ -1,10 +1,5 @@
 const { DataTypes, Op } = require('sequelize');
 const sequelize = require('../database/connection');
-const { Person }       = require('./person');
-const { Status }       = require('./status');
-const { Address }      = require('./address');
-const { Province }     = require('./province');
-const { TypeShipment } = require('./typeShipment');
 
 const Shipment = sequelize.define('shipment', {
     id: {
@@ -12,93 +7,217 @@ const Shipment = sequelize.define('shipment', {
         primaryKey: true,
         autoIncrement: true,
     },
-    trackingId:      { type: DataTypes.STRING },
-    statusId:        { type: DataTypes.INTEGER },
-    createdAt:       { type: DataTypes.DATE },
-    senderId:        { type: DataTypes.INTEGER },
-    recipientId:     { type: DataTypes.INTEGER },
-    addressId:       { type: DataTypes.INTEGER },
-    shipmentTypeId:  { type: DataTypes.INTEGER },
-    weightKg:        { type: DataTypes.DECIMAL(8, 2) },
-    packageQty:      { type: DataTypes.INTEGER }
+    trackingId:       { type: DataTypes.STRING },
+    statusId:         { type: DataTypes.INTEGER },
+    createdAt:        { type: DataTypes.DATE },
+    senderId:         { type: DataTypes.INTEGER },
+    recipientId:      { type: DataTypes.INTEGER },
+    addressId:        { type: DataTypes.INTEGER },
+    shipmentTypeId:   { type: DataTypes.INTEGER },
+    weightKg:         { type: DataTypes.DECIMAL(8, 2) },
+    volumeM3:         { type: DataTypes.DECIMAL(8, 3) },
+    packageQty:       { type: DataTypes.INTEGER },
+    deliveryUserId:   { type: DataTypes.INTEGER },
+    legacyTrackingId: { type: DataTypes.STRING },
+    zoneId:               { type: DataTypes.INTEGER },
+    currentBranchId:      { type: DataTypes.INTEGER },
+    expectedDeliveryDate: { type: DataTypes.DATEONLY },
+    expectedDeliveryFrom: { type: DataTypes.TIME, allowNull: true },
+    expectedDeliveryTo:   { type: DataTypes.TIME, allowNull: true },
+    priority:             { type: DataTypes.INTEGER, defaultValue: 1 },
+    basePriority:         { type: DataTypes.INTEGER, defaultValue: 1 },
+    codAmount:            { type: DataTypes.DECIMAL(12, 2), allowNull: true,  field: 'cod_amount' },
+    codMethod:            { type: DataTypes.STRING(20),     allowNull: true,  field: 'cod_method' },
+    specialInstructions:  { type: DataTypes.TEXT,           allowNull: true,  field: 'special_instructions' },
+    fragile:              { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'fragile' },
+    refrigerated:         { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'refrigerated' },
+    oversized:            { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'oversized' },
+    estimatedMinutes:     { type: DataTypes.INTEGER,        allowNull: false, defaultValue: 5,     field: 'estimated_minutes' },
+    deliveryMode:         { type: DataTypes.STRING(20),     allowNull: false, defaultValue: 'home', field: 'delivery_mode' },
+    pickupBranchId:       { type: DataTypes.INTEGER,        allowNull: true,  field: 'pickup_branch_id' },
+    // Sprint 3 - 4.1 Código clave de entrega
+    deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
+    // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)
+    portalToken:          { type: DataTypes.STRING(60),     allowNull: true,  field: 'portal_token' },
+    // NFAL07 (LGT-158) — link accionable de un solo uso + vencimiento.
+    portalTokenUsedAt:    { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_used_at' },
+    portalTokenExpiresAt: { type: DataTypes.DATE,           allowNull: true,  field: 'portal_token_expires_at' },
+    // Sprint 4 - Notificación de demora (LGT-160)
+    delayNotifiedAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'delayNotifiedAt' },
+    // LGT-210/209 - reprogramación y trazabilidad de demora propagada en cascada.
+    pendingReschedule:    { type: DataTypes.BOOLEAN,        allowNull: false, defaultValue: false, field: 'pending_reschedule' },
+    rescheduleDate:       { type: DataTypes.DATEONLY,       allowNull: true,  field: 'reschedule_date' },
+    delayOriginIncidentId:{ type: DataTypes.INTEGER,        allowNull: true,  field: 'delay_origin_incident_id' },
+    // LGT-215 - envío de reposición: apunta al envío original que reemplaza.
+    replacementOfShipmentId: { type: DataTypes.INTEGER,    allowNull: true,  field: 'replacement_of_shipment_id' },
+    // LGT-214 precondición: costo total persistido al crear el envío (para nota de crédito).
+    costTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    // Sprint 5 — dashboard analítico: transporte que realizó el envío (para métricas por camioneta).
+    transportId: { type: DataTypes.INTEGER, allowNull: true },
+    // [prototype] Seguro de mercadería: valor declarado en el alta y seguro calculado/"congelado".
+    declaredValue:   { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'declaredValue' },
+    insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
+    // Recargo por zona peligrosa, congelado al alta. El ruteo no lo recalcula.
+    dangerSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'dangerSurcharge' },
+    // Recargo por distancia origen-destino (línea recta) + Express/Frágil, congelados al alta.
+    distanceKm:        { type: DataTypes.DECIMAL(10, 2), allowNull: true, field: 'distanceKm' },
+    distanceSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'distanceSurcharge' },
+    expressSurcharge:  { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'expressSurcharge' },
+    fragileSurcharge:  { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'fragileSurcharge' },
 },
 { timestamps: true, tableName: 'shipment' });
 
-Shipment.belongsTo(Person,       { as: 'sender',       foreignKey: 'senderId'       });
-Shipment.belongsTo(Person,       { as: 'recipient',    foreignKey: 'recipientId'    });
-Shipment.belongsTo(Status,       { as: 'status',       foreignKey: 'statusId'       });
-Shipment.belongsTo(Address,      { as: 'address',      foreignKey: 'addressId'      });
-Shipment.belongsTo(TypeShipment, { as: 'shipmentType', foreignKey: 'shipmentTypeId' });
+const getAll = () => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Province } = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { User } = require('./user');
+    
+    const { Branch } = require('./branch');
 
-const defaultIncludes = [
-    { model: Person,       as: 'sender'       },
-    { model: Person,       as: 'recipient'    },
-    { model: Status,       as: 'status'       },
-    { model: Address,      as: 'address',      include: [{ model: Province, as: 'province' }] },
-    { model: TypeShipment, as: 'shipmentType' },
-];
-
-const getAll = async () => {
-    return await Shipment.findAll({ include: defaultIncludes });
+    return Shipment.findAll({
+        include: [
+            { model: Person, as: 'sender' },
+            { model: Person, as: 'recipient' },
+            { model: Status, as: 'status' },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
+            { model: TypeShipment, as: 'shipmentType' },
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'pickupBranch', required: false }
+        ],
+        order: [['id', 'DESC']],
+        limit: 500,
+    });
 };
 
-const getById = async (id) => {
-    return await Shipment.findOne({
+const getById = (id) => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Province } = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { User } = require('./user');
+    const { Branch } = require('./branch');
+    const { Zone } = require('./zone');
+
+    return Shipment.findOne({
         where: { id },
-        include: defaultIncludes
+        include: [
+            { model: Person, as: 'sender' },
+            { model: Person, as: 'recipient' },
+            { model: Status, as: 'status' },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
+            { model: TypeShipment, as: 'shipmentType' },
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'currentBranch', required: false },
+            { model: Branch, as: 'pickupBranch',  required: false },
+            { model: Zone, as: 'zone', required: false }
+        ]
     });
 };
 
-const generateTrackingId = async () => {
-    const last = await Shipment.findOne({ order: [['id', 'DESC']] });
-    const next = last ? last.id + 1 : 1;
-    return `ENV-${String(next).padStart(3, '0')}`;
+const generateTrackingId = async (prefix = 'ENV') => {
+    const last = await Shipment.findOne({
+        where: { trackingId: { [Op.like]: `${prefix}-%` } },
+        order: [['id', 'DESC']],
+    });
+    if (!last) { return `${prefix}-001`; }
+    const lastNum = parseInt(String(last.trackingId).split('-').pop(), 10) || 0;
+    return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
 };
 
-const create = async (data) => {
-    const trackingId = await generateTrackingId();
-    return await Shipment.create({
+const create = async (data, options = {}) => {
+    const trackingId = await generateTrackingId(data.trackingPrefix || 'ENV');
+    const { generateSecretCode, generatePortalToken, generatePortalTokenExpiry } = require('../utils/shipmentTokens');
+    return Shipment.create({
         trackingId,
-        statusId:       1,
-        senderId:       data.senderId,
-        recipientId:    data.recipientId,
-        addressId:      data.addressId,
-        shipmentTypeId: data.shipmentTypeId || null,
-        weightKg:       data.weightKg       || null,
-        packageQty:     data.packageQty      || null,
-        createdAt:      new Date().toISOString().split('T')[0]
+        deliverySecretCode:   data.deliverySecretCode   || generateSecretCode(),
+        portalToken:          data.portalToken          || generatePortalToken(),
+        portalTokenExpiresAt: data.portalTokenExpiresAt || generatePortalTokenExpiry(),
+        statusId:         data.statusId || 1,
+        senderId:         data.senderId,
+        recipientId:      data.recipientId,
+        addressId:        data.addressId,
+        deliveryMode:     data.deliveryMode    || 'home',
+        pickupBranchId:   data.pickupBranchId  || null,
+        shipmentTypeId:   data.shipmentTypeId || null,
+        fragile:          !!data.fragile,
+        weightKg:         data.weightKg       || null,
+        volumeM3:         data.volumeM3        || null,
+        packageQty:       data.packageQty      || null,
+        declaredValue:    data.declaredValue   || null,
+        zoneId:               data.zoneId          || null,
+        currentBranchId:      data.currentBranchId || null,
+        expectedDeliveryDate: data.expectedDeliveryDate || null,
+        expectedDeliveryFrom: data.expectedDeliveryFrom || null,
+        expectedDeliveryTo:   data.expectedDeliveryTo   || null,
+        deliveryUserId:       data.deliveryUserId  || null,
+        legacyTrackingId: data.legacyTrackingId || null,
+        priority:         data.priority     || 1,
+        basePriority:     data.basePriority || 1,
+        createdAt:        new Date().toISOString().split('T')[0]
+    }, { transaction: options.transaction });
+};
+
+const findByLegacyTrackingId = (legacyTrackingId) => {
+    if (!legacyTrackingId) { return Promise.resolve(null); }
+    return Shipment.findOne({ where: { legacyTrackingId } });
+};
+
+const findPotentialDuplicate = ({ senderDocument, recipientDocument, street, number, provinceId, statusId }) => {
+    const { Person } = require('./person');
+    const { Address } = require('./address');
+
+    return Shipment.findOne({
+        where: { statusId },
+        include: [
+            { model: Person,  as: 'sender',    where: { document: senderDocument },    required: true },
+            { model: Person,  as: 'recipient', where: { document: recipientDocument }, required: true },
+            { model: Address, as: 'address',   where: { street, number, provinceId },  required: true },
+        ]
     });
 };
 
-const search = async ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds }) => {
+const search = ({ trackingId, role, name, document, senderName, senderDocument, recipientName, recipientDocument, statusIds, deliveryUserId, currentBranchId }) => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Branch } = require('./branch');
+    
     const shipmentWhere  = {};
     const senderWhere    = {};
     const recipientWhere = {};
+
+    if (deliveryUserId) { shipmentWhere.deliveryUserId = deliveryUserId; }
+
+    if (currentBranchId) { shipmentWhere.currentBranchId = Number(currentBranchId); }
 
     if (statusIds && statusIds.length > 0) {
         shipmentWhere.statusId = { [Op.in]: statusIds.map(Number) };
     }
 
-    if (trackingId) shipmentWhere.trackingId = { [Op.iLike]: `%${trackingId}%` };
+    if (trackingId) { shipmentWhere.trackingId = { [Op.iLike]: `%${trackingId}%` }; }
 
     const isBoth      = !role || role === 'both';
     const isSender    = role === 'sender';
     const isRecipient = role === 'recipient';
 
     if (isBoth) {
-        if (senderName)        senderWhere.fullName    = { [Op.iLike]: `%${senderName}%` };
-        if (senderDocument)    senderWhere.document    = senderDocument;
-        if (recipientName)     recipientWhere.fullName = { [Op.iLike]: `%${recipientName}%` };
-        if (recipientDocument) recipientWhere.document = recipientDocument;
+        if (senderName)        { senderWhere.fullName    = { [Op.iLike]: `%${senderName}%` }; }
+        if (senderDocument)    { senderWhere.document    = senderDocument; }
+        if (recipientName)     { recipientWhere.fullName = { [Op.iLike]: `%${recipientName}%` }; }
+        if (recipientDocument) { recipientWhere.document = recipientDocument; }
     } else if (isSender) {
-        if (name)     senderWhere.fullName = { [Op.iLike]: `%${name}%` };
-        if (document) senderWhere.document = document;
+        if (name)     { senderWhere.fullName = { [Op.iLike]: `%${name}%` }; }
+        if (document) { senderWhere.document = document; }
     } else if (isRecipient) {
-        if (name)     recipientWhere.fullName = { [Op.iLike]: `%${name}%` };
-        if (document) recipientWhere.document = document;
+        if (name)     { recipientWhere.fullName = { [Op.iLike]: `%${name}%` }; }
+        if (document) { recipientWhere.document = document; }
     }
 
-    return await Shipment.findAll({
+    return Shipment.findAll({
         where: shipmentWhere,
         include: [
             {
@@ -115,56 +234,261 @@ const search = async ({ trackingId, role, name, document, senderName, senderDocu
             },
             { model: Status,  as: 'status'  },
             { model: Address, as: 'address' },
-        ]
+            { model: Branch,  as: 'currentBranch', required: false },
+        ],
+        order: [['id', 'DESC']],
+        limit: 200,
+        subQuery: false,
     });
 };
 
-const existsByDocument = async (document) => {
-    if (!document) return false;
+const update = async (data, options = {}) => {
+    const { Status } = require('./status');
+    const { Person } = require('./person');
+    const { Address } = require('./address');
+    const transaction = options.transaction;
 
-    const person = await Person.findOne({ where: { document } });
-    if (!person) return false;
+    const shipment = await Shipment.findOne({
+        where: { id: data.id },
+        include: [{ model: Status, as: 'status' }],
+        transaction,
+    });
+    if (!shipment) { return null; }
 
-    const result = await Shipment.findOne({
-        where: {
-            [Op.or]: [
-                { senderId:    person.id },
-                { recipientId: person.id },
-            ]
+    const statusId = shipment.statusId;
+
+    // Entregado, Cancelado, En Sucursal, Paquete Fallido, Intento Fallido — solo deliveryUserId si corresponde
+    if (statusId === 4 || statusId === 5 || statusId === 3 || statusId === 8 || statusId === 9) {
+        if (data.deliveryUserId !== undefined) {
+             await Shipment.update(
+                { deliveryUserId: data.deliveryUserId || null },
+                { where: { id: data.id }, transaction }
+            );
         }
-    });
-    return result !== null;
-};
+        return shipment;
+    }
 
+    // En Tránsito, Asignado, En Preparación — solo contacto destinatario + deliveryUserId
+    if (statusId === 2 || statusId === 6 || statusId === 7) {
+        await Person.update(
+            { phone: data.recipientPhone, email: data.recipientEmail },
+            { where: { id: shipment.recipientId }, transaction }
+        );
 
-const update = async (data) => {
-    const shipment = await Shipment.findOne({ where: { id: data.id } });
-    if (!shipment) return null;
+        if (data.deliveryUserId !== undefined) {
+            await Shipment.update(
+               { deliveryUserId: data.deliveryUserId || null },
+               { where: { id: data.id }, transaction }
+           );
+        }
+        return shipment;
+    }
 
-    await Person.update(
-        { fullName: data.recipientName, document: data.recipientDocument, phone: data.recipientPhone, email: data.recipientEmail },
-        { where: { id: shipment.recipientId } }
-    );
+    if (statusId === 1) { // Pendiente — modificación completa
+        await Person.update(
+            { fullName: data.recipientName, document: data.recipientDocument, phone: data.recipientPhone, email: data.recipientEmail },
+            { where: { id: shipment.recipientId }, transaction }
+        );
 
-    await Address.update(
-        { street: data.street, number: data.number, provinceId: data.province, postalCode: data.postalCode, floorApartment: data.floorApartment, lat: data.addressLat || null, lng: data.addressLng || null },
-        { where: { id: shipment.addressId } }
-    );
+        await Address.update(
+            {
+                street: data.street,
+                number: data.number,
+                provinceId: data.province,
+                postalCode: data.postalCode,
+                floorApartment: data.floorApartment,
+                lat: data.addressLat || null,
+                lng: data.addressLng || null
+            },
+            { where: { id: shipment.addressId }, transaction }
+        );
 
-    await Shipment.update(
-        {
-            shipmentTypeId: data.shipmentTypeId || null,
-            weightKg:       data.weightKg       || null,
-            packageQty:     data.packageQty      || null,
-        },
-        { where: { id: data.id } }
-    );
+        await Shipment.update(
+            {
+                deliveryUserId:  data.deliveryUserId  || null,
+                weightKg:        data.weightKg        || shipment.weightKg,
+                packageQty:      data.packageQty      || shipment.packageQty,
+                shipmentTypeId:  data.shipmentTypeId  || shipment.shipmentTypeId,
+            },
+            { where: { id: data.id }, transaction }
+        );
+    }
 
     return shipment;
 };
 
-const updateStatus = async (id, newStatusId) => {
-    return await Shipment.update({ statusId: newStatusId }, { where: { id } });
+const getByTrackingId = (trackingId) => {
+    const { Person }       = require('./person');
+    const { Status }       = require('./status');
+    const { Address }      = require('./address');
+    const { Province }     = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { User }         = require('./user');
+
+    const { Branch } = require('./branch');
+    return Shipment.findOne({
+        where: { trackingId },
+        include: [
+            { model: Person, as: 'sender' },
+            { model: Person, as: 'recipient' },
+            { model: Status, as: 'status' },
+            { model: Address, as: 'address', required: false, include: [{ model: Province, as: 'province' }] },
+            { model: TypeShipment, as: 'shipmentType' },
+            { model: User, as: 'deliveryUser', required: false },
+            { model: Branch, as: 'pickupBranch', required: false }
+        ]
+    });
 };
 
-module.exports = { Shipment, getAll, getById, create, update, search, existsByDocument, updateStatus };
+const updateStatus = (id, newStatusId, options = {}) => {
+    const updates = { statusId: newStatusId };
+    if (options.deliveryUserId !== undefined) {
+        updates.deliveryUserId = options.deliveryUserId;
+    }
+    if (options.currentBranchId !== undefined) {
+        updates.currentBranchId = options.currentBranchId;
+    }
+    return Shipment.update(updates, { where: { id }, transaction: options.transaction });
+};
+
+const findByIdForUpdate = (id, transaction) => Shipment.findOne({
+    where: { id },
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined,
+});
+
+const getForKanban = (statusIds, { branchId } = {}) => {
+    const { Person }    = require('./person');
+    const { Status }    = require('./status');
+    const { Address }   = require('./address');
+    const { Province }  = require('./province');
+    const { User }      = require('./user');
+
+    const where = { statusId: { [Op.in]: statusIds } };
+    if (branchId) { where.currentBranchId = Number(branchId); }
+
+    return Shipment.findAll({
+        where,
+        include: [
+            { model: Person,  as: 'recipient' },
+            { model: Status,  as: 'status' },
+            { model: Address, as: 'address', include: [{ model: Province, as: 'province' }] },
+            { model: User,    as: 'deliveryUser', required: false },
+        ],
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+const updatePriority = (id, newPriority, options = {}) => {
+    return Shipment.update({ priority: newPriority }, { where: { id }, transaction: options.transaction });
+};
+
+const getActiveShipments = () => {
+    return Shipment.findAll({
+        where: { statusId: { [Op.notIn]: [4, 5] } }
+    });
+};
+
+const TERMINAL_STATUS_IDS = [4, 5];
+
+const clientIdentityIncludes = (full = false) => {
+    const { Person } = require('./person');
+    const { Status } = require('./status');
+    const { Address } = require('./address');
+    const { Province } = require('./province');
+    const { TypeShipment } = require('./typeShipment');
+    const { Branch } = require('./branch');
+
+    const personAttrs = full
+        ? ['id', 'fullName', 'document', 'email', 'phone']
+        : ['fullName', 'document', 'email'];
+
+    return [
+        { model: Person, as: 'sender', attributes: personAttrs },
+        { model: Person, as: 'recipient', attributes: personAttrs },
+        { model: Status, as: 'status', attributes: ['id', 'description'] },
+        {
+            model: Address,
+            as: 'address',
+            attributes: full ? ['street', 'number', 'postalCode', 'lat', 'lng'] : [],
+            required: false,
+            include: full ? [{ model: Province, as: 'province', attributes: ['description'] }] : [],
+        },
+        { model: TypeShipment, as: 'shipmentType', attributes: ['description'], required: false },
+        { model: Branch, as: 'currentBranch', attributes: ['name', 'latitude', 'longitude'], required: false },
+        { model: Branch, as: 'pickupBranch', attributes: ['name', 'address', 'phone', 'latitude', 'longitude'], required: false },
+    ];
+};
+
+// Envíos donde el cliente es remitente o destinatario con DNI + email coincidentes.
+const findByClientIdentity = async ({ document, email }, { full = false } = {}) => {
+    const { normalize } = require('../services/incidentEmailValidation');
+    const docNum = Number(document);
+    const emailNorm = normalize(email);
+
+    if (!docNum || !emailNorm) { return []; }
+
+    const rows = await sequelize.query(
+        `SELECT s.id
+           FROM logitrack.shipment s
+           JOIN logitrack.person sender ON s."senderId" = sender.id
+           JOIN logitrack.person recipient ON s."recipientId" = recipient.id
+          WHERE (sender.document = :doc AND LOWER(TRIM(sender.email)) = :email)
+             OR (recipient.document = :doc AND LOWER(TRIM(recipient.email)) = :email)
+          ORDER BY s."createdAt" DESC`,
+        { replacements: { doc: docNum, email: emailNorm }, type: sequelize.QueryTypes.SELECT }
+    );
+
+    const ids = rows.map((r) => r.id);
+    if (!ids.length) { return []; }
+
+    return Shipment.findAll({
+        where: { id: { [Op.in]: ids } },
+        include: clientIdentityIncludes(full),
+        order: [['createdAt', 'DESC']],
+    });
+};
+
+const countByClientIdentity = async ({ document, email }) => {
+    const list = await findByClientIdentity({ document, email });
+    return list.length;
+};
+
+// ── NFAL07 (LGT-158): ciclo de vida del link accionable de autogestión ──────
+const SELF_SERVICE_TOKEN_TTL_DAYS = 7;
+
+// Estado del link de autogestión para un envío.
+//   'used'    → ya se reprogramó con él (un solo uso consumido)
+//   'expired' → venció (expiresAt en el pasado)
+//   'ok'      → utilizable (incluye legacy: ambos campos en null)
+const selfServiceTokenState = (shipment) => {
+    const json = typeof shipment?.toJSON === 'function' ? shipment.toJSON() : (shipment || {});
+    if (json.portalTokenUsedAt) { return 'used'; }
+    if (json.portalTokenExpiresAt && new Date(json.portalTokenExpiresAt) < new Date()) { return 'expired'; }
+    return 'ok';
+};
+
+// Arma el link al enviar un aviso accionable: vence en N días y se "rearma" (usedAt = null).
+const armSelfServiceToken = (shipmentId, ttlDays = SELF_SERVICE_TOKEN_TTL_DAYS) => {
+    const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+    return Shipment.update(
+        { portalTokenUsedAt: null, portalTokenExpiresAt: expiresAt },
+        { where: { id: shipmentId } }
+    );
+};
+
+// Marca el link como consumido (al reprogramar desde /portal/self/:token).
+const markSelfServiceTokenUsed = (shipmentId, options = {}) => {
+    return Shipment.update(
+        { portalTokenUsedAt: new Date() },
+        { where: { id: shipmentId }, ...options }
+    );
+};
+
+module.exports = {
+    Shipment, getAll, getById, create, update, search, updateStatus, findByLegacyTrackingId,
+    findPotentialDuplicate, getByTrackingId, findByIdForUpdate, getForKanban, generateTrackingId,
+    updatePriority, getActiveShipments, findByClientIdentity, countByClientIdentity,
+    clientIdentityIncludes, TERMINAL_STATUS_IDS,
+    SELF_SERVICE_TOKEN_TTL_DAYS, selfServiceTokenState, armSelfServiceToken, markSelfServiceTokenUsed,
+};

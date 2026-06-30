@@ -1,0 +1,708 @@
+<%# Partial: preview con drag&drop + apply individual %>
+<style>
+:root {
+    --pp-radius: 12px;
+    --pp-shadow: 0 1px 3px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.03);
+    --pp-shadow-hover: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+}
+.proposals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1rem; }
+.proposal-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 1.25rem;
+    border-radius: var(--pp-radius);
+    box-shadow: var(--pp-shadow);
+    transition: box-shadow .2s ease, transform .15s ease, border-color .2s ease;
+    position: relative;
+}
+.proposal-card:hover { box-shadow: var(--pp-shadow-hover); }
+.proposal-card.applied { opacity: .85; border-color: var(--color-success, #16a34a); }
+.proposal-card.drop-target { border-color: var(--color-primary); border-style: dashed; transform: scale(1.005); }
+.proposal-card.recalculating { opacity: .55; pointer-events: none; }
+.proposal-card.recalculating::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(59,130,246,.15), transparent);
+    background-size: 200% 100%; animation: shimmer 1.2s linear infinite;
+    border-radius: var(--pp-radius); pointer-events: none;
+}
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.proposal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .5rem; }
+.proposal-card h3 { margin: 0; color: var(--color-text); font-size: 1.05rem; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.proposal-cluster-badge {
+    display: inline-block; padding: .15rem .55rem; border-radius: 999px;
+    font-size: .7rem; font-weight: 600;
+    background: var(--color-primary-light); color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+.proposal-meta { color: var(--color-text-secondary); margin: .25rem 0; font-size: .85rem; }
+.proposal-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .5rem; margin: .65rem 0; padding: .6rem; background: var(--color-bg); border-radius: 8px; }
+.proposal-stat { font-size: .75rem; color: var(--color-text-muted); }
+.proposal-stat strong { display: block; color: var(--color-text); font-size: .95rem; margin-top: .15rem; }
+
+.proposal-shipments-zone {
+    margin: .75rem 0;
+    padding: .55rem;
+    border: 1px dashed var(--color-border);
+    border-radius: 8px;
+    min-height: 56px;
+    background: var(--color-bg);
+    transition: background .2s, border-color .2s;
+}
+.proposal-shipments-zone.drag-over { background: var(--color-primary-light); border-color: var(--color-primary); }
+.shipment-chip {
+    display: inline-flex; align-items: center; gap: .35rem;
+    background: var(--color-surface); color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: .3rem .6rem; border-radius: 999px;
+    font-size: .75rem; margin: .15rem;
+    cursor: grab; user-select: none;
+    transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.shipment-chip:hover { border-color: var(--color-primary); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,.06); }
+.shipment-chip:active { cursor: grabbing; }
+.shipment-chip.dragging { opacity: .4; }
+.shipment-chip .chip-priority { font-size: .6rem; padding: 0 .3rem; border-radius: 4px; color: #fff; font-weight: 700; }
+.priority-1 { background: #94a3b8; } .priority-2 { background: #0284c7; } .priority-3 { background: #dc2626; }
+.chip-move {
+    border: none; background: transparent; color: var(--color-text-muted);
+    cursor: pointer; font-size: .85rem; line-height: 1; padding: 0 .1rem; margin-left: .1rem;
+    border-radius: 4px; transition: color .12s, background .12s;
+}
+.chip-move:hover { color: var(--color-primary); background: var(--color-primary-light); }
+#move-menu {
+    position: fixed; z-index: 10000; min-width: 200px; max-width: 280px;
+    background: var(--color-surface); color: var(--color-text);
+    border: 1px solid var(--color-border); border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0,0,0,.2), 0 2px 6px rgba(0,0,0,.08);
+    padding: .35rem; overflow: hidden;
+}
+#move-menu .mm-title { font-size: .72rem; font-weight: 700; color: var(--color-text-secondary); padding: .3rem .5rem .35rem; }
+#move-menu .mm-item {
+    display: block; width: 100%; text-align: left; border: none; background: transparent;
+    color: var(--color-text); font-size: .82rem; padding: .45rem .55rem; border-radius: 6px; cursor: pointer;
+}
+#move-menu .mm-item:hover { background: var(--color-primary-light); color: var(--color-primary); }
+#move-menu .mm-empty { font-size: .8rem; color: var(--color-text-muted); padding: .45rem .55rem; }
+
+.proposal-reasoning { margin: .65rem 0; }
+.proposal-reasoning summary { cursor: pointer; font-size: .8rem; font-weight: 600; color: var(--color-primary); padding: .3rem 0; }
+.proposal-reasoning-body { padding: .6rem; background: var(--color-bg); border-radius: 6px; color: var(--color-text); font-size: .8rem; border: 1px solid var(--color-border); }
+.proposal-reasoning-body p { margin: .25rem 0; }
+
+.proposal-actions { display: flex; gap: .5rem; margin-top: .85rem; flex-wrap: wrap; }
+.btn-apply { background: var(--color-success, #16a34a); color: #fff; border: none; padding: .5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background .2s, transform .12s; }
+.btn-apply:hover { background: #15803d; transform: translateY(-1px); }
+.btn-apply.applied { background: var(--color-text-muted); cursor: default; }
+.btn-apply.applied:hover { transform: none; }
+.btn-exclude { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); padding: .4rem .7rem; border-radius: 6px; font-size: .8rem; cursor: pointer; transition: border-color .2s; }
+.btn-exclude:hover { border-color: var(--color-warning); }
+
+.proposal-map { height: 280px; margin-top: .75rem; border-radius: 8px; overflow: hidden; border: 1px solid var(--color-border); }
+
+.unassigned-pool {
+    margin-top: 1rem; padding: 1rem;
+    border: 2px dashed var(--color-warning); border-radius: var(--pp-radius);
+    background: var(--color-warning-bg); color: var(--color-text);
+}
+.unassigned-pool h3 { margin: 0 0 .5rem 0; font-size: 1rem; display: flex; align-items: center; gap: .35rem; }
+.unassigned-pool.drag-over { background: var(--color-primary-light); border-color: var(--color-primary); }
+
+.warn-banner { border-left: 4px solid var(--color-warning); background: var(--color-warning-bg); color: var(--color-text); padding: .5rem .75rem; border-radius: 4px; margin: .5rem 0; font-size: .82rem; }
+.deficit-banner { border: 1px solid #d97706; background: #fffbeb; color: #78350f; padding: .75rem 1rem; border-radius: 8px; margin: .75rem 0; font-weight: 500; }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .75rem; margin: .75rem 0; padding: .75rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; }
+.summary-grid .item { font-size: .8rem; color: var(--color-text-secondary); }
+.summary-grid .item strong { color: var(--color-text); display: block; font-size: 1.05rem; margin-top: .15rem; }
+
+.help-banner { background: var(--color-info-bg); border-left: 4px solid var(--color-info); padding: .65rem .85rem; border-radius: 6px; margin: .5rem 0; font-size: .85rem; color: var(--color-text); }
+.help-banner strong { color: var(--color-info); }
+
+#chip-popover {
+    position: fixed;
+    pointer-events: none;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
+    border-radius: 10px;
+    padding: .75rem .85rem;
+    font-size: .78rem;
+    min-width: 240px;
+    max-width: 320px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity .12s ease, transform .12s ease;
+}
+#chip-popover.visible { opacity: 1; transform: translateY(0); }
+#chip-popover .pop-title { font-weight: 700; font-size: .9rem; color: var(--color-primary); margin-bottom: .25rem; display: flex; align-items: center; gap: .35rem; }
+#chip-popover .pop-row { display: flex; justify-content: space-between; gap: .75rem; margin: .15rem 0; }
+#chip-popover .pop-row .lbl { color: var(--color-text-secondary); font-size: .72rem; }
+#chip-popover .pop-row .val { color: var(--color-text); font-weight: 500; text-align: right; }
+#chip-popover .pop-pri { display: inline-block; padding: .05rem .4rem; border-radius: 999px; font-size: .65rem; font-weight: 700; color: #fff; }
+#chip-popover hr { border: none; border-top: 1px solid var(--color-border); margin: .4rem 0; }
+</style>
+
+<div id="chip-popover" role="tooltip"></div>
+<section id="results" style="margin-top: 1.5rem; display: none;">
+    <h2 style="margin-bottom:.5rem">Propuestas</h2>
+    <div class="help-banner">💡 <strong>Tip:</strong> Arrastrá los <em>chips</em> de envíos entre propuestas, o tocá el botón <strong>⇄</strong> del envío para <strong>enviarlo a otro repartidor</strong>. Soltá en "Sin asignar" para sacar de la ruta. El cálculo se actualiza automáticamente.</div>
+    <div id="proposals-summary" class="proposal-meta"></div>
+    <div id="proposals" class="proposals-grid"></div>
+    <div id="unassigned-pool"></div>
+</section>
+
+<script>
+(function() {
+    let lastShipmentIds = [];
+    let excludedTxIds = new Set();
+    let appliedTxIds = new Set();
+    let currentState = null; // { proposals: [...], unassigned: [...], summary }
+
+    const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtEta = (iso) => { if (!iso) return ''; return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    const fmtMoney = (n) => '$' + Number(n ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDuration = (min) => { if (min == null) return '-'; const h = Math.floor(min / 60); const m = min % 60; return h > 0 ? `${h}h${m > 0 ? ' ' + m + 'min' : ''}` : `${m}min`; };
+
+    const buildAssignmentsFromState = () => {
+        return currentState.proposals.map(p => ({
+            transportId: p.transportId,
+            shipmentIds: p.shipmentIds,
+        }));
+    };
+
+    // Mueve un envío de un transporte (o "unassigned") a otro y recalcula.
+    // Lo usan tanto el drag&drop como el menú "enviar a otro repartidor".
+    const moveShipment = (sid, fromTx, toTx) => {
+        sid = Number(sid);
+        if (String(fromTx) === String(toTx)) { return; }
+        if (toTx !== 'unassigned' && appliedTxIds.has(Number(toTx))) {
+            window.rtAlert('No se puede modificar una ruta ya aplicada.', 'warning'); return;
+        }
+        if (fromTx !== 'unassigned' && appliedTxIds.has(Number(fromTx))) {
+            window.rtAlert('No se puede sacar de una ruta ya aplicada.', 'warning'); return;
+        }
+        if (fromTx !== 'unassigned') {
+            const fromP = currentState.proposals.find(p => p.transportId === Number(fromTx));
+            if (fromP) { fromP.shipmentIds = fromP.shipmentIds.filter(x => x !== sid); }
+        } else {
+            currentState.unassigned = (currentState.unassigned || []).filter(u => (u.id || u.shipmentId) !== sid);
+        }
+        if (toTx !== 'unassigned') {
+            const toP = currentState.proposals.find(p => p.transportId === Number(toTx));
+            if (toP && !toP.shipmentIds.includes(sid)) { toP.shipmentIds.push(sid); }
+        } else {
+            currentState.unassigned = currentState.unassigned || [];
+            currentState.unassigned.push({ id: sid, code: 'manual', reason: 'Removido manualmente de la ruta' });
+        }
+        recalc();
+    };
+
+    // Menú flotante con los repartidores destino posibles para un envío.
+    const openMoveMenu = (chip) => {
+        const existing = document.getElementById('move-menu');
+        if (existing) { existing.remove(); }
+        const fromTx = chip.closest('[data-transport-id]')?.dataset.transportId;
+        const sid = chip.dataset.shipmentId;
+        const targets = (currentState.proposals || [])
+            .filter(p => String(p.transportId) !== String(fromTx) && !appliedTxIds.has(p.transportId))
+            .map(p => ({ tx: String(p.transportId), label: `${p.transport.name}${p.transport.driver ? ' · ' + p.transport.driver.fullName : ''}` }));
+        if (fromTx !== 'unassigned') { targets.push({ tx: 'unassigned', label: '⚠️ Sin asignar (sacar de la ruta)' }); }
+
+        const menu = document.createElement('div');
+        menu.id = 'move-menu';
+        menu.innerHTML = `<div class="mm-title">Enviar a…</div>` + (targets.length
+            ? targets.map(t => `<button type="button" class="mm-item" data-to="${t.tx}">${escapeHtml(t.label)}</button>`).join('')
+            : `<div class="mm-empty">No hay otro repartidor disponible</div>`);
+        document.body.appendChild(menu);
+        const rect = chip.getBoundingClientRect();
+        let x = rect.left, y = rect.bottom + 6;
+        const mw = menu.offsetWidth, mh = menu.offsetHeight;
+        if (x + mw > window.innerWidth - 8) { x = window.innerWidth - mw - 8; }
+        if (y + mh > window.innerHeight - 8) { y = rect.top - mh - 6; }
+        menu.style.left = Math.max(8, x) + 'px';
+        menu.style.top = Math.max(8, y) + 'px';
+        menu.querySelectorAll('.mm-item').forEach(b => {
+            b.addEventListener('click', () => { const to = b.dataset.to; menu.remove(); moveShipment(sid, fromTx, to); });
+        });
+        const closer = (ev) => { if (!menu.contains(ev.target) && ev.target !== chip) { menu.remove(); document.removeEventListener('mousedown', closer); } };
+        setTimeout(() => document.addEventListener('mousedown', closer), 0);
+    };
+
+    const recalc = async () => {
+        document.querySelectorAll('.proposal-card').forEach(c => c.classList.add('recalculating'));
+        const res = await fetch('/route/optimize/recalc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, assignments: buildAssignmentsFromState() }),
+        });
+        const data = await res.json();
+        if (!res.ok) { window.rtAlert(data.error || 'Error al recalcular', 'error'); document.querySelectorAll('.proposal-card').forEach(c => c.classList.remove('recalculating')); return; }
+        // Mantener unassigned previos (envíos sacados manualmente) + los nuevos del recalc
+        const previousUnassigned = currentState.unassigned || [];
+        // Merge: si un envío reaparece en proposals, sacarlo de unassigned
+        const inProposals = new Set(data.proposals.flatMap(p => p.shipmentIds));
+        const mergedUn = [...previousUnassigned, ...data.unassigned].filter(u => !inProposals.has(u.id || u.shipmentId));
+        // Dedupe
+        const seenIds = new Set();
+        const dedupUn = mergedUn.filter(u => {
+            const id = u.id || u.shipmentId;
+            if (seenIds.has(id)) return false;
+            seenIds.add(id);
+            return true;
+        });
+        currentState = { proposals: data.proposals, unassigned: dedupUn, summary: data.summary };
+        render();
+    };
+
+    const rejectExtras = (txId) => {
+        const proposal = currentState.proposals.find(p => p.transportId === txId);
+        if (!proposal || !proposal.opportunisticSummary) { return; }
+        const oppIds = new Set(
+            (proposal.reasoning?.shipments || []).filter(r => r.opportunistic).map(r => r.shipmentId)
+        );
+        if (oppIds.size === 0) { return; }
+        proposal.shipmentIds = proposal.shipmentIds.filter(id => !oppIds.has(id));
+        currentState.unassigned = currentState.unassigned || [];
+        for (const r of (proposal.reasoning?.shipments || [])) {
+            if (r.opportunistic && r.shipmentId) {
+                currentState.unassigned.push({ id: r.shipmentId, trackingId: r.trackingId, code: 'opp_rejected', reason: 'Extra rechazado. Puede arrastrarse a otra propuesta o dejarse para la siguiente ruta.' });
+            }
+        }
+        recalc();
+    };
+
+    const recalcExcluding = async (txId) => {
+        excludedTxIds.add(txId);
+        appliedTxIds.delete(txId);
+        const res = await fetch('/route/optimize/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shipmentIds: lastShipmentIds, branchId: window.CURRENT_BRANCH_ID, excludeTransportIds: [...excludedTxIds] }),
+        });
+        const data = await res.json();
+        if (!res.ok) { window.rtAlert(data.error || 'Error', 'error'); return; }
+        currentState = data;
+        render();
+    };
+
+    const applyOne = async (proposal, btn) => {
+        if (proposal.piggyback) {
+            const ps = proposal.piggybackSummary || {};
+            const html = `Sumar <b>${proposal.addedShipmentIds.length}</b> envío(s) a la <b>Ruta #${proposal.existingRouteId}</b> (${proposal.transport.name}).<br><br>`
+                + `Distancia: ${ps.previousTotalKm}km → ${ps.newTotalKm}km (+${ps.totalExtraKm}km)<br>`
+                + `Costo: $${ps.previousTotalCost} → $${ps.newTotalCost} (+$${ps.totalExtraCost})<br><br>`
+                + `<small>Se agregan al final de la secuencia. Si la ruta ya está En Curso, no se podrá sumar.</small>`;
+            if (!(await window.rtConfirm({ title: 'Sumar a ruta existente', html: html, confirmText: 'Sí, sumar', icon: 'question' }))) return;
+            btn.disabled = true; btn.textContent = 'Sumando...';
+            const res = await fetch('/route/' + proposal.existingRouteId + '/append', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, shipmentIds: proposal.addedShipmentIds }),
+            });
+            const data = await res.json();
+            if (!res.ok) { btn.disabled = false; btn.textContent = '🔗 Sumar a ruta existente'; window.rtAlert(data.error || 'Error', 'error'); return; }
+            appliedTxIds.add(proposal.transportId);
+            btn.classList.add('applied');
+            btn.textContent = `✅ SUMADO · Ruta #${data.routeId} (+${data.addedCount})`;
+            const card = btn.closest('.proposal-card');
+            card.classList.add('applied');
+            card.querySelectorAll('.shipment-chip').forEach(ch => { ch.draggable = false; ch.style.cursor = 'default'; });
+            return;
+        }
+        if (!(await window.rtConfirm({ title: 'Aplicar ruta', html: `Se asignarán <b>${proposal.shipmentIds.length}</b> envío(s) a <b>${proposal.transport.name}</b>.`, confirmText: 'Sí, aplicar', icon: 'question' }))) return;
+        btn.disabled = true; btn.textContent = 'Aplicando...';
+        const res = await fetch('/route/confirm-one', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ branchId: window.CURRENT_BRANCH_ID, proposal }),
+        });
+        const data = await res.json();
+        if (!res.ok) { btn.disabled = false; btn.textContent = '✓ Aplicar ruta'; window.rtAlert(data.error || 'Error', 'error'); return; }
+        appliedTxIds.add(proposal.transportId);
+        btn.classList.add('applied');
+        btn.textContent = `✅ APLICADO · Ruta #${data.routeId}`;
+        const card = btn.closest('.proposal-card');
+        card.classList.add('applied');
+        // Bloquear chips de esta propuesta para que no se arrastren mas
+        card.querySelectorAll('.shipment-chip').forEach(ch => { ch.draggable = false; ch.style.cursor = 'default'; });
+    };
+
+    window.renderRoutePreview = function(data, opts = {}) {
+        if (opts.shipmentIds) { lastShipmentIds = opts.shipmentIds; excludedTxIds = new Set(); appliedTxIds = new Set(); }
+        currentState = data;
+        document.getElementById('results').style.display = 'block';
+        render();
+    };
+
+    const render = () => {
+        const data = currentState;
+        const summaryEl = document.getElementById('proposals-summary');
+        const container = document.getElementById('proposals');
+        const poolEl = document.getElementById('unassigned-pool');
+        container.innerHTML = '';
+
+        const s = data.summary || {};
+        const totalCost = data.proposals.reduce((a,p) => a + p.totalCost, 0);
+        // Asignados: solo los originalmente seleccionados, sin contar pickups oportunistas
+        const selectedSet = new Set(lastShipmentIds);
+        const assignedSelected = data.proposals.reduce((a, p) =>
+            a + (p.shipmentIds || []).filter(id => selectedSet.has(Number(id))).length, 0);
+        const totalSelected = lastShipmentIds.length || (s.totalShipments ?? 0);
+        let summaryHtml = `
+            <div class="summary-grid">
+                <div class="item">Propuestas<strong>${data.proposals.length}</strong></div>
+                <div class="item">Asignados<strong>${assignedSelected} de ${totalSelected}</strong></div>
+                <div class="item">Sin asignar<strong>${(data.unassigned || []).filter(u => u.code !== 'already_assigned').length}</strong></div>
+                <div class="item">Costo total<strong>${fmtMoney(totalCost)}</strong></div>
+                <div class="item">Demanda<strong>${s.demandWeightKg ?? '-'}kg / ${s.demandVolumeM3 ?? '-'}m³</strong></div>
+                <div class="item">Aplicadas<strong>${appliedTxIds.size}</strong></div>
+            </div>`;
+        if (s.deficitWarning) summaryHtml += `<div class="deficit-banner">⚠ ${escapeHtml(s.deficitWarning)}</div>`;
+        if (s.unavailableTransports?.busy?.length) summaryHtml += `<div class="deficit-banner">🔒 ${s.unavailableTransports.busy.length} transporte(s) excluido(s) por tener ruta activa: <strong>${escapeHtml(s.unavailableTransports.busy.map(t => t.name).join(', '))}</strong>. Completar o cancelar esas rutas para liberarlos.</div>`;
+        if (s.unavailableTransports?.zeroCap?.length) summaryHtml += `<div class="deficit-banner">⚠ ${s.unavailableTransports.zeroCap.length} transporte(s) excluido(s) por no tener capacidad de carga configurada: <strong>${escapeHtml(s.unavailableTransports.zeroCap.map(t => t.name).join(', '))}</strong>. Actualizar el peso máximo en Transportes.</div>`;
+        summaryEl.innerHTML = summaryHtml;
+
+        data.proposals.forEach((p, idx) => {
+            const card = document.createElement('div');
+            card.className = 'proposal-card' + (appliedTxIds.has(p.transportId) ? ' applied' : '');
+            card.dataset.transportId = p.transportId;
+            const cb = p.costBreakdown || {};
+            const cluster = p.clusterProvinceName ? `<span class="proposal-cluster-badge">📍 ${escapeHtml(p.clusterProvinceName)}</span>` : '';
+            const piggyBadge = p.piggyback ? `<span class="proposal-cluster-badge" style="background:#fef3c7;color:#92400e;border-color:#f59e0b">🔗 SUMAR A RUTA #${p.existingRouteId}</span>` : '';
+            const urgentBadge = p.urgentCombinedSummary ? `<span class="proposal-cluster-badge" style="background:#fee2e2;color:#991b1b;border-color:#dc2626">🚨 ${p.urgentCombinedSummary.count} URGENTES COMBINADOS</span>` : '';
+            let urgentBlock = '';
+            if (p.urgentCombinedSummary) {
+                const us = p.urgentCombinedSummary;
+                const ships = us.shipments.map(s => escapeHtml(s.trackingId)).join(', ');
+                urgentBlock = `
+                <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#991b1b;margin-bottom:.3rem">🚨 ${us.count} envíos urgentes combinados en este vehículo dedicado</div>
+                    <div style="color:#7f1d1d">
+                        Tracking: <strong>${ships}</strong><br>
+                        Distancia máxima entre destinos: <strong>${us.maxPairDistKm.toFixed(1)}km</strong> (dentro del umbral configurado).<br>
+                        <em>Ahorra ${us.count - 1} vehículo(s) dedicado(s) adicional(es) — costo fijo evitado.</em>
+                    </div>
+                </div>`;
+            }
+            let piggyBlock = '';
+            if (p.piggyback && p.piggybackSummary) {
+                const ps = p.piggybackSummary;
+                piggyBlock = `
+                <div style="background:#fef9c3;border-left:3px solid #f59e0b;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#92400e;margin-bottom:.3rem">🔗 Piggyback: sumar a ruta planificada #${ps.routeId}</div>
+                    <div style="color:#78350f">
+                        Distancia: <strong>${ps.previousTotalKm}km → ${ps.newTotalKm}km</strong> (+${ps.totalExtraKm}km)<br>
+                        Costo: <strong>$${ps.previousTotalCost} → $${ps.newTotalCost}</strong> (+$${ps.totalExtraCost})<br>
+                        Capacidad libre restante: ${ps.capWeightLeftAfter}kg / ${ps.capVolumeLeftAfter}m³<br>
+                        <em>Más barato que lanzar una ruta nueva. Se agregan ${ps.addedCount} envío(s) al final de la secuencia.</em>
+                    </div>
+                </div>`;
+            }
+            const warns = (p.warnings || []).map(w => `<div class="warn-banner">⚠ ${escapeHtml(w)}</div>`).join('');
+
+            const chipsHtml = (p.reasoning?.shipments || []).map(r => {
+                const pri = r.priority === 'urgent' ? 3 : (r.priority === 'express' ? 2 : 1);
+                const meta = encodeURIComponent(JSON.stringify(r));
+                const oppMark = r.opportunistic ? `<span style="background:#0d9488;color:#fff;font-size:.6rem;padding:1px 4px;border-radius:3px;margin-left:2px" title="${escapeHtml(r.why || '')}">+EXTRA</span>` : '';
+                const moveBtn = appliedTxIds.has(p.transportId) ? '' : `<button type="button" class="chip-move" title="Enviar a otro repartidor" aria-label="Enviar a otro repartidor">⇄</button>`;
+                return `<span class="shipment-chip" draggable="${appliedTxIds.has(p.transportId) ? 'false' : 'true'}" data-shipment-id="${r.shipmentId}" data-tracking="${escapeHtml(r.trackingId)}" data-priority="${pri}" data-meta="${meta}">
+                    <span class="chip-priority priority-${pri}">${(r.priority || 'normal').toUpperCase().slice(0,3)}</span>
+                    ${escapeHtml(r.trackingId)}${oppMark}${moveBtn}
+                </span>`;
+            }).join('');
+
+            // Bloque destacado: resumen de oportunismo y detalle por envio
+            let oppBlock = '';
+            if (p.opportunisticSummary) {
+                const os = p.opportunisticSummary;
+                const oppShipDetails = (p.reasoning?.shipments || [])
+                    .filter(r => r.opportunistic && r.opportunisticDetail)
+                    .map(r => {
+                        const oi = r.opportunisticDetail;
+                        const verdict = oi.pctExtra <= 5 ? '✅ desvío despreciable' : (oi.pctExtra <= 15 ? '🟡 desvío moderado' : '🟠 desvío alto');
+                        return `<li style="margin:.3rem 0;font-size:.78rem">
+                            <strong>${escapeHtml(r.trackingId)}</strong> ← ${escapeHtml(oi.branchName)}<br>
+                            <span style="color:var(--color-text-muted)">Directo desde origen: ${oi.directKm}km · Vía sucursal: ${oi.viaBranchKm}km · Extra: <strong>+${oi.extraKm}km (+${oi.pctExtra}%)</strong> · Costo extra: $${oi.extraCost} · ${verdict}</span>
+                        </li>`;
+                    }).join('');
+                oppBlock = `
+                <div style="background:#ecfdf5;border-left:3px solid #0d9488;padding:.6rem .8rem;margin:.5rem 0;border-radius:4px;font-size:.8rem">
+                    <div style="font-weight:600;color:#0f766e;margin-bottom:.3rem">🟢 ${os.count} envío${os.count>1?'s':''} extra recogido${os.count>1?'s':''} en ${os.branchCount} sucursal${os.branchCount>1?'es':''} del corredor</div>
+                    <div style="color:#134e4a;margin-bottom:.3rem">
+                        Sucursales: <strong>${escapeHtml(os.branchNames.map(b => b.name).join(', '))}</strong><br>
+                        Suma: ${os.opportunisticWeightKg}kg / ${os.opportunisticVolumeM3}m³ · Desvío total: +${os.totalExtraKm}km (promedio +${os.avgPctExtra}%) · Costo extra: ~$${os.totalExtraCost}<br>
+                        <span style="color:#0f766e">💡 Lanzar 1 ruta dedicada para estos envíos costaría como mínimo el costo fijo del transporte ($${fmtMoney(os.savedFixedCost)}) más combustible y conductor.</span>
+                    </div>
+                    <details>
+                        <summary style="cursor:pointer;color:#0f766e;font-weight:500">Ver detalle por envío</summary>
+                        <ol style="margin:.4rem 0 0;padding-left:1.2rem">${oppShipDetails}</ol>
+                    </details>
+                    <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center;flex-wrap:wrap">
+                        <button type="button" class="btn-opp-accept" data-tx="${p.transportId}" style="background:#dcfce7;color:#166534;border:1px solid #86efac;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer;transition:background .15s,transform .1s" title="Confirma los extras en la propuesta. La ruta se aplica con el botón APLICAR RUTA.">✓ Aceptar extras</button>
+                        <button type="button" class="btn-opp-reject" data-tx="${p.transportId}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:.3rem .75rem;border-radius:6px;font-size:.78rem;cursor:pointer" title="Quita estos envíos de la propuesta y los mueve al pool sin asignar">✗ Rechazar extras</button>
+                        <span style="font-size:.7rem;color:var(--color-text-muted)">La ruta se confirma al presionar <strong>Aplicar ruta</strong>.</span>
+                    </div>
+                </div>`;
+            }
+
+            const stopsHtml = p.stops.map(st => {
+                const eta = st.etaIso ? `<span style="color:var(--color-text-muted);font-size:.75rem"> · ETA ${fmtEta(st.etaIso)}</span>` : '';
+                const icon = st.stopType === 'pickup' ? (st.opportunistic ? '🟢' : '📦') : (st.stopType === 'service' ? '⛽' : '🏠');
+                const detour = st.stopType === 'service' && st.detourKm ? ` <span style="color:#d97706;font-size:.7rem">(desvío +${st.detourKm}km)</span>` : '';
+                const oppTag = st.opportunistic ? ` <span style="color:#16a34a;font-size:.7rem;font-weight:600">PICKUP EXTRA</span>` : '';
+                return `<li style="font-size:.85rem;margin:.2rem 0">${icon} ${escapeHtml(st.label || '')}${oppTag} <span style="color:var(--color-text-muted)">+${st.distanceFromPrevKm}km</span>${detour}${eta}</li>`;
+            }).join('');
+
+            const isApplied = appliedTxIds.has(p.transportId);
+
+            card.innerHTML = `
+                <div class="proposal-header">
+                    <h3>${escapeHtml(p.transport.name)} ${p.transport.plate ? '(' + escapeHtml(p.transport.plate) + ')' : ''} ${cluster} ${piggyBadge} ${urgentBadge}</h3>
+                </div>
+                ${piggyBlock}
+                ${urgentBlock}
+                <div class="proposal-meta">Conductor: ${p.transport.driver ? escapeHtml(p.transport.driver.fullName) : 'Sin asignar'}</div>
+                ${warns}
+                <div class="proposal-stats">
+                    <div class="proposal-stat">Distancia<strong>${p.totalDistanceKm} km</strong></div>
+                    <div class="proposal-stat">Tiempo<strong>${fmtDuration(p.totalDurationMin)}</strong></div>
+                    <div class="proposal-stat">Costo<strong>${fmtMoney(p.totalCost)}</strong></div>
+                    <div class="proposal-stat" title="Peso total asignado / capacidad máxima del transporte">Peso<strong style="${p.utilizationWeight >= 1 ? 'color:#dc2626' : (p.utilizationWeight >= 0.8 ? 'color:#d97706' : '')}">${p.totalWeightKg}kg / ${p.transport.maxWeightKg}kg</strong></div>
+                    <div class="proposal-stat" title="Volumen total asignado / capacidad máxima del transporte">Volumen<strong style="${p.utilizationVolume >= 1 ? 'color:#dc2626' : (p.utilizationVolume >= 0.8 ? 'color:#d97706' : '')}">${p.totalVolumeM3}m³ / ${p.transport.maxVolumeM3}m³</strong></div>
+                </div>
+                ${oppBlock}
+                <div><strong style="font-size:.8rem">Envíos (${p.shipmentIds.length}):</strong></div>
+                <div class="proposal-shipments-zone" data-transport-id="${p.transportId}">
+                    ${chipsHtml || '<span style="color:var(--color-text-muted);font-size:.8rem">(vacío - arrastrá un envío aquí)</span>'}
+                </div>
+                <details class="proposal-reasoning">
+                    <summary>Detalles del cálculo</summary>
+                    <div class="proposal-reasoning-body">
+                        <p><b>Transporte:</b> ${escapeHtml(p.reasoning?.transportPick || '')}</p>
+                        <p><b>Costo:</b> ${fmtMoney(p.totalCost)} = fijo ${fmtMoney(cb.fixed)} + km ${fmtMoney(cb.perKm)} + zona ${fmtMoney(cb.zoneBase ?? cb.zoneSurcharges ?? 0)} + recargo peso ${fmtMoney(cb.weightSurcharge ?? 0)} + recargo vol ${fmtMoney(cb.volumeSurcharge ?? 0)}.</p>
+                        <p><b>Distancia:</b> ${p.distanceSource}</p>
+                        <ol style="font-size:.75rem;padding-left:1.25rem">${stopsHtml}</ol>
+                    </div>
+                </details>
+                <div id="map-${idx}" class="proposal-map"></div>
+                <div class="proposal-actions">
+                    <button class="btn-apply ${isApplied ? 'applied' : ''}" data-action="apply" ${isApplied ? 'disabled' : ''}>
+                        ${isApplied ? '✅ APLICADO' : (p.piggyback ? '🔗 Sumar a ruta existente' : '✓ Aplicar ruta')}
+                    </button>
+                    ${p.piggyback ? '' : `<button class="btn-exclude" data-action="exclude" ${isApplied ? 'disabled' : ''}>Recalcular sin este transporte</button>`}
+                </div>
+            `;
+            container.appendChild(card);
+
+            // Map
+            setTimeout(() => {
+                const map = L.map('map-' + idx).setView([p.stops[0]?.lat || -34.6, p.stops[0]?.lng || -58.4], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
+                const lls = [];
+                p.stops.forEach(st => {
+                    const isPickup = st.stopType === 'pickup';
+                    const isService = st.stopType === 'service';
+                    const isOpp = st.opportunistic;
+                    const fillColor = isOpp ? '#0d9488' : (isPickup ? '#16a34a' : (isService ? '#d97706' : '#dc2626'));
+                    const typeLabel = isOpp ? 'Pickup oportunista' : (isPickup ? 'Pickup' : (isService ? 'Servicio (combustible/descanso)' : 'Entrega'));
+                    L.circleMarker([st.lat, st.lng], { radius: 7, color: '#fff', weight: 2, fillColor, fillOpacity: 1 })
+                        .bindPopup(`<b>#${st.sequence} ${typeLabel}</b><br>${escapeHtml(st.label || '')}`).addTo(map);
+                    lls.push([st.lat, st.lng]);
+                });
+                if (p.geometry?.type === 'LineString' && p.geometry.coordinates?.length > 1) {
+                    const poly = p.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                    L.polyline(poly, { color: '#1e88e5', weight: 4, opacity: 0.85 }).addTo(map);
+                    map.fitBounds(poly, { padding: [20,20] });
+                } else if (lls.length > 1) {
+                    L.polyline(lls, { color: '#888', weight: 3, dashArray: '6 6' }).addTo(map);
+                    map.fitBounds(lls, { padding: [20,20] });
+                }
+            }, 50);
+        });
+
+        // Pool sin asignar — agrupar por código de razón para explicar 100% el motivo
+        const un = data.unassigned || [];
+        const codeLabels = {
+            no_fit: 'No cabe en flota disponible',
+            oversized: 'Sobredimensionado vs. flota',
+            capacity: 'Excede capacidad del transporte',
+            no_geo: 'Sin geolocalización',
+            zone: 'Zona no compatible',
+            no_transports: 'Sin transportes disponibles',
+            branch_closed: 'Sucursal cerrada',
+            already_assigned: 'Ya asignado a otra ruta',
+            tx_invalid: 'Transporte inválido',
+            opp_rejected: 'Extra rechazado manualmente',
+            manual: 'Removido manualmente',
+            rejected: 'No cumple filtros',
+        };
+        const codeIcons = {
+            no_fit: '📦', oversized: '🚛', capacity: '⚖️', no_geo: '📍', zone: '🗺️',
+            no_transports: '🚫', branch_closed: '🔒', already_assigned: '🔗',
+            tx_invalid: '❌', opp_rejected: '↩️', manual: '✋', rejected: '⛔',
+        };
+        const grouped = new Map();
+        for (const u of un) {
+            const code = u.code || 'other';
+            if (!grouped.has(code)) { grouped.set(code, []); }
+            grouped.get(code).push(u);
+        }
+        const groupsHtml = [...grouped.entries()].map(([code, items]) => {
+            const label = codeLabels[code] || code;
+            const icon = codeIcons[code] || '⚠️';
+            const sampleReason = items[0]?.reason || '';
+            const itemsHtml = items.map(u => {
+                const sid = u.id || u.shipmentId;
+                const tracking = u.trackingId || `#${sid}`;
+                const reason = u.reason || sampleReason;
+                return `<div style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem .5rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;margin:.25rem 0">
+                    <span class="shipment-chip" draggable="true" data-shipment-id="${sid}" data-tracking="${escapeHtml(tracking)}" data-priority="1" style="flex-shrink:0">
+                        <span class="chip-priority priority-1">UN</span>
+                        ${escapeHtml(tracking)}
+                        <button type="button" class="chip-move" title="Enviar a un repartidor" aria-label="Enviar a un repartidor">⇄</button>
+                    </span>
+                    <span style="font-size:.78rem;color:var(--color-text-secondary);line-height:1.35">${escapeHtml(reason)}</span>
+                </div>`;
+            }).join('');
+            return `<details open style="margin:.5rem 0">
+                <summary style="cursor:pointer;font-weight:600;font-size:.85rem;color:var(--color-text)">${icon} ${escapeHtml(label)} (${items.length})</summary>
+                <div style="padding:.3rem 0 0 .3rem">${itemsHtml}</div>
+            </details>`;
+        }).join('');
+
+        const noProposalBanner = (data.proposals.length === 0 && un.length > 0)
+            ? `<div class="deficit-banner" style="background:#fef2f2;border-color:#dc2626;color:#991b1b">❌ <strong>No se generó ninguna propuesta.</strong> Ningún envío seleccionado pudo asignarse a un transporte. Ver detalle de causas abajo.</div>`
+            : '';
+
+        poolEl.innerHTML = `${noProposalBanner}<div class="unassigned-pool" data-transport-id="unassigned">
+            <h3>⚠️ Sin asignar (${un.length}) <span style="font-size:.75rem;font-weight:400;color:var(--color-text-muted)">- razón visible por envío · arrastrá para reasignar o descartar</span></h3>
+            ${groupsHtml || '<span style="color:var(--color-text-muted);font-size:.85rem">(vacío — todos asignados)</span>'}
+        </div>`;
+
+        // Wire actions
+        container.querySelectorAll('[data-action="apply"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const card = btn.closest('.proposal-card');
+                const txId = Number(card.dataset.transportId);
+                const proposal = currentState.proposals.find(pp => pp.transportId === txId);
+                if (proposal) applyOne(proposal, btn);
+            });
+        });
+        container.querySelectorAll('[data-action="exclude"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const txId = Number(btn.closest('.proposal-card').dataset.transportId);
+                recalcExcluding(txId);
+            });
+        });
+        container.querySelectorAll('.btn-opp-reject').forEach(btn => {
+            btn.addEventListener('click', () => rejectExtras(Number(btn.dataset.tx)));
+        });
+        container.querySelectorAll('.btn-opp-accept').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Feedback visual. Los extras ya están en la propuesta; persistencia ocurre en "Aplicar ruta".
+                btn.style.background = '#16a34a';
+                btn.style.color = '#fff';
+                btn.style.borderColor = '#15803d';
+                btn.textContent = '✓ Extras confirmados';
+                btn.disabled = true;
+                btn.style.cursor = 'default';
+                btn.style.opacity = '.9';
+            });
+        });
+
+        // Popover hover/focus
+        const pop = document.getElementById('chip-popover');
+        const priColors = { 1: '#94a3b8', 2: '#0284c7', 3: '#dc2626' };
+        const priLabels = { 1: 'NORMAL', 2: 'EXPRESS', 3: 'URGENT' };
+        const showPop = (chip, evt) => {
+            const meta = chip.dataset.meta;
+            if (!meta) return;
+            let r;
+            try { r = JSON.parse(decodeURIComponent(meta)); } catch { return; }
+            const pri = r.priority === 'urgent' ? 3 : (r.priority === 'express' ? 2 : 1);
+            const addr = [r.addressStreet, r.addressNumber].filter(Boolean).join(' ') || '—';
+            const win = (r.windowFrom && r.windowTo) ? `${r.windowFrom}–${r.windowTo}` : '—';
+            const dest = r.provinceName || '—';
+            const expDate = r.expectedDeliveryDate ? new Date(r.expectedDeliveryDate).toLocaleDateString('es-AR') : '—';
+            pop.innerHTML = `
+                <div class="pop-title">📦 ${escapeHtml(r.trackingId)}</div>
+                <div class="pop-row"><span class="lbl">Prioridad</span><span class="val"><span class="pop-pri" style="background:${priColors[pri]}">${priLabels[pri]}</span></span></div>
+                <hr>
+                <div class="pop-row"><span class="lbl">📍 Provincia</span><span class="val">${escapeHtml(dest)}</span></div>
+                <div class="pop-row"><span class="lbl">Zona</span><span class="val">${escapeHtml(r.zoneName || '—')}</span></div>
+                <div class="pop-row"><span class="lbl">Domicilio</span><span class="val">${escapeHtml(addr)}</span></div>
+                <div class="pop-row"><span class="lbl">CP</span><span class="val">${escapeHtml(r.postalCode || '—')}</span></div>
+                <div class="pop-row"><span class="lbl">Destinatario</span><span class="val">${escapeHtml(r.recipientName || '—')}</span></div>
+                <hr>
+                <div class="pop-row"><span class="lbl">Peso</span><span class="val">${r.weightKg ?? '—'} kg</span></div>
+                <div class="pop-row"><span class="lbl">Volumen</span><span class="val">${r.volumeM3 ?? '—'} m³</span></div>
+                <div class="pop-row"><span class="lbl">Bultos</span><span class="val">${r.packageQty ?? '—'}</span></div>
+                <hr>
+                <div class="pop-row"><span class="lbl">⏰ Ventana</span><span class="val">${win}</span></div>
+                <div class="pop-row"><span class="lbl">📅 Fecha estimada</span><span class="val">${expDate}</span></div>
+            `;
+            pop.classList.add('visible');
+            const rect = chip.getBoundingClientRect();
+            const w = pop.offsetWidth || 280;
+            const h = pop.offsetHeight || 200;
+            let x = rect.left + rect.width / 2 - w / 2;
+            let y = rect.bottom + 8;
+            if (x < 8) x = 8;
+            if (x + w > window.innerWidth - 8) x = window.innerWidth - w - 8;
+            if (y + h > window.innerHeight - 8) y = rect.top - h - 8;
+            pop.style.left = x + 'px';
+            pop.style.top = y + 'px';
+            void evt;
+        };
+        const hidePop = () => pop.classList.remove('visible');
+        document.querySelectorAll('.shipment-chip[data-meta]').forEach(chip => {
+            chip.addEventListener('mouseenter', e => showPop(chip, e));
+            chip.addEventListener('mouseleave', hidePop);
+            chip.addEventListener('focus', e => showPop(chip, e));
+            chip.addEventListener('blur', hidePop);
+            chip.tabIndex = 0;
+        });
+
+        // Botón "enviar a otro repartidor" (alternativa al drag&drop, útil en touch)
+        document.querySelectorAll('.chip-move').forEach(btn => {
+            btn.setAttribute('draggable', 'false');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                openMoveMenu(btn.closest('.shipment-chip'));
+            });
+        });
+
+        // Wire DnD
+        const allChips = document.querySelectorAll('.shipment-chip[draggable="true"]');
+        allChips.forEach(chip => {
+            chip.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', chip.dataset.shipmentId);
+                e.dataTransfer.setData('text/from', chip.closest('[data-transport-id]').dataset.transportId);
+                chip.classList.add('dragging');
+            });
+            chip.addEventListener('dragend', () => chip.classList.remove('dragging'));
+        });
+
+        const dropZones = document.querySelectorAll('[data-transport-id]');
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const sid = Number(e.dataTransfer.getData('text/plain'));
+                const fromTx = e.dataTransfer.getData('text/from');
+                const toTx = zone.dataset.transportId;
+                moveShipment(sid, fromTx, toTx);
+            });
+        });
+    };
+})();
+</script>
