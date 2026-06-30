@@ -35,6 +35,12 @@ const Shipment = sequelize.define('shipment', {
     estimatedMinutes:     { type: DataTypes.INTEGER,        allowNull: false, defaultValue: 5,     field: 'estimated_minutes' },
     deliveryMode:         { type: DataTypes.STRING(20),     allowNull: false, defaultValue: 'home', field: 'delivery_mode' },
     pickupBranchId:       { type: DataTypes.INTEGER,        allowNull: true,  field: 'pickup_branch_id' },
+    // Retiro en sucursal con QR: código legible + token del QR + ventana de retiro.
+    pickupCode:           { type: DataTypes.STRING(12),     allowNull: true,  field: 'pickup_code' },
+    pickupToken:          { type: DataTypes.STRING(64),     allowNull: true,  field: 'pickup_token' },
+    pickupReadyAt:        { type: DataTypes.DATE,           allowNull: true,  field: 'pickup_ready_at' },
+    pickupExpiresAt:      { type: DataTypes.DATE,           allowNull: true,  field: 'pickup_expires_at' },
+    pickupConfirmedByUserId: { type: DataTypes.INTEGER,     allowNull: true,  field: 'pickup_confirmed_by_user_id' },
     // Sprint 3 - 4.1 Código clave de entrega
     deliverySecretCode:   { type: DataTypes.STRING(10),     allowNull: true,  field: 'delivery_secret_code' },
     // Sprint 3 - 3.2 Portal autogestión (token público para cambiar franja/modalidad)

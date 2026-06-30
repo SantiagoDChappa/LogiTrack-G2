@@ -898,6 +898,44 @@ const getLiveMap = async (req, res) => {
     }
 };
 
+// Página pública de estado (estilo Mercado Libre): último estado + mensaje calculado
+// (ETA a domicilio / "llegó al punto de retiro") + línea de tiempo. El QR/código de retiro
+// NO se muestra acá (es público): se ofrece un CTA para identificarse en Mis Envíos.
+const getTrackStatus = async (req, res) => {
+    const trackingId = (req.params.trackingId || '').trim().toUpperCase();
+    const nombreEmpresa = await settingModel.get('nombre_empresa').catch(() => null);
+    const support = { nombre: nombreEmpresa || 'LogiTrack' };
+    const statusView = require('../services/shipmentStatusView.service');
+
+    if (!trackingId) {
+        return res.status(404).render('portal/trackStatus', { support, notFound: true, trackingId: '' });
+    }
+    try {
+        const shipment = await Shipment.findOne({ where: { trackingId }, include: trackingIncludes });
+        if (!shipment) {
+            return res.status(404).render('portal/trackStatus', { support, notFound: true, trackingId });
+        }
+        const enriched = await enrichShipmentRecord(shipment);
+        let eta = null;
+        if (enriched.deliveryMode !== 'branch_pickup') {
+            try { eta = await require('../services/etaWindow.service').etaForShipment(enriched.id); }
+            catch { /* sin ETA: el mensaje cae al genérico por estado */ }
+        }
+        const sv = statusView.buildStatusMessage(enriched, eta);
+        const timeline = statusView.buildTimeline(enriched.history);
+
+        return res.render('portal/trackStatus', {
+            support, notFound: false, trackingId,
+            sv, timeline,
+            recipientName: enriched.recipient?.fullName || '',
+            identifyUrl: '/portal/mis-envios',
+        });
+    } catch (err) {
+        console.error('Track status error:', err.message);
+        return res.status(404).render('portal/trackStatus', { support, notFound: true, trackingId });
+    }
+};
+
 // Resuelve un envío por código de seguimiento (sólo el id, para los endpoints públicos).
 const resolveShipmentByTracking = (trackingId) => {
     const t = (trackingId || '').trim().toUpperCase();
@@ -1095,4 +1133,4 @@ const sucursalesCercanas = async (req, res) => {
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta, getLiveChat, postLiveChat, getCotizador, cotizarPublic, sucursalesCercanas };
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getTrackStatus, getLivePosition, getLiveEta, getLiveChat, postLiveChat, getCotizador, cotizarPublic, sucursalesCercanas };

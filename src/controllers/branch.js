@@ -84,4 +84,34 @@ const setClosed = async (req, res) => {
     res.redirect('/branch?ok=' + (closed ? 'closed' : 'reopened'));
 };
 
-module.exports = { getIndex, getNewForm, create, getEditForm, update, setClosed };
+// ── Retiro en sucursal: pantalla del operador para confirmar entregas con QR/código ──
+const getPickupScanner = async (req, res) => {
+    res.render('branch/pickup', {
+        result: null,
+        error: null,
+        currentUser: res.locals.currentUser,
+    });
+};
+
+const postPickupConfirm = async (req, res) => {
+    const pickupService = require('../services/pickupCode.service');
+    const value = req.body.value || req.body.code || '';
+    const wantsJson = (req.get('accept') || '').includes('application/json') || req.xhr;
+    try {
+        const shipment = await pickupService.confirmPickup(value, res.locals.currentUser);
+        const payload = {
+            ok: true,
+            trackingId: shipment.trackingId,
+            recipientName: shipment.recipient?.fullName || '',
+            branchName: shipment.currentBranch?.name || '',
+        };
+        if (wantsJson) { return res.json(payload); }
+        return res.render('branch/pickup', { result: payload, error: null, currentUser: res.locals.currentUser });
+    } catch (e) {
+        const msg = e.code ? e.message : 'No se pudo confirmar el retiro.';
+        if (wantsJson) { return res.status(e.code === 'NOT_FOUND' ? 404 : 422).json({ ok: false, error: msg, code: e.code }); }
+        return res.status(422).render('branch/pickup', { result: null, error: msg, currentUser: res.locals.currentUser });
+    }
+};
+
+module.exports = { getIndex, getNewForm, create, getEditForm, update, setClosed, getPickupScanner, postPickupConfirm };

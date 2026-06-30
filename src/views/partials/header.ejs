@@ -38,6 +38,7 @@
                 <% if (currentUser.roleId === 1 || currentUser.roleId === 2 || currentUser.roleId === 4) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Incidencias</ul></a>
                     <a href="/shipment/modifications"><ul><span class="material-symbols-outlined">edit_note</span>Modificaciones portal</ul></a>
+                    <a href="/branch/pickup"><ul><span class="material-symbols-outlined">qr_code_scanner</span>Confirmar retiro</ul></a>
                 <% } %>
                 <% if (currentUser.roleId === 3) { %>
                     <a href="/incident"><ul><span class="material-symbols-outlined">report</span>Mis incidencias</ul></a>

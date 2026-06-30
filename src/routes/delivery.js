@@ -552,7 +552,7 @@ router.post('/route/:id/stop/:stopId/drop-at-branch', requireDelivery, async (re
         const shipment = await shipmentModel.getById(stop.shipmentId);
         if (!shipment) { throw new Error('Envío no encontrado'); }
         // Si todavía no salió a tránsito (ASSIGNED/IN_PREPARATION), primero IN_TRANSIT
-        // (ASSIGNED→AT_BRANCH no es una transición válida; pasa siempre por IN_TRANSIT).
+        // (ASSIGNED→READY_FOR_PICKUP no es una transición válida; pasa siempre por IN_TRANSIT).
         if (shipment.statusId === Status.ASSIGNED.id || shipment.statusId === Status.IN_PREPARATION.id) {
             await stateMachine.transition({
                 shipmentId: stop.shipmentId,
@@ -561,13 +561,18 @@ router.post('/route/:id/stop/:stopId/drop-at-branch', requireDelivery, async (re
                 branchId:   route.originBranchId,
             });
         }
-        // Dejar en la sucursal de retiro: IN_TRANSIT → AT_BRANCH (la transición setea
-        // currentBranchId = sucursal). Si ya está AT_BRANCH (reintento), solo cerramos.
+        // Genera el código/QR de retiro ANTES de la transición: así el aviso automático
+        // SHIPMENT_READY_FOR_PICKUP (mapeado al estado) ya encuentra el código en el envío.
+        const pickup = await require('../services/pickupCode.service').ensurePickupCode(stop.shipmentId);
+
+        // Dejar listo para retiro: IN_TRANSIT → READY_FOR_PICKUP (la transición setea
+        // currentBranchId = sucursal de retiro y dispara el mail con el código). Reintento: si
+        // ya está READY_FOR_PICKUP, sólo cerramos la parada.
         const fresh = await shipmentModel.getById(stop.shipmentId);
-        if (fresh && fresh.statusId !== Status.AT_BRANCH.id) {
+        if (fresh && fresh.statusId !== Status.READY_FOR_PICKUP.id) {
             await stateMachine.transition({
                 shipmentId: stop.shipmentId,
-                toStatusId: Status.AT_BRANCH.id,
+                toStatusId: Status.READY_FOR_PICKUP.id,
                 actor:      res.locals.currentUser,
                 branchId:   stop.branchId,
             });
@@ -576,11 +581,8 @@ router.post('/route/:id/stop/:stopId/drop-at-branch', requireDelivery, async (re
             { completed: true, completedAt: new Date() },
             { where: { id: req.params.stopId, routeId: req.params.id } }
         );
-        // Aviso al cliente: disponible para retiro en sucursal (evento SHIPMENT_IN_BRANCH).
-        require('../controllers/shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_IN_BRANCH, stop.shipmentId)
-            .catch(e => console.error('[delivery] notif SHIPMENT_IN_BRANCH:', e.message));
         const branchName = stop.branch ? stop.branch.name : 'la sucursal de retiro';
-        res.json({ ok: true, trackingId: shipment.trackingId, branchName });
+        res.json({ ok: true, trackingId: shipment.trackingId, branchName, pickupCode: pickup.code });
     } catch (e) {
         console.error('drop-at-branch err', e.message);
         res.status(422).json({ error: `No se pudo dejar en sucursal: ${e.message}` });
