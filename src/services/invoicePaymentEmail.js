@@ -30,13 +30,16 @@ const buildBody = ({ invoice, shipment, payUrl, empresa }) => {
       </div>
       <div style="padding:24px">
         <p style="margin:0 0 12px">Hola <strong>${sender}</strong>,</p>
-        <p style="margin:0 0 16px">Generamos la factura de tu envío <strong>${tracking}</strong>. Para completar la contratación, aboná el comprobante:</p>
+        <p style="margin:0 0 16px">Generamos la factura de tu envío <strong>${tracking}</strong>. Ingresá al siguiente enlace para elegir cómo pagar:</p>
         <div style="text-align:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:0 0 20px">
           <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em">Total a pagar</div>
           <div style="font-size:30px;font-weight:800;color:#0f172a;margin-top:4px">$ ${total}</div>
         </div>
-        <a href="${payUrl}" style="display:block;text-align:center;background:#009ee3;color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:14px;border-radius:10px">Pagar con Mercado Pago</a>
-        <p style="margin:18px 0 0;font-size:12px;color:#94a3b8;text-align:center">Pago simulado · Si el botón no funciona, copiá este enlace:<br>${payUrl}</p>
+        <a href="${payUrl}" style="display:block;text-align:center;background:#009ee3;color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:14px;border-radius:10px">Ver opciones de pago</a>
+        <div style="margin:16px 0 0;font-size:12.5px;color:#64748b;text-align:center;line-height:1.6">
+          Podés pagar con <strong>Mercado Pago</strong>, <strong>efectivo (Pago Fácil)</strong> o <strong>transferencia bancaria</strong>.
+        </div>
+        <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;text-align:center">Si el botón no funciona, copiá este enlace:<br>${payUrl}</p>
       </div>
     </div>
   </div>
