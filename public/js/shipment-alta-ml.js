@@ -15,7 +15,7 @@
     const form = document.querySelector('.form-new form');
     if (!form) { return; }
 
-    const TIMEOUT_MS = 35000;       // tope de espera del ML antes de caer a fecha default
+    const TIMEOUT_MS = 10000;       // tope de espera del ML antes de caer a fecha default
     const RISK_HALFLIFE_DAYS = 3;   // cada N días de margen, el riesgo se reduce a la mitad
 
     let confirmed = false;          // cuando es true, dejamos pasar el submit real
@@ -71,50 +71,38 @@
     async function computePrediction(onStep) {
         const v = getFormValues();
 
-        onStep && onStep('Analizando distancia y ruta…');
-        const distRes = await fetch('/api/distance', {
+        onStep && onStep('Estimando fecha de entrega…');
+        const now = new Date();
+        const mlDay = (now.getDay() + 6) % 7;
+        const month = now.getMonth() + 1;
+        const shipType = parseInt(v.shipTypeId) === 1 ? 0 : 1;
+
+        const estRes = await fetch('/api/estimate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 destinationProvinceId: v.provinceId ? parseInt(v.provinceId) : undefined,
-                destinationStreet:     v.street,
-                destinationNumber:     v.number,
-                destinationLat:        Number.isFinite(v.lat) ? v.lat : undefined,
-                destinationLng:        Number.isFinite(v.lng) ? v.lng : undefined,
+                destinationStreet: v.street,
+                destinationNumber: v.number,
+                destinationLat: Number.isFinite(v.lat) ? v.lat : undefined,
+                destinationLng: Number.isFinite(v.lng) ? v.lng : undefined,
+                weight_kg: parseFloat(v.weightKg),
+                package_quantity: parseInt(v.packageQty),
+                ship_type: shipType,
+                shipmentId: null,
             }),
         });
-        const dist = await distRes.json();
 
-        onStep && onStep('Estimando fecha de entrega…');
-        const now    = new Date();
-        const mlDay  = (now.getDay() + 6) % 7;      // ML espera 0=Lun…6=Dom
-        const month  = now.getMonth() + 1;
-        const shipType = parseInt(v.shipTypeId) === 1 ? 0 : 1;   // 1=Express→0, resto→1
-
-        const predRes = await fetch('/api/predict', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                distance_km:          dist.distance_km,
-                weight_kg:            parseFloat(v.weightKg),
-                package_quantity:     parseInt(v.packageQty),
-                ship_type:            shipType,
-                day_of_week:          mlDay,
-                month,
-                origin_province:      dist.origin_province_ml,
-                destination_province: dist.destination_province_ml,
-                shipmentId:           null,
-            }),
-        });
-        const pred = await predRes.json();
-        if (pred.error) { throw new Error(pred.error); }
+        if (!estRes.ok) throw new Error('Error en estimación');
+        const data = await estRes.json();
+        if (data.error) throw new Error(data.error);
 
         return {
-            deliveryDays: pred.delivery_days,
-            probability:  pred.probability,
-            distKm:       dist.distance_km,
-        };
-    }
+            deliveryDays: data.delivery_days,
+            probability: data.probability,
+            distKm: data.distance_km,
+    };
+}
 
     function withTimeout(promise, ms) {
         return Promise.race([

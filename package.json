@@ -7,6 +7,8 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
+    "start:ml": "python ml/api.py",
+    "start:all": "node -e \"require('child_process').spawn('python', ['ml/api.py'], {cwd:'ml', stdio:'inherit'});\" && npm start",
     "dev": "nodemon app.js",
     "db:setup": "node src/database/setup.js",
     "db:seed-shipments": "node src/database/runSql.js src/database/seed_shipments.sql",

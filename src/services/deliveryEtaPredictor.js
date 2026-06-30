@@ -6,47 +6,40 @@
 //   - El spawn de Python tiene timeout: si el ML no está disponible (p.ej. Render sin
 //     Python) o tarda, cae a una estimación heurística rápida. Nunca cuelga la request.
 
-const path = require('path');
-const { spawn } = require('child_process');
+
 const { PROVINCES } = require('../utils/provinces');
 const { haversine } = require('../utils/geo');
 const settingModel = require('../models/setting');
 const { addBusinessDays, estimateDeliveryDate } = require('../utils/deliveryEstimate');
 const shipmentPredictionModel = require('../models/shipmentPrediction');
 
-const PYTHON = process.env.PYTHON_BIN || 'python3';
-const SCRIPT = path.join(__dirname, '../../ml/predict_stdin.py');
-const ML_TIMEOUT_MS = Number(process.env.ML_PREDICT_TIMEOUT_MS) || 3500;
+const ML_TIMEOUT_MS = Number(process.env.ML_PREDICT_TIMEOUT_MS) || 5000;
 
 // Ejecuta el predictor Python con timeout. Resuelve { days, probability, delayed } o null.
+const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/predict';
+
 function runMlPredict(features) {
-    return new Promise((resolve) => {
-        let proc;
-        try { proc = spawn(PYTHON, [SCRIPT]); } catch { return resolve(null); }
-
-        let stdout = '';
-        let settled = false;
-        const finish = (val) => {
-            if (settled) { return; }
-            settled = true;
-            try { proc.kill(); } catch { /* ya terminó */ }
-            resolve(val);
-        };
-        const timer = setTimeout(() => finish(null), ML_TIMEOUT_MS);
-
-        proc.stdout.on('data', (c) => { stdout += c; });
-        proc.on('error', () => { clearTimeout(timer); finish(null); });
-        proc.on('close', (code) => {
-            clearTimeout(timer);
-            if (code !== 0) { return finish(null); }
+    return new Promise(async (resolve) => {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), ML_TIMEOUT_MS);
+            let res;
             try {
-                const p = JSON.parse(stdout);
-                finish({ days: Number(p.delivery_days), probability: p.probability, delayed: p.delayed });
-            } catch { finish(null); }
-        });
-
-        try { proc.stdin.write(JSON.stringify(features)); proc.stdin.end(); }
-        catch { clearTimeout(timer); finish(null); }
+                res = await fetch(ML_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(features),
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timeout);
+            }
+            if (!res.ok) return resolve(null);
+            const p = await res.json();
+            resolve({ days: Number(p.delivery_days), probability: p.probability, delayed: p.delayed });
+        } catch {
+            resolve(null);
+        }
     });
 }
 

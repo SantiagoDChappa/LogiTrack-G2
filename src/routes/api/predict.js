@@ -1,53 +1,66 @@
-const { spawn } = require('child_process');
-const path = require('path');
 const express = require('express');
 const router = express.Router();
 const { savePrediction } = require('../../models/shipmentPrediction');
 
-const PYTHON = process.env.PYTHON_BIN || 'python3';
-const SCRIPT = path.join(__dirname, '../../../ml/predict_stdin.py');
+const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/predict';
+
+function heuristicPrediction(shipType) {
+    const days = shipType === 0 ? 2 : 5;
+    return {
+        delivery_days: days,
+        probability: 0,
+        delayed: false,
+        label: 'ESTIMATED',
+    };
+}
 
 router.post('/', async (req, res) => {
-    const proc = spawn(PYTHON, [SCRIPT]);
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', chunk => { stdout += chunk; });
-    proc.stderr.on('data', chunk => { stderr += chunk; });
-
-    proc.on('close', async (code) => {
-        if (code !== 0) {
-            console.error('ML process error:', stderr);
-            return res.status(503).json({ error: 'Servicio ML no disponible' });
-        }
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        let flaskRes;
         try {
-            const pred = JSON.parse(stdout);
-
-            // Guardar predicción si viene con shipmentId
-            if (req.body.shipmentId) {
-                await savePrediction({
-                    shipmentId:       req.body.shipmentId,
-                    predictedDays:    pred.delivery_days,
-                    delayProbability: pred.probability,
-                    delayed:          pred.delayed,
-                    distanceKm:       req.body.distance_km,
-                });
-            }
-
-            res.json(pred);
-        } catch {
-            console.error('ML bad output:', stdout);
-            res.status(503).json({ error: 'Respuesta ML inválida' });
+            flaskRes = await fetch(ML_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(req.body),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeout);
         }
-    });
 
-    proc.on('error', err => {
-        console.error('ML spawn error:', err);
-        res.status(503).json({ error: 'Servicio ML no disponible' });
-    });
+        if (!flaskRes.ok) throw new Error(`Flask status ${flaskRes.status}`);
 
-    proc.stdin.write(JSON.stringify(req.body));
-    proc.stdin.end();
+        const pred = await flaskRes.json();
+
+        if (req.body.shipmentId) {
+            savePrediction({
+                shipmentId: req.body.shipmentId,
+                predictedDays: pred.delivery_days,
+                delayProbability: pred.probability,
+                delayed: pred.delayed,
+                distanceKm: req.body.distance_km,
+            }).catch(() => {});
+        }
+
+        res.json(pred);
+    } catch (err) {
+        console.error('[predict] ML API error, usando heurística:', err.message);
+        const fallback = heuristicPrediction(req.body.ship_type);
+
+        if (req.body.shipmentId) {
+            savePrediction({
+                shipmentId: req.body.shipmentId,
+                predictedDays: fallback.delivery_days,
+                delayProbability: 0,
+                delayed: false,
+                distanceKm: req.body.distance_km,
+            }).catch(() => {});
+        }
+
+        res.json(fallback);
+    }
 });
 
 module.exports = router;

@@ -64,7 +64,7 @@ const apiSearchRoutes  = require('./src/routes/api/search');
 const accountRoutes    = require('./src/routes/account');
 const passwordResetRoutes = require('./src/routes/passwordReset');
 const branchRoutes = require('./src/routes/branch');
-
+const estimateRouter = require('./src/routes/api/estimate');
 
 // Conecto la base de datos con el sistema y aplico migraciones pendientes.
 const path = require('path');
@@ -79,6 +79,30 @@ if (process.env.NODE_ENV === 'test') {
         .then(() => console.warn('Base de datos conectada y migrada'))
         .catch(err => console.error('Error de DB:', err));
 }
+
+const { spawn } = require('child_process');
+
+const ML_PORT = process.env.ML_PORT || 5001;
+let flaskProcess;
+
+function startFlask() {
+    const flaskScript = path.join(__dirname, 'ml', 'api.py');
+    flaskProcess = spawn('python', [flaskScript], {
+        cwd: path.join(__dirname, 'ml'),
+        stdio: 'pipe',
+    });
+    flaskProcess.stdout.on('data', (d) => process.stdout.write(`[flask] ${d}`));
+    flaskProcess.stderr.on('data', (d) => process.stderr.write(`[flask] ${d}`));
+    flaskProcess.on('error', (err) => console.warn('[flask] No se pudo iniciar ML:', err.message));
+    flaskProcess.on('exit', (code) => console.warn(`[flask] Proceso terminado (código ${code})`));
+}
+
+// Limpiar Flask al salir
+process.on('exit', () => { if (flaskProcess) flaskProcess.kill(); });
+process.on('SIGINT', () => { if (flaskProcess) flaskProcess.kill(); process.exit(); });
+process.on('SIGTERM', () => { if (flaskProcess) flaskProcess.kill(); process.exit(); });
+
+startFlask();
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'src', 'views'));
@@ -110,6 +134,8 @@ app.use(express.static('public', {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
+
+
 
 // Helpers globales para EJS
 const { IncidentStatusLabel, IncidentResolutionLabel } = require('./src/constants/enums');
@@ -157,6 +183,7 @@ app.use('/api/route',             requireAuth, apiRouteRoutes);
 app.use('/api/branches',          requireAuth, apiBranchesRoutes);
 app.use('/api/cost-preview',      requireAuth, apiCostPreviewRoutes);
 app.use('/api/zones-geo',         requireAuth, apiZonesGeoRoutes);
+app.use('/api/estimate', requireAuth, estimateRouter);
 app.use('/api/danger-areas',      requireAuth, apiDangerAreasRoutes);
 app.use('/api/dept-overrides',    requireAuth, apiDeptOverridesRoutes);
 app.use('/api/search',            requireAuth, apiSearchRoutes);
