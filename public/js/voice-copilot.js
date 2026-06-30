@@ -96,17 +96,6 @@
         return 'no'; // "no", silencio o respuesta poco clara → cancelar (regla: ante la duda, no ejecutar)
     }
 
-    // ── CV-05: flujo de "entrega fallida" (dictado de motivo → lectura → confirmación) ──
-    // Saca el disparador inicial del transcript para quedarse solo con el motivo dicho.
-    function extractMotivo(raw) {
-        return String(raw || '').trim()
-            .replace(/^\s*(entrega fallida|marcar (como )?fallida|parada no realizada|no pude entregar|fallida)\b[\s,:.]*/i, '')
-            .replace(/^(porque|por que|el motivo es|motivo|ya que|es que|por)\s+/i, '')
-            .trim();
-    }
-    function cleanMotivo(raw) {
-        return String(raw || '').trim().replace(/^(porque|por que|el motivo es|motivo|ya que|es que|por)\s+/i, '').trim();
-    }
     // Motivo OPCIONAL de pausa para trazabilidad: si el repartidor lo dice en la misma frase
     // ("registrar pausa por almuerzo") lo tomamos; si no, queda genérico. Cero turnos extra.
     function extractPauseReason(raw) {
@@ -131,126 +120,6 @@
         const free = text.slice(0, 60);                                          // motivo libre (no encaja en el catálogo)
         return { reason: free, label: free };
     }
-    function classifyFailedConfirm(text) {
-        const t = normalize(text);
-        if (/^(si|sí|sip|dale|confirmo|confirmar|correcto|afirmativo|ok|oka|okey|de una|obvio|asi es)\b/.test(t)) { return 'yes'; }
-        if (/^(cancelar|cancela|olvidalo|dejalo|nada)\b/.test(t)) { return 'cancel'; }
-        return 'redo'; // "no", "corregir" o poco claro → re-pedir el motivo (CA3)
-    }
-
-    // Motivos oficiales de entrega fallida — los mismos del formulario manual y del cálculo de
-    // fecha sugerida. La voz NO guarda el texto crudo como motivo (el STT se equivoca y la
-    // oficina recibe basura): encasilla lo dictado en uno de estos códigos y deja lo dictado
-    // como observación. Los labels se pueden sobreescribir desde el catálogo configurable del
-    // servidor (window.LT_FAILED_REASONS); los sinónimos para reconocer el habla viven acá.
-    const FAILED_REASON_DEFS = [
-        { code: 'ausente', label: 'Ausente',
-            syn: ['ausente', 'no habia nadie', 'no hay nadie', 'no estaba', 'no estaban', 'nadie',
-                'no atendio', 'no atiende', 'no responde', 'no contesta', 'no abrio', 'no abre', 'toque y nada'] },
-        { code: 'domicilio_erroneo', label: 'Domicilio incorrecto',
-            syn: ['domicilio incorrecto', 'domicilio erroneo', 'direccion incorrecta', 'direccion equivocada', 'direccion mal',
-                'direccion erronea', 'mal la direccion', 'domicilio inexistente', 'direccion inexistente', 'no existe la direccion',
-                'no existe el domicilio', 'no es la direccion', 'no encontre la direccion'] },
-        { code: 'rechazo', label: 'Rechazo',
-            syn: ['rechazo', 'rechazado', 'rechaza', 'no lo quiso', 'no lo quiere', 'no lo acepto', 'no acepto',
-                'no quiso recibir', 'no quiere recibir', 'devolvio el paquete'] },
-        { code: 'calle_cortada', label: 'Calle cortada / zona inaccesible',
-            syn: ['zona inaccesible', 'inaccesible', 'calle cortada', 'no pude entrar', 'no puedo entrar', 'no se puede acceder',
-                'no hay acceso', 'zona peligrosa', 'no llegue', 'no pude llegar'] },
-        { code: 'otro', label: 'Otro', syn: [] },
-    ];
-    function reasonDefs() {
-        const override = Array.isArray(window.LT_FAILED_REASONS) ? window.LT_FAILED_REASONS : null;
-        if (!override) { return FAILED_REASON_DEFS; }
-        return FAILED_REASON_DEFS.map((d) => {
-            const o = override.find((x) => x.code === d.code);
-            return o ? { ...d, label: o.label || d.label } : d;
-        });
-    }
-    // Encasilla lo dictado en un motivo oficial. Devuelve { code, label, observation, matched } o null.
-    function classifyReason(raw) {
-        const obs = String(raw || '').trim();
-        const t = normalize(obs);
-        if (!t) { return null; }
-        const defs = reasonDefs();
-        for (const d of defs) {
-            if (d.syn.some((s) => t.includes(normalize(s)))) {
-                return { code: d.code, label: d.label, observation: obs, matched: true };
-            }
-        }
-        const otro = defs.find((d) => d.code === 'otro');           // sin coincidencia → "otro" + lo dictado como detalle
-        return { code: 'otro', label: otro ? otro.label : 'Otro', observation: obs, matched: false };
-    }
-
-    let failedTries = 0; // CV-05: límite de reintentos al pedir el motivo (no preguntar infinito en manos libres)
-    function failedStart(motivoText) {
-        failedTries = 0;
-        const r = motivoText ? classifyReason(motivoText) : null;
-        if (!r) { return failedAskMotivo(false); } // CA4
-        return failedConfirm(r);
-    }
-    function failedAskMotivo(again) {                   // CA3/CA4: pedir (o re-pedir) el motivo
-        if (failedTries >= 3) { // tope: corta el loop y deriva a la pantalla
-            pendingPrompt = null;
-            return respond('No pude entender el motivo. Marcá la entrega como fallida desde la pantalla cuando puedas.', { error: true });
-        }
-        failedTries++;
-        pendingPrompt = (text) => {
-            // extractMotivo (no cleanMotivo): saca también el prefijo del comando, así si repite
-            // "marcar fallida" como respuesta no termina clasificado como "otro" con basura.
-            const r = classifyReason(extractMotivo(text));
-            if (!r) { return failedAskMotivo(true); }
-            return failedConfirm(r);
-        };
-        respond(again
-            ? 'No te entendí el motivo. Decímelo de nuevo, por ejemplo: no había nadie.'
-            : '¿Cuál es el motivo de la entrega fallida?', { relisten: true });
-    }
-    function failedConfirm(r) {                         // CA1: confirma por el motivo OFICIAL, no por el texto crudo
-        pendingPrompt = (text) => {
-            const c = classifyFailedConfirm(text);
-            if (c === 'yes') { return failedRegister(r); }                     // CA2
-            if (c === 'cancel') { return respond('Listo, no registro nada.', {}); }
-            return failedAskMotivo(false);                                      // CA3 (no/corregir)
-        };
-        // Si no se pudo encasillar, avisa que va como "otro" y repite lo dictado para que el repartidor controle.
-        const detail = r.matched ? '' : ` con tu comentario: ${r.observation}`;
-        respond(`Voy a marcar la entrega como fallida por: ${r.label}${detail}. ¿Confirmás?`, { relisten: true });
-    }
-    async function failedRegister(motivo) {             // CA2/CA5/CA6/CA7
-        const myTurn = turnGen; // si el repartidor cancela mientras se registra, no respondemos tarde
-        const stop = window.LT_NEXT_STOP;
-        if (!stop || !stop.id) { return respond('No hay una entrega pendiente para marcar.', {}); }
-        const geo = await getGeo();
-        if (myTurn !== turnGen) { return; } // canceló/empezó otra orden durante el GPS → NO mandar el POST
-        // motivo: { code, label, observation } — código oficial + lo dictado tal cual (punto 3)
-        let status, data;
-        try {
-            // window.fetch pasa por la cola offline: sin señal, queda encolado.
-            const res = await fetch(`/delivery/route/${ctx.routeId}/stop/${stop.id}/failed`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    reasonCode: motivo.code, reasonText: motivo.label, comment: motivo.observation || null,
-                    latitude: geo.latitude || null, longitude: geo.longitude || null,
-                }),
-            });
-            status = res.status;
-            data = await res.json().catch(() => ({}));
-        } catch (_) { return myTurn === turnGen ? respond('No pude registrar el intento, probá de nuevo.', { error: true }) : undefined; }
-
-        if (myTurn !== turnGen) { return; } // el repartidor ya pasó a otra cosa: no pisamos su pantalla
-
-        if (status === 409) { return respond(data.error || 'No puedo marcar esta parada todavía.', {}); }      // CA5 (orden/pausa)
-        if (!data || (data.ok !== true && !data.queued)) {
-            return respond((data && data.error) || 'No pude registrar el intento, probá de nuevo.', { error: true });
-        }
-        if (data.queued) { return respond('Sin señal: el intento quedó pendiente y lo registro cuando vuelva la conexión.', {}); }
-        if (data.maxAttemptsReached) {                                                                          // CA6
-            return respond('Intento registrado. Este envío alcanzó el máximo de intentos y no admite más reintentos.', {});
-        }
-        // CA7: la voz solo deja el intento con su motivo; foto/firma/código se completan a mano en pantalla.
-        return respond(`Listo, marqué la entrega como no realizada por ${motivo.label}.`, {});                   // CA2
-    }
 
     // ── Registro de comandos ────────────────────────────────────────────────────
     // cada comando: { id, label, keywords[], applies(ctx)->{ok,reason}, run(ctx)->{speak} }
@@ -261,7 +130,7 @@
         id: 'help', label: 'Ayuda',
         keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
         run: () => ({ speak: 'Podés pedirme: próxima entrega, cuántas paradas quedan, '
-            + 'registrar o retomar pausa, reportar zona insegura, o entrega fallida.' }),
+            + 'registrar o retomar pausa, o reportar zona insegura.' }),
     });
 
     // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
@@ -313,6 +182,45 @@
                 window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest), '_blank');
             } catch { return { speak: 'No pude abrir la navegación.', error: true }; }
             return { speak: `Abriendo la navegación hacia ${dir ? speakable(dir) : 'tu próxima entrega'}.` };
+        },
+    });
+
+    // Llamar al destinatario de la próxima entrega (link tel: nativo, como el botón "Llamar").
+    register({
+        id: 'call', label: 'llamar al destinatario',
+        keywords: ['llamar al cliente', 'llamar al destinatario', 'llama al cliente',
+            'comunicame con el cliente', 'llamar', 'llamalo'],
+        run: () => {
+            const n = window.LT_NEXT_STOP;
+            if (!n) { return { speak: 'No te quedan entregas pendientes.' }; }
+            const tel = (n.phone || '').toString().trim();
+            if (!tel) { return { speak: 'Esta entrega no tiene teléfono cargado.', error: true }; }
+            try { window.location.href = 'tel:' + encodeURIComponent(tel); }
+            catch { return { speak: 'No pude iniciar la llamada.', error: true }; }
+            return { speak: `Llamando a ${n.recipient || 'el destinatario'}.` };
+        },
+    });
+
+    // Posponer la próxima entrega ("volver luego"). Acción sensible → confirma. No se puede en pausa.
+    register({
+        id: 'postpone', label: 'volver luego',
+        keywords: ['volver luego', 'volver mas tarde', 'saltear esta parada', 'saltar esta parada',
+            'posponer parada', 'posponer esta entrega', 'dejar para despues'],
+        applies: (c) => c.paused
+            ? { ok: false, reason: 'No puedo posponer con la ruta en pausa. Primero retomá.' }
+            : { ok: true },
+        confirm: () => {
+            const n = window.LT_NEXT_STOP;
+            return `¿Pospongo la entrega de ${n && n.recipient ? n.recipient : 'esta parada'}? Decí sí.`;
+        },
+        run: async () => {
+            const n = window.LT_NEXT_STOP;
+            if (!n || !n.id) { return { speak: 'No tenés una entrega para posponer.' }; }
+            const r = await window.LT_voiceSkip(n.id, '');
+            if (r && r.queued) { return { speak: 'Sin señal: la postergación quedó en cola y se guarda al volver la conexión.' }; }
+            if (r && r.ok)     { return { speak: `Listo, pospuse la entrega de ${n.recipient || 'esta parada'}. La vas a ver al final.` }; }
+            if (r && r.paused) { return { speak: 'No puedo posponer con la ruta en pausa.', error: true }; }
+            return { speak: 'No pude posponer la parada.', error: true };
         },
     });
 
@@ -425,18 +333,6 @@
             }
             return { speak: 'Listo, zona insegura reportada con tu ubicación.' };          // CA2
         },
-    });
-    // CV-05 — Marcar una parada como no realizada (dicta el motivo, lo confirma, y registra).
-    register({
-        id: 'failed', label: 'entrega fallida',
-        keywords: ['entrega fallida', 'parada no realizada', 'no pude entregar', 'marcar fallida', 'fallida'],
-        applies: (c) => {
-            if (c.paused) { return { ok: false, reason: 'Primero tenés que retomar la ruta.' }; }       // CV-03 CA5
-            if (!window.LT_NEXT_STOP || !window.LT_NEXT_STOP.id) { return { ok: false, reason: 'No hay una entrega pendiente para marcar.' }; }
-            return { ok: true };
-        },
-        // Inicia el flujo multipaso usando el transcript completo para extraer el motivo dicho.
-        run: (c, raw) => { failedStart(extractMotivo(raw)); return { handled: true }; },
     });
 
     // CV-07 — Pedir ayuda en una emergencia (acción sensible: confirmación breve antes de enviar).

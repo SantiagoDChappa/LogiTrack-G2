@@ -900,6 +900,7 @@
             recipient: (_ns.shipment.recipient && _ns.shipment.recipient.fullName) || null,
             lat:       (_ns.lat != null ? Number(_ns.lat) : null), // para abrir navegación (CV-16)
             lng:       (_ns.lng != null ? Number(_ns.lng) : null),
+            phone:     (_ns.shipment.recipient && _ns.shipment.recipient.phone) || null, // para llamar por voz
         } : null;
 
         // Buscar un envío por voz (CV-14): lista de entregas con destinatario y dirección.
@@ -907,11 +908,16 @@
             .filter(s => s.stopType === 'delivery' && s.shipment)
             .sort((a, b) => a.sequence - b.sequence)
             .map(s => ({
+                id:        s.id,
                 seq:       s.sequence,
                 completed: !!s.completed,
+                skipped:   !!s.skipped,
                 recipient: (s.shipment.recipient && s.shipment.recipient.fullName) || null,
                 street:    (s.shipment.address && s.shipment.address.street) || null,
                 number:    (s.shipment.address && s.shipment.address.number) || null,
+                lat:       (s.lat != null ? Number(s.lat) : null),
+                lng:       (s.lng != null ? Number(s.lng) : null),
+                phone:     (s.shipment.recipient && s.shipment.recipient.phone) || null,
             }));
 
         // Avance de la ruta (CV-06): conteo sobre las entregas.
@@ -925,7 +931,7 @@
             postponed: _postponedN,
         };
     %>
-    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- jsonScript(_nsData) %>; window.LT_PROGRESS = <%- jsonScript(_progress) %>; window.LT_STOPS = <%- jsonScript(_stopsData) %>; window.LT_FAILED_REASONS = <%- jsonScript(typeof failedReasons !== 'undefined' ? failedReasons : []) %>;</script>
+    <script>window.LT_ROUTE_ID = <%= route.id %>; window.LT_ROUTE_ACTIVE = <%= route.statusId === 2 ? 'true' : 'false' %>; window.LT_READONLY = <%= readOnly ? 'true' : 'false' %>; window.LT_NEXT_STOP = <%- jsonScript(_nsData) %>; window.LT_PROGRESS = <%- jsonScript(_progress) %>; window.LT_STOPS = <%- jsonScript(_stopsData) %>;</script>
     <style>
     /* === SweetAlert dark + fixes === */
     html[data-theme="dark"] .swal2-popup {
@@ -2726,6 +2732,29 @@
             if (!res.ok) { return { ok: false, error: true }; }
             clearPauseUI();
             return { ok: true, addedSeconds: data.addedSeconds || 0, queued: !!data.queued }; // CV-17
+        } catch (_) { return { ok: false, error: true }; }
+    };
+    // Posponer ("volver luego") por voz: reusa el endpoint /skip (encolable offline) + la UI,
+    // y recalcula LT_NEXT_STOP para que "próxima/navegar/llamar" no apunten a la pospuesta.
+    window.LT_voiceSkip = async function (stopId, reason) {
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/stop/${stopId}/skip`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason || 'Pospuesta por voz' }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return res.status === 409 ? { ok: false, paused: true } : { ok: false, error: true }; }
+            markStopSkipped(stopId, true);
+            const st = (window.LT_STOPS || []).find((s) => s.id === stopId);
+            if (st) { st.skipped = true; }
+            // Misma lógica que _ns en el render: primero pendiente sin postergar; si no quedan, una postergada.
+            const nx = (window.LT_STOPS || []).find((s) => !s.completed && !s.skipped)
+                    || (window.LT_STOPS || []).find((s) => !s.completed) || null;
+            window.LT_NEXT_STOP = nx ? {
+                id: nx.id, street: nx.street, number: nx.number, recipient: nx.recipient,
+                lat: nx.lat, lng: nx.lng, phone: nx.phone,
+            } : null;
+            return { ok: true, queued: !!data.queued };
         } catch (_) { return { ok: false, error: true }; }
     };
 
