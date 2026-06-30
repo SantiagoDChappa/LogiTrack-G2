@@ -14,7 +14,7 @@ const {
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { getReturnForm, postReturn, listReturns, returnDetail, postEditModality, returnCreditNote } = require('../controllers/portalReturn');
-const { getCheckout, postPay, postPayMp, postWebhook } = require('../controllers/payment');
+const { getCheckout, postPay, postPayMp, postWebhook, postReportEfectivo, postUploadComprobante } = require('../controllers/payment');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
 
@@ -35,6 +35,15 @@ const portalEvidenceUpload = (req, res, next) => {
             req.uploadError = err.message || 'Archivo no válido.';
         }
         return next();
+    });
+};
+
+// Comprobante de transferencia (pago simulado): mismas restricciones que la
+// evidencia de incidencia (imagen o PDF, hasta 10MB), pero con su propio campo.
+const comprobanteUpload = (req, res, next) => {
+    evidenceUpload.single('comprobante')(req, res, (err) => {
+        if (err) { req.file = undefined; }
+        next();
     });
 };
 
@@ -80,6 +89,10 @@ router.post('/portal/encuesta/:token', postPublicSurvey);
 router.get('/pago/:token',     getCheckout);
 router.post('/pago/:token',    postPay);
 router.post('/pago/:token/mp', postPayMp);
+// Efectivo (Pago Fácil simulado) y transferencia: el remitente reporta el pago o
+// sube el comprobante, queda "en verificación" hasta que un operador lo confirma.
+router.post('/pago/:token/efectivo',      comprobanteUpload, postReportEfectivo);
+router.post('/pago/:token/transferencia', comprobanteUpload, postUploadComprobante);
 
 // Webhook de Mercado Pago (servidor a servidor, sin login).
 router.post('/payment/webhook', postWebhook);

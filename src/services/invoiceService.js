@@ -75,7 +75,36 @@ const markPaid = async (invoice, { method = 'mercadopago' } = {}) => {
         payMethod: method,
         payRef:    buildPayRef(),
         paidAt:    new Date(),
+        pendingVerificationMethod: null,
+        pendingVerificationAt:     null,
     });
+    return { ok: true, invoice };
+};
+
+// El remitente reporta desde el link público que pagó en efectivo (Pago Fácil
+// simulado) o subió el comprobante de transferencia: queda "en verificación",
+// no se marca PAGADA todavía — eso lo confirma un operador/supervisor.
+const requestVerification = async (invoice, { method, file } = {}) => {
+    if (!invoice || invoice.payStatus !== 'PENDIENTE') {
+        return { ok: false, message: 'La factura no está pendiente de pago' };
+    }
+    const updates = {
+        pendingVerificationMethod: method,
+        pendingVerificationAt: new Date(),
+    };
+    if (file) {
+        updates.comprobanteData = file.buffer.toString('base64');
+        updates.comprobanteMime = file.mimetype;
+        updates.comprobanteFileName = String(file.originalname || 'comprobante').slice(0, 200);
+    }
+    await invoice.update(updates);
+    return { ok: true, invoice };
+};
+
+// El operador descarta la verificación reportada (p. ej. comprobante inválido)
+// sin marcar la factura como pagada, para que el remitente pueda reintentar.
+const clearVerification = async (invoice) => {
+    await invoice.update({ pendingVerificationMethod: null, pendingVerificationAt: null });
     return { ok: true, invoice };
 };
 
@@ -105,4 +134,5 @@ const voidByCreditNote = async (invoice, creditNoteId) => {
 module.exports = {
     generate, getById, getByShipment, getByToken, markPaid, buildNumber,
     setMpPreference, markPaidByMp, voidByCreditNote,
+    requestVerification, clearVerification,
 };

@@ -5,99 +5,388 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pago · LogiTrack</title>
     <style>
-        :root { --mp:#009ee3; --mp-dark:#0079b8; --ok:#16a34a; --bg:#f0f2f5; --ink:#0f172a; --muted:#64748b; --border:#e2e8f0; }
-        * { box-sizing: border-box; }
-        body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
-            font-family:Arial,Helvetica,sans-serif; display:flex; align-items:flex-start; justify-content:center; padding:24px; }
-        .card { width:100%; max-width:460px; background:#fff; border-radius:16px; overflow:hidden;
-            box-shadow:0 8px 30px rgba(15,23,42,.12); }
-        .head { background:var(--mp); color:#fff; padding:20px 24px; }
-        .head .brand { font-size:13px; opacity:.9; }
-        .head .num { font-size:20px; font-weight:800; margin-top:2px; }
-        .body { padding:24px; }
-        .amount-box { text-align:center; background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:20px; }
-        .amount-box .lbl { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
-        .amount-box .val { font-size:34px; font-weight:800; margin-top:4px; }
-        .row { display:flex; justify-content:space-between; font-size:14px; padding:6px 0; color:var(--muted); }
-        .row strong { color:var(--ink); }
-        .btn { display:block; width:100%; text-align:center; border:none; border-radius:10px; padding:14px;
-            font-size:16px; font-weight:700; cursor:pointer; color:#fff; background:var(--mp); margin-top:18px; }
-        .btn:hover { background:var(--mp-dark); }
-        .note { margin-top:16px; font-size:12px; color:#94a3b8; text-align:center; }
-        .badge { display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:13px;
-            padding:6px 14px; border-radius:999px; background:#dcfce7; color:#166534; }
-        .paid-icon { width:64px; height:64px; margin:4px auto 12px; border-radius:50%; background:var(--ok);
-            color:#fff; display:flex; align-items:center; justify-content:center; font-size:38px; font-weight:800; }
-        .center { text-align:center; }
-        .sim { display:inline-block; margin-top:4px; font-size:11px; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:6px; padding:2px 8px; }
+        :root {
+            --mp:#009ee3; --mp-dark:#0079b8;
+            --ok:#16a34a; --ok-bg:#dcfce7; --ok-ink:#166534;
+            --warn:#f59e0b; --warn-bg:#fef3c7; --warn-ink:#92400e;
+            --void-bg:#e0e7ff; --void-ink:#3730a3;
+            --danger:#dc2626;
+            --bg:#f1f5f9; --ink:#0f172a; --muted:#64748b;
+            --border:#e2e8f0; --surface:#fff;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body {
+            min-height:100vh; background:var(--bg); color:var(--ink);
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+            display:flex; align-items:flex-start; justify-content:center;
+            padding:32px 16px;
+        }
+        .card {
+            width:100%; max-width:480px;
+            background:var(--surface); border-radius:20px; overflow:hidden;
+            box-shadow:0 4px 6px -1px rgba(15,23,42,.07),0 12px 40px -4px rgba(15,23,42,.13);
+        }
+
+        /* ── Header ── */
+        .head {
+            background:linear-gradient(135deg,#0079b8 0%,#009ee3 100%);
+            color:#fff; padding:22px 28px 20px;
+            display:flex; justify-content:space-between; align-items:flex-start;
+        }
+        .head-left .brand { font-size:12px; opacity:.85; letter-spacing:.03em; margin-bottom:4px; }
+        .head-left .num { font-size:21px; font-weight:800; }
+        .head-right { text-align:right; }
+        .sim-badge {
+            display:inline-block; font-size:10px; font-weight:700; letter-spacing:.06em;
+            border:1px solid rgba(255,255,255,.5); border-radius:4px; padding:2px 7px;
+            opacity:.85; margin-top:6px;
+        }
+
+        /* ── Body ── */
+        .body { padding:28px; }
+
+        /* amount */
+        .amount-box {
+            text-align:center; padding:20px;
+            background:linear-gradient(135deg,#f8fafc,#f1f5f9);
+            border:1px solid var(--border); border-radius:14px; margin-bottom:22px;
+        }
+        .amount-box .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+        .amount-box .val { font-size:36px; font-weight:900; color:var(--ink); margin-top:6px; line-height:1; }
+
+        /* meta rows */
+        .meta { display:flex; flex-direction:column; gap:0; margin-bottom:20px; }
+        .meta-row {
+            display:flex; justify-content:space-between; align-items:center;
+            font-size:13.5px; padding:8px 0; border-bottom:1px solid #f1f5f9; color:var(--muted);
+        }
+        .meta-row:last-child { border-bottom:none; }
+        .meta-row strong { color:var(--ink); font-weight:600; }
+
+        /* divider */
+        .divider { display:flex; align-items:center; gap:10px; margin:20px 0 16px; }
+        .divider hr { flex:1; border:none; border-top:1px solid var(--border); }
+        .divider span { font-size:11.5px; color:var(--muted); white-space:nowrap; letter-spacing:.03em; }
+
+        /* errors */
+        .alert-error {
+            font-size:12.5px; color:var(--danger);
+            background:#fff5f5; border:1px solid #fecaca; border-radius:8px;
+            padding:10px 14px; margin-bottom:14px;
+        }
+        .alert-warn {
+            font-size:12.5px; color:var(--warn-ink);
+            background:var(--warn-bg); border:1px solid #fcd34d; border-radius:8px;
+            padding:10px 14px; margin-bottom:14px;
+        }
+
+        /* MP button */
+        .btn-mp {
+            display:flex; align-items:center; justify-content:center; gap:10px;
+            width:100%; border:none; border-radius:12px; padding:15px 18px;
+            font-size:15px; font-weight:800; cursor:pointer; color:#fff;
+            background:linear-gradient(135deg,#009ee3,#0079b8);
+            box-shadow:0 4px 14px rgba(0,158,227,.35);
+            transition:transform .1s, box-shadow .1s;
+        }
+        .btn-mp:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,158,227,.45); }
+        .btn-mp:active { transform:translateY(0); }
+        .mp-logo { width:22px; height:22px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .mp-logo svg { width:14px; height:14px; }
+        .note { font-size:11.5px; color:#94a3b8; text-align:center; margin-top:10px; line-height:1.5; }
+
+        /* alternative payment method cards */
+        .method-card {
+            border:1.5px solid var(--border); border-radius:12px;
+            overflow:hidden; margin-top:10px;
+            transition:border-color .15s;
+        }
+        .method-card.open { border-color:#94a3b8; }
+        .method-header {
+            display:flex; align-items:center; gap:12px;
+            padding:13px 16px; cursor:pointer;
+            background:var(--surface); user-select:none;
+        }
+        .method-header:hover { background:#f8fafc; }
+        .method-icon {
+            width:38px; height:38px; border-radius:10px; flex-shrink:0;
+            display:flex; align-items:center; justify-content:center; font-size:20px;
+        }
+        .method-icon.cash { background:#f0fdf4; }
+        .method-icon.transfer { background:#eff6ff; }
+        .method-info { flex:1; }
+        .method-info strong { display:block; font-size:14px; font-weight:700; color:var(--ink); }
+        .method-info small { font-size:12px; color:var(--muted); }
+        .method-arrow { font-size:18px; color:var(--muted); transition:transform .2s; line-height:1; }
+        .method-card.open .method-arrow { transform:rotate(180deg); }
+        .method-body { display:none; padding:0 16px 16px; }
+        .method-card.open .method-body { display:block; }
+
+        /* Pago Fácil code */
+        .pf-code-wrap { margin-bottom:12px; }
+        .pf-code-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+        .pf-code {
+            font-family:'Courier New',monospace; font-size:22px; font-weight:800;
+            letter-spacing:4px; text-align:center; padding:14px;
+            background:#f8fafc; border:2px dashed #cbd5e1; border-radius:10px;
+            color:var(--ink);
+        }
+        .pf-note { font-size:12px; color:var(--muted); margin:8px 0 14px; text-align:center; line-height:1.5; }
+
+        /* Bank data */
+        .bank-grid {
+            display:grid; grid-template-columns:auto 1fr; gap:6px 16px;
+            font-size:13px; padding:12px 14px;
+            background:#f8fafc; border-radius:10px;
+            margin-bottom:14px;
+        }
+        .bank-grid .lbl { color:var(--muted); white-space:nowrap; }
+        .bank-grid .val { font-weight:700; color:var(--ink); word-break:break-all; }
+
+        /* file upload */
+        .file-drop {
+            display:block;
+            border:2px dashed #cbd5e1; border-radius:10px; padding:20px 16px;
+            text-align:center; cursor:pointer; background:#f8fafc;
+            transition:border-color .15s, background .15s;
+            margin-bottom:12px;
+        }
+        .file-drop:hover { border-color:#94a3b8; background:#f1f5f9; }
+        .file-drop.has-file { border-color:var(--ok); background:#f0fdf4; }
+        .file-drop .drop-icon { font-size:28px; margin-bottom:6px; }
+        .file-drop p { font-size:13px; color:var(--muted); margin:0; }
+        .file-drop p strong { color:var(--ink); }
+        .file-drop input[type=file] { display:none; }
+        .file-drop .chosen { font-size:12px; color:var(--ok); font-weight:600; margin-top:4px; }
+
+        /* action buttons */
+        .btn-action {
+            display:block; width:100%; border:none; border-radius:10px; padding:13px;
+            font-size:14px; font-weight:800; cursor:pointer; color:#fff;
+            transition:opacity .15s;
+        }
+        .btn-action:hover { opacity:.88; }
+        .btn-cash { background:linear-gradient(135deg,#16a34a,#15803d); box-shadow:0 4px 12px rgba(22,163,74,.3); }
+        .btn-transfer { background:linear-gradient(135deg,#2563eb,#1d4ed8); box-shadow:0 4px 12px rgba(37,99,235,.3); }
+
+        /* status screens */
+        .status-screen { text-align:center; padding:8px 0 4px; }
+        .status-icon {
+            width:68px; height:68px; border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            font-size:34px; margin:0 auto 16px;
+        }
+        .status-icon.paid   { background:var(--ok-bg); }
+        .status-icon.verif  { background:var(--warn-bg); }
+        .status-icon.voided { background:var(--void-bg); }
+        .status-badge {
+            display:inline-flex; align-items:center; gap:6px;
+            font-weight:800; font-size:12.5px; letter-spacing:.04em;
+            padding:6px 16px; border-radius:999px;
+        }
+        .status-badge.paid   { background:var(--ok-bg);   color:var(--ok-ink); }
+        .status-badge.verif  { background:var(--warn-bg);  color:var(--warn-ink); }
+        .status-badge.voided { background:var(--void-bg);  color:var(--void-ink); }
+        .status-amount { font-size:28px; font-weight:900; margin:14px 0 4px; }
+        .status-msg { font-size:13.5px; color:var(--muted); line-height:1.6; max-width:300px; margin:0 auto 16px; }
+        .status-detail { font-size:13px; color:var(--muted); padding-top:14px; border-top:1px solid var(--border); }
+        .status-detail .sr { display:flex; justify-content:space-between; padding:5px 0; }
+        .status-detail .sr strong { color:var(--ink); }
     </style>
 </head>
 <body>
     <div class="card">
     <% if (!invoice) { %>
-        <div class="head"><div class="num">Link no válido</div></div>
-        <div class="body center">
+        <div class="head"><div class="head-left"><div class="num">Link no válido</div></div></div>
+        <div class="body" style="text-align:center;color:var(--muted);padding-top:32px;padding-bottom:32px">
+            <p style="font-size:40px;margin-bottom:12px">🔗</p>
             <p>Este enlace de pago no existe o expiró.</p>
         </div>
     <% } else { %>
         <div class="head">
-            <div class="brand"><%= empresa %> · Mercado Pago
-                <% if (!mpConfigured) { %><span class="sim">SIMULADO</span><% } %>
+            <div class="head-left">
+                <div class="brand"><%= empresa %></div>
+                <div class="num">Factura <%= invoice.number %></div>
             </div>
-            <div class="num">Factura <%= invoice.number %></div>
+            <div class="head-right">
+                <% if (!mpConfigured) { %><span class="sim-badge">SIMULADO</span><% } %>
+            </div>
         </div>
         <div class="body">
             <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+
+            <%# ── PAGADA ── %>
             <% if (invoice.payStatus === 'PAGADA') { %>
-                <div class="center">
-                    <div class="paid-icon">✓</div>
-                    <div class="badge">FACTURA PAGADA</div>
-                    <p style="margin:16px 0 4px;font-size:22px;font-weight:800"><%= fmt(total) %></p>
+                <div class="status-screen">
+                    <div class="status-icon paid">✓</div>
+                    <span class="status-badge paid">FACTURA PAGADA</span>
+                    <div class="status-amount"><%= fmt(total) %></div>
                     <% if (typeof justPaid !== 'undefined' && justPaid) { %>
-                        <p style="color:var(--muted);margin:0 0 16px">¡Gracias! Registramos tu pago.</p>
+                        <p class="status-msg">¡Gracias! Tu pago fue registrado correctamente.</p>
                     <% } %>
+                    <div class="status-detail">
+                        <div class="sr"><span>N° de operación</span><strong><%= invoice.payRef || '—' %></strong></div>
+                        <div class="sr"><span>Medio de pago</span><strong><%= invoice.payMethod || 'mercadopago' %></strong></div>
+                        <div class="sr"><span>Fecha</span><strong><%= invoice.paidAt ? new Date(invoice.paidAt).toLocaleString('es-AR') : '—' %></strong></div>
+                        <% if (shipment) { %><div class="sr"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+                    </div>
                 </div>
-                <div class="row"><span>N° de operación</span><strong><%= invoice.payRef || '—' %></strong></div>
-                <div class="row"><span>Medio</span><strong><%= invoice.payMethod || 'mercadopago' %></strong></div>
-                <div class="row"><span>Fecha</span><strong><%= invoice.paidAt ? new Date(invoice.paidAt).toLocaleString('es-AR') : '—' %></strong></div>
-                <% if (shipment) { %><div class="row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+
+            <%# ── ANULADA ── %>
             <% } else if (invoice.payStatus === 'ANULADA') { %>
-                <div class="center">
-                    <div class="badge" style="background:#e0e7ff;color:#3730a3">FACTURA ANULADA</div>
-                    <p style="color:var(--muted);margin:16px 0 0">Esta factura fue anulada por una nota de crédito. No tenés nada que pagar.</p>
+                <div class="status-screen">
+                    <div class="status-icon voided">⊘</div>
+                    <span class="status-badge voided">FACTURA ANULADA</span>
+                    <p class="status-msg" style="margin-top:14px">
+                        Esta factura fue anulada por una nota de crédito. No tenés nada que pagar.
+                    </p>
                 </div>
+
+            <%# ── EN VERIFICACIÓN ── %>
+            <% } else if (invoice.pendingVerificationMethod) { %>
+                <div class="status-screen">
+                    <div class="status-icon verif">⏳</div>
+                    <span class="status-badge verif">EN VERIFICACIÓN</span>
+                    <div class="status-amount"><%= fmt(total) %></div>
+                    <p class="status-msg">
+                        <% if (invoice.pendingVerificationMethod === 'efectivo') { %>
+                            Registramos que pagaste en efectivo (Pago Fácil). Quien gestiona tu envío va a confirmarlo a la brevedad.
+                        <% } else { %>
+                            Recibimos tu comprobante de transferencia. Quien gestiona tu envío lo va a verificar a la brevedad.
+                        <% } %>
+                    </p>
+                </div>
+
+            <%# ── PENDIENTE ── %>
             <% } else { %>
                 <div class="amount-box">
                     <div class="lbl">Total a pagar</div>
                     <div class="val"><%= fmt(total) %></div>
                 </div>
-                <div class="row"><span>Cliente</span><strong><%= invoice.senderName || (shipment && shipment.sender ? shipment.sender.fullName : '—') %></strong></div>
-                <% if (shipment) { %><div class="row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+                <div class="meta">
+                    <div class="meta-row"><span>Cliente</span><strong><%= invoice.senderName || (shipment && shipment.sender ? shipment.sender.fullName : '—') %></strong></div>
+                    <% if (shipment) { %><div class="meta-row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+                </div>
 
                 <% if (typeof mpError !== 'undefined' && mpError) { %>
-                    <p class="note" style="color:#b91c1c;border:1px dashed #fecaca;border-radius:8px;padding:8px"><%= mpError %></p>
+                    <div class="alert-error"><%= mpError %></div>
+                <% } %>
+                <% if (typeof comprobanteError !== 'undefined' && comprobanteError) { %>
+                    <div class="alert-error"><%= comprobanteError %></div>
                 <% } %>
 
                 <% if (typeof mpDisabledByAdmin !== 'undefined' && mpDisabledByAdmin) { %>
-                    <p class="note" style="color:#92400e;border:1px dashed #fcd34d;border-radius:8px;padding:8px">
-                        El pago online no está disponible en este momento. Coordiná el pago con quien gestiona tu envío.
-                    </p>
+                    <div class="alert-warn">El pago online no está disponible en este momento. Coordiná el pago con quien gestiona tu envío.</div>
                 <% } else { %>
-                    <form method="POST" action="/pago/<%= invoice.payToken %><%= mpConfigured ? '/mp' : '' %>" id="checkout-form">
-                        <button type="submit" class="btn">Pagar con Mercado Pago — <%= fmt(total) %></button>
+                    <form method="POST" action="/pago/<%= invoice.payToken %><%= mpConfigured ? '/mp' : '' %>">
+                        <button type="submit" class="btn-mp">
+                            <span class="mp-logo">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="12" fill="#009ee3"/>
+                                    <path d="M7 12.5c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                                    <circle cx="12" cy="14" r="1.5" fill="#fff"/>
+                                </svg>
+                            </span>
+                            Pagar con Mercado Pago
+                        </button>
                     </form>
                     <p class="note">
-                        <% if (mpConfigured) { %>
-                            Mercado Pago te redirige a un entorno seguro para completar el pago.
-                        <% } else { %>
-                            Pago simulado para fines de demostración. No se procesa dinero real.
-                        <% } %>
-                        <br>¿Pagás en efectivo o por transferencia? Coordinalo con quien gestiona tu envío.
+                        <% if (mpConfigured) { %>Mercado Pago te redirige a un entorno seguro.<% } else { %>Pago simulado · no se procesa dinero real.<% } %>
                     </p>
+                <% } %>
+
+                <%# ── Opciones alternativas ── %>
+                <% const _showEfectivo = typeof paymentMethods !== 'undefined' && paymentMethods.efectivoEnabled;
+                   const _showTransfer = typeof paymentMethods !== 'undefined' && paymentMethods.transferenciaEnabled && (paymentMethods.cbu || paymentMethods.alias); %>
+                <% if (_showEfectivo || _showTransfer) { %>
+                    <div class="divider">
+                        <hr><span>O también podés pagar con</span><hr>
+                    </div>
+
+                    <% if (_showEfectivo) { %>
+                    <div class="method-card" id="card-cash">
+                        <div class="method-header" onclick="toggleMethod('card-cash')">
+                            <div class="method-icon cash">💵</div>
+                            <div class="method-info">
+                                <strong>Efectivo — Pago Fácil</strong>
+                                <small>Pagá en cualquier punto de pago</small>
+                            </div>
+                            <span class="method-arrow">⌄</span>
+                        </div>
+                        <div class="method-body">
+                            <div class="pf-code-wrap">
+                                <div class="pf-code-label">Código de pago</div>
+                                <div class="pf-code">PF-<%= String(invoice.id).padStart(6,'0') %></div>
+                            </div>
+                            <p class="pf-note">Mostrá este código en cualquier punto de Pago Fácil o Rapipago. Cuando hayas pagado, sacale una foto al comprobante y subila acá.</p>
+                            <form method="POST" action="/pago/<%= invoice.payToken %>/efectivo" enctype="multipart/form-data">
+                                <label class="file-drop" id="file-drop-cash" for="comprobante-input-cash">
+                                    <div class="drop-icon">📎</div>
+                                    <p><strong>Adjuntá el comprobante</strong></p>
+                                    <p>JPG, PNG o PDF · hasta 10 MB</p>
+                                    <div class="chosen" id="file-chosen-cash" style="display:none"></div>
+                                    <input type="file" id="comprobante-input-cash" name="comprobante" accept="image/jpeg,image/png,application/pdf" required onchange="onFileChange(this,'file-drop-cash','file-chosen-cash')">
+                                </label>
+                                <button type="submit" class="btn-action btn-cash">✓ Ya pagué en efectivo</button>
+                            </form>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <% if (_showTransfer) { %>
+                    <div class="method-card" id="card-transfer">
+                        <div class="method-header" onclick="toggleMethod('card-transfer')">
+                            <div class="method-icon transfer">🏦</div>
+                            <div class="method-info">
+                                <strong>Transferencia bancaria</strong>
+                                <small>CBU / alias · adjuntá el comprobante</small>
+                            </div>
+                            <span class="method-arrow">⌄</span>
+                        </div>
+                        <div class="method-body">
+                            <div class="bank-grid">
+                                <% if (paymentMethods.alias) { %><span class="lbl">Alias</span><span class="val"><%= paymentMethods.alias %></span><% } %>
+                                <% if (paymentMethods.cbu) { %><span class="lbl">CBU</span><span class="val"><%= paymentMethods.cbu %></span><% } %>
+                                <% if (paymentMethods.titular) { %><span class="lbl">Titular</span><span class="val"><%= paymentMethods.titular %></span><% } %>
+                                <% if (paymentMethods.banco) { %><span class="lbl">Banco</span><span class="val"><%= paymentMethods.banco %></span><% } %>
+                            </div>
+                            <form method="POST" action="/pago/<%= invoice.payToken %>/transferencia" enctype="multipart/form-data">
+                                <label class="file-drop" id="file-drop-transfer" for="comprobante-input-transfer">
+                                    <div class="drop-icon">📎</div>
+                                    <p><strong>Adjuntá el comprobante</strong></p>
+                                    <p>JPG, PNG o PDF · hasta 10 MB</p>
+                                    <div class="chosen" id="file-chosen-transfer" style="display:none"></div>
+                                    <input type="file" id="comprobante-input-transfer" name="comprobante" accept="image/jpeg,image/png,application/pdf" required onchange="onFileChange(this,'file-drop-transfer','file-chosen-transfer')">
+                                </label>
+                                <button type="submit" class="btn-action btn-transfer">↑ Subir comprobante</button>
+                            </form>
+                        </div>
+                    </div>
+                    <% } %>
                 <% } %>
             <% } %>
         </div>
     <% } %>
     </div>
+    <script>
+        function toggleMethod(id) {
+            const card = document.getElementById(id);
+            const isOpen = card.classList.contains('open');
+            document.querySelectorAll('.method-card').forEach(c => c.classList.remove('open'));
+            if (!isOpen) { card.classList.add('open'); }
+        }
+        function onFileChange(input, dropId, chosenId) {
+            const drop = document.getElementById(dropId);
+            const chosen = document.getElementById(chosenId);
+            if (input.files && input.files[0]) {
+                drop.classList.add('has-file');
+                chosen.textContent = '✓ ' + input.files[0].name;
+                chosen.style.display = 'block';
+            } else {
+                drop.classList.remove('has-file');
+                chosen.style.display = 'none';
+            }
+        }
+    </script>
 </body>
 </html>

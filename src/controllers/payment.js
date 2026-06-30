@@ -29,6 +29,7 @@ const isMpEnabled = async () => {
 const renderCheckout = async (res, invoice, extra = {}) => {
     const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);
     const empresa = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
+    const paymentMethods = await paymentMethodsConfig.get();
     res.render('payment/checkout', {
         invoice,
         shipment,
@@ -37,7 +38,8 @@ const renderCheckout = async (res, invoice, extra = {}) => {
         mpConfigured: await isMpEnabled(),
         // Credenciales presentes pero el admin lo apagó desde Ajustes → distinto
         // mensaje del modo simulado (que es cuando ni siquiera hay credenciales).
-        mpDisabledByAdmin: mercadoPagoService.isConfigured() && !(await paymentMethodsConfig.get()).mercadopagoEnabled,
+        mpDisabledByAdmin: mercadoPagoService.isConfigured() && !paymentMethods.mercadopagoEnabled,
+        paymentMethods,
         layout: false,
         ...extra,
     });
@@ -120,6 +122,67 @@ const postPayMp = async (req, res) => {
     }
 };
 
+// POST /pago/:token/efectivo — el remitente avisa que pagó en efectivo (Pago Fácil
+// simulado) y adjunta una foto del comprobante. No marca la factura como pagada:
+// queda "en verificación" hasta que un operador/supervisor lo confirma.
+const postReportEfectivo = async (req, res) => {
+    const invoice = await invoiceService.getByToken(req.params.token);
+    if (!invoice) {
+        return res.status(404).render('payment/checkout', { invoice: null, layout: false });
+    }
+    if (!req.file) {
+        return renderCheckout(res, invoice, { comprobanteError: 'Subí una foto del comprobante de Pago Fácil.' });
+    }
+    if (invoice.payStatus === 'PENDIENTE' && !invoice.pendingVerificationMethod) {
+        const cfg = await paymentMethodsConfig.get();
+        if (cfg.efectivoEnabled) {
+            await invoiceService.requestVerification(invoice, { method: 'efectivo', file: req.file });
+        }
+    }
+    return renderCheckout(res, invoice, { justReported: true });
+};
+
+// POST /pago/:token/transferencia — el remitente sube el comprobante de transferencia.
+// Igual que el efectivo: queda "en verificación", no se autoconfirma.
+const postUploadComprobante = async (req, res) => {
+    const invoice = await invoiceService.getByToken(req.params.token);
+    if (!invoice) {
+        return res.status(404).render('payment/checkout', { invoice: null, layout: false });
+    }
+    if (!req.file) {
+        return renderCheckout(res, invoice, { comprobanteError: 'Subí una imagen o PDF del comprobante.' });
+    }
+    if (invoice.payStatus === 'PENDIENTE' && !invoice.pendingVerificationMethod) {
+        const cfg = await paymentMethodsConfig.get();
+        if (cfg.transferenciaEnabled) {
+            await invoiceService.requestVerification(invoice, { method: 'transferencia', file: req.file });
+        }
+    }
+    return renderCheckout(res, invoice, { justReported: true });
+};
+
+// GET /shipment/:id/comprobante — el operador/supervisor/admin ve el comprobante
+// de transferencia que subió el remitente, para verificarlo antes de confirmar el cobro.
+const getComprobante = async (req, res) => {
+    const invoice = await invoiceService.getByShipment(Number(req.params.id));
+    if (!invoice || !invoice.comprobanteData) {
+        return res.status(404).send('No hay comprobante para este envío');
+    }
+    const buffer = Buffer.from(invoice.comprobanteData, 'base64');
+    const fileName = (invoice.comprobanteFileName || 'comprobante').replace(/"/g, '');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.type(invoice.comprobanteMime || 'application/octet-stream').send(buffer);
+};
+
+// POST /shipment/:id/descartar-verificacion — el operador descarta un pago
+// reportado (p. ej. comprobante inválido) sin marcarlo como cobrado, para que
+// el remitente pueda reintentar desde el link.
+const postDiscardVerification = async (req, res) => {
+    const invoice = await invoiceService.getByShipment(Number(req.params.id));
+    if (invoice) { await invoiceService.clearVerification(invoice); }
+    return res.redirect(`/shipment/update/${req.params.id}`);
+};
+
 // POST /payment/webhook — notificación de Mercado Pago. Siempre responde 200
 // (incluso ante error interno) para que MP no reintente indefinidamente.
 const postWebhook = async (req, res) => {
@@ -186,4 +249,7 @@ const postRegisterPayment = async (req, res) => {
     return res.redirect(returnUrl);
 };
 
-module.exports = { getCheckout, postPay, postPayMp, postWebhook, postRegisterPayment };
+module.exports = {
+    getCheckout, postPay, postPayMp, postWebhook, postRegisterPayment,
+    postReportEfectivo, postUploadComprobante, getComprobante, postDiscardVerification,
+};
