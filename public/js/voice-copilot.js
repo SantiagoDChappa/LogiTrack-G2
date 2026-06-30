@@ -41,6 +41,7 @@
     let pendingPrompt = null;  // función que captura la próxima respuesta (flujo multipaso: motivo de fallida)
     let audioCtx = null;
     let speakGen = 0;         // invalida callbacks de locuciones interrumpidas (CA12)
+    let lastResponse = '';    // última cosa que dijo el copiloto (para el comando "repetir")
     let turnGen = 0;          // invalida respuestas de red que llegan tarde tras cancelar/empezar otra orden
     let wakeMode = false;     // CV-12: escucha continua de la palabra clave (opt-in)
     let wakeRec = null;       // reconocimiento de fondo para el wake word
@@ -105,6 +106,30 @@
     }
     function cleanMotivo(raw) {
         return String(raw || '').trim().replace(/^(porque|por que|el motivo es|motivo|ya que|es que|por)\s+/i, '').trim();
+    }
+    // Motivo OPCIONAL de pausa para trazabilidad: si el repartidor lo dice en la misma frase
+    // ("registrar pausa por almuerzo") lo tomamos; si no, queda genérico. Cero turnos extra.
+    function extractPauseReason(raw) {
+        return String(raw || '').trim()
+            .replace(/^\s*(registrar pausa|tomar pausa|pausar la ruta|pausar ruta|poner en pausa|pausar|pausa|pausame)\b[\s,:.]*/i, '')
+            .replace(/^(por|porque|para|por que|el motivo es|motivo|a)\s+/i, '')
+            .trim();
+    }
+    const PAUSE_REASONS = [
+        { code: 'almuerzo',    syn: ['almuerzo', 'almorzar', 'comer', 'comida', 'la comida', 'a comer'] },
+        { code: 'combustible', syn: ['combustible', 'nafta', 'gasoil', 'gas oil', 'cargar nafta', 'cargar combustible', 'cargar', 'estacion de servicio', 'surtidor'] },
+        { code: 'descanso',    syn: ['descanso', 'descansar', 'un rato', 'parar un rato', 'bano', 'cafe', 'estirar las piernas', 'merienda'] },
+    ];
+    // Devuelve { reason, label } — reason va al backend; label es para confirmar por voz.
+    function classifyPauseReason(raw) {
+        const text = extractPauseReason(raw);
+        const t = normalize(text);
+        if (!t) { return { reason: 'pausa', label: '' }; }                       // no dijo motivo → genérico
+        for (const r of PAUSE_REASONS) {
+            if (r.syn.some((s) => t.includes(normalize(s)))) { return { reason: r.code, label: r.code }; }
+        }
+        const free = text.slice(0, 60);                                          // motivo libre (no encaja en el catálogo)
+        return { reason: free, label: free };
     }
     function classifyFailedConfirm(text) {
         const t = normalize(text);
@@ -234,9 +259,18 @@
 
     register({
         id: 'help', label: 'Ayuda',
-        keywords: ['que puedo decir', 'que puedo hacer', 'ayuda', 'comandos', 'opciones'],
-        run: () => ({ speak: 'Podés decir: cuál es mi próxima entrega; registrar pausa; retomar ruta; '
-            + 'reportar zona insegura; o entrega fallida. También “ayuda” para repetir esta lista.' }),
+        keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
+        run: () => ({ speak: 'Podés pedirme: próxima entrega, cuántas paradas quedan, '
+            + 'registrar o retomar pausa, reportar zona insegura, o entrega fallida.' }),
+    });
+
+    // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
+    register({
+        id: 'repeat', label: 'repetir',
+        keywords: ['repetir', 'repeti', 'repetilo', 'que dijiste', 'no escuche', 'no te escuche', 'como dijiste', 'no escuche bien'],
+        run: () => (lastResponse
+            ? { speak: lastResponse }
+            : { speak: 'Todavía no dije nada para repetir.' }),
     });
 
     // CV-02 — Consultar la próxima entrega.
@@ -261,6 +295,24 @@
                 return { speak: `Tu próxima entrega es en ${speakable(dir)}. No figura el destinatario.` };
             }
             return { speak: `Tu próxima entrega es en ${speakable(dir)}, para ${n.recipient}.` };  // CA1
+        },
+    });
+
+    // CV-16 — Abrir navegación hacia la próxima entrega (Google Maps; después guía por voz).
+    register({
+        id: 'navigate', label: 'navegar a la próxima',
+        keywords: ['llevame a la proxima', 'abrir navegacion', 'navegar a la proxima', 'navegar',
+            'como llego', 'como llego a la proxima', 'llevame ahi', 'iniciar navegacion'],
+        run: () => {
+            const n = window.LT_NEXT_STOP;
+            if (!n) { return { speak: 'No te quedan entregas pendientes.' }; }
+            const dir = [n.street, n.number].filter(Boolean).join(' ').trim();
+            const dest = (n.lat != null && n.lng != null) ? `${n.lat},${n.lng}` : dir; // coords si hay; si no, dirección
+            if (!dest) { return { speak: 'La próxima entrega no tiene dirección para navegar.', error: true }; }
+            try {
+                window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest), '_blank');
+            } catch { return { speak: 'No pude abrir la navegación.', error: true }; }
+            return { speak: `Abriendo la navegación hacia ${dir ? speakable(dir) : 'tu próxima entrega'}.` };
         },
     });
 
@@ -297,11 +349,13 @@
             if (c.paused) { return { ok: false, reason: 'Ya hay una pausa en curso.' }; } // CA3
             return { ok: true };
         },
-        run: async () => {
+        run: async (c, raw) => {
             if (typeof window.LT_voicePause !== 'function') { return { speak: 'No puedo registrar la pausa ahora.', error: true }; }
-            const r = await window.LT_voicePause('pausa');
-            if (r.ok && r.queued) { return { speak: 'Sin señal: la pausa quedó en cola y se registra al volver la conexión.' }; } // CV-17
-            if (r.ok) { return { speak: 'Listo, pausa registrada. Decime retomar ruta cuando arranques de nuevo.' }; } // CA1
+            const { reason, label } = classifyPauseReason(raw); // motivo opcional para trazabilidad
+            const por = label ? ` por ${label}` : '';
+            const r = await window.LT_voicePause(reason);
+            if (r.ok && r.queued) { return { speak: `Sin señal: la pausa${por} quedó en cola y se registra al volver la conexión.` }; } // CV-17
+            if (r.ok) { return { speak: `Listo, pausa registrada${por}. Decime retomar ruta cuando arranques de nuevo.` }; } // CA1
             if (r.already) { return { speak: 'Ya hay una pausa en curso.' }; }                                       // CA3 (carrera)
             return { speak: 'No pude registrar la pausa, probá de nuevo.', error: true };                            // CA6
         },
@@ -376,7 +430,7 @@
     // "ayuda" queda para la lista de comandos; la emergencia usa disparadores inequívocos.
     register({
         id: 'panic', label: 'emergencia',
-        keywords: ['emergencia', 'panico', 'pánico', 'socorro', 'auxilio', 'sos', 'ayuda urgente', 'necesito ayuda', 'pedir ayuda'],
+        keywords: ['emergencia', 'panico', 'pánico', 'socorro', 'auxilio', 'sos', 'ayuda', 'ayuda urgente', 'necesito ayuda', 'pedir ayuda'],
         confirm: '¿Confirmás que querés enviar una alerta de emergencia a la central?', // CA1 (confirmación breve)
         run: async () => {
             const geo = await getGeo();
@@ -555,7 +609,14 @@
     const earcon = {
         start:   () => tone(660, 0.12, 'sine'),
         process: () => tone(520, 0.07, 'sine'),
-        error:   () => tone(220, 0.20, 'triangle'),
+        ok:      () => { tone(700, 0.09, 'sine'); setTimeout(() => tone(950, 0.11, 'sine'), 95); }, // ascendente = éxito
+        error:   () => tone(220, 0.20, 'triangle'),                                                 // grave = error
+    };
+    // Vibración (solo móvil): feedback sin mirar ni depender del audio (lo más "manos al volante").
+    const buzz = {
+        start: () => { try { if (navigator.vibrate) { navigator.vibrate(40); } } catch { /* noop */ } },
+        ok:    () => { try { if (navigator.vibrate) { navigator.vibrate(60); } } catch { /* noop */ } },
+        error: () => { try { if (navigator.vibrate) { navigator.vibrate([70, 50, 70]); } } catch { /* noop */ } }, // doble = error
     };
 
     // ── Voz (TTS) ───────────────────────────────────────────────────────────────
@@ -671,7 +732,7 @@
         recognition.continuous = false;
         let handled = false;
 
-        recognition.onstart = () => { listenStartedAt = Date.now(); setState('listening'); earcon.start(); showBubble(LABELS.listening, 'state'); };
+        recognition.onstart = () => { listenStartedAt = Date.now(); setState('listening'); earcon.start(); buzz.start(); showBubble(LABELS.listening, 'state'); };
         recognition.onresult = (ev) => {
             handled = true;
             clearTimeout(noSpeechTimer);
@@ -740,7 +801,7 @@
         const matches = scoreCommands(text);
         if (matches.length === 0) {                                  // CA8 no reconocida
             track('no-match', { words: tokens(text).length });       // mide la tasa de "no entendí" sin guardar lo dictado
-            return respond('No entendí, ¿podés repetir? Podés decir “¿qué puedo decir?”.', { error: true, relisten: true });
+            return respond('No entendí. Decí “opciones” para ver qué podés pedir.', { error: true, relisten: true });
         }
         const top = matches[0];
         const second = matches[1];
@@ -794,7 +855,11 @@
         opts = opts || {};
         setState('speaking');
         showBubble(text, opts.error ? 'error' : 'info');
-        if (opts.error) { earcon.error(); }
+        lastResponse = text; // para el comando "repetir"
+        // Feedback sin escuchar la frase: tono + vibración distintos según resultado.
+        // Solo en respuestas terminales (no en preguntas/relisten, que son neutras).
+        if (opts.error) { earcon.error(); buzz.error(); }
+        else if (!opts.relisten) { earcon.ok(); buzz.ok(); }
         speak(text, () => {
             if (opts.relisten && SpeechRec) { startListening(); return; }
             setState('idle');
