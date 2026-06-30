@@ -354,8 +354,8 @@
                                 <% if ([1, 2, 4].includes(currentUser.roleId) && (_pm.efectivoEnabled || _pm.transferenciaEnabled)) { %>
                                     <form method="POST" action="/shipment/<%= shipment.id %>/registrar-cobro" style="display:inline-flex;align-items:center;gap:.35rem;margin:0">
                                         <select name="method" style="font-size:.85rem" id="registrar-cobro-method">
-                                            <% if (_pm.efectivoEnabled) { %><option value="efectivo">Efectivo</option><% } %>
-                                            <% if (_pm.transferenciaEnabled) { %><option value="transferencia">Transferencia</option><% } %>
+                                            <% if (_pm.efectivoEnabled) { %><option value="efectivo" <%= invoice.pendingVerificationMethod === 'efectivo' ? 'selected' : '' %>>Efectivo</option><% } %>
+                                            <% if (_pm.transferenciaEnabled) { %><option value="transferencia" <%= invoice.pendingVerificationMethod === 'transferencia' ? 'selected' : '' %>>Transferencia</option><% } %>
                                         </select>
                                         <button type="submit" class="btn btn--ghost" style="font-size:.85rem">
                                             <span class="material-symbols-outlined" style="font-size:1.1rem">payments</span>
@@ -372,6 +372,22 @@
                                 <% if (_pm.alias && _pm.cbu) { %> · <% } %>
                                 <% if (_pm.cbu) { %>CBU <strong><%= _pm.cbu %></strong><% } %>
                                 <% if (_pm.titular) { %> (<%= _pm.titular %>)<% } %>
+                            </div>
+                        <% } %>
+                        <% if (invoice.payStatus === 'PENDIENTE' && invoice.pendingVerificationMethod) { %>
+                            <div style="margin-top:.5rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;background:#fef3c7;color:#92400e;border-radius:8px;padding:.5rem .75rem;font-size:.8rem">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem">hourglass_top</span>
+                                <span>
+                                    El remitente reportó un pago por
+                                    <strong><%= invoice.pendingVerificationMethod === 'efectivo' ? 'efectivo (Pago Fácil)' : 'transferencia' %></strong>
+                                    el <%= fmtDate(invoice.pendingVerificationAt) %>. Revisalo y registrá el cobro, o descartalo si no corresponde.
+                                </span>
+                                <a href="/shipment/<%= shipment.id %>/comprobante" target="_blank" style="color:#92400e;font-weight:700;text-decoration:underline">Ver comprobante</a>
+                                <% if ([1, 2, 4].includes(currentUser.roleId)) { %>
+                                    <form method="POST" action="/shipment/<%= shipment.id %>/descartar-verificacion" style="margin:0">
+                                        <button type="submit" class="btn btn--ghost" style="font-size:.75rem;padding:.2rem .5rem">Descartar</button>
+                                    </form>
+                                <% } %>
                             </div>
                         <% } %>
                     <% } %>

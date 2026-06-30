@@ -35,6 +35,14 @@ const Invoice = sequelize.define('Invoice', {
     mpPaymentId:     { type: DataTypes.STRING(80), allowNull: true,  field: 'mpPaymentId' },
     // [prototype] Anulada por una nota de crédito que cubrió el total del envío.
     voidedByCreditNoteId: { type: DataTypes.INTEGER, allowNull: true, field: 'voidedByCreditNoteId' },
+    // [prototype] Pago en efectivo (Pago Fácil simulado) o transferencia reportado por
+    // el remitente desde el link público: queda "en verificación" hasta que un
+    // operador/supervisor lo confirma (ver invoiceService.requestVerification).
+    pendingVerificationMethod: { type: DataTypes.STRING(20), allowNull: true, field: 'pendingVerificationMethod' },
+    pendingVerificationAt:     { type: DataTypes.DATE,       allowNull: true, field: 'pendingVerificationAt' },
+    comprobanteData:           { type: DataTypes.TEXT,       allowNull: true, field: 'comprobanteData' },
+    comprobanteMime:           { type: DataTypes.STRING(50), allowNull: true, field: 'comprobanteMime' },
+    comprobanteFileName:       { type: DataTypes.STRING(200), allowNull: true, field: 'comprobanteFileName' },
 }, {
     tableName: 'invoice',
     schema: 'logitrack',

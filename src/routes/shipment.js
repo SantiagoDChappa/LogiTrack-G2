@@ -4,7 +4,7 @@ const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, 
 const { validateShipment, validateUpdateShipment, handleUpdateValidationErrors, validatePriority } = require('../middlewares/shipment.js');
 const { requireAuth, requireAdmin, requireSupervisor, requireSupervisorOrAdmin, requireSupervisorOrOperator } = require('../middlewares/auth.js');
 const { csvUpload } = require('../middlewares/upload.js');
-const { postRegisterPayment } = require('../controllers/payment.js');
+const { postRegisterPayment, getComprobante, postDiscardVerification } = require('../controllers/payment.js');
 
 router.get('/', home);
 router.get('/search', searchShipments);
@@ -26,6 +26,8 @@ router.post('/update/:id/prepare',     requireSupervisorOrAdmin, prepareShipment
 router.post('/update/:id/cancel',      requireSupervisorOrAdmin, cancelShipment);
 router.post('/update/:id/mark-failed', requireSupervisorOrAdmin, markPackageFailed);
 router.post('/:id/registrar-cobro',    requireSupervisorOrOperator, postRegisterPayment);
+router.get('/:id/comprobante',         requireSupervisorOrOperator, getComprobante);
+router.post('/:id/descartar-verificacion', requireSupervisorOrOperator, postDiscardVerification);
 router.get('/:id/qr', requireAuth, getQR);
 router.get('/:id/label', requireAuth, getLabel);
 
