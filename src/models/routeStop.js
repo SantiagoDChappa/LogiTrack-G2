@@ -19,6 +19,8 @@ const RouteStop = sequelize.define('route_stop', {
     arrivedAt:          { type: DataTypes.DATE, allowNull: true, field: 'arrived_at' },
     etaAt:              { type: DataTypes.DATE, allowNull: true, field: 'eta_at' },
     estimatedMinutes:   { type: DataTypes.INTEGER, allowNull: false, defaultValue: 5, field: 'estimated_minutes' },
+    // Última Milla: ya se envió el aviso "ya casi llego" para esta parada (idempotencia).
+    nextNotified:       { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'next_notified' },
 }, { tableName: 'route_stop', timestamps: false });
 
 module.exports = { RouteStop };

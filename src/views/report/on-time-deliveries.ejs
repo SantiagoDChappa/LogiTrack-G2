@@ -63,6 +63,8 @@
                 </form>
             </div>
 
+            <%- include('../partials/report-narrative', { narrative }) %>
+
             <% if (!error && summary !== null) { %>
                 <% if (summary.total === 0) { %>
                     <!-- Escenario 2: sin datos suficientes -->

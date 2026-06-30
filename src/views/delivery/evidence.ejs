@@ -650,7 +650,11 @@
             if (!window.LTOfflineApp) return false;
             try {
                 await window.LTOfflineApp.enqueuePOD({ path: form.action, body: params.toString(), routeId: routeIdVal });
-                window.location = '/delivery?delivered=true&queued=1';
+                // Volvemos al ruteo (no al inicio) para seguir con la entrega siguiente; el
+                // overlay de la cola marca esta parada como entregada al recargar la ruta.
+                window.location = routeIdVal
+                    ? `/delivery/route/${routeIdVal}?delivered=true&queued=1`
+                    : '/delivery?delivered=true&queued=1';
                 return true;
             } catch (_) { return false; }
         }

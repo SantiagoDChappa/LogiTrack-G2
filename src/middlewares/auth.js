@@ -63,8 +63,13 @@ const requireAuth = async (req, res, next) => {
             }
         }
 
-        // #2 Nudge: ofrecer activar 2FA a usuarios sin él (la X lo descarta por esta sesión).
-        res.locals.showTfaNudge = !decoded.twoFactorEnabled && req.cookies?.tfaNudge !== 'off';
+        // #2 Nudge: ofrecer activar 2FA. Solo en el home del repartidor (roleId 3),
+        // no en el resto de las vistas (p. ej. el ruteo/mapa). La X lo descarta por esta sesión.
+        const nudgeUrl = (req.originalUrl || '').split('?')[0].replace(/\/$/, '');
+        res.locals.showTfaNudge = !decoded.twoFactorEnabled
+            && decoded.roleId === RoleType.DELIVERY.id
+            && nudgeUrl === '/delivery'
+            && req.cookies?.tfaNudge !== 'off';
 
         const settingModel = require('../models/setting');
         const statusModel  = require('../models/status');

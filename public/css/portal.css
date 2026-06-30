@@ -109,7 +109,12 @@ body {
     font-family: 'Inter', system-ui, sans-serif;
     background: var(--c-bg);
     color: var(--c-text);
+    /* Sticky footer: columna flex de alto completo para que el footer caiga
+       siempre al fondo aunque el contenido sea corto. 100dvh = alto real en iOS. */
+    display: flex;
+    flex-direction: column;
     min-height: 100vh;
+    min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -291,6 +296,24 @@ ul { list-style: none; }
     line-height: 1.6;
     max-width: 500px;
 }
+
+.portal-hero-quote-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 1.25rem;
+    padding: 0.7rem 1.25rem;
+    border-radius: 9999px;
+    background: #fff;
+    color: #1e3a8a;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .25);
+}
+.portal-hero-quote-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(15, 23, 42, .32); text-decoration: none; }
+.portal-hero-quote-btn .material-symbols-outlined { font-size: 1.15rem; }
 
 /* ─── SEARCH ─── */
 .portal-search-form { width: 100%; }
@@ -692,6 +715,8 @@ ul { list-style: none; }
     background: #0f172a;
     color: #94a3b8;
     padding: 32px 24px;
+    /* Empuja el footer al fondo consumiendo el espacio libre de arriba. */
+    margin-top: auto;
 }
 
 .portal-footer-inner {
@@ -977,6 +1002,7 @@ ul { list-style: none; }
 .portal-chatbot-window {
     width: min(410px, calc(100vw - 24px));
     height: min(700px, calc(100vh - 110px));
+    height: min(700px, calc(100dvh - 110px)); /* iPhone: alto real del chatbot */
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1439,6 +1465,7 @@ ul { list-style: none; }
     padding: 2rem 1rem 4rem;
     background: var(--c-bg);
     min-height: calc(100vh - 72px);
+    min-height: calc(100dvh - 72px); /* iPhone Safari: alto real sin barra */
 }
 .portal-mis-envios-wrapper {
     max-width: 560px;

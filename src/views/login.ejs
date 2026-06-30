@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <%- include('partials/head') %>
-    <link rel="stylesheet" href="/css/login.css">
+    <link rel="stylesheet" href="/css/login.css?v=<%= assetVersion %>">
     <title><%= nombreEmpresa %> — Iniciar sesión</title>
 </head>
 <body>
@@ -100,9 +100,8 @@
         </div>
     </div>
 
-    <a href="/" class="login-back-btn">
+    <a href="/" class="login-back-btn" aria-label="Volver">
         <span class="material-symbols-outlined">arrow_back</span>
-        VOLVER
     </a>
 
     <script src="/js/theme.js" defer></script>

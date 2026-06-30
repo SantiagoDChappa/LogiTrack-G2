@@ -1,0 +1,25 @@
+<%#
+  Partial reutilizable: captura/figura del manual con marco, zoom (lightbox) y pie opcional.
+  Locals:
+    - src      (requerido) ruta del asset, ej: '/images/help/envios/01-listado.webp'
+    - alt      (requerido) texto alternativo accesible
+    - caption  (opcional)  pie de foto (admite HTML simple)
+    - width    (opcional)  ancho intrínseco en px (evita layout shift)
+    - height   (opcional)  alto intrínseco en px
+%>
+<%
+  var _figSrc = src + (src.indexOf('?') === -1 ? '?v=' + assetVersion : '');
+  var _w = (typeof width !== 'undefined' && width) ? width : null;
+  var _h = (typeof height !== 'undefined' && height) ? height : null;
+%>
+<figure class="help-figure">
+    <button type="button" class="help-figure__frame" data-help-zoom
+            aria-label="Ampliar imagen: <%= alt %>">
+        <img class="help-figure__img" src="<%= _figSrc %>" alt="<%= alt %>"
+             loading="lazy" decoding="async"
+             <% if (_w) { %>width="<%= _w %>"<% } %><% if (_h) { %> height="<%= _h %>"<% } %>>
+    </button>
+    <% if (typeof caption !== 'undefined' && caption) { %>
+    <figcaption class="help-figure__caption"><%- caption %></figcaption>
+    <% } %>
+</figure>

@@ -153,6 +153,8 @@
                 </form>
             </div>
 
+            <%- include('../partials/report-narrative', { narrative }) %>
+
             <% if (!error) { %>
                 <% if (kpis.totalSurveys === 0) { %>
                     <div class="report-card">

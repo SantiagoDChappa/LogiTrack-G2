@@ -20,6 +20,10 @@
             <span><%= support.nombre %></span>
         </a>
         <div class="portal-nav-right">
+            <a href="/portal/cotizar" class="portal-nav-link">
+                <span class="material-symbols-outlined">calculate</span>
+                Cotizar envío
+            </a>
             <a href="/portal/mis-envios" class="portal-nav-link">
                 <span class="material-symbols-outlined">inventory_2</span>
                 Portal autogestivo
@@ -82,6 +86,10 @@
                 <p class="portal-hero-label">Zona de Seguimiento</p>
                 <h1 class="portal-hero-title">Seguimiento de Envios</h1>
                 <p class="portal-hero-sub">Ingresa tu numero de seguimiento o DNI del destinatario para rastrear tu paquete en tiempo real.</p>
+                <a href="/portal/cotizar" class="portal-hero-quote-btn">
+                    <span class="material-symbols-outlined">calculate</span>
+                    ¿Cuánto sale tu envío? Cotizalo
+                </a>
             </div>
         </div>
     </section>
@@ -242,6 +250,22 @@
                             <span class="portal-card-label">Remitente</span>
                             <span class="portal-card-value"><%= s.sender ? s.sender.fullName : '—' %></span>
                         </div>
+                    </div>
+
+                    <!-- Última Milla: franja horaria de llegada (se rellena por JS si hay ETA). -->
+                    <div id="portal-eta-<%= s.id %>" class="portal-eta-box" style="display:none;margin-top:.75rem;padding:.85rem 1rem;border-radius:10px;border:1px solid #bfdbfe;background:#eff6ff;">
+                        <span style="font-size:1.25rem;line-height:1;">🛵</span>
+                        <span class="portal-eta-text" style="margin-left:.5rem;font-weight:600;color:#1e3a8a;"></span>
+                    </div>
+
+                    <!-- Última Milla: chat con el repartidor (visible sólo si está abierto). -->
+                    <div id="portal-chat-<%= s.id %>" class="portal-chat-box" data-tracking="<%= s.trackingId %>" style="display:none;margin-top:.75rem;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+                        <div style="background:#1e3a8a;color:#fff;padding:.55rem .9rem;font-weight:600;font-size:.9rem;">💬 Chat con el repartidor</div>
+                        <div class="portal-chat-msgs" style="max-height:220px;overflow-y:auto;padding:.6rem .9rem;display:flex;flex-direction:column;gap:.4rem;background:#f8fafc;"></div>
+                        <form class="portal-chat-form" style="display:flex;gap:.4rem;padding:.6rem;border-top:1px solid #e2e8f0;">
+                            <input type="text" class="portal-chat-input" maxlength="1000" placeholder="Escribí un mensaje…" autocomplete="off" style="flex:1;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.9rem;">
+                            <button type="submit" style="padding:.5rem 1rem;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">Enviar</button>
+                        </form>
                     </div>
 
                     <% if (s.mapStops && s.mapStops.length >= 1) { %>
@@ -448,8 +472,75 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function(){
-        const data = <%- JSON.stringify(shipments.map(s => ({ id: s.id, stops: s.mapStops || [], activeRouteId: s.activeRouteId || null }))) %>;
+        const data = <%- JSON.stringify(shipments.map(s => ({ id: s.id, trackingId: s.trackingId, stops: s.mapStops || [], activeRouteId: s.activeRouteId || null }))) %>;
         data.forEach(item => {
+            // Última Milla: box de franja horaria. Vive aunque no haya mapa; se oculta si no
+            // hay ETA (envío sin ruta activa). Se recalcula solo: si el repartidor se atrasa,
+            // el texto cambia a disculpa + nuevo tope.
+            const etaBox = document.getElementById('portal-eta-' + item.id);
+            if (etaBox) {
+                const etaText = etaBox.querySelector('.portal-eta-text');
+                const updateEta = () => {
+                    fetch('/delivery/eta/shipment/' + item.id)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(e => {
+                            if (!e || !e.text) { etaBox.style.display = 'none'; return; }
+                            etaText.textContent = e.text;
+                            etaBox.style.display = 'block';
+                            etaBox.style.background = e.delayed ? '#fef3c7' : '#eff6ff';
+                            etaBox.style.borderColor = e.delayed ? '#fcd34d' : '#bfdbfe';
+                            etaText.style.color = e.delayed ? '#92400e' : '#1e3a8a';
+                        }).catch(() => {});
+                };
+                updateEta();
+                setInterval(updateEta, 20000);
+            }
+
+            // Última Milla: chat cliente↔repartidor. Polling cada 5s. Se muestra sólo si el
+            // chat está abierto; al cerrarse (entrega completada) deja de mostrarse.
+            const chatBox = document.getElementById('portal-chat-' + item.id);
+            if (chatBox) {
+                const tracking = chatBox.getAttribute('data-tracking');
+                const msgsEl = chatBox.querySelector('.portal-chat-msgs');
+                const form = chatBox.querySelector('.portal-chat-form');
+                const input = chatBox.querySelector('.portal-chat-input');
+                let lastId = 0;
+                const append = (m) => {
+                    const mine = m.role === 'CLIENT';
+                    const row = document.createElement('div');
+                    row.style.cssText = 'align-self:' + (mine ? 'flex-end' : 'flex-start') + ';max-width:80%;padding:.4rem .65rem;border-radius:10px;font-size:.88rem;background:' + (mine ? '#dbeafe' : '#fff') + ';border:1px solid ' + (mine ? '#bfdbfe' : '#e2e8f0') + ';';
+                    row.textContent = m.body;
+                    msgsEl.appendChild(row);
+                    if (m.id > lastId) lastId = m.id;
+                };
+                const poll = () => {
+                    fetch('/delivery/chat/track/' + encodeURIComponent(tracking) + '/messages?since=' + lastId)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(t => {
+                            if (!t) return;
+                            if (t.open) {
+                                chatBox.style.display = 'block';
+                                (t.messages || []).forEach(append);
+                                if (t.messages && t.messages.length) msgsEl.scrollTop = msgsEl.scrollHeight;
+                            } else {
+                                chatBox.style.display = 'none';
+                            }
+                        }).catch(() => {});
+                };
+                form.addEventListener('submit', (ev) => {
+                    ev.preventDefault();
+                    const body = input.value.trim();
+                    if (!body) return;
+                    input.value = '';
+                    fetch('/delivery/chat/track/' + encodeURIComponent(tracking) + '/messages', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ body }),
+                    }).then(r => r.ok ? r.json() : null).then(m => { if (m) { append(m); msgsEl.scrollTop = msgsEl.scrollHeight; } }).catch(() => {});
+                });
+                poll();
+                setInterval(poll, 5000);
+            }
+
             if (!item.stops.length) return;
             const el = document.getElementById('portal-map-' + item.id);
             if (!el) return;

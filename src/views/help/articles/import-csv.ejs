@@ -1,41 +1,93 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Ideal para la puesta en marcha o para cargar muchos envíos de una vez.</li>
+            <li>Descargás la plantilla, completás el CSV, lo subís y revisás el preview de validación.</li>
+            <li>Confirmás y los envíos válidos se crean en lote.</li>
+        </ul>
+    </div>
+</div>
+
 <h2>Cuándo usarlo</h2>
-<p>Ideal para la <strong>puesta en marcha</strong> o cuando tenés muchos envíos para cargar de una vez. Accedé desde <a href="/shipment/import">Importar CSV</a>.</p>
+<p>La <a href="/shipment/import">importación masiva</a> es ideal para la <strong>puesta en marcha</strong> o cuando tenés muchos envíos para cargar de una vez, en lugar de darlos de alta uno por uno.</p>
+
+<%- include('../partials/figure', {
+    src: '/images/help/import-csv/01-importar.png',
+    alt: 'Pantalla de importación masiva de envíos con descarga de plantilla y zona de carga del archivo CSV',
+    caption: 'Importar CSV: descargás el template (paso 1), subís tu archivo (paso 2) y el sistema valida fila por fila antes de confirmar.'
+}) %>
 
 <h2>Pasos de importación</h2>
-<ol>
-    <li>Descargá la plantilla de ejemplo si está disponible.</li>
-    <li>Completá el CSV con los datos requeridos (remitente, destinatario, dirección, etc.).</li>
-    <li>Subí el archivo y revisá el preview de validación.</li>
-    <li>Confirmá la importación — los envíos válidos se crean en lote.</li>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Descargá el template</p>
+        <div class="help-steps__text">Usalo como base. Mantené los nombres de columnas exactos; el orden no importa.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Completá el CSV</p>
+        <div class="help-steps__text">Cargá los datos requeridos (remitente, destinatario, dirección, etc.) respetando formatos.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Subí el archivo</p>
+        <div class="help-steps__text">Arrastralo a la zona de carga (máx. 10 MB, hasta 1.000 filas) y esperá el preview de validación.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Revisá y corregí</p>
+        <div class="help-steps__text">Si hay errores, corregí el archivo y volvé a subir, o confirmá solo las filas válidas.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Confirmá</p>
+        <div class="help-steps__text">Los envíos válidos se crean en lote. Verificá en <a href="/help/envios">Envíos</a> que aparezcan con su <a href="/help/glosario">tracking</a>.</div>
+    </li>
 </ol>
 
-<h2>Identificadores en el CSV</h2>
-<p>Los envíos terminados (Entregado, Cancelado) se identifican con prefijo <a href="/help/glosario">HIST-</a> (ej. HIST-001). Los envíos activos (Pendiente, En tránsito, En sucursal) con prefijo <a href="/help/glosario">IENV-</a> (ej. IENV-001).</p>
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">tag</span>
+    <div class="help-callout__body">Los envíos terminados (Entregado, Cancelado) se identifican con prefijo <a href="/help/glosario">HIST-</a> (ej. HIST-001); los activos (Pendiente, En tránsito, En sucursal) con prefijo <a href="/help/glosario">IENV-</a> (ej. IENV-001). Ambos contadores son independientes del ENV- del alta individual.</div>
+</div>
 
-<h2>Tour contextual</h2>
-<p>En Importar CSV encontrás el ícono <strong>tour</strong> en la barra superior con un recorrido por plantilla, carga y validación.</p>
+<div class="help-callout help-callout--tip">
+    <span class="help-callout__icon material-symbols-outlined">fact_check</span>
+    <div class="help-callout__body">Revisá los errores de validación fila por fila antes de confirmar. Corregí el CSV y reimportá solo las filas fallidas si el sistema lo permite.</div>
+</div>
 
-<h2>Paso a paso</h2>
-<ol>
-    <li>Entrá a <a href="/shipment/import">Importar CSV</a> desde el menú de administración.</li>
-    <li>Descargá la plantilla y completala respetando columnas obligatorias y formatos.</li>
-    <li>Subí el archivo CSV y esperá el preview de validación fila por fila.</li>
-    <li>Corregí errores en el archivo si los hay y volvé a subir, o confirmá solo las filas válidas.</li>
-    <li>Verificá en <a href="/help/envios">Envíos</a> que los registros se crearon con su código de <a href="/help/glosario">tracking</a>.</li>
-</ol>
+<h2>¿Algo no funciona?</h2>
 
-<h2>Errores frecuentes</h2>
-<ul>
-    <li><strong>Muchas filas fallan la validación:</strong> revisá CP, dirección y campos obligatorios; un error en una columna invalida la fila completa.</li>
-    <li><strong>Confundí prefijos HIST- e IENV-:</strong> usá IENV- para envíos activos e HIST- solo para registros históricos terminados.</li>
-    <li><strong>Importé duplicados:</strong> verificá que no existan envíos con el mismo identificador antes de confirmar la importación masiva.</li>
-</ul>
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Muchas filas fallan la validación
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Revisá CP, dirección y campos obligatorios: un error en una sola columna invalida la fila completa.</p>
+    </div>
+</details>
 
-<div class="help-tip">Revisá los errores de validación fila por fila antes de confirmar. Corregí el CSV y reimportá solo las filas fallidas si el sistema lo permite.</div>
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Confundí los prefijos HIST- e IENV-
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Usá <strong>IENV-</strong> para envíos activos e <strong>HIST-</strong> solo para registros históricos ya terminados.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Importé duplicados
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Verificá que no existan envíos con el mismo identificador antes de confirmar la importación masiva.</p>
+    </div>
+</details>
 
 <h2>Artículos relacionados</h2>
-<ul>
-    <li><a href="/help/envios">Gestión de envíos</a></li>
-    <li><a href="/help/ruteo">Ruteo y optimización</a></li>
-    <li><a href="/help/glosario">Glosario</a></li>
+<ul class="help-related">
+    <li><a href="/help/envios"><span class="material-symbols-outlined">inventory_2</span>Gestión de envíos</a></li>
+    <li><a href="/help/ruteo"><span class="material-symbols-outlined">route</span>Ruteo y optimización</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
 </ul>

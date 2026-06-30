@@ -582,6 +582,42 @@
                             <small style="color:var(--color-text-secondary)">Porcentaje sobre el valor declarado de la mercadería. Se suma al total del envío y se itemiza en factura y nota de crédito. 0 = sin seguro.</small>
                         </div>
 
+        <div class="field">
+                            <label for="costo_por_km">Costo por km de distancia ($) <span class="req">*</span></label>
+                            <input type="number" id="costo_por_km" name="costo_por_km" min="0" max="9999" step="0.01" value="<%= params.costo_por_km %>" required>
+                            <small style="color:var(--color-text-secondary)">Se multiplica por la distancia en línea recta entre la sucursal de origen y el destino. 0 = sin recargo por distancia.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_express_pct">Recargo envío Express (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_express_pct" name="recargo_express_pct" min="0" max="500" step="0.01" value="<%= params.recargo_express_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra para envíos de tipo "Express". 0 = sin recargo.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_fragil_pct">Recargo paquete frágil (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_fragil_pct" name="recargo_fragil_pct" min="0" max="500" step="0.01" value="<%= params.recargo_fragil_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el envío se marca como "Paquete frágil". 0 = sin recargo.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="recargo_zona_peligrosa_pct">Recargo zona peligrosa (%) <span class="req">*</span></label>
+                            <input type="number" id="recargo_zona_peligrosa_pct" name="recargo_zona_peligrosa_pct" min="0" max="500" step="0.01" value="<%= params.recargo_zona_peligrosa_pct %>" required>
+                            <small style="color:var(--color-text-secondary)">Porcentaje extra cuando el destino cae en una zona marcada como peligrosa (y llegable). Se valida por coordenadas/CP del destino. 0 = sin recargo. Las zonas se marcan en el mapa de Zonas.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="dias_retencion_sucursal">Retención en sucursal (días hábiles) <span class="req">*</span></label>
+                            <input type="number" id="dias_retencion_sucursal" name="dias_retencion_sucursal" min="1" max="90" step="1" value="<%= params.dias_retencion_sucursal %>" required>
+                            <small style="color:var(--color-text-secondary)">Días hábiles que el paquete queda disponible para retiro en la sucursal antes de volver al circuito de devolución. Se usa para estimar la ventana de retiro en el alta de envío.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="horas_cancelacion_pago_pendiente">Cancelar si no se paga, después de (horas) <span class="req">*</span></label>
+                            <input type="number" id="horas_cancelacion_pago_pendiente" name="horas_cancelacion_pago_pendiente" min="1" max="720" step="1" value="<%= params.horas_cancelacion_pago_pendiente %>" required>
+                            <small style="color:var(--color-text-secondary)">Envíos con "Pago antes de despachar" que sigan sin cobrarse pasado este plazo se cancelan solos y se le avisa al cliente. Default: 48 horas.</small>
+                        </div>
+
                         <%/* El nombre de la empresa se configura en la tarjeta "Identidad visual" (LGT-172) */%>
 
                         <div class="field">
@@ -712,6 +748,69 @@
 
             <!-- Card: Notificaciones por evento (destinatarios + templates) -->
             <% } %>
+
+            <% if (activeSection === 'cobros') { %>
+            <!-- Card: Configuración de cobros (CBU/alias de la empresa + medios habilitados) -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">account_balance</span>
+                    Configuración de cobros
+                </h2>
+                <p class="settings-subtitle">
+                    Datos bancarios de la empresa (referencia interna para el operador/supervisor al coordinar una transferencia) y qué medios de pago están habilitados.
+                </p>
+                <form method="POST" action="/setting/cobros">
+                    <input type="hidden" name="_section" value="cobros">
+                    <div class="settings-addr">
+                        <div class="field">
+                            <label for="cbu_empresa">CBU</label>
+                            <input type="text" id="cbu_empresa" name="cbu_empresa" maxlength="30" value="<%= params.cbu_empresa %>" placeholder="0000000000000000000000">
+                        </div>
+                        <div class="field">
+                            <label for="alias_empresa">Alias</label>
+                            <input type="text" id="alias_empresa" name="alias_empresa" maxlength="40" value="<%= params.alias_empresa %>" placeholder="mi.empresa.cobros">
+                        </div>
+                        <div class="field">
+                            <label for="titular_empresa">Titular</label>
+                            <input type="text" id="titular_empresa" name="titular_empresa" maxlength="120" value="<%= params.titular_empresa %>">
+                        </div>
+                        <div class="field">
+                            <label for="banco_empresa">Banco</label>
+                            <input type="text" id="banco_empresa" name="banco_empresa" maxlength="60" value="<%= params.banco_empresa %>">
+                        </div>
+
+                        <div class="field span-full" style="border-top:1px solid var(--color-border);padding-top:var(--space-4);margin-top:var(--space-2);">
+                            <label style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">
+                                Medios de pago habilitados
+                            </label>
+                            <small style="color:var(--color-text-secondary);display:block;margin-bottom:var(--space-2)">
+                                Si se deshabilita un medio, deja de aparecer como opción para el operador/supervisor (y Mercado Pago deja de mostrarse en el link de pago del cliente).
+                            </small>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+                                <input type="checkbox" name="medio_pago_mercadopago_habilitado" value="true" <%= params.medio_pago_mercadopago_habilitado ? 'checked' : '' %>>
+                                <span>Mercado Pago</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+                                <input type="checkbox" name="medio_pago_efectivo_habilitado" value="true" <%= params.medio_pago_efectivo_habilitado ? 'checked' : '' %>>
+                                <span>Efectivo</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" name="medio_pago_transferencia_habilitado" value="true" <%= params.medio_pago_transferencia_habilitado ? 'checked' : '' %>>
+                                <span>Transferencia</span>
+                            </label>
+                        </div>
+
+                        <div class="field span-full">
+                            <button type="submit" class="btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;">
+                                <span class="material-symbols-outlined" style="font-size:1.1rem">save</span>
+                                Guardar configuración de cobros
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <% } %>
+
             <% if (activeSection === 'comunicaciones') { %>
             <span class="settings-anchor" id="sec-comunicaciones"></span>
             <section class="settings-category" id="cat-comunicaciones">
@@ -839,6 +938,36 @@
                 <p style="color:var(--color-text-secondary)">
                     La plantilla aún no está cargada. Corré las migraciones <code>036</code> y <code>037</code> para poder editarla;
                     mientras tanto se usa el texto por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Mail de pago de factura (link de pago simulado) — transaccional, siempre activo -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">payments</span>
+                    Mail de pago de factura
+                </h2>
+                <p class="settings-subtitle">
+                    Mail que recibe el remitente con el link de pago simulado al generarse la factura del envío.
+                    Es transaccional: <strong>siempre se envía</strong> (no se puede desactivar).
+                    Placeholders: <code>{{empresaNombre}}</code> <code>{{invoiceNumber}}</code> <code>{{senderName}}</code>
+                    <code>{{trackingCode}}</code> <code>{{totalAmount}}</code> <code>{{payUrl}}</code>.
+                </p>
+                <% if (templatesByEvent['INVOICE_PAYMENT_LINK']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla del mail de pago</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="INVOICE_PAYMENT_LINK"
+                        data-description="Mail de pago de factura (link de pago simulado)"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>086</code> y <code>087</code> para poder editarla;
+                    mientras tanto se usa el HTML por defecto del sistema.
                 </p>
                 <% } %>
             </div>
@@ -1469,11 +1598,11 @@
                     document.getElementById('tpl-variant-default').addEventListener('click', () => {
                         if (variantSel.value) { postForm('/setting/email-template/default/' + variantSel.value); }
                     });
-                    document.getElementById('tpl-variant-delete').addEventListener('click', () => {
+                    document.getElementById('tpl-variant-delete').addEventListener('click', async () => {
                         const list = TPL[currentEvent] || [];
                         if (!variantSel.value) { return; }
-                        if (list.length <= 1) { alert('No se puede eliminar la única variante del evento.'); return; }
-                        if (confirm('¿Eliminar esta variante?')) { postForm('/setting/email-template/delete/' + variantSel.value); }
+                        if (list.length <= 1) { await window.ltAlert({ icon: 'warning', title: 'No se puede eliminar', text: 'Es la única variante del evento.' }); return; }
+                        if (await window.ltConfirm({ title: '¿Eliminar esta variante?', confirmButtonColor: '#dc2626' })) { postForm('/setting/email-template/delete/' + variantSel.value); }
                     });
 
                     // ---- Abrir modal ----
@@ -1576,6 +1705,52 @@
                 </form>
             </div>
 
+            <!-- Card ETA: Última Milla — avisos de llegada -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">schedule</span>
+                    Última Milla — avisos de llegada
+                </h2>
+                <p class="settings-subtitle">
+                    Cómo se calcula la franja horaria que ve el cliente en el portal y cuándo se le avisa que el repartidor está por llegar.
+                </p>
+                <form method="POST" action="/setting/eta-settings">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4) var(--space-5)">
+                        <div class="field">
+                            <label for="eta_proximity_km">Aviso "ya casi llego" — distancia (km)</label>
+                            <input type="number" id="eta_proximity_km" name="eta_proximity_km" min="0.1" max="2" step="0.1" value="<%= params.eta_proximity_km %>">
+                            <span class="field-hint" style="font-size:.8rem;color:var(--color-text-secondary);margin-top:4px;display:block;">
+                                Por GPS: cuando el repartidor entra en este radio de la próxima parada, se manda el mail con el mapa en vivo. Máx 2 km.
+                            </span>
+                        </div>
+                        <div class="field">
+                            <label for="eta_proximity_minutes">Franja "ya casi llego" — anticipación (min)</label>
+                            <input type="number" id="eta_proximity_minutes" name="eta_proximity_minutes" min="1" max="60" step="1" value="<%= params.eta_proximity_minutes %>">
+                        </div>
+                        <div class="field">
+                            <label for="eta_format">Formato de la hora mostrada</label>
+                            <select id="eta_format" name="eta_format">
+                                <option value="range" <%= params.eta_format === 'range' ? 'selected' : '' %>>Franja (entre 20:35 y 20:55)</option>
+                                <option value="exact" <%= params.eta_format === 'exact' ? 'selected' : '' %>>Hora exacta (20:35)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="eta_range_margin_minutes">Margen de la franja (min)</label>
+                            <input type="number" id="eta_range_margin_minutes" name="eta_range_margin_minutes" min="1" max="120" step="1" value="<%= params.eta_range_margin_minutes %>">
+                        </div>
+                        <div class="field">
+                            <label for="eta_avg_speed_kmh">Velocidad promedio asumida (km/h)</label>
+                            <input type="number" id="eta_avg_speed_kmh" name="eta_avg_speed_kmh" min="5" max="120" step="1" value="<%= params.eta_avg_speed_kmh %>">
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar ajustes" aria-label="Guardar ajustes">
+                            <span class="material-symbols-outlined">save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card 4: Asignación de sucursales -->
             <div class="settings-card">
                 <h2 class="settings-card-title">
@@ -1664,7 +1839,7 @@
                                 <td><input type="checkbox" name="createsIncident" <%= r.createsIncident ? 'checked' : '' %>></td>
                                 <td>
                                     <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar motivo?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar este motivo?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1703,7 +1878,7 @@
                                 <td><input type="checkbox" name="active" <%= t.active ? 'checked' : '' %>></td>
                                 <td>
                                     <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Desactivar tipo?')" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
+                                    <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Desactivar este tipo?" data-confirm-color="#dc2626" data-tooltip="Desactivar" aria-label="Desactivar"><span class="material-symbols-outlined">block</span></button>
                                 </td>
                             </form>
                         </tr>
@@ -1772,7 +1947,7 @@
                             </label>
                             <div class="tw-actions">
                                 <button class="action-btn guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
-                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" onclick="return confirm('Eliminar franja?')" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
+                                <button class="action-btn eliminar" type="submit" name="_action" value="delete" data-confirm="¿Eliminar esta franja?" data-confirm-color="#dc2626" data-tooltip="Borrar" aria-label="Borrar"><span class="material-symbols-outlined">delete</span></button>
                             </div>
                         </form>
                     <% }) %>
@@ -2117,13 +2292,14 @@
 
         const _qs = new URLSearchParams(window.location.search);
         const _param = _qs.get('success');
-        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc') {
+        if (_param === '1' || _param === '2' || _param === '3' || _param === '4' || _param === 'flush' || _param === 'proc' || _param === 'cobros') {
             const isDark = (localStorage.getItem('theme') ?? 'light') === 'dark';
             const _titles = {
                 '1': 'Ajustes guardados',
                 '2': 'Sucursal asignada correctamente',
                 '3': 'Configuración de ruteo guardada',
-                '4': 'Parámetros guardados correctamente'
+                '4': 'Parámetros guardados correctamente',
+                'cobros': 'Configuración de cobros guardada'
             };
             let _title = _titles[_param];
             let _text;

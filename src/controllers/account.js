@@ -9,6 +9,12 @@ const crypto = require('crypto');
 const resetTokenModel = require('../models/passwordResetToken');
 const { sendEmail } = require('../services/notification/emailSender');
 const tfa = require('../services/twoFactorService');
+const actionLogModel = require('../models/actionLog');
+
+// Registro estándar de "cambio de contraseña" en el historial del usuario:
+// nunca guarda el valor real, solo que ocurrió, quién lo hizo y cuándo.
+const recordPasswordChange = (userId, req) =>
+    actionLogModel.record(userId, 'UPDATE', 'USER', userId, { changes: [{ field: 'Contraseña', before: '(oculta)', after: '(cambiada)' }] }, req);
 
 // Valida un segundo factor (TOTP o código de respaldo, que se consume). Devuelve true/false.
 const verifySecondFactor = async (user, code) => {
@@ -57,6 +63,7 @@ const postForcedPasswordChange = async (req, res) => {
     }
 
     await userModel.setPassword(userId, newPassword);
+    recordPasswordChange(userId, req);
     const fresh = await userModel.getById(userId);
 
     // #2 Si el rol exige 2FA y todavía no lo tiene, encadenar al enrolamiento (estilo login,
@@ -138,6 +145,7 @@ const postReset = async (req, res) => {
     if (perr) { return back(perr); }
 
     await userModel.setPassword(row.userId, newPassword);
+    recordPasswordChange(row.userId, req);
     await resetTokenModel.markUsed(row.id);
     await resetTokenModel.invalidateForUser(row.userId);
     res.render('account/reset', { token: null, done: true, error: null, needs2fa: false });
@@ -197,6 +205,7 @@ const postChangePassword = async (req, res) => {
     if (await bcrypt.compare(String(newPassword), user.password)) { return back('La nueva contraseña debe ser distinta de la actual.'); }
 
     await userModel.setPassword(userId, newPassword);
+    recordPasswordChange(userId, req);
     const fresh = await userModel.getById(userId);
     setAuthCookie(res, await buildToken(fresh, false), false);
     res.redirect('/account/profile?ok=password');

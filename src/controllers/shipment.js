@@ -265,8 +265,10 @@ const getDetail = async (req, res) => {
         canCreateReturn = !!elig.ok;
     }
 
+    const paymentMethods = await require('../services/paymentMethodsConfig').get();
+
     res.render('shipment/detail', {
-        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes,
+        shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes, paymentMethods,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
@@ -280,23 +282,25 @@ const getDetail = async (req, res) => {
 };
 
 const getNewShipmentForm = async (req, res) => {
-    const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
+    const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
         provinceModel.getAll(),
         typeShipmentModel.getAll(),
         branchModel.getPickupEnabled(),
         settingModel.get('seguro_pct'),
+        settingModel.get('dias_retencion_sucursal'),
     ]);
-    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches, seguroPct: parseFloat(seguroPct) || 0 });
+    res.render('shipment/new', { errors: [], body: {}, provinces, typesShipment, pickupBranches, seguroPct: parseFloat(seguroPct) || 0, retentionDays: parseInt(retentionDays) || 10 });
 };
 
 const createShipment = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
             settingModel.get('seguro_pct'),
+            settingModel.get('dias_retencion_sucursal'),
         ]);
         return res.render('shipment/new', {
             errors: errors.array().map(e => e.msg),
@@ -304,7 +308,8 @@ const createShipment = async (req, res) => {
             provinces,
             typesShipment,
             pickupBranches,
-            seguroPct: parseFloat(seguroPct) || 0
+            seguroPct: parseFloat(seguroPct) || 0,
+            retentionDays: parseInt(retentionDays) || 10
         });
     }
 
@@ -477,6 +482,7 @@ const createShipment = async (req, res) => {
             deliveryMode:    deliveryMode,
             pickupBranchId:  isPickup ? pickupBranch.id : null,
             shipmentTypeId:  body.shipmentTypeId || null,
+            fragile:         body.fragile === 'true',
             weightKg:        body.weightKg       || null,
             packageQty:      body.packageQty     || null,
             volumeM3:        body.volumeM3       || null,
@@ -488,6 +494,9 @@ const createShipment = async (req, res) => {
             expectedDeliveryDate: body.expectedDeliveryDate || computeDefaultExpectedDeliveryDate(body.shipmentTypeId),
             expectedDeliveryFrom: normalizeTime(body.expectedDeliveryFrom),
             expectedDeliveryTo: normalizeTime(body.expectedDeliveryTo),
+            // El alta manual siempre espera el cobro antes de avanzar; la carga
+            // masiva (CSV) no pasa por acá y no genera factura, así que no aplica.
+            statusId: Status.PENDING_PAYMENT.id,
         }, { transaction: t });
 
         const creatorCoords = await resolveUserBranchCoords(res.locals.currentUser?.id);
@@ -512,23 +521,44 @@ const createShipment = async (req, res) => {
         // [prototype] El desglose ya incluye el seguro de mercadería; persistimos también
         // insuranceAmount aparte para itemizarlo en factura/NC sin recalcularlo después.
         const costSvc = require('../services/shipmentCostService');
-        const breakdown = await costSvc.computeCost(freshShipment);
+        // liveDanger: evaluar la zona peligrosa AHORA (al alta) y congelar el recargo.
+        // Después el ruteo/detalle/NC usan el total ya persistido, sin recalcular.
+        const breakdown = await costSvc.computeCost(freshShipment, { liveDanger: true });
         const costTotal = breakdown ? breakdown.final : 0;
         const insuranceAmount = breakdown ? breakdown.insurance : 0;
+        const dangerSurcharge = breakdown ? (breakdown.dangerSurcharge || 0) : 0;
+        const distanceKm = breakdown ? breakdown.distanceKm : null;
+        const distanceSurcharge = breakdown ? (breakdown.distanceSurcharge || 0) : 0;
+        const expressSurcharge = breakdown ? (breakdown.expressSurcharge || 0) : 0;
+        const fragileSurcharge = breakdown ? (breakdown.fragileSurcharge || 0) : 0;
         const costUpdates = {};
         if (costTotal > 0)        { costUpdates.costTotal = costTotal;             freshShipment.costTotal = costTotal; }
         if (insuranceAmount > 0)  { costUpdates.insuranceAmount = insuranceAmount; freshShipment.insuranceAmount = insuranceAmount; }
+        if (dangerSurcharge > 0)  { costUpdates.dangerSurcharge = dangerSurcharge; freshShipment.dangerSurcharge = dangerSurcharge; }
+        if (distanceKm !== null && distanceKm !== undefined) {
+            costUpdates.distanceKm = distanceKm; freshShipment.distanceKm = distanceKm;
+            costUpdates.distanceSurcharge = distanceSurcharge; freshShipment.distanceSurcharge = distanceSurcharge;
+        }
+        if (expressSurcharge > 0) { costUpdates.expressSurcharge = expressSurcharge; freshShipment.expressSurcharge = expressSurcharge; }
+        if (fragileSurcharge > 0) { costUpdates.fragileSurcharge = fragileSurcharge; freshShipment.fragileSurcharge = fragileSurcharge; }
         if (Object.keys(costUpdates).length) {
             await shipmentModel.Shipment.update(costUpdates, { where: { id: freshShipment.id } });
         }
 
         // Factura del envío (comprobante al remitente) con el desglose de costo.
         // Best-effort: un fallo de facturación no debe tumbar el alta del envío.
+        // [prototype] Tras generarla, mandamos al remitente el link de pago simulado.
         try {
-            await require('../services/invoiceService').generate({
+            const { invoice } = await require('../services/invoiceService').generate({
                 shipmentId: freshShipment.id,
                 userId: res.locals.currentUser?.id || null,
             });
+            if (invoice && invoice.payStatus !== 'PAGADA') {
+                const empresa = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
+                require('../services/invoicePaymentEmail')
+                    .sendPaymentLink({ invoice, shipment: freshShipment, empresa })
+                    .catch((e) => console.error('[createShipment] mail de pago:', e.message));
+            }
         } catch (e) {
             console.error('[createShipment] factura:', e.message);
         }
@@ -539,11 +569,12 @@ const createShipment = async (req, res) => {
         res.redirect(`/shipment/detail/${shipment.id}?created=true`);
     } catch (err) {
         console.error('ERROR createShipment:', err.message);
-        const [provinces, typesShipment, pickupBranches, seguroPct] = await Promise.all([
+        const [provinces, typesShipment, pickupBranches, seguroPct, retentionDays] = await Promise.all([
             provinceModel.getAll(),
             typeShipmentModel.getAll(),
             branchModel.getPickupEnabled(),
             settingModel.get('seguro_pct'),
+            settingModel.get('dias_retencion_sucursal'),
         ]);
         res.render('shipment/new', {
             errors: [err.message],
@@ -551,7 +582,8 @@ const createShipment = async (req, res) => {
             provinces,
             typesShipment,
             pickupBranches,
-            seguroPct: parseFloat(seguroPct) || 0
+            seguroPct: parseFloat(seguroPct) || 0,
+            retentionDays: parseInt(retentionDays) || 10
         });
     }
 };

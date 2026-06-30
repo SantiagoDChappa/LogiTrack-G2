@@ -3,7 +3,8 @@ const router = express.Router();
 const {
     getPortal, getPublicCreateForm, createPublic, publicSuccess,
     createPublicApi, confirmIncident, getIncidentTypesApi,
-    getSelfServiceForm, saveSelfService, getSelfServiceSaved,
+    getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getLivePosition, getLiveEta, getLiveChat, postLiveChat,
+    getCotizador, cotizarPublic, sucursalesCercanas,
 } = require('../controllers/portal');
 const {
     getIdentifyForm, postRequestAccess, postConfirmAccess, getConfirmAccess,
@@ -13,6 +14,7 @@ const {
     getIncidentSurveyList, getIncidentSurveyForm, postIncidentSurvey, postLogout,
 } = require('../controllers/portalClient');
 const { getReturnForm, postReturn, listReturns, returnDetail, postEditModality, returnCreditNote } = require('../controllers/portalReturn');
+const { getCheckout, postPay, postPayMp, postWebhook } = require('../controllers/payment');
 const { requirePortalClient, optionalPortalClient } = require('../middlewares/portalClient');
 const { evidenceUpload } = require('../middlewares/upload');
 
@@ -37,6 +39,24 @@ const portalEvidenceUpload = (req, res, next) => {
 };
 
 router.get('/',                        getPortal);
+// Última Milla — mapa de seguimiento en vivo (link del mail "ya casi llego"), público.
+router.get('/track/:trackingId/live',     getLiveMap);
+// Datos del mapa en vivo (públicos, sin login): posición del repartidor + franja de ETA.
+router.get('/track/:trackingId/position', getLivePosition);
+router.get('/track/:trackingId/eta',      getLiveEta);
+// Chat cliente ↔ repartidor del mapa en vivo (público, por tracking).
+router.get('/track/:trackingId/chat',     getLiveChat);
+router.post('/track/:trackingId/chat',    postLiveChat);
+
+// Cotizador público de envíos (estimación de costo sin login). No expone datos
+// personales (solo parámetros de tarifa). Mejora futura: rate-limit básico en el
+// POST para evitar scraping abusivo (hoy no hay middleware de rate-limit global).
+router.get('/portal/cotizar',          getCotizador);
+router.post('/portal/cotizar',         cotizarPublic);
+// Sucursales más cercanas a la ubicación del cliente (dónde despachar). Solo
+// expone datos de la empresa, no afecta la cotización.
+router.post('/portal/sucursales-cercanas', sucursalesCercanas);
+
 router.get('/portal/incident/new',     getPublicCreateForm);
 router.post('/portal/incident',        optionalEvidence, createPublic);
 router.get('/portal/incident/confirm', confirmIncident);
@@ -54,6 +74,15 @@ router.get('/portal/self-saved/:trackingId',  getSelfServiceSaved);
 // CP-ENCS03 — Encuesta de satisfacción accesible desde el email sin login (token firmado)
 router.get('/portal/encuesta/:token',  getPublicSurveyForm);
 router.post('/portal/encuesta/:token', postPublicSurvey);
+
+// [prototype] Pago de la factura (link del mail al remitente, sin login). "mercadopago"
+// crea una preferencia real si MP está configurado; si no, cae al simulado de postPay.
+router.get('/pago/:token',     getCheckout);
+router.post('/pago/:token',    postPay);
+router.post('/pago/:token/mp', postPayMp);
+
+// Webhook de Mercado Pago (servidor a servidor, sin login).
+router.post('/payment/webhook', postWebhook);
 
 // Portal — Mis envíos del cliente (HU 1)
 router.get('/portal/mis-envios',              optionalPortalClient, getIdentifyForm);

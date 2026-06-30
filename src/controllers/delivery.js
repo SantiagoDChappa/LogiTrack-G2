@@ -116,6 +116,8 @@ const saveFailedAttempt = async (req, res) => {
         // accionable (reprogramar / retiro en sucursal), respetando la config del evento.
         require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_FAILED_ATTEMPT, shipment.id)
             .catch(e => console.error('[delivery] notif SHIPMENT_FAILED_ATTEMPT:', e.message));
+        // Última Milla: la entrega de esta parada terminó (fallida) → cerrar el chat.
+        require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
 
         if (clientActionId) {
             require('../models/offlineSyncLog').create({ clientActionId, userId: res.locals.currentUser?.id || null, actionType: 'FAILED' }).catch(() => {});
@@ -298,8 +300,17 @@ const saveEvidence = async (req, res) => {
             await autoCloseForShipment(shipment.id, { reason: 'Cierre automático: envío entregado' }, t);
         });
 
+        // Entrega confirmada → notificar al cliente "tu envío fue entregado". El flujo del
+        // repartidor usa ShipmentModel.updateStatus directo (no el controller de shipment),
+        // así que la notificación NO salía por esta vía: la emitimos acá explícitamente.
+        require('./shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_DELIVERED, shipment.id)
+            .catch(e => console.error('[delivery] notif SHIPMENT_DELIVERED:', e.message));
         // CP-ENCS01: al entregar, enviar email con el link a la encuesta (fire-and-forget).
         require('../services/portalSurveyService').sendSurveyEmail(shipment.id).catch(() => {});
+        // Última Milla: cierra el chat de entrega (ya no hay coordinación pendiente).
+        require('../services/deliveryChat.service').close(shipment.id).catch(() => {});
+        // Última Milla: el aviso de la próxima entrega se dispara por GPS/distancia en el
+        // heartbeat (notifyOnProximity), no al confirmar la entrega anterior.
 
         if (clientActionId) {
             require('../models/offlineSyncLog').create({ clientActionId, userId: res.locals.currentUser?.id || null, actionType: 'POD' }).catch(() => {});

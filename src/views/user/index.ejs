@@ -66,19 +66,21 @@
                         <th>Email</th>
                         <th>Rol</th>
                         <th>Estado</th>
+                        <th>Último ingreso</th>
                         <th class="col-actions">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% if (users.length === 0) { %>
                         <tr>
-                            <td colspan="6" class="empty-row">
+                            <td colspan="7" class="empty-row">
                                 <span class="material-symbols-outlined">search</span>
                                 No se encontraron resultados para esa búsqueda
                             </td>
                         </tr>
                     <% } else { %>
                         <% users.forEach(user => { %>
+                            <% const _lastLogin = (lastLoginMap || {})[user.id]; %>
                             <tr>
                                 <td><%= user.fullName %></td>
                                 <td><%= user.document %></td>
@@ -95,14 +97,21 @@
                                         <span class="status-badge retrasado">Baja</span>
                                     <% } %>
                                 </td>
+                                <td style="white-space:nowrap;color:var(--color-text-secondary)">
+                                    <%= _lastLogin ? new Date(_lastLogin).toLocaleString('es-AR') : 'Nunca ingresó' %>
+                                </td>
                                 <td class="col-actions">
-                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar">
-                                        <span class="material-symbols-outlined">edit</span>
+                                    <a href="/user/<%= user.id %>/historial" class="action-btn" data-tooltip="Ver historial" aria-label="Ver historial de <%= user.fullName %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">history</span>
+                                    </a>
+                                    <a href="/user/update/<%= user.id %>" class="action-btn modificar" data-tooltip="Modificar" aria-label="Modificar usuario <%= user.fullName %>">
+                                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                                     </a>
                                     <% if (user.active) { %>
                                     <button type="button" class="action-btn eliminar" data-tooltip="Dar de baja"
+                                        aria-label="Dar de baja al usuario <%= user.fullName %>"
                                         onclick="confirmarBaja('<%= user.id %>', '<%= user.fullName %>')">
-                                        <span class="material-symbols-outlined">person_off</span>
+                                        <span class="material-symbols-outlined" aria-hidden="true">person_off</span>
                                     </button>
                                     <% } %>
                                 </td>

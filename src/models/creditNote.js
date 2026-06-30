@@ -14,6 +14,11 @@ const CreditNote = sequelize.define('CreditNote', {
     senderDocument:  { type: DataTypes.STRING(30) },
     // [prototype] Importe de seguro itemizado (parte del total `amount`).
     insuranceAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'insuranceAmount' },
+    // [prototype] Recargo por distancia + Express/Frágil itemizados (parte del total `amount`).
+    distanceKm:        { type: DataTypes.DECIMAL(10, 2), allowNull: true, field: 'distanceKm' },
+    distanceSurcharge: { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'distanceSurcharge' },
+    expressSurcharge:  { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'expressSurcharge' },
+    fragileSurcharge:  { type: DataTypes.DECIMAL(12, 2), allowNull: true, field: 'fragileSurcharge' },
     createdByUserId: { type: DataTypes.INTEGER },
     createdAt:       { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
 }, {

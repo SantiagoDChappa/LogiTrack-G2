@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Cobranzas / morosidad</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header"><h1>Cobranzas / morosidad</h1></div>
+
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/receivables-aging" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <a href="/report/receivables-aging" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <span class="material-symbols-outlined">refresh</span>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+
+            <div class="report-card" style="display:flex;gap:2rem;flex-wrap:wrap">
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Total pendiente</div><strong style="font-size:1.3rem;color:#b45309"><%= fmt(totalPending) %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Facturas impagas</div><strong style="font-size:1.3rem"><%= count %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Antigüedad prom. (DSO)</div><strong style="font-size:1.3rem"><%= dso %> días</strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Más antigua</div><strong style="font-size:1.3rem"><%= oldestDays %> días</strong></div>
+            </div>
+
+            <% if (totalPending === 0) { %>
+                <div class="report-card"><div class="report-empty-state">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    <p>No hay facturas pendientes de cobro en ese rango. ¡Todo al día!</p>
+                </div></div>
+            <% } else { %>
+                <% const maxBucket = Math.max(...buckets.map(b => b.total)); %>
+                <div class="report-card">
+                    <div class="dp-table-header"><h2>Deuda por antigüedad</h2></div>
+                    <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead><tr>
+                            <th>Tramo</th>
+                            <th style="text-align:right">Facturas</th>
+                            <th style="text-align:right">Monto</th>
+                            <th style="text-align:right">% del total</th>
+                            <th>Peso</th>
+                        </tr></thead>
+                        <tbody>
+                            <% buckets.forEach(b => { %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= b.label %></td>
+                                <td style="text-align:right"><%= b.count %></td>
+                                <td style="text-align:right"><strong><%= fmt(b.total) %></strong></td>
+                                <td style="text-align:right"><%= totalPending > 0 ? Math.round((b.total/totalPending)*100) : 0 %>%</td>
+                                <td style="min-width:140px">
+                                    <div style="background:var(--color-border);border-radius:999px;height:.55rem;overflow:hidden;max-width:200px">
+                                        <div style="height:100%;background:<%= b.minDays >= 31 ? '#dc2626' : (b.minDays >= 8 ? '#b45309' : '#16a34a') %>;width:<%= maxBucket > 0 ? Math.round((b.total/maxBucket)*100) : 0 %>%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            <% } %>
+
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

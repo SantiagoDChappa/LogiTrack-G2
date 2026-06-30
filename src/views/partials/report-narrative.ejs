@@ -1,0 +1,27 @@
+<%# Caja "en palabras": resumen del reporte en lenguaje natural.
+     Espera una variable `narrative` = { headline, bullets[], tone }. Si no está, no pinta nada. %>
+<% if (typeof narrative !== 'undefined' && narrative && narrative.headline) {
+     const tone = narrative.tone || 'info';
+     const palette = {
+        good: { bg: 'rgba(22,163,74,.10)',  bd: '#86efac', ic: '#16a34a', icon: 'check_circle' },
+        warn: { bg: 'rgba(180,83,9,.10)',   bd: '#fcd34d', ic: '#b45309', icon: 'warning' },
+        info: { bg: 'rgba(37,99,235,.08)',   bd: '#bfdbfe', ic: '#2563eb', icon: 'lightbulb' },
+     }[tone] || { bg: 'rgba(37,99,235,.08)', bd: '#bfdbfe', ic: '#2563eb', icon: 'lightbulb' };
+%>
+<div class="report-card report-narrative" style="background:<%= palette.bg %>;border:1px solid <%= palette.bd %>;">
+    <div style="display:flex;gap:.75rem;align-items:flex-start;">
+        <span class="material-symbols-outlined" style="color:<%= palette.ic %>;font-size:1.5rem;flex-shrink:0;margin-top:1px;"><%= palette.icon %></span>
+        <div style="flex:1;min-width:0;">
+            <div style="font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:<%= palette.ic %>;margin-bottom:.25rem;">En palabras</div>
+            <p style="margin:0;font-size:1.02rem;font-weight:600;line-height:1.4;"><%= narrative.headline %></p>
+            <% if (narrative.bullets && narrative.bullets.length) { %>
+                <ul style="margin:.6rem 0 0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.3rem;">
+                    <% narrative.bullets.forEach(function (b) { %>
+                        <li style="font-size:.9rem;line-height:1.4;"><%= b %></li>
+                    <% }) %>
+                </ul>
+            <% } %>
+        </div>
+    </div>
+</div>
+<% } %>

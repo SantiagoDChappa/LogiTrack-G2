@@ -30,6 +30,17 @@
                 </form>
             </div>
 
+            <%# Última Milla — acceso al mapa de seguimiento en vivo (sólo si hay ruta activa). %>
+            <% if (shipment.activeRouteId) { %>
+            <a href="/track/<%= encodeURIComponent(shipment.trackingId) %>/live" class="portal-live-cta"
+               style="display:flex;align-items:center;gap:.7rem;margin:0 0 1rem;padding:.9rem 1.1rem;border-radius:12px;
+                      background:var(--c-primary);color:#fff;text-decoration:none;font-weight:600;box-shadow:var(--shadow);">
+                <span class="material-symbols-outlined">my_location</span>
+                <span style="flex:1;">Seguir mi envío en vivo</span>
+                <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+            </a>
+            <% } %>
+
             <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
 
             <%# LGT-182 — Devoluciones del envío %>

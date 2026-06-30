@@ -1,5 +1,17 @@
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>En <strong>Reportes</strong> tenés volumen, entregas a tiempo, rendimiento, fallas y satisfacción.</li>
+            <li>Configurás rango de fechas, sucursal o zona y analizás tendencias.</li>
+            <li>El <strong>Dashboard Analítico</strong> suma KPIs en tiempo casi real con gráficos.</li>
+        </ul>
+    </div>
+</div>
+
 <h2>Reportes disponibles</h2>
-<p>En el menú <strong>Reportes</strong> encontrás:</p>
+<p>Desde el menú <strong>Reportes</strong> accedés a distintas vistas de análisis:</p>
 <ul>
     <li><a href="/report/shipments-by-period">Volumen de envíos</a> — cantidad por período.</li>
     <li><a href="/report/on-time-deliveries">Entregas a tiempo</a> — cumplimiento de plazos.</li>
@@ -8,31 +20,82 @@
     <li><a href="/report/satisfaction">Satisfacción</a> — encuestas y <a href="/help/glosario">NPS</a> del portal.</li>
 </ul>
 
+<%- include('../partials/figure', {
+    src: '/images/help/reportes/01-volumen.png',
+    alt: 'Reporte de volumen de envíos por período con distribución por estado, gráfico de barras y de torta',
+    caption: 'Volumen de envíos por período: total del rango, distribución por estado y gráficos. Exportable y filtrable por fechas.'
+}) %>
+
+<p>Cada reporte combina una tabla con porcentajes y gráficos (barras, torta) para leer los datos de un vistazo. Los botones de la barra superior permiten <strong>exportar</strong> y descargar la vista.</p>
+
 <h2>Dashboards analíticos</h2>
-<p>En <strong>Dashboard Analítico</strong> hay paneles operativos con KPIs en tiempo casi real y gráficos de tendencia.</p>
+<p>En <strong>Dashboard Analítico</strong> hay paneles operativos con KPIs en tiempo casi real y gráficos de tendencia, ideales para el seguimiento del día.</p>
 
 <h2>Paso a paso</h2>
-<ol>
-    <li>Desde el menú lateral, elegí <strong>Reportes</strong> o <strong>Dashboard Analítico</strong> según necesites detalle tabular o vista gráfica.</li>
-    <li>Seleccioná el reporte deseado (volumen, entregas a tiempo, rendimiento, fallas o satisfacción).</li>
-    <li>Configurá el rango de fechas, sucursal o zona según los filtros disponibles.</li>
-    <li>Analizá los resultados: identificá tendencias, cuellos de botella o zonas con bajo cumplimiento.</li>
-    <li>Para profundizar en un dato puntual, cruzá con <a href="/help/incidencias">Incidencias</a> o <a href="/help/ruteo">Ruteo</a>.</li>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Elegí la vista</p>
+        <div class="help-steps__text">Desde el menú lateral, <strong>Reportes</strong> (detalle tabular) o <strong>Dashboard Analítico</strong> (vista gráfica).</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Seleccioná el reporte</p>
+        <div class="help-steps__text">Volumen, entregas a tiempo, rendimiento, fallas o satisfacción.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Configurá los filtros</p>
+        <div class="help-steps__text">Ajustá rango de fechas, sucursal o zona según los filtros disponibles.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Analizá</p>
+        <div class="help-steps__text">Identificá tendencias, cuellos de botella o zonas con bajo cumplimiento.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Profundizá</p>
+        <div class="help-steps__text">Para un dato puntual, cruzá con <a href="/help/incidencias">Incidencias</a> o <a href="/help/ruteo">Ruteo</a>.</div>
+    </li>
 </ol>
 
-<h2>Errores frecuentes</h2>
-<ul>
-    <li><strong>Los números difieren del panel de inicio:</strong> los reportes usan rangos de fecha y filtros distintos al resumen diario de <a href="/help/panel-general">Panel general</a>.</li>
-    <li><strong>Como supervisor veo menos datos que el admin:</strong> los supervisores ven información acotada a su sucursal; los administradores ven el panorama global.</li>
-    <li><strong>El NPS aparece vacío:</strong> requiere respuestas de encuestas del portal cliente; sin encuestas completadas no hay datos de satisfacción.</li>
-</ul>
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">visibility</span>
+    <div class="help-callout__body">Los supervisores ven datos acotados a su sucursal; los administradores ven el panorama global. Por eso un mismo reporte puede mostrar números distintos según tu rol.</div>
+</div>
 
-<div class="help-tip">Los supervisores ven datos acotados a su sucursal; los administradores ven el panorama global.</div>
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Los números difieren del panel de inicio
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Los reportes usan rangos de fecha y filtros distintos al resumen diario de <a href="/help/panel-general">Panel general</a>.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        Como supervisor veo menos datos que el admin
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Es esperable: los supervisores ven información acotada a su sucursal; los administradores ven todo.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El NPS aparece vacío
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Requiere respuestas de encuestas del portal cliente. Sin encuestas completadas no hay datos de satisfacción.</p>
+    </div>
+</details>
 
 <h2>Artículos relacionados</h2>
-<ul>
-    <li><a href="/help/panel-general">Panel general (Inicio)</a></li>
-    <li><a href="/help/incidencias">Incidencias operativas</a></li>
-    <li><a href="/help/portal-cliente-staff">Portal del cliente (vista staff)</a></li>
-    <li><a href="/help/glosario">Glosario</a></li>
+<ul class="help-related">
+    <li><a href="/help/panel-general"><span class="material-symbols-outlined">dashboard</span>Panel general (Inicio)</a></li>
+    <li><a href="/help/incidencias"><span class="material-symbols-outlined">report_problem</span>Incidencias operativas</a></li>
+    <li><a href="/help/portal-cliente-staff"><span class="material-symbols-outlined">public</span>Portal del cliente (vista staff)</a></li>
+    <li><a href="/help/glosario"><span class="material-symbols-outlined">menu_book</span>Glosario</a></li>
 </ul>

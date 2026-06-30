@@ -38,6 +38,8 @@ const { NotificationInApp }   = require('./notificationInApp');
 const { FailedAttemptReason } = require('./failedAttemptReason');
 const { StandardMessage }     = require('./standardMessage');
 const { DeliveryTimeWindow }  = require('./deliveryTimeWindow');
+const { DeliveryChat }        = require('./deliveryChat');
+const { DeliveryChatMessage } = require('./deliveryChatMessage');
 
 // Asociar SOLO si el modelo fue cargado correctamente (evita errores en circularidad parcial)
 const safeAssociate = () => {
@@ -253,4 +255,6 @@ module.exports = {
     FailedAttemptReason,
     StandardMessage,
     DeliveryTimeWindow,
+    DeliveryChat,
+    DeliveryChatMessage,
 };

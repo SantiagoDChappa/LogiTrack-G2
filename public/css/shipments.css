@@ -1772,6 +1772,11 @@
 .addr-validation-box--invalid { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
 [data-theme="dark"] .addr-validation-box--valid   { background:#064e3b; color:#6ee7b7; border-color:#065f46; }
 [data-theme="dark"] .addr-validation-box--invalid { background:#450a0a; color:#fca5a5; border-color:#991b1b; }
+/* Zona peligrosa (llegable, recargo) y no llegable (bloqueada). */
+.addr-validation-box--warning { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+.addr-validation-box--danger  { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+[data-theme="dark"] .addr-validation-box--warning { background:#451a03; color:#fcd34d; border-color:#92400e; }
+[data-theme="dark"] .addr-validation-box--danger  { background:#450a0a; color:#fca5a5; border-color:#991b1b; }
 
 /* ── Predicción ML ──────────────────────────────────────────── */
 .pred-card {
@@ -1867,6 +1872,13 @@
 .pred-semaforo--baja  { background: #fee2e2; color: #991b1b; }
 
 .pred-prob--sub { margin-top: var(--space-1); }
+
+/* Nota de margen entre la fecha elegida y la estimada por el ML (BUG-35) */
+.pred-prob--hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-weight: var(--font-weight-regular, 400);
+}
 
 /* Etiquetas/factores como chips (antes salían pegadas y sin estilo) */
 .pred-tags {
@@ -2078,6 +2090,7 @@
 /* ── Layout ──────────────────────────────────────────────────── */
 .kanban-page {
   height: 100vh;
+  height: 100dvh; /* iPhone Safari: la barra del navegador no corta el tablero */
   min-height: unset;
   display: flex;
   flex-direction: column;
@@ -2563,7 +2576,7 @@
   .kanban-page { height: auto; overflow: visible; }
   .kanban-board-wrap { overflow-x: auto; overflow-y: visible; }
   .kanban-board { height: auto; align-items: flex-start; }
-  .k-col { width: 240px; max-height: 80vh; }
+  .k-col { width: 240px; max-height: 80vh; max-height: 80dvh; }
   .k-filter-hint { display: none; }
   .k-search-box input { width: 130px; }
 }

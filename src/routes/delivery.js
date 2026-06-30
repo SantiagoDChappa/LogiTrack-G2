@@ -9,7 +9,7 @@ const { Route, RouteStatus } = require('../models/route');
 const { RouteStop } = require('../models/routeStop');
 const { RoutePause } = require('../models/routePause');
 const stateMachine = require('../services/shipmentStateMachine');
-const { Status } = require('../constants/enums');
+const { Status, NotificationEvent } = require('../constants/enums');
 const { deliveryValidation, handleCreateValidationErrors } = require('../middlewares/delivery');
 const sequelize = require('../database/connection');
 
@@ -116,7 +116,14 @@ async function recordOfflineAction(req, res, statusCode, body, conflict) {
 async function offlineIdempotency(req, res, next) {
     if (req.method !== 'POST') { return next(); }
     const key = req.get('Idempotency-Key');
-    if (!key) { return next(); }
+    // 'undefined'/'null' llegan como string si el cliente setea el header con un valor JS
+    // undefined. Tratarlos como sin-clave evita que TODAS las acciones colisionen en una
+    // única fila y se deduplicen entre sí (bug "encola pero no actualiza").
+    if (!key || key === 'undefined' || key === 'null') { return next(); }
+    // [sync-debug] Toda acción re-sincronizada llega acá (lleva Idempotency-Key). Log visible
+    // en Render para diagnosticar por qué "encola pero no actualiza". Quitar cuando se resuelva.
+    const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
+    console.log(`[sync] recv user=${uid} ${req.method} ${req.originalUrl} key=${key} queuedAt=${req.get('X-Queued-At') || '-'}`);
     try {
         const rows = await sequelize.query(
             'SELECT "statusCode","responseBody" FROM logitrack.offline_action WHERE "idempotencyKey"=:k',
@@ -125,6 +132,7 @@ async function offlineIdempotency(req, res, next) {
         if (rows.length) {
             // Ya aplicada: respondemos sin volver a ejecutar el handler (dedupe del reintento).
             const code = rows[0].statusCode || 200;
+            console.log(`[sync] dedupe key=${key} prevStatus=${code} (NO se re-ejecuta el handler)`);
             return res.status(code).json({ ok: code < 400, deduped: true });
         }
         // Gana el servidor: si la ruta ya está cerrada/cancelada/interrumpida, rechazamos.
@@ -132,6 +140,7 @@ async function offlineIdempotency(req, res, next) {
         if (m) {
             const route = await Route.findByPk(Number(m[1]), { attributes: ['statusId'] }).catch(() => null);
             if (route && [RouteStatus.FINISHED, RouteStatus.CANCELLED, RouteStatus.INTERRUPTED].includes(route.statusId)) {
+                console.log(`[sync] conflict route=${m[1]} statusId=${route.statusId} key=${key} → 409 (ruta cerrada)`);
                 const body = { ok: false, conflict: true, error: 'La ruta fue cerrada o reasignada mientras estabas sin conexión; esta acción no se aplicó.' };
                 await recordOfflineAction(req, res, 409, body, true);
                 return res.status(409).json(body);
@@ -139,7 +148,10 @@ async function offlineIdempotency(req, res, next) {
         }
         // Registra la acción al terminar la respuesta (cubre json, redirect y send) para
         // deduplicar reintentos futuros con la misma clave.
-        res.on('finish', () => { recordOfflineAction(req, res, res.statusCode || 200, null, false); });
+        res.on('finish', () => {
+            console.log(`[sync] applied key=${key} ${req.method} ${req.originalUrl} → status=${res.statusCode}`);
+            recordOfflineAction(req, res, res.statusCode || 200, null, false);
+        });
         return next();
     } catch (e) {
         console.error('offlineIdempotency:', e.message);
@@ -147,6 +159,15 @@ async function offlineIdempotency(req, res, next) {
     }
 }
 router.use(offlineIdempotency);
+
+// [sync-debug] Beacon cliente→Render: el flush de la cola corre en el navegador/SW, así que
+// sus decisiones no se ven en los logs del server. La página postea acá para reflejarlas en
+// Render (igual que /fatigue/voz-log). Best-effort, sin auth estricta. Quitar al resolver.
+router.post('/sync-log', requireDelivery, (req, res) => {
+    const uid = res.locals.currentUser ? res.locals.currentUser.id : '?';
+    console.log(`[sync][cliente] user=${uid}`, JSON.stringify(req.body).slice(0, 1000));
+    res.status(204).end();
+});
 
 // Bundle del ruteo activo para operar offline. Solo la ruta IN_ROUTE del propio
 // repartidor, con los datos mínimos necesarios (se cachean CIFRADOS en el dispositivo).
@@ -176,12 +197,32 @@ router.get('/route/:id/offline-bundle', requireDelivery, async (req, res) => {
             address: s.shipment.address ? { street: s.shipment.address.street, number: s.shipment.address.number } : null,
         } : null,
     }));
+    // Control de fatiga para operar offline: se cachea junto al ruteo "cuando carga
+    // los datos". Lleva si está habilitado + los parámetros para PUNTUAR la prueba de
+    // REACCIÓN y decidir el bloqueo del lado del cliente con el MISMO criterio del
+    // server (sin red). Offline solo se usa REACCIÓN (la voz necesita STT en el server).
+    let fatigue = { enabled: false };
+    try {
+        const cfg = await require('../services/fatigue/config').getConfig(route.originBranchId);
+        fatigue = {
+            enabled: cfg.enabled,
+            method: 'REACCION',            // offline forzamos reacción
+            methodRecheck: cfg.methodRecheck,
+            consentVersion: cfg.consentVersion,
+            reactionAttempts: cfg.reactionAttempts,
+            reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+            reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+            thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
+        };
+    } catch (e) { console.warn('[offline-bundle] fatigue cfg:', e.message); }
+
     res.json({
         routeId: route.id, statusId: route.statusId,
         totalDistanceKm: route.totalDistanceKm,
         transportName: route.transport ? route.transport.name : '',
         originBranch: route.originBranch ? route.originBranch.name : '',
         cachedAt: new Date().toISOString(),
+        fatigue,
         stops,
     });
 });
@@ -213,6 +254,24 @@ router.get('/', requireDelivery, async (req, res) => {
 
         const activeRoute = inRoute || planned[0] || null;
         const upcomingRoutes = planned.filter(r => !activeRoute || r.id !== activeRoute.id);
+
+        // Ojo de Patrón: si la ruta activa está PLANIFICADA pero el control de fatiga de
+        // inicio quedó BLOQUEADO (no pasó la prueba de reacción/voz, con autoBlock según
+        // config), el card se muestra en rojo y sin accionable — no puede iniciar ni entrar.
+        // Una ruta que sólo "necesita hacer la prueba" (FATIGUE_REQUIRED/PENDING) NO se
+        // bloquea: el repartidor debe entrar para realizar el control.
+        let startBlocked = null;
+        if (activeRoute && activeRoute.statusId === RouteStatus.PLANNED && !driverDisabled) {
+            try {
+                const cfg = await require('../services/fatigue/config').getConfig(activeRoute.originBranchId);
+                if (cfg.enabled) {
+                    const gate = await require('../services/fatigue').canStart(activeRoute.id);
+                    if (!gate.ok && gate.reason === 'BLOCKED') {
+                        startBlocked = { id: activeRoute.id, score: gate.score || null };
+                    }
+                }
+            } catch (e) { console.warn('[fatigue] startBlocked check:', e.message); }
+        }
 
         // LGT-193/199: ruta bloqueada o pausada por fatiga → aviso al repartidor.
         const fatigueRoute = routes.find(r =>
@@ -269,6 +328,7 @@ router.get('/', requireDelivery, async (req, res) => {
             finishedRoutes: finished.map(summarizeRoute),
             fatigueBlocked,
             driverDisabled,
+            startBlocked,
         });
     } catch (err) {
         console.error(err);
@@ -342,6 +402,20 @@ router.get('/route/:id', requireDelivery, async (req, res) => {
         if (route.statusId === RouteStatus.BLOCKED_FATIGUE || route.statusId === RouteStatus.PAUSED_FATIGUE) {
             return res.redirect('/delivery?fatigue=1');
         }
+        // Ojo de Patrón: ruta PLANIFICADA cuyo control de inicio quedó BLOQUEADO (no pasó
+        // la prueba de reacción/voz) → no puede entrar ni por URL directa. Vuelve al home
+        // con el aviso. Las rutas que sólo necesitan hacer la prueba sí pueden entrar.
+        if (route.statusId === RouteStatus.PLANNED) {
+            try {
+                const cfg = await fatigueCfg.getConfig(route.originBranchId);
+                if (cfg.enabled) {
+                    const gate = await fatigueSvc.canStart(route.id);
+                    if (!gate.ok && gate.reason === 'BLOCKED') {
+                        return res.redirect('/delivery?fatiga=bloqueado&ruta=' + route.id);
+                    }
+                }
+            } catch (e) { console.warn('[fatigue] route gate:', e.message); }
+        }
         const readOnly = route.statusId === RouteStatus.FINISHED || route.statusId === RouteStatus.CANCELLED;
         // Para el POD offline en la misma página: saber si el envío exige código clave.
         const settingModel = require('../models/setting');
@@ -399,6 +473,9 @@ router.post('/route/:id/stop/:stopId/arrive', requireDelivery, async (req, res) 
         const { NotificationEvent: NE3 } = require('../constants/enums');
         require('../controllers/shipment').notifyShipmentEvent(NE3.SHIPMENT_ARRIVED_DESTINATION, stop.shipmentId)
             .catch(e => console.error('notif ARRIVED_DESTINATION', stop.shipmentId, e.message));
+        // Última Milla: asegura el chat abierto al llegar (por si no se abrió en el aviso).
+        require('../services/deliveryChat.service').ensureOpen(stop.shipmentId, stop.id)
+            .catch(e => console.error('[chat] ensureOpen arrive:', e.message));
     }
     res.json({ ok: true });
 });
@@ -451,6 +528,62 @@ router.post('/route/:id/stop/:stopId/pickup-confirmed', requireDelivery, async (
     } catch (e) {
         console.error('pickup-confirmed err', e.message);
         res.status(422).json({ error: `No se pudo confirmar el pickup: ${e.message}. Revisá los envíos y reintentá.` });
+    }
+});
+
+// Retiro por sucursal: el repartidor DEJA el paquete en la sucursal de retiro (no es una
+// entrega a domicilio, no requiere POD). El envío pasa a AT_BRANCH con currentBranchId =
+// sucursal de retiro, queda disponible para que el cliente lo retire, y se le avisa.
+router.post('/route/:id/stop/:stopId/drop-at-branch', requireDelivery, async (req, res) => {
+    const route = await routeModel.getById(req.params.id);
+    if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+        return res.status(403).json({ error: 'No autorizado' });
+    }
+    const pauseCheck = await ensureNotPaused(route.id);
+    if (!pauseCheck.ok) { return res.status(409).json(pauseCheck); }
+    const gateP = checkStopOrder(route, req.params.stopId);
+    if (!gateP.ok) { return res.status(409).json({ error: gateP.error, blockingStop: gateP.blockingStop }); }
+
+    const stop = (route.stops || []).find(s => String(s.id) === String(req.params.stopId));
+    if (!stop || stop.stopType !== 'delivery' || !stop.branchId || !stop.shipmentId) {
+        return res.status(422).json({ error: 'Esta parada no es una entrega en sucursal de retiro.' });
+    }
+    try {
+        const shipment = await shipmentModel.getById(stop.shipmentId);
+        if (!shipment) { throw new Error('Envío no encontrado'); }
+        // Si todavía no salió a tránsito (ASSIGNED/IN_PREPARATION), primero IN_TRANSIT
+        // (ASSIGNED→AT_BRANCH no es una transición válida; pasa siempre por IN_TRANSIT).
+        if (shipment.statusId === Status.ASSIGNED.id || shipment.statusId === Status.IN_PREPARATION.id) {
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.IN_TRANSIT.id,
+                actor:      res.locals.currentUser,
+                branchId:   route.originBranchId,
+            });
+        }
+        // Dejar en la sucursal de retiro: IN_TRANSIT → AT_BRANCH (la transición setea
+        // currentBranchId = sucursal). Si ya está AT_BRANCH (reintento), solo cerramos.
+        const fresh = await shipmentModel.getById(stop.shipmentId);
+        if (fresh && fresh.statusId !== Status.AT_BRANCH.id) {
+            await stateMachine.transition({
+                shipmentId: stop.shipmentId,
+                toStatusId: Status.AT_BRANCH.id,
+                actor:      res.locals.currentUser,
+                branchId:   stop.branchId,
+            });
+        }
+        await RouteStop.update(
+            { completed: true, completedAt: new Date() },
+            { where: { id: req.params.stopId, routeId: req.params.id } }
+        );
+        // Aviso al cliente: disponible para retiro en sucursal (evento SHIPMENT_IN_BRANCH).
+        require('../controllers/shipment').notifyShipmentEvent(NotificationEvent.SHIPMENT_IN_BRANCH, stop.shipmentId)
+            .catch(e => console.error('[delivery] notif SHIPMENT_IN_BRANCH:', e.message));
+        const branchName = stop.branch ? stop.branch.name : 'la sucursal de retiro';
+        res.json({ ok: true, trackingId: shipment.trackingId, branchName });
+    } catch (e) {
+        console.error('drop-at-branch err', e.message);
+        res.status(422).json({ error: `No se pudo dejar en sucursal: ${e.message}` });
     }
 });
 
@@ -545,6 +678,8 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
                 { completed: true, completedAt: new Date() },
                 { where: { id: stop.id, routeId: route.id } }
             );
+            // Última Milla: el aviso "próxima entrega" se dispara por GPS/distancia en el
+            // heartbeat (POST /heartbeat → notifyOnProximity), no al resolver la parada.
             return res.json({ ok: true, packageFailed: true });
         }
 
@@ -628,6 +763,7 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             const shipmentCtrl = require('../controllers/shipment');
             shipmentCtrl.notifyShipmentEvent(NE.SHIPMENT_RESCHEDULED, stop.shipmentId)
                 .catch(e => console.error('notif RESCHEDULED retry', stop.shipmentId, e.message));
+            // Última Milla: el aviso "próxima entrega" se dispara por GPS/distancia (heartbeat).
             return res.json({ ok: true, retrySameDay: true });
         }
 
@@ -646,6 +782,7 @@ router.post('/route/:id/stop/:stopId/failed', requireDelivery, async (req, res) 
             { where: { id: stop.id, routeId: route.id } }
         );
         // maxAttemptsReached: el copiloto de voz lo usa para avisar que el envío ya no admite reintentos (CV-05 CA6).
+        // Última Milla: el aviso "próxima entrega" se dispara por GPS/distancia (heartbeat).
         res.json({ ok: true, maxAttemptsReached });
     } catch (e) {
         res.status(422).json({ error: e.message });
@@ -665,6 +802,7 @@ router.post('/route/:id/stop/:stopId/skip', requireDelivery, async (req, res) =>
         { skipped: true, skipReason: reason, skippedAt: new Date() },
         { where: { id: req.params.stopId, routeId: req.params.id } }
     );
+    // Última Milla: el aviso "próxima entrega" se dispara por GPS/distancia (heartbeat).
     res.json({ ok: true });
 });
 
@@ -761,6 +899,14 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
     } catch (e) {
         console.error('start route history/notify err:', e.message);
     }
+    // Última Milla: guarda la "promesa" de ETA por parada (tope contra el que se mide el
+    // atraso) ya con la ruta iniciada. No bloquea la respuesta.
+    try {
+        const etaWindow = require('../services/etaWindow.service');
+        const freshRoute = await routeModel.getById(req.params.id);
+        etaWindow.persistPromisedEtas(freshRoute)
+            .catch(e => console.error('[eta] persistPromisedEtas:', e.message));
+    } catch (e) { console.error('[eta] start:', e.message); }
     res.json({ ok: true });
 });
 
@@ -822,6 +968,8 @@ router.post('/route/:id/finish', requireDelivery, async (req, res) => {
         { finishedAt: new Date(), statusId: RouteStatus.FINISHED },
         { where: { id: req.params.id } }
     );
+    // Última Milla: la ruta terminó → cerrar cualquier chat que haya quedado abierto.
+    require('../services/deliveryChat.service').closeForRoute(req.params.id).catch(() => {});
     res.json({ ok: true, autoFailedSkipped: autoFailed });
 });
 
@@ -907,8 +1055,13 @@ router.get('/route/:id/fatigue/config', requireDelivery, async (req, res) => {
     const cfg = await fatigueCfg.getConfig(route.originBranchId);
     res.json({
         enabled: cfg.enabled, method: cfg.method, methodStart: cfg.methodStart,
+        methodRecheck: cfg.methodRecheck,
         testDurationSec: cfg.testDurationSec, consentVersion: cfg.consentVersion,
         reactionFastMs: cfg.reactionFastMs, reactionSlowMs: cfg.reactionSlowMs,
+        // Parámetros que permiten PUNTUAR y decidir el bloqueo del lado del cliente
+        // (mismo criterio que el server) cuando no hay conexión. Modo offline = REACCION.
+        reactionEvalMode: cfg.reactionEvalMode, reactionRequired: cfg.reactionRequired,
+        thresholdPct: cfg.thresholdPct, autoBlock: cfg.autoBlock,
         voiceSttEnabled: require('../services/fatigue/stt').isEnabled(),
         voiceAcousticEnabled: cfg.voiceAcousticEnabled,
         voiceMaxAttempts: cfg.voiceMaxAttempts, reactionAttempts: cfg.reactionAttempts,
@@ -1149,6 +1302,8 @@ router.post('/route/:id/cancel', requireDelivery, async (req, res) => {
             returnedToBranch: true,
         }, { where: { id: route.id }, transaction: t });
     });
+    // Última Milla: ruta cancelada → cerrar chats abiertos de sus envíos.
+    require('../services/deliveryChat.service').closeForRoute(route.id).catch(() => {});
     res.json({ ok: true, returnedShipments: returned });
 });
 
@@ -1190,6 +1345,8 @@ router.post('/route/:id/interrupt', requireDelivery, async (req, res) => {
             }).catch(e => console.error('interrupt shipment transition', s.shipmentId, e.message));
         }
     });
+    // Última Milla: ruta interrumpida → cerrar chats abiertos de sus envíos.
+    require('../services/deliveryChat.service').closeForRoute(req.params.id).catch(() => {});
     res.json({ ok: true, pendingReturned: pending.length });
 });
 
@@ -1324,6 +1481,15 @@ router.post('/heartbeat', requireDelivery, async (req, res) => {
         `INSERT INTO logitrack.driver_position (user_id, route_id, latitude, longitude, speed_kmh) VALUES (:uid, :rid, :lat, :lng, :sp)`,
         { replacements: { uid: res.locals.currentUser.id, rid: routeId || null, lat: Number(latitude), lng: Number(longitude), sp: speedKmh || null } }
     );
+    // Última Milla: además de alimentar el mapa en vivo, cada heartbeat evalúa la distancia a
+    // la próxima parada. Si el repartidor está a ≤ proximityKm (config, default 1 km, tope 2),
+    // dispara el aviso "ya casi llego" al destinatario (idempotente por parada). Fire-and-forget:
+    // no bloquea la respuesta del heartbeat.
+    if (routeId) {
+        require('../services/etaWindow.service')
+            .notifyOnProximity(Number(routeId), Number(latitude), Number(longitude))
+            .catch(e => console.error('[eta] notifyOnProximity:', e.message));
+    }
     res.json({ ok: true });
 });
 
@@ -1331,15 +1497,91 @@ router.post('/heartbeat', requireDelivery, async (req, res) => {
 router.get('/position/route/:routeId', async (req, res) => {
     const sequelize = require('../database/connection');
     const { QueryTypes } = require('sequelize');
+    // driver_position.route_id lo puebla el heartbeat (route.ejs manda routeId). El JOIN
+    // previo a transport usaba r."transportId" (camelCase) — columna inexistente en el
+    // esquema snake_case → siempre tiraba y el camión nunca aparecía en el portal.
     const rows = await sequelize.query(
-        `SELECT dp.latitude::float lat, dp.longitude::float lng, dp.speed_kmh::float speed, dp.recorded_at AS at
-           FROM logitrack.driver_position dp
-           JOIN logitrack.route r ON r."transportId" IN (SELECT id FROM logitrack.transport WHERE driver_user_id=dp.user_id)
-          WHERE r.id=:rid
-          ORDER BY dp.recorded_at DESC LIMIT 1`,
+        `SELECT latitude::float lat, longitude::float lng, speed_kmh::float speed, recorded_at AS at
+           FROM logitrack.driver_position
+          WHERE route_id = :rid
+          ORDER BY recorded_at DESC LIMIT 1`,
         { replacements: { rid: Number(req.params.routeId) }, type: QueryTypes.SELECT }
     );
     res.json(rows[0] || null);
+});
+
+// Última Milla: franja horaria de llegada de un envío (público, para el box del portal).
+// Devuelve null si el envío no está en una ruta activa con ETA calculable.
+router.get('/eta/shipment/:shipmentId', async (req, res) => {
+    try {
+        const eta = await require('../services/etaWindow.service').etaForShipment(req.params.shipmentId);
+        res.json(eta || null);
+    } catch (e) {
+        console.error('[eta] endpoint:', e.message);
+        res.json(null);
+    }
+});
+
+// ===================== Chat de entrega (Última Milla) =======================
+// Polling HTTP. Lado repartidor (autenticado) y lado cliente (público por tracking).
+const deliveryChat = require('../services/deliveryChat.service');
+
+// Repartidor: leer hilo del envío.
+router.get('/chat/shipment/:shipmentId/messages', requireDelivery, async (req, res) => {
+    try {
+        const thread = await deliveryChat.getThread(Number(req.params.shipmentId), Number(req.query.since) || 0);
+        res.json(thread);
+    } catch (e) { console.error('[chat] driver get:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Repartidor: enviar mensaje.
+router.post('/chat/shipment/:shipmentId/messages', requireDelivery, async (req, res) => {
+    try {
+        const msg = await deliveryChat.addMessage(Number(req.params.shipmentId), deliveryChat.SenderRole.DRIVER, req.body.body);
+        if (!msg) { return res.status(409).json({ error: 'Chat cerrado o mensaje vacío' }); }
+        res.json(msg);
+    } catch (e) { console.error('[chat] driver post:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Repartidor: marcar como leídos los mensajes del cliente (al abrir ese hilo).
+router.post('/chat/shipment/:shipmentId/read', requireDelivery, async (req, res) => {
+    try {
+        const n = await deliveryChat.markClientRead(Number(req.params.shipmentId));
+        res.json({ ok: true, marked: n });
+    } catch (e) { console.error('[chat] driver read:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Repartidor: inbox — resumen de chats abiertos de las entregas de la ruta (no leídos).
+router.get('/route/:id/chats', requireDelivery, async (req, res) => {
+    try {
+        const route = await routeModel.getById(req.params.id);
+        if (!route || route.transport?.driverUserId !== res.locals.currentUser.id) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+        const rows = await deliveryChat.routeChatSummary(req.params.id);
+        res.json(rows);
+    } catch (e) { console.error('[chat] route summary:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Cliente (público): leer hilo por código de seguimiento.
+router.get('/chat/track/:trackingId/messages', async (req, res) => {
+    try {
+        const sid = await deliveryChat.shipmentIdByTracking(req.params.trackingId);
+        if (!sid) { return res.json({ status: 'NONE', open: false, chatId: null, messages: [] }); }
+        const thread = await deliveryChat.getThread(sid, Number(req.query.since) || 0);
+        res.json(thread);
+    } catch (e) { console.error('[chat] client get:', e.message); res.status(500).json({ error: 'chat' }); }
+});
+
+// Cliente (público): enviar mensaje por código de seguimiento.
+router.post('/chat/track/:trackingId/messages', async (req, res) => {
+    try {
+        const sid = await deliveryChat.shipmentIdByTracking(req.params.trackingId);
+        if (!sid) { return res.status(404).json({ error: 'Envío no encontrado' }); }
+        const msg = await deliveryChat.addMessage(sid, deliveryChat.SenderRole.CLIENT, req.body.body);
+        if (!msg) { return res.status(409).json({ error: 'Chat cerrado o mensaje vacío' }); }
+        res.json(msg);
+    } catch (e) { console.error('[chat] client post:', e.message); res.status(500).json({ error: 'chat' }); }
 });
 
 // Reprogramar fallidos: marca como en sucursal el dia siguiente para nuevo ruteo

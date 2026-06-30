@@ -5,10 +5,30 @@ function setupAutocompletado(tipo) {
   const nameInput = document.getElementById(`${tipo}-name`);
   const emailInput = document.getElementById(`${tipo}-email`);
   const phoneInput = document.getElementById(`${tipo}-phone`);
+  const phoneDisplay = document.getElementById(`${tipo}-phone-display`);
   const editBtn = document.getElementById(`${tipo}-edit`);
 
+  // El teléfono visible es el -display (lo formatea phone-format.js y sincroniza el
+  // hidden -phone). Setear el hidden no actualiza la vista: hay que tocar el display
+  // y disparar 'input' para que phone-format reformatee y rellene el hidden.
+  function setPhone(val) {
+    if (phoneDisplay) {
+      phoneDisplay.value = val || '';
+      phoneDisplay.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      phoneInput.value = val || '';
+    }
+  }
+
+  function clearDatos() {
+    nameInput.value = '';
+    emailInput.value = '';
+    setPhone('');
+  }
+
   function blockFields(bloquear) {
-    [nameInput, emailInput, phoneInput].forEach(input => {
+    [nameInput, emailInput, phoneDisplay || phoneInput].forEach(input => {
+      if (!input) return;
       input.readOnly = bloquear;
       input.style.opacity = bloquear ? '0.6' : '';
       input.style.cursor = bloquear ? 'not-allowed' : '';
@@ -28,11 +48,12 @@ function setupAutocompletado(tipo) {
 
     timeout = setTimeout(() => {
       doc = limpiarDocumento(doc);
+      // Solo limpiamos lo que venía autocompletado de otra persona (campos bloqueados).
+      // Si el usuario tipeó los datos a mano, los respetamos aunque borre/acorte el DNI.
       if (doc.length < 6) {
+        const venianAutocompletados = nameInput.readOnly;
         blockFields(false);
-        nameInput.value = '';
-        emailInput.value = '';
-        phoneInput.value = '';
+        if (venianAutocompletados) { clearDatos(); }
         return;
       }
 
@@ -42,14 +63,15 @@ function setupAutocompletado(tipo) {
           if (data) {
             nameInput.value = data.fullName;
             emailInput.value = data.email;
-            phoneInput.value = data.phone;
+            setPhone(data.phone);
 
             blockFields(true);
           } else {
+            // No existe persona con ese DNI: NO pisamos lo que el usuario escribió;
+            // solo limpiamos si los campos venían autocompletados de otra persona.
+            const venianAutocompletados = nameInput.readOnly;
             blockFields(false);
-            nameInput.value = '';
-            emailInput.value = '';
-            phoneInput.value = '';
+            if (venianAutocompletados) { clearDatos(); }
           }
 
           // 🔁 chequeo sincronización
@@ -65,7 +87,7 @@ function setupAutocompletado(tipo) {
     setDatos: (data) => {
       nameInput.value = data.fullName;
       emailInput.value = data.email;
-      phoneInput.value = data.phone;
+      setPhone(data.phone);
     }
   };
 }

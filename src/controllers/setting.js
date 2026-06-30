@@ -22,12 +22,12 @@ const statusColors = require('../services/statusColors');
 const loginLogModel = require('../models/loginLog');
 
 // LGT-174: secciones de Ajustes (cada una es su propia página, navegada desde el menú).
-const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'incidencias', 'auditoria'];
+const SETTING_SECTIONS = ['general', 'comunicaciones', 'plantillas', 'ruteo', 'catalogos', 'incidencias', 'auditoria', 'cobros'];
 
 // Tras guardar, vuelve a la sección desde la que se envió el formulario (vía Referer).
 function settingBack(req, suffix = '') {
     const ref = req.get('Referer') || '';
-    const m = ref.match(/\/setting\/(general|comunicaciones|plantillas|ruteo|catalogos|auditoria)\b/);
+    const m = ref.match(/\/setting\/(general|comunicaciones|plantillas|ruteo|catalogos|auditoria|cobros)\b/);
     return `/setting/${m ? m[1] : 'general'}${suffix}`;
 }
 
@@ -120,6 +120,20 @@ const getSettings = async (req, res) => {
             cantidad_maxima_paquetes: settings.cantidad_maxima_paquetes || '20',
             costo_base_envio:         settings.costo_base_envio         || '500',
             seguro_pct:               settings.seguro_pct               || '0',
+            costo_por_km:             settings.costo_por_km             || '0',
+            recargo_express_pct:      settings.recargo_express_pct      || '0',
+            recargo_fragil_pct:       settings.recargo_fragil_pct       || '0',
+            recargo_zona_peligrosa_pct: settings.recargo_zona_peligrosa_pct || '0',
+            dias_retencion_sucursal:    settings.dias_retencion_sucursal    || '10',
+            horas_cancelacion_pago_pendiente: settings.horas_cancelacion_pago_pendiente || '48',
+            // Configuración de cobros: datos bancarios (referencia interna) + medios habilitados.
+            cbu_empresa:     settings.cbu_empresa     || '',
+            alias_empresa:   settings.alias_empresa   || '',
+            titular_empresa: settings.titular_empresa || '',
+            banco_empresa:   settings.banco_empresa   || '',
+            medio_pago_mercadopago_habilitado:   settings.medio_pago_mercadopago_habilitado   !== 'false',
+            medio_pago_efectivo_habilitado:      settings.medio_pago_efectivo_habilitado      !== 'false',
+            medio_pago_transferencia_habilitado: settings.medio_pago_transferencia_habilitado !== 'false',
             nombre_empresa:           settings.nombre_empresa           || 'LogiTrack',
             logo_empresa:             settings.logo_empresa             || '',
             telefono_soporte:         settings.telefono_soporte         || '0800-555-5678',
@@ -133,6 +147,12 @@ const getSettings = async (req, res) => {
             clock_24h:                         settings.clock_24h !== '0',
             // Toggle de Resend como respaldo (default ON). '0' = solo SendGrid.
             email_resend_enabled:              settings.email_resend_enabled !== '0',
+            // Última Milla — parámetros de ETA / avisos de llegada.
+            eta_proximity_minutes:    settings.eta_proximity_minutes    || '4',
+            eta_proximity_km:         settings.eta_proximity_km         || '1',
+            eta_range_margin_minutes: settings.eta_range_margin_minutes || '20',
+            eta_avg_speed_kmh:        settings.eta_avg_speed_kmh        || '25',
+            eta_format:               settings.eta_format               || 'range',
         },
         timezones: require('../utils/datetime').TIMEZONES,
         // Estado de cada proveedor de email (configurado o no) para mostrar contexto.
@@ -533,6 +553,70 @@ const saveStatusColors = async (req, res) => {
     }
 };
 
+// Última Milla: guarda los parámetros del cálculo de ETA y los avisos de llegada.
+const saveEtaSettings = async (req, res) => {
+    try {
+        const intIn = (raw, def, min, max) => {
+            const n = parseInt(raw, 10);
+            if (!Number.isFinite(n) || n < min || n > max) { return def; }
+            return n;
+        };
+        // Radio del aviso por GPS: fraccional, topeado en 2 km (parametrizable hasta 2).
+        const floatIn = (raw, def, min, max) => {
+            const n = parseFloat(raw);
+            if (!Number.isFinite(n) || n < min || n > max) { return def; }
+            return n;
+        };
+        const proximity   = intIn(req.body.eta_proximity_minutes, 4, 1, 60);
+        const proximityKm = floatIn(req.body.eta_proximity_km, 1, 0.1, 2);
+        const margin      = intIn(req.body.eta_range_margin_minutes, 20, 1, 120);
+        const speed       = intIn(req.body.eta_avg_speed_kmh, 25, 5, 120);
+        const format      = req.body.eta_format === 'exact' ? 'exact' : 'range';
+
+        const pairs = {
+            eta_proximity_minutes:    String(proximity),
+            eta_proximity_km:         String(proximityKm),
+            eta_range_margin_minutes: String(margin),
+            eta_avg_speed_kmh:        String(speed),
+            eta_format:               format,
+        };
+        for (const [key, value] of Object.entries(pairs)) {
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(settingBack(req, '?success=eta_settings'));
+    } catch (err) {
+        console.error('saveEtaSettings:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=eta_settings_save'));
+    }
+};
+
+// Configuración de cobros: datos bancarios (referencia interna para el operador
+// cuando coordina una transferencia) + qué medios de pago están habilitados.
+const saveCobros = async (req, res) => {
+    try {
+        const pairs = {
+            cbu_empresa:     String(req.body.cbu_empresa     || '').trim(),
+            alias_empresa:   String(req.body.alias_empresa   || '').trim(),
+            titular_empresa: String(req.body.titular_empresa || '').trim(),
+            banco_empresa:   String(req.body.banco_empresa   || '').trim(),
+            medio_pago_mercadopago_habilitado:   req.body.medio_pago_mercadopago_habilitado   === 'true' ? 'true' : 'false',
+            medio_pago_efectivo_habilitado:      req.body.medio_pago_efectivo_habilitado      === 'true' ? 'true' : 'false',
+            medio_pago_transferencia_habilitado: req.body.medio_pago_transferencia_habilitado === 'true' ? 'true' : 'false',
+        };
+        for (const [key, value] of Object.entries(pairs)) {
+            const oldValue = await settingModel.get(key);
+            await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+            await settingModel.set(key, value);
+        }
+        res.redirect(`/setting/${req.body._section === 'cobros' ? 'cobros' : 'general'}?success=cobros`);
+    } catch (err) {
+        console.error('saveCobros:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=cobros_save'));
+    }
+};
+
 // Guarda el color personalizado de cada estado de incidencia (enum fijo).
 const saveIncidentStatusColors = async (req, res) => {
     try {
@@ -729,6 +813,12 @@ const saveParams = async (req, res) => {
             'cantidad_maxima_paquetes',
             'costo_base_envio',
             'seguro_pct',
+            'costo_por_km',
+            'recargo_express_pct',
+            'recargo_fragil_pct',
+            'recargo_zona_peligrosa_pct',
+            'dias_retencion_sucursal',
+            'horas_cancelacion_pago_pendiente',
             // 'nombre_empresa' se gestiona en la tarjeta "Identidad visual" (/setting/identity) — LGT-172
             'telefono_soporte',
             'email_soporte',
@@ -776,6 +866,40 @@ const saveParams = async (req, res) => {
         const seguroPct = parseFloat(req.body.seguro_pct);
         if (isNaN(seguroPct) || seguroPct < 0 || seguroPct > 100) {
             return res.redirect(settingBack(req, '?error=seguro_pct'));
+        }
+
+        // % de recargo por destino peligroso (llegable): entre 0 y 500. 0 = sin recargo.
+        const dangerPct = parseFloat(req.body.recargo_zona_peligrosa_pct);
+        if (isNaN(dangerPct) || dangerPct < 0 || dangerPct > 500) {
+            return res.redirect(settingBack(req, '?error=recargo_zona_peligrosa'));
+        }
+
+        // $ por km de distancia origen-destino. 0 = sin recargo por distancia.
+        const costoPorKm = parseFloat(req.body.costo_por_km);
+        if (isNaN(costoPorKm) || costoPorKm < 0 || costoPorKm > 9999) {
+            return res.redirect(settingBack(req, '?error=costo_por_km'));
+        }
+
+        // % de recargo Express / Frágil: entre 0 y 500. 0 = sin recargo.
+        const expressPct = parseFloat(req.body.recargo_express_pct);
+        if (isNaN(expressPct) || expressPct < 0 || expressPct > 500) {
+            return res.redirect(settingBack(req, '?error=recargo_express'));
+        }
+        const fragilPct = parseFloat(req.body.recargo_fragil_pct);
+        if (isNaN(fragilPct) || fragilPct < 0 || fragilPct > 500) {
+            return res.redirect(settingBack(req, '?error=recargo_fragil'));
+        }
+
+        // Días hábiles que el paquete queda disponible para retiro en sucursal.
+        const retencion = parseInt(req.body.dias_retencion_sucursal);
+        if (isNaN(retencion) || retencion < 1 || retencion > 90) {
+            return res.redirect(settingBack(req, '?error=dias_retencion_sucursal'));
+        }
+
+        // Horas sin pagar antes de cancelar automáticamente un envío "Pendiente de Pago".
+        const horasCancelacion = parseInt(req.body.horas_cancelacion_pago_pendiente);
+        if (isNaN(horasCancelacion) || horasCancelacion < 1 || horasCancelacion > 720) {
+            return res.redirect(settingBack(req, '?error=horas_cancelacion_pago_pendiente'));
         }
 
         const horaInicio = req.body.horario_entrega_inicio;
@@ -1019,5 +1143,7 @@ module.exports = {
     triggerDelayDetection,
     saveDateTimeSettings,
     saveEmailProviders,
+    saveEtaSettings,
+    saveCobros,
     exportAuditCsv,
 };

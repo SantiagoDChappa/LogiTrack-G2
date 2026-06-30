@@ -316,20 +316,64 @@
                             <% if (costClient.insurance > 0) { %>
                             <div style="display:flex;justify-content:space-between"><span>Seguro de mercadería</span><span><%= fmtMoney(costClient.insurance) %></span></div>
                             <% } %>
+                            <% if (costClient.distanceSurcharge > 0) { %>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo distancia<% if (costClient.distanceKm) { %> (<%= costClient.distanceKm %> km)<% } %></span><span><%= fmtMoney(costClient.distanceSurcharge) %></span></div>
+                            <% } %>
+                            <% if (costClient.expressSurcharge > 0) { %>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo Express</span><span><%= fmtMoney(costClient.expressSurcharge) %></span></div>
+                            <% } %>
+                            <% if (costClient.fragileSurcharge > 0) { %>
+                            <div style="display:flex;justify-content:space-between"><span>Recargo frágil</span><span><%= fmtMoney(costClient.fragileSurcharge) %></span></div>
+                            <% } %>
+                            <% if (costClient.dangerSurcharge > 0) { %>
+                            <div style="display:flex;justify-content:space-between;color:var(--color-danger)"><span>Recargo zona peligrosa</span><span><%= fmtMoney(costClient.dangerSurcharge) %></span></div>
+                            <% } %>
                             <hr style="margin:.35rem 0;border-color:var(--color-border)">
                             <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span><%= fmtMoney(costClient.subtotal) %></span></div>
                             <% if (costClient.penalty > 0) { %>
                                 <div style="display:flex;justify-content:space-between;color:var(--color-danger)"><span>Penalización SLA</span><span>-<%= fmtMoney(costClient.penalty) %></span></div>
                             <% } %>
-                            <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Total a cobrar</span><span><%= fmtMoney(costClient.final) %></span></div>
+                            <div style="display:flex;justify-content:space-between;font-weight:700;margin-top:.25rem"><span>Subtotal (sin IVA)</span><span><%= fmtMoney(costClient.final) %></span></div>
+                            <div style="font-size:.75rem;color:var(--color-text-secondary);margin-top:.15rem">El total con IVA se ve en la factura.</div>
                         </div>
                     <% } %>
 
                     <% if (typeof invoice !== 'undefined' && invoice) { %>
-                        <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="margin-top:.5rem;display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
-                            <span class="material-symbols-outlined">receipt_long</span>
-                            Ver factura <%= invoice.number %>
-                        </a>
+                        <% const _pm = typeof paymentMethods !== 'undefined' ? paymentMethods : { efectivoEnabled: true, transferenciaEnabled: true }; %>
+                        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                            <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
+                                <span class="material-symbols-outlined">receipt_long</span>
+                                Ver factura <%= invoice.number %>
+                            </a>
+                            <% if (invoice.payStatus === 'PAGADA') { %>
+                                <span class="status-badge entregado">Cobrada (<%= invoice.payMethod || '—' %>)</span>
+                            <% } else if (invoice.payStatus === 'ANULADA') { %>
+                                <span class="status-badge cancelado">Anulada por nota de crédito</span>
+                            <% } else { %>
+                                <span class="status-badge retrasado">Pendiente de cobro</span>
+                                <% if ([1, 2, 4].includes(currentUser.roleId) && (_pm.efectivoEnabled || _pm.transferenciaEnabled)) { %>
+                                    <form method="POST" action="/shipment/<%= shipment.id %>/registrar-cobro" style="display:inline-flex;align-items:center;gap:.35rem;margin:0">
+                                        <select name="method" style="font-size:.85rem" id="registrar-cobro-method">
+                                            <% if (_pm.efectivoEnabled) { %><option value="efectivo">Efectivo</option><% } %>
+                                            <% if (_pm.transferenciaEnabled) { %><option value="transferencia">Transferencia</option><% } %>
+                                        </select>
+                                        <button type="submit" class="btn btn--ghost" style="font-size:.85rem">
+                                            <span class="material-symbols-outlined" style="font-size:1.1rem">payments</span>
+                                            Registrar cobro
+                                        </button>
+                                    </form>
+                                <% } %>
+                            <% } %>
+                        </div>
+                        <% if (invoice.payStatus === 'PENDIENTE' && _pm.transferenciaEnabled && (_pm.cbu || _pm.alias)) { %>
+                            <div style="margin-top:.4rem;font-size:.78rem;color:var(--color-text-secondary)">
+                                Datos para transferencia:
+                                <% if (_pm.alias) { %>alias <strong><%= _pm.alias %></strong><% } %>
+                                <% if (_pm.alias && _pm.cbu) { %> · <% } %>
+                                <% if (_pm.cbu) { %>CBU <strong><%= _pm.cbu %></strong><% } %>
+                                <% if (_pm.titular) { %> (<%= _pm.titular %>)<% } %>
+                            </div>
+                        <% } %>
                     <% } %>
                 </div>
 
@@ -457,7 +501,7 @@
                         <% } %>
 
                         <% if (typeof returnError !== 'undefined' && returnError) { %>
-                            <div class="alert alert-error" style="margin-top:.6rem;"><%= returnError %></div>
+                            <div class="alert alert-error" role="alert" style="margin-top:.6rem;"><%= returnError %></div>
                         <% } %>
                         <% if (typeof canCreateReturn !== 'undefined' && canCreateReturn) { %>
                             <a href="/returns/new?shipmentId=<%= shipment.id %>" class="action-btn action-btn--lg modificar" style="margin-top:.6rem;display:inline-flex;align-items:center;gap:.4rem;width:fit-content;" data-tooltip="Crear devolución" aria-label="Crear devolución">

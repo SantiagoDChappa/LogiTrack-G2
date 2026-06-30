@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Reporte - Usuarios</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header">
+                <h1>Reporte de usuarios</h1>
+            </div>
+
+            <!-- Filtro -->
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/users" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="roleId">Rol</label>
+                            <select id="roleId" name="roleId">
+                                <option value="">Todos</option>
+                                <% roleTypes.forEach(role => { %>
+                                <option value="<%= role.id %>" <%= Number(filters.roleId) === role.id ? 'selected' : '' %>><%= role.description %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <a href="/report/users" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <span class="material-symbols-outlined">refresh</span>
+                            </a>
+                            <a href="/report/users/export?roleId=<%= filters.roleId %>&from=<%= filters.from %>&to=<%= filters.to %>" class="action-btn action-btn--lg neutro" data-tooltip="Exportar CSV" aria-label="Exportar CSV">
+                                <span class="material-symbols-outlined">download</span>
+                            </a>
+                        </div>
+                    </div>
+                    <p style="font-size:.8rem;color:var(--color-text-secondary);margin:.6rem 0 0">
+                        "Logins" y "Cambios" cuentan solo dentro del rango de fechas elegido. El "Último ingreso" siempre muestra el más reciente, sin importar el rango.
+                    </p>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% if (rows.length === 0) { %>
+                <div class="report-card">
+                    <div class="report-empty-state">
+                        <span class="material-symbols-outlined">person_off</span>
+                        <p>No se encontraron usuarios con esos filtros.</p>
+                    </div>
+                </div>
+            <% } else { %>
+                <div class="report-card">
+                    <div class="dp-table-header">
+                        <h2>Resultados — <%= rows.length %> usuario<%= rows.length !== 1 ? 's' : '' %></h2>
+                    </div>
+                    <div class="audit-table-wrap">
+                    <table class="audit-table" id="users-report-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Documento</th>
+                                <th>Rol</th>
+                                <th>Sucursal</th>
+                                <th>Estado</th>
+                                <th>Último ingreso</th>
+                                <th style="text-align:right">Logins</th>
+                                <th style="text-align:right">Cambios</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% rows.forEach(u => { %>
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="u-avatar" style="background:<%= avatarColor(u.fullName) %>"><%= initials(u.fullName) %></span>
+                                        <div class="user-cell-info">
+                                            <strong><%= u.fullName %></strong>
+                                            <span class="user-cell-sub"><%= u.email %></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="white-space:nowrap"><%= u.document %></td>
+                                <td><span class="badge-role"><%= u.roleLabel %></span></td>
+                                <td style="white-space:nowrap"><%= u.branchLabel %></td>
+                                <td>
+                                    <% if (u.active) { %>
+                                    <span class="status-badge entregado">Alta</span>
+                                    <% } else { %>
+                                    <span class="status-badge retrasado">Baja</span>
+                                    <% } %>
+                                </td>
+                                <td style="white-space:nowrap" class="user-cell-sub"><%= u.lastLogin ? new Date(u.lastLogin).toLocaleString('es-AR') : 'Nunca ingresó' %></td>
+                                <td style="text-align:right"><strong><%= u.loginCount %></strong></td>
+                                <td style="text-align:right"><strong><%= u.changeCount %></strong></td>
+                                <td><a href="/user/<%= u.id %>/historial?from=/report/users" class="action-btn" data-tooltip="Ver historial" aria-label="Ver historial"><span class="material-symbols-outlined">history</span></a></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    </div>
+                    <div class="pagination" id="users-report-pagination"></div>
+                </div>
+            <% } %>
+
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+        // Paginación simple, 15 filas por página, sin tocar el script compartido.
+        (function () {
+            const PAGE_SIZE = 15;
+            const table = document.getElementById('users-report-table');
+            const pagEl = document.getElementById('users-report-pagination');
+            if (!table || !pagEl) { return; }
+            const rows = Array.from(table.tBodies[0].rows);
+            const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+            let page = 0;
+
+            function render() {
+                rows.forEach((row, i) => {
+                    row.style.display = (i >= page * PAGE_SIZE && i < (page + 1) * PAGE_SIZE) ? '' : 'none';
+                });
+                pagEl.innerHTML = '';
+                if (pages <= 1) { return; }
+                const info = document.createElement('span');
+                info.className = 'pagination-info';
+                info.textContent = `Página ${page + 1} de ${pages} (${rows.length} usuarios)`;
+                const prev = document.createElement('button');
+                prev.type = 'button';
+                prev.className = 'btn-filter' + (page <= 0 ? ' ghost' : '');
+                prev.innerHTML = '<span class="material-symbols-outlined">chevron_left</span> Anterior';
+                prev.disabled = page <= 0;
+                prev.addEventListener('click', () => { page--; render(); });
+                const next = document.createElement('button');
+                next.type = 'button';
+                next.className = 'btn-filter' + (page >= pages - 1 ? ' ghost' : '');
+                next.innerHTML = 'Siguiente <span class="material-symbols-outlined">chevron_right</span>';
+                next.disabled = page >= pages - 1;
+                next.addEventListener('click', () => { page++; render(); });
+                pagEl.append(info, prev, next);
+            }
+            render();
+        })();
+
+        document.getElementById('report-form').addEventListener('submit', function (e) {
+            const from = document.getElementById('from').value;
+            const to   = document.getElementById('to').value;
+            if (from && to && from > to) {
+                e.preventDefault();
+                const existing = this.querySelector('.report-alert');
+                if (!existing) {
+                    const alert = document.createElement('div');
+                    alert.className = 'report-alert report-alert--error';
+                    alert.innerHTML = '<span class="material-symbols-outlined">error</span> La fecha de inicio no puede ser mayor a la fecha de fin.';
+                    this.querySelector('.filter-row').insertAdjacentElement('afterend', alert);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

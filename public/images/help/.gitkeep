@@ -1,0 +1,4 @@
+# Capturas y diagramas del manual de usuario (Centro de ayuda).
+# Convención: public/images/help/<slug-del-articulo>/<NN-nombre>.png
+# Las capturas reales se generan con: npm run help:screenshots (Playwright).
+# Ver Test/capture-help-screenshots.js para configurar URL/credenciales.

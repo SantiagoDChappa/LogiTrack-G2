@@ -54,6 +54,8 @@
                 </form>
             </div>
 
+            <%- include('../partials/report-narrative', { narrative }) %>
+
             <% if (!error) { %>
                 <% if (hasQuery && rows.length === 0) { %>
                     <div class="report-card">
