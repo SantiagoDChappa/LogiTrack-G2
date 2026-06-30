@@ -47,6 +47,7 @@ const buildUsersReportData = async (query) => {
 
 const getUsersReport = async (req, res) => {
     const data = await buildUsersReportData(req.query);
+    data.narrative = require('../services/reportNarrator').usersReport(data);
     res.render('report/users', { ...data, roleTypes: Object.values(RoleType), avatarColor, initials });
 };
 

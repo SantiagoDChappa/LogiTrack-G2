@@ -14,19 +14,23 @@ const {
     buildShipmentsByPeriodExport,
     renderReportExport,
 } = require('../services/reportExport');
+const narrator = require('../services/reportNarrator');
 
 const getShipmentsByPeriod = async (req, res) => {
     const viewModel = await getShipmentsByPeriodData(req.query);
+    viewModel.narrative = narrator.shipmentsByPeriod(viewModel);
     res.render('report/shipments-by-period', viewModel);
 };
 
 const getOnTimeDeliveries = async (req, res) => {
     const viewModel = await getOnTimeDeliveriesData(req.query);
+    viewModel.narrative = narrator.onTimeDeliveries(viewModel);
     res.render('report/on-time-deliveries', viewModel);
 };
 
 const getDeliveryPerformance = async (req, res) => {
     const viewModel = await getDeliveryPerformanceData(req.query);
+    viewModel.narrative = narrator.deliveryPerformance(viewModel);
     res.render('report/delivery-performance', viewModel);
 };
 
@@ -78,6 +82,7 @@ const exportDeliveryPerformance = async (req, res) => {
 
 const getIncidentsByPeriod = async (req, res) => {
     const viewModel = await getIncidentsByPeriodData(req.query);
+    viewModel.narrative = narrator.incidentsByPeriod(viewModel);
     res.render('report/incidents-by-period', viewModel);
 };
 
@@ -103,6 +108,7 @@ const getSatisfactionReport = async (req, res) => {
     const viewModel = await getSatisfactionData({ ...req.query, branchId });
     viewModel.isAdmin = isAdmin;
     viewModel.currentBranchId = currentUser.branchId || null;
+    viewModel.narrative = narrator.satisfaction(viewModel);
     res.render('report/satisfaction', viewModel);
 };
 

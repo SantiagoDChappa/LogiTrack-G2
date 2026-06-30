@@ -20,6 +20,8 @@ const settingModel = require('../models/setting');
 
 const DEFAULTS = {
     proximityMin:   4,
+    proximityKm:    1,    // radio del aviso "casi llego" por GPS (default 1 km, tope 2)
+    proximityKmMax: 2,
     format:         'range',
     rangeMargin:    20,
     avgSpeedKmh:    25,
@@ -27,15 +29,19 @@ const DEFAULTS = {
 };
 
 async function loadConfig() {
-    const [prox, fmt, margin, speed] = await Promise.all([
+    const [prox, fmt, margin, speed, proxKm] = await Promise.all([
         settingModel.get('eta_proximity_minutes'),
         settingModel.get('eta_format'),
         settingModel.get('eta_range_margin_minutes'),
         settingModel.get('eta_avg_speed_kmh'),
+        settingModel.get('eta_proximity_km'),
     ]);
     const num = (v, def) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : def; };
+    // El radio del aviso se topea en proximityKmMax (parametrizable hasta 2 km).
+    const km = num(proxKm, DEFAULTS.proximityKm);
     return {
         proximityMin: num(prox, DEFAULTS.proximityMin),
+        proximityKm:  Math.min(km, DEFAULTS.proximityKmMax),
         format:       fmt === 'exact' ? 'exact' : 'range',
         rangeMargin:  num(margin, DEFAULTS.rangeMargin),
         avgSpeedKmh:  num(speed, DEFAULTS.avgSpeedKmh),
@@ -189,44 +195,23 @@ async function etaForShipment(shipmentId) {
     };
 }
 
-// Aviso "sos la próxima entrega" disparado por EVENTO. Se llama justo después de que el
-// repartidor RESUELVE una parada (entrega confirmada, intento fallido o postergada): en ese
-// momento recalcula las ETAs y le avisa por mail al destinatario de la parada que quedó
-// PRIMERA en la cola (la próxima que el repartidor va a visitar), con su franja horaria +
-// link al mapa en vivo.
-//
-// Por qué por evento y no por GPS: el disparo por proximidad del heartbeat dependía de que
-// el repartidor tuviera el GPS prendido y reportando; si no, no avisaba nunca. Al colgarlo
-// de "terminó una entrega" el aviso es determinístico y llega con la antelación natural de
-// una parada completa.
-//
-// Idempotente por parada vía route_stop.next_notified: cada parada se avisa UNA sola vez,
-// cuando llega al frente de la cola.
-async function notifyUpcomingDelivery(routeId) {
-    if (!routeId) { return; }
-    const routeModel = require('../models/route');
-    const route = await routeModel.getById(routeId);
-    if (!route || route.statusId !== routeModel.RouteStatus.IN_ROUTE) { return; }
-
-    const cfg = await loadConfig();
-    const pending = pendingDeliveryStops(route);
-    if (pending.length === 0) { return; } // no quedan entregas por delante
-
-    const next = pending[0];
-    if (next.nextNotified) { return; } // ya avisado al ponerse al frente
-
+// Despacha el aviso "sos la próxima entrega" (SHIPMENT_NEXT_DELIVERY) para una parada:
+// recalcula su franja, marca idempotencia (route_stop.next_notified), manda el mail con
+// el link al mapa en vivo y abre el chat. Devuelve true si avisó, false si no correspondía
+// (ya avisada, sin ETA, o ganó una carrera). Lo comparten los disparadores (hoy: GPS).
+async function dispatchNextDelivery(route, next, cfg) {
     const etas = await computeEtas(route, cfg);
     const etaNext = etas.get(next.id);
-    if (!etaNext) { return; }
+    if (!etaNext) { return false; }
     const window = formatWindow(etaNext, cfg);
 
-    // Marca ANTES de despachar para no duplicar si entran dos eventos casi juntos.
+    // Marca ANTES de despachar para no duplicar si entran dos heartbeats casi juntos.
     const { RouteStop } = require('../models/routeStop');
     const [updated] = await RouteStop.update(
         { nextNotified: true },
         { where: { id: next.id, nextNotified: false } }
     );
-    if (updated === 0) { return; } // otro evento ya disparó
+    if (updated === 0) { return false; } // otro disparo ya avisó
 
     // "antes de las X": el aviso de próxima entrega usa el tope superior de la franja.
     const etaText = cfg.format === 'exact'
@@ -245,6 +230,38 @@ async function notifyUpcomingDelivery(routeId) {
     // recibe el aviso (no esperamos a que el repartidor llegue físicamente).
     require('./deliveryChat.service').ensureOpen(next.shipmentId, next.id)
         .catch(e => console.error('[chat] ensureOpen next:', e.message));
+    return true;
+}
+
+// Aviso "sos la próxima entrega" disparado por GPS/DISTANCIA. Se llama en cada heartbeat con
+// la posición actual del repartidor: si está a ≤ proximityKm (config, default 1 km, tope 2)
+// de la PRÓXIMA parada pendiente, le avisa por mail al destinatario con su franja horaria +
+// link al mapa en vivo.
+//
+// Por qué por distancia: el aviso debe salir cuando el repartidor está físicamente cerca,
+// no antes. Requiere el GPS prendido (obligatorio para rutear), así que el disparo es fiable.
+//
+// Idempotente por parada vía route_stop.next_notified: cada parada se avisa UNA sola vez.
+async function notifyOnProximity(routeId, lat, lng) {
+    if (!routeId || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) { return; }
+    const routeModel = require('../models/route');
+    const route = await routeModel.getById(routeId);
+    if (!route || route.statusId !== routeModel.RouteStatus.IN_ROUTE) { return; }
+
+    const cfg = await loadConfig();
+    const pending = pendingDeliveryStops(route);
+    if (pending.length === 0) { return; } // no quedan entregas por delante
+
+    const next = pending[0];
+    if (next.nextNotified) { return; } // ya avisado
+
+    const coords = stopCoords(next);
+    if (!coords) { return; } // sin coordenadas de la parada no se puede medir distancia
+
+    const km = haversine(Number(lat), Number(lng), coords.lat, coords.lng);
+    if (km > cfg.proximityKm) { return; } // todavía lejos
+
+    await dispatchNextDelivery(route, next, cfg);
 }
 
 module.exports = {
@@ -255,6 +272,6 @@ module.exports = {
     formatWindow,
     persistPromisedEtas,
     etaForShipment,
-    notifyUpcomingDelivery,
+    notifyOnProximity,
     DEFAULTS,
 };

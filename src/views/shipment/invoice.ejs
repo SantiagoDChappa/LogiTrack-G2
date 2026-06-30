@@ -8,9 +8,28 @@
     <style>
         @media print {
             /* Una factura limpia: solo la tarjeta, sin chrome de la app. */
-            @page { size: A4; margin: 1.6cm; }
+            /* margin:0 en @page hace que Chromium NO imprima su encabezado/pie
+               (fecha, título, URL, "1/1"). El margen visual lo recupera el padding
+               del body. */
+            @page { size: A4; margin: 0; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             html, body { background: #fff !important; }
+            body { padding: 1.6cm !important; }
+            /* La factura es un documento: siempre en claro. En tema oscuro los tokens
+               de texto son casi blancos y, sobre el fondo blanco forzado de impresión,
+               quedaban lavados/ilegibles. Reseteamos los tokens a sus valores claros. */
+            html { color-scheme: light !important; }
+            html[data-theme="dark"], :root {
+                --color-text: #0f172a !important;
+                --color-text-secondary: #475569 !important;
+                --color-surface: #ffffff !important;
+                --color-border: #e2e8f0 !important;
+                --rp-text: #0f172a !important;
+                --rp-muted: #475569 !important;
+                --rp-surface: #ffffff !important;
+                --rp-border: #e2e8f0 !important;
+            }
+            body { color: #0f172a !important; }
             header, nav, .page-header, .page-header__actions,
             #tfa-nudge, .skip-to-content { display: none !important; }
             .main-content { padding: 0 !important; margin: 0 !important; }

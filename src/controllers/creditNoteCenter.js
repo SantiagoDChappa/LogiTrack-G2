@@ -68,6 +68,7 @@ const buildCreditNoteCenterData = async (query, viewer) => {
 
 const getCreditNoteCenter = async (req, res) => {
     const data = await buildCreditNoteCenterData(req.query, res.locals.currentUser);
+    data.narrative = require('../services/reportNarrator').creditNoteCenter(data);
     res.render('report/creditNotes', data);
 };
 

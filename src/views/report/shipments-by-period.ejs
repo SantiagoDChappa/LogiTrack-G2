@@ -55,6 +55,8 @@
                 </form>
             </div>
 
+            <%- include('../partials/report-narrative', { narrative }) %>
+
             <% if (!error) { %>
                 <% if (hasQuery && totalShipments === 0) { %>
                     <!-- Escenario 2: sin datos -->

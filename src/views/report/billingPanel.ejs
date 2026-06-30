@@ -40,6 +40,8 @@
                 </form>
             </div>
 
+            <%- include('../partials/report-narrative', { narrative }) %>
+
             <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
 
             <!-- Totales globales -->

@@ -76,6 +76,7 @@ const buildInvoiceCenterData = async (query, viewer) => {
 
 const getInvoiceCenter = async (req, res) => {
     const data = await buildInvoiceCenterData(req.query, res.locals.currentUser);
+    data.narrative = require('../services/reportNarrator').invoiceCenter(data);
     res.render('report/invoices', { ...data, payStatusOptions: PAY_STATUS_LABELS });
 };
 

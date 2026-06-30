@@ -149,6 +149,7 @@ const getSettings = async (req, res) => {
             email_resend_enabled:              settings.email_resend_enabled !== '0',
             // Última Milla — parámetros de ETA / avisos de llegada.
             eta_proximity_minutes:    settings.eta_proximity_minutes    || '4',
+            eta_proximity_km:         settings.eta_proximity_km         || '1',
             eta_range_margin_minutes: settings.eta_range_margin_minutes || '20',
             eta_avg_speed_kmh:        settings.eta_avg_speed_kmh        || '25',
             eta_format:               settings.eta_format               || 'range',
@@ -560,13 +561,21 @@ const saveEtaSettings = async (req, res) => {
             if (!Number.isFinite(n) || n < min || n > max) { return def; }
             return n;
         };
-        const proximity = intIn(req.body.eta_proximity_minutes, 4, 1, 60);
-        const margin    = intIn(req.body.eta_range_margin_minutes, 20, 1, 120);
-        const speed     = intIn(req.body.eta_avg_speed_kmh, 25, 5, 120);
-        const format    = req.body.eta_format === 'exact' ? 'exact' : 'range';
+        // Radio del aviso por GPS: fraccional, topeado en 2 km (parametrizable hasta 2).
+        const floatIn = (raw, def, min, max) => {
+            const n = parseFloat(raw);
+            if (!Number.isFinite(n) || n < min || n > max) { return def; }
+            return n;
+        };
+        const proximity   = intIn(req.body.eta_proximity_minutes, 4, 1, 60);
+        const proximityKm = floatIn(req.body.eta_proximity_km, 1, 0.1, 2);
+        const margin      = intIn(req.body.eta_range_margin_minutes, 20, 1, 120);
+        const speed       = intIn(req.body.eta_avg_speed_kmh, 25, 5, 120);
+        const format      = req.body.eta_format === 'exact' ? 'exact' : 'range';
 
         const pairs = {
             eta_proximity_minutes:    String(proximity),
+            eta_proximity_km:         String(proximityKm),
             eta_range_margin_minutes: String(margin),
             eta_avg_speed_kmh:        String(speed),
             eta_format:               format,

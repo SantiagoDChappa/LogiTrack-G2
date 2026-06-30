@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Ingresos por período</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header"><h1>Ingresos por período</h1></div>
+
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/income-by-period" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <a href="/report/income-by-period" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <span class="material-symbols-outlined">refresh</span>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+
+            <div class="report-card" style="display:flex;gap:2rem;flex-wrap:wrap">
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Facturado</div><strong style="font-size:1.3rem"><%= fmt(totals.total) %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Facturas</div><strong style="font-size:1.3rem"><%= totals.count %></strong></div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Ticket promedio</div><strong style="font-size:1.3rem"><%= fmt(totals.avgTicket) %></strong></div>
+                <% if (prevTotal != null) { %>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Período anterior</div><strong style="font-size:1.3rem"><%= fmt(prevTotal) %></strong></div>
+                <% } %>
+            </div>
+
+            <% if (rows.length === 0) { %>
+                <div class="report-card"><div class="report-empty-state">
+                    <span class="material-symbols-outlined">show_chart</span>
+                    <p>No hay facturación en ese rango de fechas.</p>
+                </div></div>
+            <% } else { %>
+                <% const maxTotal = Math.max(...rows.map(r => r.total)); %>
+                <div class="report-card">
+                    <div class="dp-table-header"><h2>Por <%= granularityLabel %> — <%= rows.length %> <%= granularityLabel %><%= rows.length !== 1 ? 's' : '' %></h2></div>
+                    <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead><tr>
+                            <th><%= granularityLabel === 'mes' ? 'Mes' : 'Día' %></th>
+                            <th style="text-align:right">Facturas</th>
+                            <th style="text-align:right">Facturado</th>
+                            <th>Comparativa</th>
+                        </tr></thead>
+                        <tbody>
+                            <% rows.forEach(r => { %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= r.label %></td>
+                                <td style="text-align:right"><%= r.count %></td>
+                                <td style="text-align:right"><strong><%= fmt(r.total) %></strong></td>
+                                <td style="min-width:140px">
+                                    <div style="background:var(--color-border);border-radius:999px;height:.55rem;overflow:hidden;max-width:200px">
+                                        <div style="height:100%;background:#2563eb;width:<%= maxTotal > 0 ? Math.round((r.total/maxTotal)*100) : 0 %>%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+            <% } %>
+
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

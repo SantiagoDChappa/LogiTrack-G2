@@ -4,6 +4,15 @@
     <%- include('../partials/head') %>
     <title>Sucursales — LogiTrack</title>
     <link rel="stylesheet" href="/css/shipments.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        #branch-map { height: 380px; width: 100%; border-radius: 12px; margin-bottom: 1.25rem;
+            border: 1px solid var(--color-border, #e2e8f0); z-index: 0; }
+        .branch-map-legend { display:flex; gap:1rem; flex-wrap:wrap; font-size:.82rem;
+            color: var(--color-text-secondary); margin:-.5rem 0 1rem; }
+        .branch-map-legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%;
+            margin-right:.35rem; vertical-align:middle; }
+    </style>
 </head>
 <body>
     <%- include('../partials/header') %>
@@ -19,6 +28,19 @@
 
         <% if (ok) { %>
             <div class="alert" role="status" style="background:rgba(22,163,74,.12);color:#166534;border:1px solid #86efac;padding:.5rem .75rem;border-radius:8px;margin-bottom:1rem">Operación realizada con éxito.</div>
+        <% } %>
+
+        <% const mapPoints = (branches || []).filter(b => b.latitude != null && b.longitude != null).map(b => ({
+            name: b.name, address: b.address, closed: !!b.closed,
+            lat: Number(b.latitude), lng: Number(b.longitude),
+        })); %>
+        <% if (mapPoints.length > 0) { %>
+            <div id="branch-map"></div>
+            <div class="branch-map-legend">
+                <span><span class="dot" style="background:#16a34a"></span>Activa</span>
+                <span><span class="dot" style="background:#dc2626"></span>Cerrada</span>
+                <span>Ubicación de cada sucursal — agrupá visualmente por zona.</span>
+            </div>
         <% } %>
 
         <div class="shipments-wrapper">
@@ -97,6 +119,35 @@
         </div>
     </main>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        (function () {
+            const points = <%- JSON.stringify(mapPoints) %>;
+            const el = document.getElementById('branch-map');
+            if (!el || !window.L || points.length === 0) { return; }
+
+            const map = L.map(el, { scrollWheelZoom: false });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap', maxZoom: 19,
+            }).addTo(map);
+
+            const markers = points.map(p => {
+                const color = p.closed ? '#dc2626' : '#16a34a';
+                const icon = L.divIcon({
+                    className: 'branch-pin',
+                    html: `<span style="display:block;width:16px;height:16px;border-radius:50% 50% 50% 0;`
+                        + `background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);`
+                        + `transform:rotate(-45deg)"></span>`,
+                    iconSize: [16, 16], iconAnchor: [8, 16], popupAnchor: [0, -16],
+                });
+                return L.marker([p.lat, p.lng], { icon })
+                    .bindPopup(`<strong>${p.name}</strong><br>${p.address}`
+                        + `<br><em>${p.closed ? 'Cerrada' : 'Activa'}</em>`);
+            });
+            const group = L.featureGroup(markers).addTo(map);
+            map.fitBounds(group.getBounds().pad(0.2), { maxZoom: 13 });
+        })();
+    </script>
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
     <script src="/js/table-tools.js?v=<%= assetVersion %>" defer></script>

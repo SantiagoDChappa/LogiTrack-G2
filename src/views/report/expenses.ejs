@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Gastos y resultado</title>
+    <link rel="stylesheet" href="/css/report.css">
+    <link rel="stylesheet" href="/css/shipments.css">
+    <%- include('../auditoria/_styles') %>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="report-wrapper">
+
+            <div class="page-header"><h1>Gastos y resultado</h1></div>
+
+            <% if (ok) { %>
+                <div class="report-alert" style="background:rgba(22,163,74,.12);color:#166534;border:1px solid #86efac;padding:.5rem .75rem;border-radius:8px;margin-bottom:1rem">Operación realizada con éxito.</div>
+            <% } %>
+            <% if (error) { %>
+                <div class="report-alert report-alert--error"><span class="material-symbols-outlined">error</span> Revisá los datos: la categoría y un importe mayor a 0 son obligatorios.</div>
+            <% } %>
+
+            <div class="report-card filter-card">
+                <form method="GET" action="/report/expenses" id="report-form" novalidate>
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="from">Desde</label>
+                            <input type="date" id="from" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="filter-field">
+                            <label for="to">Hasta</label>
+                            <input type="date" id="to" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="filter-actions">
+                            <button type="submit" class="action-btn action-btn--lg buscar" data-tooltip="Consultar" aria-label="Consultar">
+                                <span class="material-symbols-outlined">search</span>
+                            </button>
+                            <a href="/report/expenses" class="action-btn action-btn--lg neutro" data-tooltip="Limpiar" aria-label="Limpiar">
+                                <span class="material-symbols-outlined">refresh</span>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <%- include('../partials/report-narrative', { narrative }) %>
+
+            <% const fmt = (n) => '$ ' + Number(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); %>
+
+            <!-- Resultado neto -->
+            <div class="report-card" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center">
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Ingresos facturados</div><strong style="font-size:1.3rem;color:#16a34a"><%= fmt(income) %></strong></div>
+                <div style="font-size:1.3rem;opacity:.5">−</div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Notas de crédito</div><strong style="font-size:1.3rem;color:#3730a3"><%= fmt(creditNotes) %></strong></div>
+                <div style="font-size:1.3rem;opacity:.5">−</div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Gastos</div><strong style="font-size:1.3rem;color:#b45309"><%= fmt(totalExpenses) %></strong></div>
+                <div style="font-size:1.3rem;opacity:.5">=</div>
+                <div><div style="font-size:.72rem;opacity:.6;text-transform:uppercase">Resultado neto</div><strong style="font-size:1.5rem;color:<%= net >= 0 ? '#16a34a' : '#dc2626' %>"><%= fmt(net) %></strong></div>
+            </div>
+
+            <!-- Alta de gasto -->
+            <div class="report-card">
+                <div class="dp-table-header"><h2>Registrar un gasto</h2></div>
+                <form method="POST" action="/report/expenses" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;align-items:end">
+                    <div class="filter-field">
+                        <label for="category">Categoría</label>
+                        <input list="cat-list" id="category" name="category" required placeholder="Ej: Combustible">
+                        <datalist id="cat-list">
+                            <% categories.forEach(c => { %><option value="<%= c %>"></option><% }) %>
+                        </datalist>
+                    </div>
+                    <div class="filter-field">
+                        <label for="amount">Importe ($)</label>
+                        <input type="number" id="amount" name="amount" min="0.01" step="0.01" required placeholder="Ej: 15000">
+                    </div>
+                    <div class="filter-field">
+                        <label for="incurredOn">Fecha</label>
+                        <input type="date" id="incurredOn" name="incurredOn" value="<%= new Date().toISOString().slice(0,10) %>">
+                    </div>
+                    <% if (isAdmin) { %>
+                    <div class="filter-field">
+                        <label for="branchId">Sucursal</label>
+                        <select id="branchId" name="branchId">
+                            <option value="">Sin sucursal</option>
+                            <% branches.forEach(b => { %><option value="<%= b.id %>"><%= b.name %></option><% }) %>
+                        </select>
+                    </div>
+                    <% } %>
+                    <div class="filter-field" style="grid-column:1/-1">
+                        <label for="description">Descripción (opcional)</label>
+                        <input type="text" id="description" name="description" maxlength="200" placeholder="Detalle del gasto">
+                    </div>
+                    <div>
+                        <button type="submit" class="action-btn action-btn--lg guardar" data-tooltip="Guardar gasto" aria-label="Guardar gasto">
+                            <span class="material-symbols-outlined">add</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Listado -->
+            <div class="report-card">
+                <div class="dp-table-header"><h2>Gastos registrados — <%= rows.length %></h2></div>
+                <% if (rows.length === 0) { %>
+                    <div class="report-empty-state">
+                        <span class="material-symbols-outlined">payments</span>
+                        <p>No hay gastos cargados en ese rango. Registrá el primero arriba.</p>
+                    </div>
+                <% } else { %>
+                    <div class="audit-table-wrap">
+                    <table class="audit-table">
+                        <thead><tr>
+                            <th>Fecha</th>
+                            <th>Categoría</th>
+                            <th>Descripción</th>
+                            <th>Sucursal</th>
+                            <th style="text-align:right">Importe</th>
+                            <th></th>
+                        </tr></thead>
+                        <tbody>
+                            <% rows.forEach(r => { %>
+                            <tr>
+                                <td style="white-space:nowrap"><%= r.incurredOn %></td>
+                                <td><%= r.category %></td>
+                                <td><%= r.description || '—' %></td>
+                                <td><%= r.branchName %></td>
+                                <td style="text-align:right"><strong><%= fmt(r.amount) %></strong></td>
+                                <td>
+                                    <form method="POST" action="/report/expenses/<%= r.id %>/delete" style="display:inline" data-confirm="¿Eliminar este gasto?">
+                                        <button type="submit" class="action-btn eliminar" data-tooltip="Eliminar" aria-label="Eliminar">
+                                            <span class="material-symbols-outlined">delete</span>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                    </div>
+                <% } %>
+            </div>
+
+        </div>
+    </main>
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+</body>
+</html>

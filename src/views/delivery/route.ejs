@@ -1835,11 +1835,38 @@
         window.addEventListener('online', () => { b.remove(); fatigueOfflineShown = false; }, { once: true });
     }
 
+    // Última Milla — GPS obligatorio para rutear: el seguimiento en vivo y el aviso "ya casi
+    // llego" dependen de la posición del repartidor. Pide la ubicación una vez; si el permiso
+    // está denegado o no hay señal, no se puede iniciar. En modo prueba (?sim=1) se omite,
+    // porque los heartbeats los inyecta el panel de simulación.
+    function ensureGpsReady() {
+        return new Promise((resolve) => {
+            if (new URLSearchParams(location.search).get('sim') === '1') { resolve(true); return; }
+            if (!navigator.geolocation) { resolve(false); return; }
+            navigator.geolocation.getCurrentPosition(
+                () => resolve(true),
+                () => resolve(false),
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        });
+    }
+
     // LGT-190/191 — gate de inicio: consentimiento + prueba antes de salir.
     async function startWithFatigue() {
         // BUG-32 — sin conexión no se puede correr el gate ni persistir el inicio en el
         // server; abortamos sin recargar (evita el bucle) y diferimos hasta que vuelva online.
         if (!navigator.onLine) { notifyFatigueOffline(); return; }
+        // GPS obligatorio antes de cualquier gate: sin ubicación no se inicia la ruta.
+        if (!(await ensureGpsReady())) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Activá la ubicación (GPS)',
+                html: 'Para iniciar la ruta necesitás permitir el acceso a tu ubicación.<br>' +
+                      'Activá el GPS del dispositivo y el permiso de ubicación del navegador, y volvé a intentar.',
+                confirmButtonText: 'Entendido', confirmButtonColor: '#d97706', allowOutsideClick: false,
+            });
+            return;
+        }
         // Bloquea la ruta mientras se carga la config y se resuelve el gate (no se puede operar antes).
         showRouteLoader('Preparando control de fatiga…');
         const cfg = await getFatigueCfg();

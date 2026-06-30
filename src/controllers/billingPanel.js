@@ -79,6 +79,7 @@ const buildBillingPanelData = async (query, viewer) => {
 
 const getBillingPanel = async (req, res) => {
     const data = await buildBillingPanelData(req.query, res.locals.currentUser);
+    data.narrative = require('../services/reportNarrator').billingPanel(data);
     res.render('report/billingPanel', data);
 };
 
