@@ -45,7 +45,31 @@
                 window.addrValid = false;
             });
         }
+
+        // Re-render por error de validación: el server devuelve la dirección en los
+        // hidden (street/number/province/postal/lat/lng). Reconstruimos el chip y la
+        // validación para que la dirección NO se vea vacía y no haya que recargarla.
+        restoreFromHidden();
     });
+
+    // Reconstruye el estado "dirección seleccionada" desde los hidden ya cargados.
+    function restoreFromHidden() {
+        const street   = el('street')?.value;
+        const number   = el('number')?.value;
+        const province = el('province')?.value;
+        if (!street || !province) { return; }   // nada que restaurar
+
+        const postal = el('postal-code')?.value || '';
+        const main = [street, number].filter(Boolean).join(' ');
+        const sub  = postal ? `CP ${postal}` : '';
+        showChip(main, sub);
+
+        addressSelected = true;
+        window.addrValid = true;
+        const searchBox = el('address-search');
+        if (searchBox) { searchBox.value = ''; searchBox.required = false; }
+        setValidationState('valid', `Dirección cargada: <strong>${main}</strong>${sub ? ' — ' + sub : ''}`);
+    }
 
     // ── Debounce y búsqueda ────────────────────────────────────
     function schedule(q) {
