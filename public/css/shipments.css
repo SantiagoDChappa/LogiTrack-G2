@@ -61,6 +61,24 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Admin de envíos: al achicar el viewport, la tabla scrollea en ambos ejes en vez de
+   comprimirse ilegible. El `min-width` obliga a que la tabla no baje de cierto ancho:
+   así el scroll horizontal se activa cuando el wrapper es más angosto. El `max-height`
+   + `overflow-y: auto` habilita scroll vertical cuando hay muchas filas y sticky header
+   deja los títulos siempre visibles. */
+.shipments-table-wrap {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.shipments-table-wrap > table {
+  min-width: 960px;
+}
+.shipments-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
 .table-wrapper table {
   width: 100%;
   border-collapse: collapse;

@@ -17,19 +17,16 @@
             <span class="portal-card-tracking-id"><%= s.trackingId %></span>
         </div>
         <span class="portal-badge <%= sk %>"><%= statusLabel %></span>
+        <% if (s.delayNotifiedAt && !isCancelled && sk !== 'entregado' && sk !== 'devuelto') { %>
+            <span class="portal-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;margin-left:.4rem;font-size:.72rem" title="El envío está demorado por un incidente en la ruta.">
+                <span class="material-symbols-outlined" style="font-size:.9rem;vertical-align:middle">schedule</span>
+                Demorado
+            </span>
+        <% } %>
     </div>
 
     <div class="portal-timeline">
-        <% const timelineSteps = isCancelled
-               ? ['pendiente', 'en_transito', 'en_sucursal', 'cancelado']
-               : ['pendiente', 'en_transito', 'en_sucursal', 'entregado'];
-           const timelineLabels = isCancelled
-               ? ['Confirmado', 'En Transito', 'En Sucursal', 'Cancelado']
-               : ['Confirmado', 'En Transito', 'En Sucursal', 'Entregado'];
-           const timelineIcons = isCancelled
-               ? ['check_circle', 'local_shipping', 'warehouse', 'cancel']
-               : ['check_circle', 'local_shipping', 'warehouse', 'home'];
-           const statusToStep = {
+        <% const statusToStep = {
                pendiente: 'pendiente', confirmado: 'pendiente', inicial: 'pendiente',
                asignado: 'pendiente', en_preparacion: 'pendiente', en_transito: 'en_transito',
                en_sucursal: 'en_sucursal', intento_fallido: 'en_transito',
@@ -37,6 +34,19 @@
                cancelado: 'cancelado', cancelada: 'cancelado'
            };
            const currentStep = statusToStep[sk] || 'pendiente';
+           // "En Sucursal" sólo aplica a retiro en sucursal, o si el envío realmente
+           // pasó/está en ese estado (p.ej. reintento de entrega a domicilio vuelto a depósito).
+           const historyHasSucursal = (s.history || []).some(function(h) {
+               const d = h.toStatus.description.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[\s-]+/g, '_');
+               return statusToStep[d] === 'en_sucursal';
+           });
+           const includeSucursal = s.deliveryMode === 'branch_pickup' || currentStep === 'en_sucursal' || historyHasSucursal;
+           const baseSteps = includeSucursal ? ['pendiente', 'en_transito', 'en_sucursal'] : ['pendiente', 'en_transito'];
+           const baseLabels = includeSucursal ? ['Confirmado', 'En Transito', 'En Sucursal'] : ['Confirmado', 'En Transito'];
+           const baseIcons = includeSucursal ? ['check_circle', 'local_shipping', 'warehouse'] : ['check_circle', 'local_shipping'];
+           const timelineSteps = baseSteps.concat([isCancelled ? 'cancelado' : 'entregado']);
+           const timelineLabels = baseLabels.concat([isCancelled ? 'Cancelado' : 'Entregado']);
+           const timelineIcons = baseIcons.concat([isCancelled ? 'cancel' : 'home']);
            let activeIdx = timelineSteps.indexOf(currentStep);
            if (activeIdx === -1) activeIdx = isCancelled ? timelineSteps.length - 1 : 0;
            const stepDates = {};

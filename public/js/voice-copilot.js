@@ -365,10 +365,11 @@
             if (data.queued) {                                                            // CA5
                 return { speak: 'Sin señal: la alerta de emergencia quedó en cola y se envía apenas vuelva la conexión.' };
             }
-            if (!hasGeo) {                                                                // CA4
-                return { speak: 'Alerta de emergencia enviada a la central, sin tu ubicación porque no estaba disponible.' };
-            }
-            return { speak: 'Alerta de emergencia enviada a la central con tu ubicación.' }; // CA2
+            const ubic = hasGeo ? 'con tu ubicación' : 'sin tu ubicación porque no estaba disponible'; // CA4/CA2
+            const avisado = data.notified > 0
+                ? 'Avisamos a tu supervisor.'
+                : 'Quedó registrada, pero no pude avisar a un supervisor; llamá a la central.';
+            return { speak: `Alerta de emergencia enviada ${ubic}. ${avisado}` };
         },
     });
 
@@ -376,17 +377,21 @@
     // y la resalta en pantalla. No reordena la ruta ni cambia estados. Funciona en pausa/offline.
     register({
         id: 'search', label: 'buscar un envío',
-        keywords: ['llevame al paquete', 'llevame a la entrega', 'donde esta el paquete', 'donde esta la entrega',
-            'buscar el paquete', 'buscar la entrega', 'buscar paquete', 'buscar entrega', 'paquete de', 'buscar a'],
+        keywords: ['llevame al paquete', 'llevame a la entrega', 'llevame al envio', 'donde esta el paquete',
+            'donde esta la entrega', 'donde esta el envio', 'buscar el paquete', 'buscar la entrega', 'buscar el envio',
+            'buscar paquete', 'buscar entrega', 'buscar envio', 'paquete de', 'entrega de', 'envio de', 'buscar a'],
         run: (c, raw) => { searchStart(extractSearchName(raw)); return { handled: true }; },
     });
 
     // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
     function extractSearchName(raw) {
-        return String(raw || '').trim().replace(
-            /^\s*(llevame al paquete de|llevame a la entrega de|donde esta el paquete de|donde esta la entrega de|buscar el paquete de|buscar la entrega de|el paquete de|la entrega de|paquete de|entrega de|buscar a|buscar)\s*/i,
-            ''
-        ).trim();
+        // Saca los prefijos del disparador en bucle (aguanta "buscar el paquete camila" sin "de",
+        // y "buscar el envío de camila gómez"), hasta quedarse solo con el nombre.
+        const strip = /^\s*(llevame a la|llevame al|llevame a|donde esta el|donde esta la|donde esta|buscar el|buscar la|buscar a|buscar|busca a|busca|el paquete|la entrega|el envio|paquete|entrega|envio|de|para)\b\s*/i;
+        let s = String(raw || '').trim();
+        let prev;
+        do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
+        return s.trim();
     }
     function extractNameOnly(raw) {
         return String(raw || '').trim().replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
@@ -396,11 +401,15 @@
         const q = normalize(name);
         if (!q) { return []; }
         const words = q.split(' ').filter((w) => w.length >= 3);
-        return stops.filter((s) => {
-            if (!s.recipient) { return false; }
-            const r = normalize(s.recipient);
-            return r.includes(q) || words.some((w) => r.includes(w));
-        });
+        const cand = stops.filter((s) => s.recipient).map((s) => ({ s, r: normalize(s.recipient) }));
+        // Búsqueda por niveles (de más preciso a más laxo) para no traer de más:
+        // 1) la frase completa dicha ("camila gomez" → solo Camila Gómez).
+        let hits = cand.filter((x) => x.r.includes(q));
+        // 2) si dijo varias palabras y no hubo match exacto: exigir que estén TODAS (orden libre).
+        if (!hits.length && words.length > 1) { hits = cand.filter((x) => words.every((w) => x.r.includes(w))); }
+        // 3) última red: por cualquier palabra (evita quedarse sin nada por un error del reconocimiento).
+        if (!hits.length) { hits = cand.filter((x) => words.some((w) => x.r.includes(w))); }
+        return hits.map((x) => x.s);
     }
     function highlightStop(seq) {
         try {

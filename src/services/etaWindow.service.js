@@ -219,12 +219,31 @@ async function dispatchNextDelivery(route, next, cfg) {
         : `Tu envío llega antes de las ${window.toLabel}.`;
 
     const shipmentCtrl = require('../controllers/shipment');
-    const { NotificationEvent } = require('../constants/enums');
+    const { NotificationEvent, ShipmentHistoryEvent } = require('../constants/enums');
     await shipmentCtrl.notifyShipmentEvent(NotificationEvent.SHIPMENT_NEXT_DELIVERY, next.shipmentId, {
         etaText,
         etaFrom: window.fromLabel,
         etaTo:   window.toLabel,
     });
+
+    // Timeline paso-a-paso (misEnviosDetail y /track/:trackingId lo consumen vía
+    // shipmentStatusView.buildTimeline). Sin cambio de estado real: from=to=statusId.
+    // eventType STATUS_CHANGE porque no hay entrada dedicada en ShipmentHistoryEvent y no
+    // amerita migración para un solo caso.
+    try {
+        const shipmentHistoryModel = require('../models/shipmentHistory');
+        const { Shipment } = require('../models/shipment');
+        const s = await Shipment.findByPk(next.shipmentId, { attributes: ['statusId'] });
+        const currentStatus = s?.statusId || null;
+        await shipmentHistoryModel.create({
+            shipmentId:   next.shipmentId,
+            fromStatusId: currentStatus,
+            toStatusId:   currentStatus,
+            comment:      `Sos la próxima entrega. ${etaText}`,
+            userId:       null,
+            eventType:    ShipmentHistoryEvent.STATUS_CHANGE,
+        });
+    } catch (e) { console.error('[eta] history NEXT_DELIVERY:', e.message); }
 
     // Chat: abrir el canal del envío que viene ya, así el cliente puede coordinar apenas
     // recibe el aviso (no esperamos a que el repartidor llegue físicamente).

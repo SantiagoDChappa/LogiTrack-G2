@@ -86,22 +86,25 @@ const buildMapStops = (json, history) => {
     return stops;
 };
 
-// Ruta activa (planificada o en curso) más reciente que contiene a este envío.
+// Ruta activa en curso más reciente que ya avisó "casi llego" (Última Milla) para este envío.
 // Vía modelos Sequelize: respetan el mapeo de columnas a snake_case. La versión previa
 // usaba SQL crudo con identificadores camelCase ("shipmentId"/"statusId") que no existen
 // en el esquema → siempre tiraba y el camión del mapa en vivo nunca aparecía.
+// nextNotified=true es la misma bandera que dispara el mail de proximidad (etaWindow.service
+// notifyOnProximity, ≤1km de la parada): el botón/página "seguir en vivo" se habilita recién
+// ahí, no apenas se arma la ruta, para que coincida con el aviso que recibe el cliente.
 const fetchActiveRouteId = async (shipmentId) => {
     try {
         const { Route, RouteStatus } = require('../models/route');
         const { RouteStop } = require('../models/routeStop');
-        const stops = await RouteStop.findAll({
-            where: { shipmentId, stopType: 'delivery' },
+        const stop = await RouteStop.findOne({
+            where: { shipmentId, stopType: 'delivery', nextNotified: true },
+            order: [['id', 'DESC']],
             attributes: ['routeId'],
         });
-        if (stops.length === 0) { return null; }
+        if (!stop) { return null; }
         const route = await Route.findOne({
-            where: { id: stops.map(s => s.routeId), statusId: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
-            order: [['createdAt', 'DESC']],
+            where: { id: stop.routeId, statusId: RouteStatus.IN_ROUTE },
             attributes: ['id'],
         });
         return route?.id || null;

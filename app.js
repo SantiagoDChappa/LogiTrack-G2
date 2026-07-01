@@ -58,6 +58,7 @@ const invoiceRoutes = require('./src/routes/invoice');
 const notificationInAppRoutes = require('./src/routes/notificationInApp');
 const shipmentModificationRoutes = require('./src/routes/shipmentModification');
 const fatigueRoutes    = require('./src/routes/fatigue');
+const supervisionRoutes = require('./src/routes/supervision');
 const onboardingRoutes = require('./src/routes/onboarding');
 const helpRoutes       = require('./src/routes/help');
 const apiSearchRoutes  = require('./src/routes/api/search');
@@ -186,6 +187,7 @@ app.use('/invoice', requireAuth, invoiceRoutes);
 // Centro de notificaciones in-app: por usuario, disponible para todos los roles logueados.
 app.use('/notifications', requireAuth, notificationInAppRoutes);
 app.use('/fatigue',   requireAuth, fatigueRoutes);
+app.use('/supervision', requireAuth, supervisionRoutes);
 app.use('/api/onboarding', requireAuth, onboardingRoutes);
 
 // PII (nombre/email/telefono por documento): SOLO usuarios logueados.

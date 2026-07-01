@@ -47,6 +47,9 @@
                     <input type="hidden" name="email" value="<%= email %>">
                     <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
                     <input type="hidden" name="expiresAt" value="<%= expiresAt %>">
+                    <% if (typeof returnTo !== 'undefined' && returnTo) { %>
+                    <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                    <% } %>
                     <input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
                         autocomplete="one-time-code" placeholder="000000" class="portal-access-code-input">
                     <button type="submit" class="btn-primary portal-access-confirm">Confirmar acceso</button>
@@ -56,6 +59,9 @@
                     <form method="POST" action="/portal/mis-envios/acceso">
                         <input type="hidden" name="email" value="<%= email %>">
                         <input type="hidden" name="document" value="<%= typeof document !== 'undefined' ? document : '' %>">
+                        <% if (typeof returnTo !== 'undefined' && returnTo) { %>
+                        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                        <% } %>
                         <button type="submit" class="portal-access-resend">
                             <span class="material-symbols-outlined">refresh</span>
                             Reenviar código

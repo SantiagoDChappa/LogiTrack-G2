@@ -17,9 +17,23 @@ const fmtDate = (d) => {
     catch { return ''; }
 };
 
-// Mensaje principal según el estado. `eta` (opcional) viene de etaWindow.etaForShipment.
-// Devuelve { headline, detail, tone, isPickup, isReady }.
-function buildStatusMessage(shipment, eta) {
+// Aplica la capa "demorado" al mensaje base si el envío tiene delayNotifiedAt y aún no
+// está en estado terminal. No reemplaza el estado — lo enriquece con prefijo y tono.
+function _applyDelayOverlay(base, shipment) {
+    if (!shipment?.delayNotifiedAt) { return base; }
+    const terminal = [Status.DELIVERED.id, Status.CANCELLED.id, Status.RETURNED.id].includes(shipment.statusId);
+    if (terminal) { return base; }
+    return {
+        ...base,
+        tone: 'delayed',
+        headline: `Con demora — ${base.headline}`,
+        detail: 'Tu envío tiene una demora. Estamos actualizando la hora estimada; el repartidor sigue con el recorrido.',
+    };
+}
+
+// Mensaje base según el estado. Devuelve { headline, detail, tone, isPickup, isReady }.
+// El overlay "demorado" (si aplica) se agrega en buildStatusMessage.
+function _buildBaseStatusMessage(shipment, eta) {
     const statusId = shipment.statusId;
     const isPickup = shipment.deliveryMode === 'branch_pickup';
     const branchName = shipment.currentBranch?.name || shipment.pickupBranch?.name || 'la sucursal';
@@ -72,6 +86,13 @@ function buildStatusMessage(shipment, eta) {
         detail: generic[statusId] || 'Estamos procesando tu envío.',
         tone: 'transit', isPickup, isReady: false,
     };
+}
+
+// Mensaje principal según el estado, con overlay "demorado" si corresponde.
+// Envuelve _buildBaseStatusMessage para no repetir la lógica de cada estado.
+function buildStatusMessage(shipment, eta) {
+    const base = _buildBaseStatusMessage(shipment, eta);
+    return _applyDelayOverlay(base, shipment);
 }
 
 // Línea de tiempo a partir del historial enriquecido (más nuevo arriba). El último (más reciente)

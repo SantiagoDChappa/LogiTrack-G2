@@ -880,18 +880,41 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
     try {
         await fatigueRecheck.startDriving(req.params.id, routeStartedAt);
     } catch (e) { console.warn('[fatigue] startDriving:', e.message); }
+    // ETAs precomputadas — se usan para el comment cliente-friendly del timeline y para
+    // persistir las promesas de ETA. Se calculan UNA vez y se reusan.
+    let etasByStop = new Map();
+    let etaCfg = null;
+    let etaRoute = null;
+    try {
+        const etaWindow = require('../services/etaWindow.service');
+        etaCfg = await etaWindow.loadConfig();
+        etaRoute = await routeModel.getById(req.params.id);
+        etasByStop = await etaWindow.computeEtas(etaRoute, etaCfg);
+    } catch (e) { console.error('[eta] pre-compute at start:', e.message); }
+
     // Sprint 3 - 2.1 / 2.3: por cada envío en la ruta emitir evento OUT_FOR_DELIVERY
-    // en el timeline y disparar notificación SHIPMENT_OUT_FOR_DELIVERY.
+    // en el timeline y disparar notificación SHIPMENT_OUT_FOR_DELIVERY. El comment queda
+    // en lenguaje del cliente (lo consume el paso a paso público de /track/:trackingId
+    // y misEnviosDetail); si hay ETA calculada, la incluye.
     try {
         const shipmentHistoryModel = require('../models/shipmentHistory');
         const { NotificationEvent, ShipmentHistoryEvent } = require('../constants/enums');
         const shipmentCtrl = require('../controllers/shipment');
+        const etaWindow = require('../services/etaWindow.service');
         for (const stop of (route.stops || []).filter(s => s.stopType === 'delivery' && s.shipmentId)) {
+            let comment = 'El repartidor salió a reparto. Tu envío llega en el transcurso del día.';
+            const eta = etasByStop.get(stop.id);
+            if (eta && etaCfg) {
+                const w = etaWindow.formatWindow(eta, etaCfg);
+                comment = etaCfg.format === 'exact'
+                    ? `El repartidor salió a reparto. Tu envío llega cerca de las ${w.fromLabel}.`
+                    : `El repartidor salió a reparto. Tu envío llega antes de las ${w.toLabel}.`;
+            }
             await shipmentHistoryModel.create({
                 shipmentId:   stop.shipmentId,
                 fromStatusId: stop.shipment?.statusId || Status.IN_TRANSIT.id,
                 toStatusId:   stop.shipment?.statusId || Status.IN_TRANSIT.id,
-                comment:      `Salida a reparto — Ruta #${route.id}`,
+                comment,
                 userId:       res.locals.currentUser.id,
                 eventType:    ShipmentHistoryEvent.OUT_FOR_DELIVERY,
             });
@@ -905,8 +928,7 @@ router.post('/route/:id/start', requireDelivery, async (req, res) => {
     // atraso) ya con la ruta iniciada. No bloquea la respuesta.
     try {
         const etaWindow = require('../services/etaWindow.service');
-        const freshRoute = await routeModel.getById(req.params.id);
-        etaWindow.persistPromisedEtas(freshRoute)
+        etaWindow.persistPromisedEtas(etaRoute || await routeModel.getById(req.params.id))
             .catch(e => console.error('[eta] persistPromisedEtas:', e.message));
     } catch (e) { console.error('[eta] start:', e.message); }
     res.json({ ok: true });
@@ -1019,9 +1041,12 @@ router.post('/route/:id/resume', requireDelivery, async (req, res) => {
 
 // === Reportar incidente EN RUTA (vehicular / accidente / zona insegura) ===
 // Distinto del módulo de Incidencias (Incident) del envío/cliente: esto es del repartidor/ruta.
-// TODO (a definir con el equipo): hoy RouteIncident es write-only — se guarda pero NO se notifica
-// a nadie ni se muestra en un panel. Falta: (1) notificar al supervisor de la sucursal (reusar el
-// sistema de notificaciones de fatiga/incidencias) y (2) una vista para verlos/resolverlos.
+// Al reportar, si el incidente es propagable (tipos vehicular/accidente/trafico/clima con
+// severidad media o alta) se marca automáticamente como demorado a TODAS las paradas
+// pendientes de la ruta (incluida la próxima). Cada destinatario recibe SHIPMENT_DELAYED,
+// aparece el evento DELAY_PROPAGATED en su timeline y el card ML-style pasa a tono
+// "delayed". El supervisor de la sucursal origen recibe ROUTE_INCIDENT_REPORTED.
+const PROPAGABLE_INCIDENT_TYPES = new Set(['vehicular', 'accidente', 'trafico', 'clima']);
 router.post('/route/:id/incident', requireDelivery, async (req, res) => {
     const { RouteIncident } = require('../models/routeIncident');
     const route = await routeModel.getById(req.params.id);
@@ -1030,16 +1055,41 @@ router.post('/route/:id/incident', requireDelivery, async (req, res) => {
     }
     const { incidentType, severity, description, latitude, longitude } = req.body;
     if (!incidentType) {return res.status(400).json({ error: 'Tipo de incidente obligatorio' });}
+    const normalizedSev = severity || 'media';
     const inc = await RouteIncident.create({
         routeId: route.id,
         userId:  res.locals.currentUser.id,
         incidentType,
-        severity:    severity    || 'media',
+        severity:    normalizedSev,
         description: description || null,
         latitude:    latitude    || null,
         longitude:   longitude   || null,
     });
-    res.json({ ok: true, incidentId: inc.id });
+
+    // Propagación automática de demora (solo si el tipo/severidad lo ameritan).
+    let affected = [];
+    try {
+        const shouldPropagate = PROPAGABLE_INCIDENT_TYPES.has(String(incidentType).toLowerCase())
+            && ['media', 'alta'].includes(String(normalizedSev).toLowerCase());
+        if (shouldPropagate) {
+            const delayProp = require('../services/delayPropagation');
+            const result = await delayProp.propagateFromRoute({
+                route,
+                originIncidentId: inc.id,
+                userId: res.locals.currentUser.id,
+                context: { incidentType, severity: normalizedSev },
+            });
+            affected = result.affected || [];
+        }
+    } catch (e) { console.error('[route-incident] propagate:', e.message); }
+
+    // Aviso al supervisor de la sucursal origen (best-effort — cableado en tarea siguiente).
+    try {
+        const notifRoute = require('../services/routeIncidentNotify');
+        notifRoute.notifySupervisor(inc, route).catch(e => console.error('[route-incident] notify:', e.message));
+    } catch { /* módulo aún no cableado */ }
+
+    res.json({ ok: true, incidentId: inc.id, affected });
 });
 
 // ===================== Ojo de Patrón — control de fatiga =====================
@@ -1235,7 +1285,15 @@ router.post('/panic', requireDelivery, async (req, res) => {
         message:     message || null,
         at:          new Date().toISOString(),
     }));
-    res.json({ ok: true, panicId: ev.id });
+    // Aviso a un humano: supervisores de la sucursal del conductor + admins (in-app + email),
+    // reusando el criterio de fatiga. Best-effort: no bloquea ni rompe el SOS si falla.
+    let notified = 0;
+    try {
+        const { notifyPanic } = require('../services/panic/notify');
+        const r = await notifyPanic({ userId: res.locals.currentUser.id, routeId: routeId || null, latitude, longitude, at: ev.createdAt });
+        notified = (r.notified || 0) + (r.emails || 0);
+    } catch (e) { console.error('[panic] notify falló:', e.message); }
+    res.json({ ok: true, panicId: ev.id, notified });
 });
 
 // === Telemetría del copiloto de voz (punto 4) ===

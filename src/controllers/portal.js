@@ -924,11 +924,46 @@ const getTrackStatus = async (req, res) => {
         const sv = statusView.buildStatusMessage(enriched, eta);
         const timeline = statusView.buildTimeline(enriched.history);
 
+        // Chips públicos (sin PII): tipo de envío, modalidad, destino resumido a nivel
+        // provincia (o sucursal si es retiro). Nada de calle/número/destinatario.
+        const isPickup = enriched.deliveryMode === 'branch_pickup';
+        const destinoLabel = isPickup
+            ? (enriched.pickupBranch?.name || enriched.currentBranch?.name || 'Sucursal')
+            : (enriched.address?.province?.description || 'Destino');
+        const chips = [
+            { icon: 'inventory_2', label: enriched.shipmentType?.description || 'Envío' },
+            { icon: isPickup ? 'store' : 'home', label: isPickup ? 'Retiro en sucursal' : 'Envío a domicilio' },
+            { icon: 'location_on', label: destinoLabel },
+        ];
+
+        // Resumen público de incidencias (sin descripciones — sólo tipo, estado y fecha).
+        let incidentSummary = { total: 0, open: 0, closed: 0, latest: null };
+        try {
+            const { listIncidentsForShipment } = require('../services/portalIncidentView');
+            const rows = await listIncidentsForShipment(enriched.id);
+            const open = rows.filter(r => r.statusKey === 'open' || r.statusKey === 'in-review');
+            const closed = rows.filter(r => r.statusKey === 'closed');
+            const latest = rows[0] || null;
+            incidentSummary = {
+                total: rows.length,
+                open: open.length,
+                closed: closed.length,
+                latest: latest ? {
+                    typeLabel: latest.typeLabel,
+                    statusLabel: latest.statusLabel,
+                    statusKey: latest.statusKey,
+                    createdAt: latest.createdAt,
+                } : null,
+            };
+        } catch (e) { console.error('[track] incidencias:', e.message); }
+
         return res.render('portal/trackStatus', {
             support, notFound: false, trackingId,
             sv, timeline,
+            chips, incidentSummary,
             recipientName: enriched.recipient?.fullName || '',
             identifyUrl: '/portal/mis-envios',
+            activeRouteId: enriched.activeRouteId || null,
         });
     } catch (err) {
         console.error('Track status error:', err.message);
@@ -943,18 +978,19 @@ const resolveShipmentByTracking = (trackingId) => {
     return Shipment.findOne({ where: { trackingId: t }, attributes: ['id'] });
 };
 
-// Ruta activa (planificada o en curso) más reciente de un envío. Igual criterio que
-// portalShipmentView.fetchActiveRouteId, replicado acá para no exportarlo.
+// Ruta en curso más reciente que ya avisó "casi llego" (Última Milla) para este envío. Igual
+// criterio que portalShipmentView.fetchActiveRouteId (replicado acá para no exportarlo): sólo
+// cuenta como "activa" a partir de nextNotified=true, la misma bandera del aviso por proximidad.
 const activeRouteIdForShipment = async (shipmentId) => {
     const { Route, RouteStatus } = require('../models/route');
     const { RouteStop } = require('../models/routeStop');
-    const stops = await RouteStop.findAll({ where: { shipmentId, stopType: 'delivery' }, attributes: ['routeId'] });
-    if (stops.length === 0) { return null; }
-    const route = await Route.findOne({
-        where: { id: stops.map((s) => s.routeId), statusId: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
-        order: [['createdAt', 'DESC']],
-        attributes: ['id'],
+    const stop = await RouteStop.findOne({
+        where: { shipmentId, stopType: 'delivery', nextNotified: true },
+        order: [['id', 'DESC']],
+        attributes: ['routeId'],
     });
+    if (!stop) { return null; }
+    const route = await Route.findOne({ where: { id: stop.routeId, statusId: RouteStatus.IN_ROUTE }, attributes: ['id'] });
     return route?.id || null;
 };
 
@@ -972,6 +1008,36 @@ const getLivePosition = async (req, res) => {
     } catch (err) {
         console.error('[live] position:', err.message);
         return res.json(null);
+    }
+};
+
+// Incidentes en ruta activos (RouteIncident sin resolver) del envío en curso, público-safe:
+// solo tipo, severidad, lat/lng y hora. Sin descripción (puede tener PII) ni driver.
+const getLiveRouteIncidents = async (req, res) => {
+    try {
+        const sh = await resolveShipmentByTracking(req.params.trackingId);
+        if (!sh) { return res.json([]); }
+        const routeId = await activeRouteIdForShipment(sh.id);
+        if (!routeId) { return res.json([]); }
+        const { RouteIncident } = require('../models/routeIncident');
+        const rows = await RouteIncident.findAll({
+            where: { routeId, resolvedAt: null },
+            order: [['reportedAt', 'DESC']],
+            limit: 20,
+        });
+        const items = rows
+            .filter(r => r.latitude != null && r.longitude != null)
+            .map(r => ({
+                type: r.incidentType,
+                severity: r.severity,
+                lat: Number(r.latitude),
+                lng: Number(r.longitude),
+                reportedAt: r.reportedAt,
+            }));
+        return res.json(items);
+    } catch (err) {
+        console.error('[live] route-incidents:', err.message);
+        return res.json([]);
     }
 };
 
@@ -1133,4 +1199,4 @@ const sucursalesCercanas = async (req, res) => {
     }
 };
 
-module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getTrackStatus, getLivePosition, getLiveEta, getLiveChat, postLiveChat, getCotizador, cotizarPublic, sucursalesCercanas };
+module.exports = { getPortal, getPublicCreateForm, createPublic, createPublicApi, confirmIncident, getIncidentTypesApi, publicSuccess, createIncidentFromPortal, confirmIncidentByToken, getSelfServiceForm, saveSelfService, getSelfServiceSaved, getLiveMap, getTrackStatus, getLivePosition, getLiveEta, getLiveRouteIncidents, getLiveChat, postLiveChat, getCotizador, cotizarPublic, sucursalesCercanas };

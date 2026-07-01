@@ -9,23 +9,23 @@
      identifyUrl= string|null   (CTA para identificarse y ver el código, en público)
 %>
 <% const tone = (sv && sv.tone) || 'transit';
-   const toneColor = { ready:'#16a34a', done:'#2563eb', transit:'#0891b2', bad:'#dc2626' }[tone] || '#0891b2';
+   const toneColor = { ready:'#16a34a', done:'#2563eb', transit:'#0891b2', bad:'#dc2626', delayed:'#d97706' }[tone] || '#0891b2';
 %>
-<div class="ss-card" style="border-left:5px solid <%= toneColor %>;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:14px;padding:1.4rem 1.5rem;margin-bottom:1.1rem">
-    <div style="font-size:.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--color-text-secondary,#64748b)">Envío <%= trackingId %></div>
+<div class="ss-card" style="border-left:5px solid <%= toneColor %>;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);border-radius:14px;padding:1.4rem 1.5rem;margin-bottom:1.1rem">
+    <div style="font-size:.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--c-text-2,#64748b)">Envío <%= trackingId %></div>
     <h2 style="margin:.3rem 0 .35rem;font-size:1.5rem;color:<%= toneColor %>"><%= sv ? sv.headline : 'En proceso' %></h2>
-    <p style="margin:0;font-size:1.02rem;line-height:1.45"><%= sv ? sv.detail : '' %></p>
+    <p style="margin:0;font-size:1.02rem;line-height:1.45;color:var(--c-text,#0f172a)"><%= sv ? sv.detail : '' %></p>
 </div>
 
 <% if (sv && sv.isReady) { %>
     <% if (authed && qrDataUrl) { %>
-        <div class="ss-card" style="text-align:center;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:14px;padding:1.5rem;margin-bottom:1.1rem">
+        <div class="ss-card" style="text-align:center;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);border-radius:14px;padding:1.5rem;margin-bottom:1.1rem">
             <h3 style="margin:0 0 .25rem">Tu código de retiro</h3>
-            <p style="margin:0 0 1rem;color:var(--color-text-secondary,#64748b);font-size:.9rem">Mostralo en la sucursal para retirar tu envío.</p>
-            <img src="<%= qrDataUrl %>" alt="Código QR de retiro" style="width:200px;height:200px;border-radius:12px;border:1px solid var(--color-border,#e2e8f0)">
+            <p style="margin:0 0 1rem;color:var(--c-text-2,#64748b);font-size:.9rem">Mostralo en la sucursal para retirar tu envío.</p>
+            <img src="<%= qrDataUrl %>" alt="Código QR de retiro" style="width:200px;height:200px;border-radius:12px;border:1px solid var(--c-border,#e2e8f0)">
             <div style="margin-top:1rem;font-size:2rem;font-weight:800;letter-spacing:.22em"><%= pickup ? pickup.code : '' %></div>
             <% if (pickup && pickup.expires) { %>
-                <p style="margin:.6rem 0 0;font-size:.85rem;color:var(--color-text-secondary,#64748b)">Válido hasta el <%= pickup.expires %></p>
+                <p style="margin:.6rem 0 0;font-size:.85rem;color:var(--c-text-2,#64748b)">Válido hasta el <%= pickup.expires %></p>
             <% } %>
         </div>
     <% } else if (!authed && identifyUrl) { %>
@@ -38,18 +38,18 @@
 <% } %>
 
 <% if (timeline && timeline.length) { %>
-    <div class="ss-card" style="background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:14px;padding:1.4rem 1.5rem;margin-bottom:1.1rem">
+    <div class="ss-card" style="background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);border-radius:14px;padding:1.4rem 1.5rem;margin-bottom:1.1rem">
         <h3 style="margin:0 0 1rem">Seguimiento</h3>
         <div style="position:relative">
             <% timeline.forEach(function (t, i) { %>
                 <div style="display:flex;gap:.8rem;padding-bottom:<%= i === timeline.length - 1 ? '0' : '1rem' %>">
                     <div style="display:flex;flex-direction:column;align-items:center">
-                        <span style="width:14px;height:14px;border-radius:50%;background:<%= t.current ? toneColor : 'var(--color-border,#cbd5e1)' %>;border:2px solid <%= t.current ? toneColor : 'var(--color-border,#cbd5e1)' %>;flex-shrink:0"></span>
-                        <% if (i !== timeline.length - 1) { %><span style="flex:1;width:2px;background:var(--color-border,#e2e8f0);margin-top:2px"></span><% } %>
+                        <span style="width:14px;height:14px;border-radius:50%;background:<%= t.current ? toneColor : 'var(--c-border,#cbd5e1)' %>;border:2px solid <%= t.current ? toneColor : 'var(--c-border,#cbd5e1)' %>;flex-shrink:0"></span>
+                        <% if (i !== timeline.length - 1) { %><span style="flex:1;width:2px;background:var(--c-border,#e2e8f0);margin-top:2px"></span><% } %>
                     </div>
                     <div style="flex:1;min-width:0;<%= t.current ? '' : 'opacity:.7' %>">
                         <div style="font-weight:<%= t.current ? '700' : '500' %>;line-height:1.35"><%= t.comment %></div>
-                        <div style="font-size:.8rem;color:var(--color-text-secondary,#64748b);margin-top:1px"><%= t.at %></div>
+                        <div style="font-size:.8rem;color:var(--c-text-2,#64748b);margin-top:1px"><%= t.at %></div>
                     </div>
                 </div>
             <% }) %>
@@ -59,6 +59,6 @@
 
 <% if (detailUrl) { %>
     <div style="text-align:center;margin-bottom:1rem">
-        <a href="<%= detailUrl %>" style="color:var(--color-primary,#2563eb);font-weight:600;text-decoration:none">Ver detalle completo del envío →</a>
+        <a href="<%= detailUrl %>" style="color:var(--c-primary,#2563eb);font-weight:600;text-decoration:none">Ver detalle completo del envío →</a>
     </div>
 <% } %>
