@@ -1,0 +1,42 @@
+<% if (typeof currentUser !== 'undefined' && currentUser && currentUser.pendingRelease) { %>
+<% const pr = currentUser.pendingRelease; %>
+<div id="whats-new-backdrop" class="whats-new-backdrop" hidden aria-hidden="true">
+    <div class="whats-new-modal" role="dialog" aria-modal="true" aria-labelledby="whats-new-title">
+        <header class="whats-new-modal__header">
+            <div>
+                <span class="whats-new-modal__badge">Nuevo</span>
+                <h2 id="whats-new-title" class="whats-new-modal__title"><%= pr.title %></h2>
+            </div>
+            <button type="button" class="whats-new-modal__close" id="whats-new-close" aria-label="Cerrar">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </header>
+        <div class="whats-new-modal__body">
+            <% pr.features.forEach(function (f) { %>
+            <article class="whats-new-card" data-help-slug="<%= f.helpSlug %>">
+                <div class="whats-new-card__media" data-fallback-icon="<%= f.icon %>">
+                    <% if (f.image) { %>
+                    <img src="<%= f.image %>?v=<%= assetVersion %>" alt="" class="whats-new-card__img" loading="lazy">
+                    <% } else { %>
+                    <span class="material-symbols-outlined whats-new-card__icon-fallback"><%= f.icon %></span>
+                    <% } %>
+                </div>
+                <div class="whats-new-card__content">
+                    <h3 class="whats-new-card__title">
+                        <span class="material-symbols-outlined"><%= f.icon %></span>
+                        <%= f.title %>
+                    </h3>
+                    <p class="whats-new-card__summary"><%= f.summary %></p>
+                    <div class="whats-new-card__actions">
+                        <a href="/help/<%= f.helpSlug %>?from=whats-new" class="help-btn whats-new-btn-manual">Ver manual</a>
+                    </div>
+                </div>
+            </article>
+            <% }); %>
+        </div>
+        <footer class="whats-new-modal__footer">
+            <button type="button" class="help-btn whats-new-btn-dismiss" id="whats-new-dismiss">Entendido</button>
+        </footer>
+    </div>
+</div>
+<% } %>

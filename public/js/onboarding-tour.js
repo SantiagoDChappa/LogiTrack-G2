@@ -356,6 +356,9 @@
             headers: { 'Content-Type': 'application/json' },
             keepalive: true,
         }).catch(function () {});
+        try {
+            window.dispatchEvent(new CustomEvent('lgt:main-tour-finished'));
+        } catch (_) { /* ignore */ }
     }
 
     function finishTour(driverObj) {

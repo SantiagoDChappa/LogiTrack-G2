@@ -340,7 +340,7 @@
 
                     <% if (typeof invoice !== 'undefined' && invoice) { %>
                         <% const _pm = typeof paymentMethods !== 'undefined' ? paymentMethods : { efectivoEnabled: true, transferenciaEnabled: true }; %>
-                        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                        <div id="shipment-payment-block" style="margin-top:.5rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                             <a href="/invoice/<%= invoice.id %>" target="_blank" class="btn btn--ghost" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem">
                                 <span class="material-symbols-outlined">receipt_long</span>
                                 Ver factura <%= invoice.number %>

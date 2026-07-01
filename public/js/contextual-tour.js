@@ -164,6 +164,7 @@
         var keys = Object.keys(TOURS);
         for (var i = 0; i < keys.length; i++) {
             var tour = TOURS[keys[i]];
+            if (tour.forceOnly) { continue; }
             var score = tourMatchScore(path, tour);
             if (score > bestScore) {
                 bestScore = score;
@@ -186,6 +187,7 @@
         if (window.__LGT.onboarded) return true;
         return tourDismissedForUser();
     }
+
 
     function startContextualTour(tour, force) {
         if (!window.__LGT || !window.driver || !window.driver.js) return;

@@ -45,6 +45,37 @@
 
             <p id="help-search-empty" class="help-search-empty" hidden>No hay artículos que coincidan con tu búsqueda.</p>
 
+            <% const newArticles = articles.filter(function (a) { return a.isNew; }); %>
+            <% if (newArticles.length) { %>
+            <section class="help-section help-section--new" data-category="novedades">
+                <h2 class="help-section__title">
+                    Novedades
+                    <span class="help-badge--pill-new">Nuevo</span>
+                </h2>
+                <div class="help-grid">
+                    <% newArticles.forEach(function (article) { %>
+                    <a href="/help/<%= article.slug %>"
+                       class="help-card help-card--new"
+                       data-title="<%= article.title %>"
+                       data-summary="<%= article.summary %>"
+                       data-keywords="<%= article.keywords %>">
+                        <div class="help-card__icon">
+                            <span class="material-symbols-outlined"><%= article.icon %></span>
+                        </div>
+                        <div class="help-card__body">
+                            <div class="help-card__title-row">
+                                <h3 class="help-card__title"><%= article.title %></h3>
+                                <span class="help-card__new">Nuevo</span>
+                            </div>
+                            <p class="help-card__summary"><%= article.summary %></p>
+                        </div>
+                        <span class="material-symbols-outlined help-card__arrow">chevron_right</span>
+                    </a>
+                    <% }); %>
+                </div>
+            </section>
+            <% } %>
+
             <% categories.forEach(function (cat) { %>
             <% const items = articles.filter(function (a) { return a.category === cat.id; }); %>
             <% if (!items.length) return; %>
@@ -53,7 +84,7 @@
                 <div class="help-grid">
                     <% items.forEach(function (article) { %>
                     <a href="/help/<%= article.slug %>"
-                       class="help-card"
+                       class="help-card<%= article.isNew ? ' help-card--new' : '' %>"
                        data-title="<%= article.title %>"
                        data-summary="<%= article.summary %>"
                        data-keywords="<%= article.keywords %>">
@@ -61,7 +92,10 @@
                             <span class="material-symbols-outlined"><%= article.icon %></span>
                         </div>
                         <div class="help-card__body">
-                            <h3 class="help-card__title"><%= article.title %></h3>
+                            <div class="help-card__title-row">
+                                <h3 class="help-card__title"><%= article.title %></h3>
+                                <% if (article.isNew) { %><span class="help-card__new">Nuevo</span><% } %>
+                            </div>
                             <p class="help-card__summary"><%= article.summary %></p>
                         </div>
                         <span class="material-symbols-outlined help-card__arrow">chevron_right</span>

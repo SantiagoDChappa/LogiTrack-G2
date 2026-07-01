@@ -150,6 +150,17 @@ const TARGETS = [
       waitFor: '.main-content', caption: 'Transportes: flota con patente, tipo y repartidor' },
     { slug: 'transportes-zonas', file: '02-zonas.png', role: 'admin', url: '/zone',
       waitFor: '.main-content', caption: 'Zonas de cobertura asociadas a los transportes' },
+
+    // --- Novedades jun 2026 ---
+    { slug: 'cobro-envios', file: '01-detalle.png', role: 'operador',
+      urlFrom: { page: '/shipment/search', linkSelector: 'a.detalle[href*="/shipment/detail/"]', match: '^/shipment/detail/\\d+' },
+      url: '/shipment/search', waitFor: '#shipment-payment-block', element: '#shipment-payment-block',
+      caption: 'Detalle del envío: badge de cobro y formulario Registrar cobro' },
+    { slug: 'copiloto-voz', file: '01-controles.png', role: 'repartidor',
+      urlFrom: { page: '/delivery', linkSelector: 'a[href*="/delivery/route/"]', match: '^/delivery/route/\\d+$' },
+      url: '/delivery', waitFor: '#btn-voice',
+      clipSelectors: ['#btn-voice', '#btn-voice-wake'],
+      caption: 'Copiloto de voz: micrófono y modo escucha en la barra de acciones' },
 ];
 
 async function login(page, email, role) {
@@ -192,7 +203,7 @@ async function login(page, email, role) {
 async function dismissTour(page) {
     await page.evaluate(() => {
         document.querySelectorAll(
-            '.driver-overlay, .driver-popover, .driver-popover-wrapper, .driver-stage, .driver-page-overlay, svg.driver-overlay, #tfa-nudge'
+            '.driver-overlay, .driver-popover, .driver-popover-wrapper, .driver-stage, .driver-page-overlay, svg.driver-overlay, #tfa-nudge, #whats-new-backdrop'
         ).forEach((el) => el.remove());
         document.documentElement.classList.remove('driver-active', 'driver-fade', 'driver-simple');
         if (document.body) { document.body.classList.remove('driver-active', 'driver-fade'); }
@@ -200,6 +211,32 @@ async function dismissTour(page) {
         if (document.body) { document.body.style.overflow = ''; }
     }).catch(() => {});
     await page.waitForTimeout(150);
+}
+
+async function screenshotUnion(page, selectors, dest) {
+    const box = await page.evaluate((sels) => {
+        const pad = 10;
+        let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+        for (const sel of sels) {
+            const el = document.querySelector(sel);
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            minX = Math.min(minX, r.left);
+            minY = Math.min(minY, r.top);
+            maxX = Math.max(maxX, r.right);
+            maxY = Math.max(maxY, r.bottom);
+        }
+        if (!Number.isFinite(minX)) return null;
+        return {
+            x: Math.max(0, minX - pad),
+            y: Math.max(0, minY - pad),
+            width: maxX - minX + pad * 2,
+            height: maxY - minY + pad * 2,
+        };
+    }, selectors);
+    if (!box || box.width < 1 || box.height < 1) return false;
+    await page.screenshot({ path: dest, clip: box });
+    return true;
 }
 
 async function capture(context, target) {
@@ -241,11 +278,33 @@ async function capture(context, target) {
         }
         await page.waitForTimeout(400); // pequeño respiro para fuentes/íconos
 
-        // El tour de onboarding (driver.js) se autolanza en /home y tapa la captura.
-        // Lo quitamos del DOM antes de fotografiar.
+        // Tour de onboarding y modal de novedades pueden tapar la captura.
         await dismissTour(page);
 
+        if (target.element) {
+            await page.evaluate((sel) => {
+                const el = document.querySelector(sel);
+                if (el) el.scrollIntoView({ block: 'center', behavior: 'instant' });
+            }, target.element).catch(() => {});
+            await page.waitForTimeout(200);
+        }
+
         let shot = null;
+        if (target.clipSelectors && target.clipSelectors.length) {
+            for (const sel of target.clipSelectors) {
+                await page.evaluate((s) => {
+                    const el = document.querySelector(s);
+                    if (el) el.scrollIntoView({ block: 'center', behavior: 'instant' });
+                }, sel).catch(() => {});
+            }
+            await page.waitForTimeout(200);
+            const ok = await screenshotUnion(page, target.clipSelectors, dest);
+            if (ok) {
+                console.log(`  ✔ ${target.slug}/${target.file}`);
+                return;
+            }
+            console.warn(`  [aviso] no pude recortar ${target.clipSelectors.join(', ')}`);
+        }
         if (target.element) {
             shot = await page.$(target.element);
         }
