@@ -963,6 +963,7 @@ const getTrackStatus = async (req, res) => {
             chips, incidentSummary,
             recipientName: enriched.recipient?.fullName || '',
             identifyUrl: '/portal/mis-envios',
+            activeRouteId: enriched.activeRouteId || null,
         });
     } catch (err) {
         console.error('Track status error:', err.message);
@@ -977,18 +978,19 @@ const resolveShipmentByTracking = (trackingId) => {
     return Shipment.findOne({ where: { trackingId: t }, attributes: ['id'] });
 };
 
-// Ruta activa (planificada o en curso) más reciente de un envío. Igual criterio que
-// portalShipmentView.fetchActiveRouteId, replicado acá para no exportarlo.
+// Ruta en curso más reciente que ya avisó "casi llego" (Última Milla) para este envío. Igual
+// criterio que portalShipmentView.fetchActiveRouteId (replicado acá para no exportarlo): sólo
+// cuenta como "activa" a partir de nextNotified=true, la misma bandera del aviso por proximidad.
 const activeRouteIdForShipment = async (shipmentId) => {
     const { Route, RouteStatus } = require('../models/route');
     const { RouteStop } = require('../models/routeStop');
-    const stops = await RouteStop.findAll({ where: { shipmentId, stopType: 'delivery' }, attributes: ['routeId'] });
-    if (stops.length === 0) { return null; }
-    const route = await Route.findOne({
-        where: { id: stops.map((s) => s.routeId), statusId: [RouteStatus.PLANNED, RouteStatus.IN_ROUTE] },
-        order: [['createdAt', 'DESC']],
-        attributes: ['id'],
+    const stop = await RouteStop.findOne({
+        where: { shipmentId, stopType: 'delivery', nextNotified: true },
+        order: [['id', 'DESC']],
+        attributes: ['routeId'],
     });
+    if (!stop) { return null; }
+    const route = await Route.findOne({ where: { id: stop.routeId, statusId: RouteStatus.IN_ROUTE }, attributes: ['id'] });
     return route?.id || null;
 };
 

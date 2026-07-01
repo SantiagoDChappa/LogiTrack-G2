@@ -5,14 +5,15 @@ const {
 
 const requirePortalClient = (req, res, next) => {
     const token = req.cookies?.[COOKIE_NAME];
+    const returnTo = '/portal/mis-envios?returnTo=' + encodeURIComponent(req.originalUrl);
     if (!token) {
-        return res.redirect('/portal/mis-envios');
+        return res.redirect(returnTo);
     }
 
     const client = verifyPortalClientSession(token);
     if (!client) {
         res.clearCookie(COOKIE_NAME);
-        return res.redirect('/portal/mis-envios');
+        return res.redirect(returnTo);
     }
 
     res.locals.portalClient = client;

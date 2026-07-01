@@ -83,7 +83,10 @@
                 </div>
             <% } %>
 
-            <% if (!sv.isReady && !sv.isPickup) { %>
+            <%# El link sólo se habilita cuando el repartidor ya está a ≤1km (mismo momento en que
+                sale el mail "casi llego" — ver etaWindow.service.notifyOnProximity). Antes de eso
+                no hay nada útil que mostrar en el mapa. %>
+            <% if (!sv.isReady && !sv.isPickup && typeof activeRouteId !== 'undefined' && activeRouteId) { %>
                 <div style="text-align:center;margin-top:.5rem">
                     <a href="/track/<%= encodeURIComponent(trackingId) %>/live" style="color:var(--c-primary,#2563eb);font-weight:600;text-decoration:none">Ver mapa en vivo →</a>
                 </div>

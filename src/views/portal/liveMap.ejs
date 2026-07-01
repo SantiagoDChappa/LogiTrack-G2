@@ -177,7 +177,7 @@
         var setStatus = function(icon, text){ statusIcon.textContent = icon; statusText.textContent = text; };
 
         if (!DATA.activeRouteId) {
-            setStatus('schedule', 'El repartidor todavía no salió a la calle.');
+            setStatus('schedule', 'Todavía no está disponible: te avisamos por mail apenas el repartidor esté cerca.');
             map.setView([DATA.dest.lat, DATA.dest.lng], 15);
         }
 

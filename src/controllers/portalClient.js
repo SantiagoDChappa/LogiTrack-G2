@@ -76,6 +76,11 @@ const getSupportInfo = async () => {
     };
 };
 
+// Sólo se acepta un returnTo relativo dentro del portal autenticado, para evitar open-redirect.
+const sanitizeReturnTo = (value) => (
+    typeof value === 'string' && value.startsWith('/portal/mis-envios/') ? value : null
+);
+
 const renderIdentify = async (req, res, extra = {}) => {
     const support = await getSupportInfo();
     res.render('portal/misEnviosIdentify', {
@@ -83,12 +88,14 @@ const renderIdentify = async (req, res, extra = {}) => {
         form: extra.form || {},
         error: extra.error || null,
         info: extra.info || null,
+        returnTo: extra.returnTo || sanitizeReturnTo(req.query.returnTo) || '',
     });
 };
 
 const getIdentifyForm = async (req, res) => {
+    const returnTo = sanitizeReturnTo(req.query.returnTo);
     if (res.locals.portalClient) {
-        return res.redirect('/portal/mis-envios/lista');
+        return res.redirect(returnTo || '/portal/mis-envios/lista');
     }
     return renderIdentify(req, res);
 };
@@ -96,6 +103,7 @@ const getIdentifyForm = async (req, res) => {
 const postRequestAccess = async (req, res) => {
     const document = req.body.document;
     const email = req.body.email;
+    const returnTo = sanitizeReturnTo(req.body.returnTo);
     const result = await requestAccess({ document, email });
 
     if (!result.ok) {
@@ -103,11 +111,13 @@ const postRequestAccess = async (req, res) => {
             return renderIdentify(req, res, {
                 error: result.message,
                 form: { document, email },
+                returnTo,
             });
         }
         return renderIdentify(req, res, {
             error: result.message,
             form: { document, email },
+            returnTo,
         });
     }
 
@@ -119,6 +129,7 @@ const postRequestAccess = async (req, res) => {
         mailDelivered: result.pending.mailDelivered,
         devCode: result.pending.devCode,
         error: null,
+        returnTo,
     });
 };
 
@@ -134,6 +145,7 @@ const setPortalSession = (res, sessionToken) => {
 const postConfirmAccess = async (req, res) => {
     const code = req.body.code;
     const email = req.body.email;
+    const returnTo = sanitizeReturnTo(req.body.returnTo);
     const result = await confirmAccess(code, email);
     if (!result.ok) {
         return res.status(result.status).render('portal/misEnviosPending', {
@@ -144,11 +156,12 @@ const postConfirmAccess = async (req, res) => {
             mailDelivered: true,
             devCode: null,
             error: result.message,
+            returnTo,
         });
     }
 
     setPortalSession(res, result.sessionToken);
-    return res.redirect('/portal/mis-envios/lista');
+    return res.redirect(returnTo || '/portal/mis-envios/lista');
 };
 
 // Compat: confirmación por link (?token=) — opcional, usado en desarrollo.

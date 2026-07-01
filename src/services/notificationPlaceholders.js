@@ -54,7 +54,7 @@ const CATALOG = [
     { token: 'pickupBranchName',  label: 'Sucursal de retiro',  group: 'Retiro',  description: 'Nombre de la sucursal donde se retira el envío.',            resolve: s => s.currentBranch?.name || s.pickupBranch?.name || '' },
     { token: 'pickupBranchAddress', label: 'Dirección de retiro', group: 'Retiro', description: 'Dirección de la sucursal de retiro.',                       resolve: s => s.currentBranch?.address || s.pickupBranch?.address || '' },
     { token: 'pickupExpires',     label: 'Vence el retiro',     group: 'Retiro',  description: 'Fecha límite para retirar el envío en la sucursal.',         resolve: s => fmtDate(s.pickupExpiresAt) },
-    { token: 'trackingStatusUrl', label: 'Enlace de estado',    group: 'Retiro',  description: '🔗 Página de estado del envío (estilo seguimiento) con el QR para retirar.', resolve: s => (s.trackingId ? `${baseUrl()}/track/${encodeURIComponent(s.trackingId)}` : baseUrl()) },
+    { token: 'trackingStatusUrl', label: 'Enlace de estado',    group: 'Retiro',  description: '🔗 Detalle del envío en el portal (identificate una vez) con el QR para retirar.', resolve: s => (s.id ? `${baseUrl()}/portal/mis-envios/envio/${s.id}` : baseUrl()) },
     // URLs accionables
     { token: 'trackingUrl',    label: 'Enlace seguimiento',  group: 'Enlaces',      description: '🔗 Ver el seguimiento del envío en el portal.', resolve: s => (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl()) },
     { token: 'liveMapUrl',     label: 'Mapa en vivo',        group: 'Enlaces',      description: '🔗 Seguir al repartidor en un mapa en vivo (punto de entrega + ubicación del repartidor en tiempo real).', resolve: s => (s.trackingId ? `${baseUrl()}/track/${encodeURIComponent(s.trackingId)}/live` : baseUrl()) },
@@ -124,6 +124,7 @@ const catalogMeta = () => CATALOG.map(({ token, label, description, group }) => 
 
 // Shipment de ejemplo para previsualización / email de prueba.
 const sampleShipment = () => ({
+    id: 1234,
     trackingId: 'ENV-001234',
     _codigo: '482913',
     _ttlHoras: 24,
