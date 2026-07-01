@@ -150,6 +150,13 @@
                             <span class="portal-card-tracking-id"><%= s.trackingId %></span>
                         </div>
                         <span class="portal-badge <%= sk %>"><%= statusLabel %></span>
+                        <%# Marca "Demorado" — solo si delayNotifiedAt está seteada y el envío no está en estado final. %>
+                        <% if (s.delayNotifiedAt && sk !== 'entregado' && sk !== 'cancelado' && sk !== 'cancelada' && sk !== 'devuelto') { %>
+                            <span class="portal-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;margin-left:.4rem;font-size:.72rem" title="El envío está demorado por un incidente en la ruta.">
+                                <span class="material-symbols-outlined" style="font-size:.9rem;vertical-align:middle">schedule</span>
+                                Demorado
+                            </span>
+                        <% } %>
                     </div>
 
                     <div class="portal-timeline">

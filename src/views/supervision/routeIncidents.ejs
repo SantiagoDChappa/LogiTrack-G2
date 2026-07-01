@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Incidentes en ruta — Supervisión</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <style>
+        .ri-page { max-width: 1100px; margin: 0 auto; }
+        .ri-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem; }
+        .ri-filters { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem; }
+        .ri-filters select, .ri-filters .btn {
+            padding:.55rem .75rem; border-radius:8px; border:1px solid var(--color-border,#cbd5e1);
+            background:var(--color-surface,#fff); color:var(--color-text,#1e293b); font-size:.9rem;
+        }
+        .ri-filters .btn { background:#2563eb; color:#fff; border:0; cursor:pointer; font-weight:600; text-decoration:none; }
+        .ri-badge { display:inline-block; padding:.15rem .55rem; border-radius:999px; font-size:.72rem; font-weight:600; }
+        .ri-badge.sev-baja  { background:#dbeafe; color:#1e40af; }
+        .ri-badge.sev-media { background:#fef3c7; color:#92400e; }
+        .ri-badge.sev-alta  { background:#fee2e2; color:#991b1b; }
+        .ri-badge.resolved  { background:#dcfce7; color:#166534; }
+        .ri-row { background:var(--color-surface,#fff); border:1px solid var(--color-border,#e2e8f0); border-radius:12px; padding:1rem 1.2rem; margin-bottom:.7rem; }
+        .ri-row.resolved { opacity:.7; }
+        .ri-row-top { display:flex; justify-content:space-between; gap:1rem; align-items:baseline; flex-wrap:wrap; }
+        .ri-row-title { font-weight:700; font-size:1.05rem; }
+        .ri-row-meta { font-size:.8rem; color:var(--color-text-secondary,#64748b); }
+        .ri-row-desc { margin-top:.5rem; font-size:.92rem; color:var(--color-text,#1e293b); }
+        .ri-row-actions { margin-top:.7rem; display:flex; gap:.5rem; }
+        .ri-row-actions button, .ri-row-actions a {
+            padding:.45rem .8rem; border-radius:8px; border:0; cursor:pointer; font-size:.85rem;
+            font-weight:600; text-decoration:none;
+        }
+        .ri-btn-resolve { background:#16a34a; color:#fff; }
+        .ri-btn-view    { background:transparent; color:var(--color-primary,#2563eb); border:1px solid var(--color-border,#cbd5e1) !important; }
+        .ri-empty { text-align:center; padding:3rem 1rem; color:var(--color-text-secondary,#64748b); }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="ri-page">
+            <div class="ri-header">
+                <div>
+                    <h1 style="margin:0">Incidentes en ruta</h1>
+                    <p style="margin:.3rem 0 0;color:var(--color-text-secondary,#64748b);font-size:.92rem">
+                        <%= totalOpen %> incidente<%= totalOpen === 1 ? '' : 's' %> sin resolver.
+                    </p>
+                </div>
+            </div>
+
+            <form method="GET" action="/supervision/route-incidents" class="ri-filters">
+                <select name="severity">
+                    <option value="">Severidad — todas</option>
+                    <% Object.entries(labels.severities).forEach(function([k,v]){ %>
+                        <option value="<%= k %>" <%= filters.severity === k ? 'selected' : '' %>><%= v %></option>
+                    <% }) %>
+                </select>
+                <select name="incidentType">
+                    <option value="">Tipo — todos</option>
+                    <% Object.entries(labels.types).forEach(function([k,v]){ %>
+                        <option value="<%= k %>" <%= filters.incidentType === k ? 'selected' : '' %>><%= v %></option>
+                    <% }) %>
+                </select>
+                <select name="resolved">
+                    <option value="0" <%= filters.resolved !== '1' ? 'selected' : '' %>>Sin resolver</option>
+                    <option value="1" <%= filters.resolved === '1' ? 'selected' : '' %>>Resueltos</option>
+                </select>
+                <button type="submit" class="btn">Filtrar</button>
+            </form>
+
+            <% if (items.length === 0) { %>
+                <div class="ri-empty">
+                    <span class="material-symbols-outlined" style="font-size:3rem;color:#94a3b8">check_circle</span>
+                    <h3>No hay incidentes que coincidan con el filtro.</h3>
+                </div>
+            <% } else { %>
+                <% items.forEach(function(it){ %>
+                    <div class="ri-row <%= it.resolvedAt ? 'resolved' : '' %>" data-inc="<%= it.id %>">
+                        <div class="ri-row-top">
+                            <div>
+                                <div class="ri-row-title">
+                                    <%= it.incidentTypeLabel %>
+                                    <span class="ri-badge sev-<%= it.severity %>"><%= it.severityLabel %></span>
+                                    <% if (it.resolvedAt) { %>
+                                        <span class="ri-badge resolved">Resuelto</span>
+                                    <% } %>
+                                </div>
+                                <div class="ri-row-meta">
+                                    Ruta #<%= it.routeId %> · <%= it.branchName %> · <%= it.driverName %>
+                                    · <%= new Date(it.reportedAt).toLocaleString('es-AR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) %>
+                                </div>
+                            </div>
+                        </div>
+                        <% if (it.description) { %>
+                            <div class="ri-row-desc"><%= it.description %></div>
+                        <% } %>
+                        <div class="ri-row-actions">
+                            <% if (!it.resolvedAt) { %>
+                                <button type="button" class="ri-btn-resolve" data-resolve="<%= it.id %>">Marcar resuelto</button>
+                            <% } %>
+                            <% if (it.latitude && it.longitude) { %>
+                                <a class="ri-btn-view" target="_blank" rel="noopener"
+                                   href="https://www.openstreetmap.org/?mlat=<%= it.latitude %>&mlon=<%= it.longitude %>&zoom=16#map=16/<%= it.latitude %>/<%= it.longitude %>">
+                                    Ver en mapa
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }) %>
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script>
+    document.querySelectorAll('[data-resolve]').forEach(function(btn){
+        btn.addEventListener('click', async function(){
+            if (!confirm('¿Marcar este incidente como resuelto?')) { return; }
+            const id = btn.getAttribute('data-resolve');
+            btn.disabled = true;
+            try {
+                const r = await fetch('/supervision/route-incidents/' + id + '/resolve', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                });
+                if (r.ok) { location.reload(); }
+                else { alert('No se pudo resolver'); btn.disabled = false; }
+            } catch { alert('Error de conexión'); btn.disabled = false; }
+        });
+    });
+    </script>
+</body>
+</html>

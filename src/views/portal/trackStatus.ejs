@@ -46,9 +46,56 @@
                 identifyUrl,
             }) %>
 
+            <%# Chips de datos públicos (sin PII): tipo, modalidad, destino resumido. %>
+            <% if (typeof chips !== 'undefined' && chips && chips.length) { %>
+                <div class="ts-chips" style="display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1.1rem">
+                    <% chips.forEach(function(c){ %>
+                        <span style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .8rem;border-radius:999px;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);font-size:.85rem;color:var(--c-text,#0f172a)">
+                            <span class="material-symbols-outlined" style="font-size:1.05rem;color:var(--c-primary,#2563eb)"><%= c.icon %></span>
+                            <%= c.label %>
+                        </span>
+                    <% }) %>
+                </div>
+            <% } %>
+
+            <%# Resumen público de incidencias del envío (sin descripciones sensibles). %>
+            <% if (typeof incidentSummary !== 'undefined' && incidentSummary && incidentSummary.total > 0) { %>
+                <% var _hasOpen = incidentSummary.open > 0;
+                   var _incColor = _hasOpen ? '#dc2626' : '#64748b';
+                   var _incBg = _hasOpen ? 'rgba(220,38,38,.08)' : 'var(--c-surface,#fff)';
+                   var _incBorder = _hasOpen ? '#fecaca' : 'var(--c-border,#e2e8f0)'; %>
+                <div style="background:<%= _incBg %>;border:1px solid <%= _incBorder %>;border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:1.1rem">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+                        <span class="material-symbols-outlined" style="color:<%= _incColor %>"><%= _hasOpen ? 'error' : 'assignment_late' %></span>
+                        <h3 style="margin:0;font-size:1.02rem;color:<%= _incColor %>">
+                            Incidencias
+                            <span style="font-weight:500;color:var(--c-text-2,#64748b);font-size:.85rem">(<%= incidentSummary.total %> en total<% if (incidentSummary.open) { %>, <%= incidentSummary.open %> abierta<%= incidentSummary.open === 1 ? '' : 's' %><% } %>)</span>
+                        </h3>
+                    </div>
+                    <% if (incidentSummary.latest) { %>
+                        <div style="font-size:.9rem;line-height:1.45">
+                            Última: <strong><%= incidentSummary.latest.typeLabel %></strong>
+                            — <%= incidentSummary.latest.statusLabel %>
+                            <span style="color:var(--c-text-2,#64748b)"> · <%= new Date(incidentSummary.latest.createdAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' }) %></span>
+                        </div>
+                    <% } %>
+                    <p style="margin:.6rem 0 0;font-size:.82rem;color:var(--c-text-2,#64748b)">Para ver el detalle, identificate en Mis Envíos.</p>
+                </div>
+            <% } %>
+
             <% if (!sv.isReady && !sv.isPickup) { %>
                 <div style="text-align:center;margin-top:.5rem">
                     <a href="/track/<%= encodeURIComponent(trackingId) %>/live" style="color:var(--c-primary,#2563eb);font-weight:600;text-decoration:none">Ver mapa en vivo →</a>
+                </div>
+            <% } %>
+
+            <%# CTA a detalle completo autenticado. Se muestra siempre salvo cuando ya está listo
+                para retiro (allí la partial ya muestra el CTA verde "Ver mi código de retiro"
+                apuntando al mismo lugar). %>
+            <% if (!sv.isReady) { %>
+                <div style="text-align:center;margin-top:1.25rem;padding:1rem;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);border-radius:12px">
+                    <p style="margin:0 0 .6rem;font-size:.9rem;color:var(--c-text-2,#64748b)">¿Querés ver dirección, incidencias, devoluciones y gestionar tu envío?</p>
+                    <a href="<%= identifyUrl %>" style="display:inline-block;background:var(--c-primary,#2563eb);color:#fff;text-decoration:none;font-weight:600;padding:.65rem 1.15rem;border-radius:10px">Ver detalle completo →</a>
                 </div>
             <% } %>
         <% } %>
