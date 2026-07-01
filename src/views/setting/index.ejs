@@ -117,8 +117,9 @@
         .tplm-close { background:none; border:none; cursor:pointer; color:var(--color-text-secondary);
             display:inline-flex; padding:.2rem; border-radius:6px; }
         .tplm-close:hover { background:var(--color-surface-alt); color:var(--color-text); }
-        .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr); gap:1.25rem;
-            padding:1.1rem 1.25rem; overflow:hidden; }
+        .tplm-body { display:grid; grid-template-columns:minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr);
+            grid-template-rows:1fr; gap:1.25rem;
+            padding:1.1rem 1.25rem; flex:1; min-height:0; overflow:hidden; }
         .tplm-editor { display:contents; }
         .tplm-col { display:flex; flex-direction:column; gap:.85rem; min-width:0; min-height:0; overflow:auto; }
         .tplm-col-body { gap:.6rem; }
@@ -967,6 +968,64 @@
                 <% } else { %>
                 <p style="color:var(--color-text-secondary)">
                     La plantilla aún no está cargada. Corré las migraciones <code>086</code> y <code>087</code> para poder editarla;
+                    mientras tanto se usa el HTML por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Mail cancelación por falta de pago -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">cancel</span>
+                    Mail de cancelación por falta de pago
+                </h2>
+                <p class="settings-subtitle">
+                    Mail que recibe el remitente cuando su envío es cancelado automáticamente por no confirmar el pago en el plazo configurado.
+                    Es transaccional: <strong>siempre se envía</strong>.
+                    Placeholders: <code>{{empresaNombre}}</code> <code>{{senderName}}</code> <code>{{trackingCode}}</code> <code>{{totalAmount}}</code>.
+                </p>
+                <% if (templatesByEvent['INVOICE_PAYMENT_CANCELLED']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla del mail de cancelación</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="INVOICE_PAYMENT_CANCELLED"
+                        data-description="Mail de cancelación por falta de pago"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>104</code> y <code>105</code>;
+                    mientras tanto se usa el HTML por defecto del sistema.
+                </p>
+                <% } %>
+            </div>
+
+            <!-- Card: Mail rechazo de comprobante -->
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">receipt_long</span>
+                    Mail de rechazo de comprobante
+                </h2>
+                <p class="settings-subtitle">
+                    Mail que recibe el remitente cuando un operador rechaza el comprobante de pago que envió.
+                    Es transaccional: <strong>siempre se envía</strong>.
+                    Placeholders: <code>{{empresaNombre}}</code> <code>{{senderName}}</code> <code>{{trackingCode}}</code> <code>{{totalAmount}}</code> <code>{{payUrl}}</code>.
+                </p>
+                <% if (templatesByEvent['INVOICE_COMPROBANTE_REJECTED']) { %>
+                <div style="padding:.75rem 1rem;background:var(--color-surface-alt);border:1px solid var(--color-border,#e2e8f0);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:1rem">
+                    <span style="font-weight:600">Plantilla del mail de rechazo</span>
+                    <button type="button" class="action-btn modificar notif-edit-tpl-btn"
+                        data-event="INVOICE_COMPROBANTE_REJECTED"
+                        data-description="Mail de rechazo de comprobante de pago"
+                        data-tooltip="Editar mail" aria-label="Editar mail">
+                        <span class="material-symbols-outlined">edit_note</span>
+                    </button>
+                </div>
+                <% } else { %>
+                <p style="color:var(--color-text-secondary)">
+                    La plantilla aún no está cargada. Corré las migraciones <code>104</code> y <code>105</code>;
                     mientras tanto se usa el HTML por defecto del sistema.
                 </p>
                 <% } %>

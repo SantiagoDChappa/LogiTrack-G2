@@ -22,7 +22,7 @@ const buildBody = ({ invoice, shipment, payUrl, empresa, cancellationHours = 48 
     const sender = invoice.senderName || shipment?.sender?.fullName || 'Cliente';
     const tracking = shipment?.trackingId || '';
     const recipientName = shipment?.recipient?.fullName || '';
-    const shipmentTypeName = shipment?.shipmentType?.name || '';
+    const shipmentTypeName = shipment?.shipmentType?.description || shipment?.shipmentType?.name || '';
     let deliveryLine = '';
     if (shipment?.deliveryMode === 'branch') {
         deliveryLine = 'Retiro en sucursal';
@@ -81,7 +81,7 @@ const sendPaymentLink = async ({ invoice, shipment, empresa = 'LogiTrack' }) => 
     try { cancellationHours = await readThresholdHours(); } catch { /* usa default */ }
 
     const recipientName = shipment?.recipient?.fullName || '';
-    const shipmentTypeName = shipment?.shipmentType?.name || '';
+    const shipmentTypeName = shipment?.shipmentType?.description || shipment?.shipmentType?.name || '';
     let deliveryLine = '';
     if (shipment?.deliveryMode === 'branch') {
         deliveryLine = 'Retiro en sucursal';
@@ -132,8 +132,15 @@ const sendPaymentCancelled = async ({ invoice, shipment, empresa = 'LogiTrack' }
     const sender = invoice?.senderName || shipment?.sender?.fullName || 'Cliente';
     const total = invoice ? fmt(totalConIva(invoice)) : '';
 
-    const subject = `Envío ${tracking} cancelado por falta de pago`.trim();
-    const body = `<!DOCTYPE html><html><body style="margin:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+    const vars = {
+        empresaNombre: empresa,
+        senderName:    sender,
+        trackingCode:  tracking,
+        totalAmount:   total ? `$ ${total}` : '',
+    };
+
+    let subject = `Envío ${tracking} cancelado por falta de pago`.trim();
+    let body = `<!DOCTYPE html><html><body style="margin:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
   <div style="max-width:520px;margin:0 auto;padding:24px">
     <div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(15,23,42,.08)">
       <div style="background:#64748b;color:#fff;padding:20px 24px">
@@ -154,8 +161,19 @@ const sendPaymentCancelled = async ({ invoice, shipment, empresa = 'LogiTrack' }
     </div>
   </div>
 </body></html>`;
+    let format = 'html';
+    try {
+        const tpl = await emailTemplateModel.getDefaultByEventCode(NotificationEvent.INVOICE_PAYMENT_CANCELLED);
+        if (tpl) {
+            subject = render(tpl.subject, vars) || subject;
+            body    = render(tpl.body, vars)    || body;
+            format  = tpl.format === 'html' ? 'html' : 'text';
+        }
+    } catch (err) {
+        console.warn('[invoicePaymentEmail] plantilla cancelación no disponible:', err.message);
+    }
 
-    await queueEmail({ recipient: to, subject, body, format: 'html' });
+    await queueEmail({ recipient: to, subject, body, format });
     return { ok: true };
 };
 
@@ -169,8 +187,16 @@ const sendComprobanteRejected = async ({ invoice, shipment, empresa = 'LogiTrack
     const tracking = shipment?.trackingId || '';
     const total = fmt(totalConIva(invoice));
 
-    const subject = `Comprobante rechazado · Envío ${tracking}`.trim();
-    const body = `<!DOCTYPE html><html><body style="margin:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+    const vars = {
+        empresaNombre: empresa,
+        senderName:    sender,
+        trackingCode:  tracking,
+        totalAmount:   `$ ${total}`,
+        payUrl,
+    };
+
+    let subject = `Comprobante rechazado · Envío ${tracking}`.trim();
+    let body = `<!DOCTYPE html><html><body style="margin:0;background:#f0f2f5;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
   <div style="max-width:520px;margin:0 auto;padding:24px">
     <div style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(15,23,42,.08)">
       <div style="background:#dc2626;color:#fff;padding:20px 24px">
@@ -189,8 +215,19 @@ const sendComprobanteRejected = async ({ invoice, shipment, empresa = 'LogiTrack
     </div>
   </div>
 </body></html>`;
+    let format = 'html';
+    try {
+        const tpl = await emailTemplateModel.getDefaultByEventCode(NotificationEvent.INVOICE_COMPROBANTE_REJECTED);
+        if (tpl) {
+            subject = render(tpl.subject, vars) || subject;
+            body    = render(tpl.body, vars)    || body;
+            format  = tpl.format === 'html' ? 'html' : 'text';
+        }
+    } catch (err) {
+        console.warn('[invoicePaymentEmail] plantilla rechazo no disponible:', err.message);
+    }
 
-    await queueEmail({ recipient: to, subject, body, format: 'html' });
+    await queueEmail({ recipient: to, subject, body, format });
     return { ok: true };
 };
 
