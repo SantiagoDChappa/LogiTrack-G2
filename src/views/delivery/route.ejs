@@ -2424,6 +2424,15 @@
         row.dataset.skipped = skipped ? '1' : '0';
         const stop = stops.find(s => s.id === Number(stopId));
         if (stop) { stop.skipped = !!skipped; if (markers[stop.id]) markers[stop.id].setIcon(buildIcon(stop, skipped ? 'skipped' : 'pending')); }
+        // El botón lo renderiza el servidor (skip/unskip); acá lo togglemos para que refleje el
+        // estado sin recargar. El handler es delegado y lee data-action al click, así que es seguro.
+        const skipBtn = row.querySelector('.btn-skip-ui');
+        if (skipBtn) {
+            skipBtn.dataset.action = skipped ? 'unskip' : 'skip';
+            skipBtn.innerHTML = skipped
+                ? '<span class="material-symbols-outlined">restart_alt</span>Retomar'
+                : '<span class="material-symbols-outlined">schedule_send</span>Volver luego';
+        }
         applyStepState();
     }
 
@@ -2576,7 +2585,6 @@
             return;
         }
 
-        const geo = await getGeo();
         const baseUrl = `/delivery/route/${routeId}/stop/${stopId}`;
 
         if (action === 'skip') {
@@ -2596,6 +2604,10 @@
             if (r) markStopSkipped(stopId, false);
             return;
         }
+
+        // De acá en adelante las acciones sí envían ubicación → recién ahora pedimos el GPS
+        // (skip/unskip salieron antes: no la usan y no deben esperar el getCurrentPosition).
+        const geo = await getGeo();
         if (action === 'failed') {
             const form = await openFailedModal(stopId);
             if (!form) return;
