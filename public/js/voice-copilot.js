@@ -129,8 +129,8 @@
     register({
         id: 'help', label: 'Ayuda',
         keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
-        run: () => ({ speak: 'Podés pedirme: próxima entrega, cuántas paradas quedan, '
-            + 'registrar o retomar pausa, o reportar zona insegura.' }),
+        run: () => ({ speak: 'Podés pedirme: próxima entrega, buscar un envío, '
+            + 'pausar o retomar, navegar, llamar al cliente, o emergencia.' }),
     });
 
     // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
@@ -298,43 +298,6 @@
             return { speak: 'No pude retomar la ruta, probá de nuevo.', error: true };                               // CA6
         },
     });
-    // CV-04 — Reportar una zona insegura (acción sensible: confirma antes de registrar).
-    register({
-        id: 'unsafe', label: 'reportar zona insegura',
-        keywords: ['reportar zona insegura', 'zona insegura', 'lugar inseguro', 'reportar peligro', 'zona peligrosa'],
-        applies: (c) => c.paused ? { ok: false, reason: 'Primero tenés que retomar la ruta.' } : { ok: true },
-        confirm: 'Voy a reportar una zona insegura en tu ubicación actual. ¿Confirmás?', // CA1
-        run: async () => {
-            const myTurn = turnGen;
-            const geo = await getGeo();                                                  // ubicación al confirmar (CA4)
-            if (myTurn !== turnGen) { return { handled: true }; } // canceló durante el GPS → NO registrar
-            const hasGeo = geo.latitude != null && geo.longitude != null;
-            let data;
-            try {
-                // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
-                const res = await fetch(`/delivery/route/${ctx.routeId}/incident`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        incidentType: 'zona_insegura', severity: 'alta',
-                        description: 'Zona insegura reportada por voz',
-                        latitude: geo.latitude || null, longitude: geo.longitude || null,
-                    }),
-                });
-                data = await res.json().catch(() => ({}));
-                if (!res.ok) { return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true }; } // CA6 implícito
-            } catch (_) {
-                return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true };
-            }
-            if (data.queued) {                                                            // CA5 (sin conexión)
-                return { speak: 'Sin señal: el reporte quedó pendiente y lo envío cuando vuelva la conexión.' };
-            }
-            if (!hasGeo) {                                                                // CA4 (sin ubicación)
-                return { speak: 'Reporté la zona insegura, pero sin tu ubicación porque no estaba disponible.' };
-            }
-            return { speak: 'Listo, zona insegura reportada con tu ubicación.' };          // CA2
-        },
-    });
-
     // CV-07 — Pedir ayuda en una emergencia (acción sensible: confirmación breve antes de enviar).
     // Se puede disparar siempre (no se bloquea por pausa ni requiere ruta en curso).
     // "ayuda" queda para la lista de comandos; la emergencia usa disparadores inequívocos.
