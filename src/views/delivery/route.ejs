@@ -2595,13 +2595,15 @@
                 confirmButtonColor: '#f59e0b',
             });
             if (reason === undefined) return;
+            markStopSkipped(stopId, true);              // UI optimista: cambia el estado ya
             const r = await post(`${baseUrl}/skip`, { reason });
-            if (r) markStopSkipped(stopId, true);
+            if (!r) markStopSkipped(stopId, false);     // revertir si el server rechazó (post ya avisó)
             return;
         }
         if (action === 'unskip') {
+            markStopSkipped(stopId, false);             // UI optimista
             const r = await post(`${baseUrl}/unskip`);
-            if (r) markStopSkipped(stopId, false);
+            if (!r) markStopSkipped(stopId, true);      // revertir si falló
             return;
         }
 
