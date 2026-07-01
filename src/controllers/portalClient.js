@@ -76,6 +76,11 @@ const getSupportInfo = async () => {
     };
 };
 
+// Sólo se acepta un returnTo relativo dentro del portal autenticado, para evitar open-redirect.
+const sanitizeReturnTo = (value) => (
+    typeof value === 'string' && value.startsWith('/portal/mis-envios/') ? value : null
+);
+
 const renderIdentify = async (req, res, extra = {}) => {
     const support = await getSupportInfo();
     res.render('portal/misEnviosIdentify', {
@@ -83,12 +88,14 @@ const renderIdentify = async (req, res, extra = {}) => {
         form: extra.form || {},
         error: extra.error || null,
         info: extra.info || null,
+        returnTo: extra.returnTo || sanitizeReturnTo(req.query.returnTo) || '',
     });
 };
 
 const getIdentifyForm = async (req, res) => {
+    const returnTo = sanitizeReturnTo(req.query.returnTo);
     if (res.locals.portalClient) {
-        return res.redirect('/portal/mis-envios/lista');
+        return res.redirect(returnTo || '/portal/mis-envios/lista');
     }
     return renderIdentify(req, res);
 };
@@ -96,6 +103,7 @@ const getIdentifyForm = async (req, res) => {
 const postRequestAccess = async (req, res) => {
     const document = req.body.document;
     const email = req.body.email;
+    const returnTo = sanitizeReturnTo(req.body.returnTo);
     const result = await requestAccess({ document, email });
 
     if (!result.ok) {
@@ -103,11 +111,13 @@ const postRequestAccess = async (req, res) => {
             return renderIdentify(req, res, {
                 error: result.message,
                 form: { document, email },
+                returnTo,
             });
         }
         return renderIdentify(req, res, {
             error: result.message,
             form: { document, email },
+            returnTo,
         });
     }
 
@@ -119,6 +129,7 @@ const postRequestAccess = async (req, res) => {
         mailDelivered: result.pending.mailDelivered,
         devCode: result.pending.devCode,
         error: null,
+        returnTo,
     });
 };
 
@@ -134,6 +145,7 @@ const setPortalSession = (res, sessionToken) => {
 const postConfirmAccess = async (req, res) => {
     const code = req.body.code;
     const email = req.body.email;
+    const returnTo = sanitizeReturnTo(req.body.returnTo);
     const result = await confirmAccess(code, email);
     if (!result.ok) {
         return res.status(result.status).render('portal/misEnviosPending', {
@@ -144,11 +156,12 @@ const postConfirmAccess = async (req, res) => {
             mailDelivered: true,
             devCode: null,
             error: result.message,
+            returnTo,
         });
     }
 
     setPortalSession(res, result.sessionToken);
-    return res.redirect('/portal/mis-envios/lista');
+    return res.redirect(returnTo || '/portal/mis-envios/lista');
 };
 
 // Compat: confirmación por link (?token=) — opcional, usado en desarrollo.
@@ -214,6 +227,24 @@ const getShipmentDetail = async (req, res) => {
     const hasAnyReturn = await returnIncidentService.findAnyByShipment(shipmentId);
     const canRequestReturn = shipment.statusId === Status.DELIVERED.id && !hasAnyReturn;
 
+    // Resumen de estado (estilo ML) + QR de retiro. Acá SÍ se muestra el QR/código porque el
+    // cliente ya está identificado en Mis Envíos.
+    const statusView = require('../services/shipmentStatusView.service');
+    let eta = null;
+    if (enriched.deliveryMode !== 'branch_pickup') {
+        try { eta = await require('../services/etaWindow.service').etaForShipment(enriched.id); }
+        catch { /* sin ETA */ }
+    }
+    const sv = statusView.buildStatusMessage(enriched, eta);
+    const timeline = statusView.buildTimeline(enriched.history);
+    let qrDataUrl = null;
+    let pickup = null;
+    if (sv.isReady && enriched.pickupToken) {
+        try { qrDataUrl = await require('qrcode').toDataURL(enriched.pickupToken, { width: 320, margin: 1 }); }
+        catch (e) { console.error('[pickup] QR gen:', e.message); }
+        pickup = { code: enriched.pickupCode || '', expires: statusView.fmtDate(enriched.pickupExpiresAt) };
+    }
+
     res.render('portal/misEnviosDetail', {
         support: await getSupportInfo(),
         client: res.locals.portalClient,
@@ -224,6 +255,7 @@ const getShipmentDetail = async (req, res) => {
         returns,
         canRequestReturn,
         returnError: req.query.returnError ? String(req.query.returnError) : null,
+        sv, timeline, qrDataUrl, pickup,
     });
 };
 

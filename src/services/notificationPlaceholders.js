@@ -49,6 +49,12 @@ const CATALOG = [
     { token: 'postalCode',     label: 'Código postal',       group: 'Dirección',    description: 'Código postal de destino.',                    resolve: s => (notNil(s.address?.postalCode) ? String(s.address.postalCode) : '') },
     // Sucursal
     { token: 'branchName',     label: 'Sucursal actual',     group: 'Sucursal',     description: 'Sucursal donde está el envío.',                resolve: s => s.currentBranch?.name || '' },
+    // Retiro en sucursal (evento SHIPMENT_READY_FOR_PICKUP).
+    { token: 'pickupCode',        label: 'Código de retiro',    group: 'Retiro',  description: 'Código que el cliente muestra en la sucursal para retirar.', resolve: s => s.pickupCode || '' },
+    { token: 'pickupBranchName',  label: 'Sucursal de retiro',  group: 'Retiro',  description: 'Nombre de la sucursal donde se retira el envío.',            resolve: s => s.currentBranch?.name || s.pickupBranch?.name || '' },
+    { token: 'pickupBranchAddress', label: 'Dirección de retiro', group: 'Retiro', description: 'Dirección de la sucursal de retiro.',                       resolve: s => s.currentBranch?.address || s.pickupBranch?.address || '' },
+    { token: 'pickupExpires',     label: 'Vence el retiro',     group: 'Retiro',  description: 'Fecha límite para retirar el envío en la sucursal.',         resolve: s => fmtDate(s.pickupExpiresAt) },
+    { token: 'trackingStatusUrl', label: 'Enlace de estado',    group: 'Retiro',  description: '🔗 Detalle del envío en el portal (identificate una vez) con el QR para retirar.', resolve: s => (s.id ? `${baseUrl()}/portal/mis-envios/envio/${s.id}` : baseUrl()) },
     // URLs accionables
     { token: 'trackingUrl',    label: 'Enlace seguimiento',  group: 'Enlaces',      description: '🔗 Ver el seguimiento del envío en el portal.', resolve: s => (s.trackingId ? `${baseUrl()}/?q=${encodeURIComponent(s.trackingId)}` : baseUrl()) },
     { token: 'liveMapUrl',     label: 'Mapa en vivo',        group: 'Enlaces',      description: '🔗 Seguir al repartidor en un mapa en vivo (punto de entrega + ubicación del repartidor en tiempo real).', resolve: s => (s.trackingId ? `${baseUrl()}/track/${encodeURIComponent(s.trackingId)}/live` : baseUrl()) },
@@ -82,6 +88,9 @@ const CATALOG = [
     { token: 'totalAmount',          label: 'Total a pagar',        group: 'Pago de factura', description: 'Importe total con IVA, ya formateado (ej. $ 12.100,00).',   resolve: s => s._totalAmount || '' },
     { token: 'empresaNombre',        label: 'Nombre de la empresa', group: 'Pago de factura', description: 'Nombre de la empresa (LogiTrack o el configurado).',       resolve: s => s._empresaNombre || 'LogiTrack' },
     { token: 'payUrl',               label: 'Enlace de pago',       group: 'Pago de factura', description: '🔗 Link al checkout de pago simulado (estilo Mercado Pago).', resolve: s => s._payUrl || `${baseUrl()}/pago/demo` },
+    { token: 'recipientName',        label: 'Destinatario',         group: 'Pago de factura', description: 'Nombre completo del destinatario del envío.',               resolve: s => s._recipientName || s.recipient?.fullName || '' },
+    { token: 'deliveryAddress',      label: 'Dirección de entrega', group: 'Pago de factura', description: 'Dirección de entrega o "Retiro en sucursal".',              resolve: s => s._deliveryAddress || '' },
+    { token: 'cancellationHours',    label: 'Horas para cancelación', group: 'Pago de factura', description: 'Horas configuradas antes de cancelar por falta de pago (default 48).', resolve: s => s._cancellationHours || '48' },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).
@@ -118,6 +127,7 @@ const catalogMeta = () => CATALOG.map(({ token, label, description, group }) => 
 
 // Shipment de ejemplo para previsualización / email de prueba.
 const sampleShipment = () => ({
+    id: 1234,
     trackingId: 'ENV-001234',
     _codigo: '482913',
     _ttlHoras: 24,

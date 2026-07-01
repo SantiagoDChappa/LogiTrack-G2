@@ -32,6 +32,7 @@
     --badge-preparing-bg:       #fed7aa;  --badge-preparing-text:      #9a3412;
     --badge-package-failed-bg:  #ffe4e6;  --badge-package-failed-text: #9f1239;
     --badge-failed-attempt-bg:  #fef08a;  --badge-failed-attempt-text: #854d0e;
+    --badge-pending-payment-bg: #fae8ff;  --badge-pending-payment-text:#86198f;
 }
 
 html { scroll-behavior: smooth; }
@@ -60,6 +61,7 @@ html { scroll-behavior: smooth; }
     --badge-preparing-bg:       #7c2d12;  --badge-preparing-text:      #fdba74;
     --badge-package-failed-bg:  #881337;  --badge-package-failed-text: #fda4af;
     --badge-failed-attempt-bg:  #713f12;  --badge-failed-attempt-text: #fde047;
+    --badge-pending-payment-bg: #4a044e;  --badge-pending-payment-text:#e9a5f7;
 }
 
 [data-theme="dark"] .portal-nav         { background: #0f172a; border-color: #334155; }
@@ -459,6 +461,7 @@ ul { list-style: none; }
 }
 
 .portal-badge.pendiente       { background: var(--badge-pending-bg);        color: var(--badge-pending-text); }
+.portal-badge.pendiente_de_pago { background: var(--badge-pending-payment-bg); color: var(--badge-pending-payment-text); }
 .portal-badge.inicial         { background: var(--badge-initial-bg);        color: var(--badge-initial-text); }
 .portal-badge.asignado        { background: var(--badge-assigned-bg);       color: var(--badge-assigned-text); }
 .portal-badge.en_preparacion  { background: var(--badge-preparing-bg);      color: var(--badge-preparing-text); }

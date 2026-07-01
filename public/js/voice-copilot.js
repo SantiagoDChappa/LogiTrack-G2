@@ -129,8 +129,8 @@
     register({
         id: 'help', label: 'Ayuda',
         keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
-        run: () => ({ speak: 'Podés pedirme: próxima entrega, cuántas paradas quedan, '
-            + 'registrar o retomar pausa, o reportar zona insegura.' }),
+        run: () => ({ speak: 'Podés pedirme: próxima entrega, buscar un envío, '
+            + 'pausar o retomar, navegar, llamar al cliente, o emergencia.' }),
     });
 
     // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
@@ -298,43 +298,6 @@
             return { speak: 'No pude retomar la ruta, probá de nuevo.', error: true };                               // CA6
         },
     });
-    // CV-04 — Reportar una zona insegura (acción sensible: confirma antes de registrar).
-    register({
-        id: 'unsafe', label: 'reportar zona insegura',
-        keywords: ['reportar zona insegura', 'zona insegura', 'lugar inseguro', 'reportar peligro', 'zona peligrosa'],
-        applies: (c) => c.paused ? { ok: false, reason: 'Primero tenés que retomar la ruta.' } : { ok: true },
-        confirm: 'Voy a reportar una zona insegura en tu ubicación actual. ¿Confirmás?', // CA1
-        run: async () => {
-            const myTurn = turnGen;
-            const geo = await getGeo();                                                  // ubicación al confirmar (CA4)
-            if (myTurn !== turnGen) { return { handled: true }; } // canceló durante el GPS → NO registrar
-            const hasGeo = geo.latitude != null && geo.longitude != null;
-            let data;
-            try {
-                // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
-                const res = await fetch(`/delivery/route/${ctx.routeId}/incident`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        incidentType: 'zona_insegura', severity: 'alta',
-                        description: 'Zona insegura reportada por voz',
-                        latitude: geo.latitude || null, longitude: geo.longitude || null,
-                    }),
-                });
-                data = await res.json().catch(() => ({}));
-                if (!res.ok) { return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true }; } // CA6 implícito
-            } catch (_) {
-                return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true };
-            }
-            if (data.queued) {                                                            // CA5 (sin conexión)
-                return { speak: 'Sin señal: el reporte quedó pendiente y lo envío cuando vuelva la conexión.' };
-            }
-            if (!hasGeo) {                                                                // CA4 (sin ubicación)
-                return { speak: 'Reporté la zona insegura, pero sin tu ubicación porque no estaba disponible.' };
-            }
-            return { speak: 'Listo, zona insegura reportada con tu ubicación.' };          // CA2
-        },
-    });
-
     // CV-07 — Pedir ayuda en una emergencia (acción sensible: confirmación breve antes de enviar).
     // Se puede disparar siempre (no se bloquea por pausa ni requiere ruta en curso).
     // "ayuda" queda para la lista de comandos; la emergencia usa disparadores inequívocos.
@@ -365,10 +328,11 @@
             if (data.queued) {                                                            // CA5
                 return { speak: 'Sin señal: la alerta de emergencia quedó en cola y se envía apenas vuelva la conexión.' };
             }
-            if (!hasGeo) {                                                                // CA4
-                return { speak: 'Alerta de emergencia enviada a la central, sin tu ubicación porque no estaba disponible.' };
-            }
-            return { speak: 'Alerta de emergencia enviada a la central con tu ubicación.' }; // CA2
+            const ubic = hasGeo ? 'con tu ubicación' : 'sin tu ubicación porque no estaba disponible'; // CA4/CA2
+            const avisado = data.notified > 0
+                ? 'Avisamos a tu supervisor.'
+                : 'Quedó registrada, pero no pude avisar a un supervisor; llamá a la central.';
+            return { speak: `Alerta de emergencia enviada ${ubic}. ${avisado}` };
         },
     });
 
@@ -376,31 +340,41 @@
     // y la resalta en pantalla. No reordena la ruta ni cambia estados. Funciona en pausa/offline.
     register({
         id: 'search', label: 'buscar un envío',
-        keywords: ['llevame al paquete', 'llevame a la entrega', 'donde esta el paquete', 'donde esta la entrega',
-            'buscar el paquete', 'buscar la entrega', 'buscar paquete', 'buscar entrega', 'paquete de', 'buscar a'],
+        keywords: ['llevame al paquete', 'llevame a la entrega', 'llevame al envio', 'donde esta el paquete',
+            'donde esta la entrega', 'donde esta el envio', 'buscar el paquete', 'buscar la entrega', 'buscar el envio',
+            'buscar paquete', 'buscar entrega', 'buscar envio', 'paquete de', 'entrega de', 'envio de', 'buscar a'],
         run: (c, raw) => { searchStart(extractSearchName(raw)); return { handled: true }; },
     });
 
     // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
     function extractSearchName(raw) {
-        return String(raw || '').trim().replace(
-            /^\s*(llevame al paquete de|llevame a la entrega de|donde esta el paquete de|donde esta la entrega de|buscar el paquete de|buscar la entrega de|el paquete de|la entrega de|paquete de|entrega de|buscar a|buscar)\s*/i,
-            ''
-        ).trim();
+        // Trabajamos sobre el texto NORMALIZADO (sin tildes ni puntuación) para que el stripping no
+        // falle por acentos ("envío") y para tolerar muletillas iniciales ("quiero buscar el envío
+        // de camila"). Saca prefijos en bucle hasta quedarse solo con el nombre. El nombre se usa
+        // para buscar (searchStops ya normaliza) y para el aviso hablado.
+        const strip = /^\s*(quiero|quisiera|queria|necesito|necesitaria|me gustaria|podes|podrias|dale|a ver|por favor|llevame a la|llevame al|llevame a|donde esta el|donde esta la|donde esta|buscame|busca me|buscar el|buscar la|buscar a|buscar|busca a|busca|buscas|encontrame|encontra|el paquete|la entrega|el envio|paquete|entrega|envio|de|para)\b\s*/i;
+        let s = normalize(raw);
+        let prev;
+        do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
+        return s.trim();
     }
     function extractNameOnly(raw) {
-        return String(raw || '').trim().replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
+        return normalize(raw).replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
     }
     function searchStops(name) {
         const stops = Array.isArray(window.LT_STOPS) ? window.LT_STOPS : [];
         const q = normalize(name);
         if (!q) { return []; }
         const words = q.split(' ').filter((w) => w.length >= 3);
-        return stops.filter((s) => {
-            if (!s.recipient) { return false; }
-            const r = normalize(s.recipient);
-            return r.includes(q) || words.some((w) => r.includes(w));
-        });
+        const cand = stops.filter((s) => s.recipient).map((s) => ({ s, r: normalize(s.recipient) }));
+        // Búsqueda por niveles (de más preciso a más laxo) para no traer de más:
+        // 1) la frase completa dicha ("camila gomez" → solo Camila Gómez).
+        let hits = cand.filter((x) => x.r.includes(q));
+        // 2) si dijo varias palabras y no hubo match exacto: exigir que estén TODAS (orden libre).
+        if (!hits.length && words.length > 1) { hits = cand.filter((x) => words.every((w) => x.r.includes(w))); }
+        // 3) última red: por cualquier palabra (evita quedarse sin nada por un error del reconocimiento).
+        if (!hits.length) { hits = cand.filter((x) => words.some((w) => x.r.includes(w))); }
+        return hits.map((x) => x.s);
     }
     function highlightStop(seq) {
         try {

@@ -31,6 +31,9 @@
             <% } %>
 
             <form class="portal-mis-envios-form" method="POST" action="/portal/mis-envios/acceso">
+                <% if (typeof returnTo !== 'undefined' && returnTo) { %>
+                <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                <% } %>
                 <div class="portal-search-field">
                     <label for="document" class="portal-search-label">DNI</label>
                     <input type="text" id="document" name="document" class="portal-search-input-field"

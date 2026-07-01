@@ -166,6 +166,12 @@
                                     <span class="status-badge <%= _sk %>">
                                         <%= _sl[_sk] || _desc || 'Sin estado' %>
                                     </span>
+                                    <% if (shipment.delayNotifiedAt && _sk !== 'entregado' && _sk !== 'cancelado' && _sk !== 'cancelada' && _sk !== 'devuelto') { %>
+                                        <span class="status-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;margin-left:.35rem;font-size:.7rem;display:inline-flex;align-items:center;gap:.2rem" title="Demora propagada por un incidente en ruta.">
+                                            <span class="material-symbols-outlined" style="font-size:.85rem">schedule</span>
+                                            Demorado
+                                        </span>
+                                    <% } %>
                                     <!-- <% const _p = shipment.latestPrediction; %>
                                     <% if (_p) { %>
                                         <% const _pp = Number(_p.delayProbability); %>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= support.nombre %> — Seguí tu envío</title>
+    <script>(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/portal.css?v=<%= assetVersion %>">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <style>
+        body { margin:0; background:var(--c-bg,#f1f5f9); color:var(--c-text,#0f172a);
+               font-family:'Inter',system-ui,sans-serif; }
+        .ts-bar { display:flex; align-items:center; gap:.55rem; padding:.7rem 1.1rem;
+                  background:var(--c-surface,#fff); border-bottom:1px solid var(--c-border,#e2e8f0); }
+        .ts-bar .material-symbols-outlined { color:var(--c-primary,#2563eb); }
+        .ts-bar b { font-weight:700; }
+        .ts-wrap { max-width:560px; margin:0 auto; padding:1.25rem 1rem 2.5rem; }
+        :root { --color-surface:var(--c-surface,#fff); --color-border:var(--c-border,#e2e8f0);
+                --color-text-secondary:var(--c-text-2,#64748b); --color-primary:var(--c-primary,#2563eb); }
+    </style>
+</head>
+<body>
+    <div class="ts-bar">
+        <span class="material-symbols-outlined">local_shipping</span>
+        <b><%= support.nombre %></b>
+        <span style="margin-left:auto;font-size:.82rem;color:var(--c-text-2,#64748b)">Seguimiento</span>
+    </div>
+
+    <div class="ts-wrap">
+        <% if (notFound) { %>
+            <div style="text-align:center;padding:3rem 1rem">
+                <span class="material-symbols-outlined" style="font-size:3rem;color:#94a3b8">search_off</span>
+                <h2>No encontramos ese envío</h2>
+                <p style="color:var(--c-text-2,#64748b)">Revisá el código de seguimiento<% if (trackingId) { %> (<strong><%= trackingId %></strong>)<% } %> e intentá de nuevo.</p>
+            </div>
+        <% } else { %>
+            <%- include('../partials/shipment-status-summary', {
+                sv, timeline,
+                authed: false,
+                qrDataUrl: null,
+                pickup: null,
+                trackingId,
+                detailUrl: null,
+                identifyUrl,
+            }) %>
+
+            <%# Chips de datos públicos (sin PII): tipo, modalidad, destino resumido. %>
+            <% if (typeof chips !== 'undefined' && chips && chips.length) { %>
+                <div class="ts-chips" style="display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1.1rem">
+                    <% chips.forEach(function(c){ %>
+                        <span style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .8rem;border-radius:999px;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);font-size:.85rem;color:var(--c-text,#0f172a)">
+                            <span class="material-symbols-outlined" style="font-size:1.05rem;color:var(--c-primary,#2563eb)"><%= c.icon %></span>
+                            <%= c.label %>
+                        </span>
+                    <% }) %>
+                </div>
+            <% } %>
+
+            <%# Resumen público de incidencias del envío (sin descripciones sensibles). %>
+            <% if (typeof incidentSummary !== 'undefined' && incidentSummary && incidentSummary.total > 0) { %>
+                <% var _hasOpen = incidentSummary.open > 0;
+                   var _incColor = _hasOpen ? '#dc2626' : '#64748b';
+                   var _incBg = _hasOpen ? 'rgba(220,38,38,.08)' : 'var(--c-surface,#fff)';
+                   var _incBorder = _hasOpen ? '#fecaca' : 'var(--c-border,#e2e8f0)'; %>
+                <div style="background:<%= _incBg %>;border:1px solid <%= _incBorder %>;border-radius:14px;padding:1.1rem 1.25rem;margin-bottom:1.1rem">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+                        <span class="material-symbols-outlined" style="color:<%= _incColor %>"><%= _hasOpen ? 'error' : 'assignment_late' %></span>
+                        <h3 style="margin:0;font-size:1.02rem;color:<%= _incColor %>">
+                            Incidencias
+                            <span style="font-weight:500;color:var(--c-text-2,#64748b);font-size:.85rem">(<%= incidentSummary.total %> en total<% if (incidentSummary.open) { %>, <%= incidentSummary.open %> abierta<%= incidentSummary.open === 1 ? '' : 's' %><% } %>)</span>
+                        </h3>
+                    </div>
+                    <% if (incidentSummary.latest) { %>
+                        <div style="font-size:.9rem;line-height:1.45">
+                            Última: <strong><%= incidentSummary.latest.typeLabel %></strong>
+                            — <%= incidentSummary.latest.statusLabel %>
+                            <span style="color:var(--c-text-2,#64748b)"> · <%= new Date(incidentSummary.latest.createdAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' }) %></span>
+                        </div>
+                    <% } %>
+                    <p style="margin:.6rem 0 0;font-size:.82rem;color:var(--c-text-2,#64748b)">Para ver el detalle, identificate en Mis Envíos.</p>
+                </div>
+            <% } %>
+
+            <%# El link sólo se habilita cuando el repartidor ya está a ≤1km (mismo momento en que
+                sale el mail "casi llego" — ver etaWindow.service.notifyOnProximity). Antes de eso
+                no hay nada útil que mostrar en el mapa. %>
+            <% if (!sv.isReady && !sv.isPickup && typeof activeRouteId !== 'undefined' && activeRouteId) { %>
+                <div style="text-align:center;margin-top:.5rem">
+                    <a href="/track/<%= encodeURIComponent(trackingId) %>/live" style="color:var(--c-primary,#2563eb);font-weight:600;text-decoration:none">Ver mapa en vivo →</a>
+                </div>
+            <% } %>
+
+            <%# CTA a detalle completo autenticado. Se muestra siempre salvo cuando ya está listo
+                para retiro (allí la partial ya muestra el CTA verde "Ver mi código de retiro"
+                apuntando al mismo lugar). %>
+            <% if (!sv.isReady) { %>
+                <div style="text-align:center;margin-top:1.25rem;padding:1rem;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);border-radius:12px">
+                    <p style="margin:0 0 .6rem;font-size:.9rem;color:var(--c-text-2,#64748b)">¿Querés ver dirección, incidencias, devoluciones y gestionar tu envío?</p>
+                    <a href="<%= identifyUrl %>" style="display:inline-block;background:var(--c-primary,#2563eb);color:#fff;text-decoration:none;font-weight:600;padding:.65rem 1.15rem;border-radius:10px">Ver detalle completo →</a>
+                </div>
+            <% } %>
+        <% } %>
+    </div>
+</body>
+</html>

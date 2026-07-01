@@ -36,6 +36,7 @@ const STATUS_LABELS = {
     [S.FAILED_ATTEMPT.id]: 'Intento fallido',
     [S.RETURNED.id]: 'Devuelto',
     [S.PENDING_PAYMENT.id]: 'Pendiente de pago',
+    [S.READY_FOR_PICKUP.id]: 'Listo para retiro',
 };
 
 // Mensajes orientados al cliente (portal publico). Sin info interna: ni actor, ni hora, ni ruta interna.
@@ -58,6 +59,9 @@ const buildAutoComment = ({ fromStatusId, toStatusId }) => {
     if (toStatusId === S.AT_BRANCH.id) {
         return 'Tu envío llegó a una sucursal.';
     }
+    if (toStatusId === S.READY_FOR_PICKUP.id) {
+        return 'Tu envío llegó al punto de retiro. Ya podés pasar a buscarlo con tu código.';
+    }
     if (toStatusId === S.DELIVERED.id) {
         return 'Tu envío fue entregado.';
     }
@@ -79,8 +83,9 @@ const TRANSITIONS = {
     [S.PENDING.id]:        [S.ASSIGNED.id, S.CANCELLED.id],
     [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.IN_TRANSIT.id, S.DELIVERED.id, S.CANCELLED.id],
     [S.IN_PREPARATION.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
-    [S.IN_TRANSIT.id]:     [S.AT_BRANCH.id, S.DELIVERED.id, S.FAILED_ATTEMPT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
+    [S.IN_TRANSIT.id]:     [S.AT_BRANCH.id, S.READY_FOR_PICKUP.id, S.DELIVERED.id, S.FAILED_ATTEMPT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.AT_BRANCH.id]:      [S.ASSIGNED.id, S.PACKAGE_FAILED.id],
+    [S.READY_FOR_PICKUP.id]: [S.DELIVERED.id, S.PACKAGE_FAILED.id],
     [S.FAILED_ATTEMPT.id]: [S.IN_TRANSIT.id, S.AT_BRANCH.id, S.PACKAGE_FAILED.id],
     [S.DELIVERED.id]:      [],
     [S.CANCELLED.id]:      [],
@@ -97,6 +102,10 @@ const RULES_TARGETED = {
     [`${S.ASSIGNED.id}->${S.DELIVERED.id}`]:              { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'DELIVERED',         label: 'Confirmar entrega',      endpoint: '/delivery/evidence/:id/pod' },
     [`${S.IN_TRANSIT.id}->${S.DELIVERED.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'DELIVERED',         label: 'Confirmar entrega',      endpoint: '/delivery/evidence/:id/pod' },
     [`${S.IN_TRANSIT.id}->${S.AT_BRANCH.id}`]:           { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Marcar en sucursal',     endpoint: '/scan/:trackingId/at-branch' },
+    // Retiro por sucursal: el repartidor deja el paquete listo para que el cliente lo retire.
+    [`${S.IN_TRANSIT.id}->${S.READY_FOR_PICKUP.id}`]:    { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Dejar en sucursal (retiro)', endpoint: '/delivery/route/:id/stop/:stopId/drop-at-branch' },
+    // El operador de la sucursal confirma la entrega leyendo el QR / código de retiro.
+    [`${S.READY_FOR_PICKUP.id}->${S.DELIVERED.id}`]:     { roles: [R.OPERATOR.id, R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'DELIVERED', label: 'Confirmar retiro en sucursal', endpoint: '/branch/pickup/confirm' },
     [`${S.IN_TRANSIT.id}->${S.FAILED_ATTEMPT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: true,  eventType: 'FAILED_ATTEMPT',    label: 'Reportar intento fallido', endpoint: '/scan/:trackingId/failed-attempt' },
     [`${S.FAILED_ATTEMPT.id}->${S.IN_TRANSIT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'RETRY',             label: 'Reintentar entrega',     endpoint: '/scan/:trackingId/retry' },
     [`${S.FAILED_ATTEMPT.id}->${S.AT_BRANCH.id}`]:       { roles: [R.DELIVERY.id, R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'RETURNED_TO_BRANCH', label: 'Devolver a sucursal',    endpoint: '/delivery/route/:id/return-scan' },
@@ -201,7 +210,7 @@ const transition = ({ shipmentId, toStatusId, actor, comment, branchId, delivery
         await shipmentModel.updateStatus(shipmentId, toStatusId, {
             transaction: t,
             ...(deliveryUserId !== undefined ? { deliveryUserId } : {}),
-            ...(toStatusId === S.AT_BRANCH.id && branchId ? { currentBranchId: branchId } : {}),
+            ...((toStatusId === S.AT_BRANCH.id || toStatusId === S.READY_FOR_PICKUP.id) && branchId ? { currentBranchId: branchId } : {}),
         });
 
         await syncRouteStopForShipment(shipmentId, toStatusId, t);

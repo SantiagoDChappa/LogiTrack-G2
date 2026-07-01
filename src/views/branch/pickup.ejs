@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <%- include('../partials/head') %>
+    <title>Confirmar retiro — LogiTrack</title>
+    <link rel="stylesheet" href="/css/shipments.css">
+    <style>
+        .pk-wrap { max-width: 560px; margin: 0 auto; }
+        .pk-card { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0);
+            border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; }
+        #pk-video { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 4/3; object-fit: cover; }
+        .pk-scanbox { position: relative; }
+        .pk-hint { font-size: .85rem; color: var(--color-text-secondary); margin-top: .5rem; }
+        .pk-manual { display: flex; gap: .5rem; margin-top: 1rem; }
+        .pk-manual input { flex: 1; text-transform: uppercase; letter-spacing: .12em; font-size: 1.1rem;
+            text-align: center; padding: .7rem; border-radius: 10px; border: 1px solid var(--color-border, #cbd5e1); }
+        .pk-result { padding: 1.25rem; border-radius: 12px; text-align: center; }
+        .pk-result--ok { background: rgba(22,163,74,.12); border: 1px solid #86efac; color: #166534; }
+        .pk-result--err { background: rgba(220,38,38,.10); border: 1px solid #fca5a5; color: #991b1b; }
+        .pk-result .material-symbols-outlined { font-size: 2.5rem; }
+        .pk-btn { padding: .7rem 1.1rem; border-radius: 10px; border: 0; background: #2563eb; color: #fff;
+            font-weight: 600; cursor: pointer; }
+        .pk-btn--ghost { background: transparent; border: 1px solid var(--color-border, #cbd5e1); color: var(--color-text, #1e293b); }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header') %>
+    <main class="main-content">
+        <div class="pk-wrap">
+            <div class="page-header"><h1>Confirmar retiro</h1></div>
+            <p class="pk-hint" style="margin-bottom:1rem">
+                Escaneá el código QR que muestra el cliente, o ingresá el código de retiro a mano.
+                Solo podés confirmar retiros de tu sucursal.
+            </p>
+
+            <div id="pk-result-slot">
+            <% if (typeof result !== 'undefined' && result) { %>
+                <div class="pk-card pk-result pk-result--ok">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    <h2 style="margin:.5rem 0 .25rem">Retiro confirmado</h2>
+                    <p style="margin:0">Envío <strong><%= result.trackingId %></strong> entregado<% if (result.recipientName) { %> a <strong><%= result.recipientName %></strong><% } %>.</p>
+                </div>
+            <% } else if (typeof error !== 'undefined' && error) { %>
+                <div class="pk-card pk-result pk-result--err">
+                    <span class="material-symbols-outlined">error</span>
+                    <h2 style="margin:.5rem 0 .25rem">No se pudo confirmar</h2>
+                    <p style="margin:0"><%= error %></p>
+                </div>
+            <% } %>
+            </div>
+
+            <div class="pk-card">
+                <div class="pk-scanbox">
+                    <video id="pk-video" playsinline muted></video>
+                </div>
+                <p class="pk-hint" id="pk-cam-hint">Iniciando cámara…</p>
+                <div style="display:flex;gap:.5rem;margin-top:.5rem">
+                    <button type="button" id="pk-cam-start" class="pk-btn pk-btn--ghost" style="display:none">Activar cámara</button>
+                </div>
+
+                <form method="POST" action="/branch/pickup/confirm" id="pk-form" class="pk-manual">
+                    <input type="text" name="value" id="pk-value" maxlength="16" autocomplete="off"
+                           placeholder="Código de retiro (ej: ABCD2345)" required>
+                    <button type="submit" class="pk-btn">Confirmar</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/theme.js" defer></script>
+    <script src="/js/ui.js" defer></script>
+    <script>
+    (function () {
+        const video   = document.getElementById('pk-video');
+        const hint    = document.getElementById('pk-cam-hint');
+        const startBtn = document.getElementById('pk-cam-start');
+        const form    = document.getElementById('pk-form');
+        const input   = document.getElementById('pk-value');
+        const slot    = document.getElementById('pk-result-slot');
+        let stream = null, scanning = false, lastValue = null, busy = false;
+
+        function showResult(ok, html) {
+            slot.innerHTML = '<div class="pk-card pk-result pk-result--' + (ok ? 'ok' : 'err') + '">'
+                + '<span class="material-symbols-outlined">' + (ok ? 'check_circle' : 'error') + '</span>'
+                + html + '</div>';
+            slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        async function confirm(value) {
+            if (busy) { return; }
+            busy = true;
+            try {
+                const res = await fetch('/branch/pickup/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ value }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.ok) {
+                    showResult(true, '<h2 style="margin:.5rem 0 .25rem">Retiro confirmado</h2><p style="margin:0">Envío <strong>'
+                        + data.trackingId + '</strong> entregado' + (data.recipientName ? ' a <strong>' + data.recipientName + '</strong>' : '') + '.</p>');
+                    input.value = '';
+                } else {
+                    showResult(false, '<h2 style="margin:.5rem 0 .25rem">No se pudo confirmar</h2><p style="margin:0">'
+                        + (data.error || 'Error') + '</p>');
+                    // Permite reintentar el mismo código tras un rato (ej. otra sucursal corrige).
+                    setTimeout(() => { lastValue = null; }, 2500);
+                }
+            } catch (e) {
+                showResult(false, '<p style="margin:0">Error de conexión. Probá de nuevo.</p>');
+            } finally {
+                busy = false;
+            }
+        }
+
+        // Envío manual por fetch (evita recargar y reusa el mismo flujo).
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const v = input.value.trim();
+            if (v) { confirm(v); }
+        });
+
+        // Escaneo de QR con la API nativa BarcodeDetector (Chromium). Sin librerías externas.
+        async function startCamera() {
+            if (!('BarcodeDetector' in window)) {
+                hint.textContent = 'Tu navegador no soporta el escaneo automático. Ingresá el código a mano.';
+                video.style.display = 'none';
+                return;
+            }
+            try {
+                const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                await video.play();
+                hint.textContent = 'Apuntá la cámara al código QR del cliente.';
+                scanning = true;
+                const tick = async () => {
+                    if (!scanning) { return; }
+                    try {
+                        const codes = await detector.detect(video);
+                        if (codes && codes.length) {
+                            const v = codes[0].rawValue;
+                            if (v && v !== lastValue) { lastValue = v; confirm(v); }
+                        }
+                    } catch { /* frame sin código */ }
+                    requestAnimationFrame(tick);
+                };
+                requestAnimationFrame(tick);
+            } catch (e) {
+                hint.textContent = 'No se pudo acceder a la cámara. Ingresá el código a mano.';
+                video.style.display = 'none';
+                startBtn.style.display = '';
+            }
+        }
+        startBtn.addEventListener('click', startCamera);
+        startCamera();
+    })();
+    </script>
+</body>
+</html>
