@@ -22,7 +22,10 @@
                             <span class="material-symbols-outlined"><%= article.icon %></span>
                         </div>
                         <div class="help-article__titles">
-                            <h1><%= article.title %></h1>
+                            <div class="help-card__title-row">
+                                <h1><%= article.title %></h1>
+                                <% if (article.isNew) { %><span class="help-badge--pill-new">Nuevo</span><% } %>
+                            </div>
                             <p class="help-article__lead"><%= article.summary %></p>
                         </div>
                     </div>

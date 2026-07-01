@@ -1,0 +1,101 @@
+<div class="help-callout help-callout--new">
+    <span class="help-callout__icon material-symbols-outlined">new_releases</span>
+    <div class="help-callout__body"><strong>Novedad — junio 2026.</strong> Los envíos manuales ahora pasan por un estado de cobro antes de entrar en operación.</div>
+</div>
+
+<div class="help-tldr">
+    <div class="help-tldr__icon"><span class="material-symbols-outlined">bolt</span></div>
+    <div class="help-tldr__body">
+        <p class="help-tldr__title">En resumen</p>
+        <ul>
+            <li>Al crear un envío manual, queda en <strong>Pendiente de Pago</strong> hasta cobrarse.</li>
+            <li>El remitente recibe un link por email para pagar con <strong>Mercado Pago</strong> (u otros medios del link público).</li>
+            <li>Vos podés registrar <strong>efectivo</strong> o <strong>transferencia</strong> desde el detalle del envío.</li>
+        </ul>
+    </div>
+</div>
+
+<h2>Flujo de cobro</h2>
+
+<div class="help-flow">
+    <span class="help-badge help-badge--new"><span class="material-symbols-outlined">payments</span>Pendiente de Pago</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">check_circle</span>Cobrada</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">schedule</span>Pendiente</span>
+    <span class="help-flow__arrow material-symbols-outlined">arrow_forward</span>
+    <span class="help-badge"><span class="material-symbols-outlined">local_shipping</span>Operación normal</span>
+</div>
+
+<p>Hasta que la factura figure como <em>Cobrada</em>, el envío no avanza a preparación ni ruteo. Si no se paga dentro del plazo configurado, el sistema puede cancelarlo automáticamente.</p>
+
+<h2>Qué hace el operador</h2>
+<ol class="help-steps">
+    <li class="help-steps__item">
+        <p class="help-steps__title">Creá el envío</p>
+        <div class="help-steps__text">Desde <a href="/shipment/new">Crear envío</a>. Al guardar, el sistema genera la factura y envía el link de pago al remitente.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Seguí el estado en el detalle</p>
+        <div class="help-steps__text">En el detalle del envío ves si está <strong>Pendiente de cobro</strong> o <strong>Cobrada (método)</strong>.</div>
+        <%- include('../partials/figure', {
+            src: '/images/help/cobro-envios/01-detalle.png',
+            alt: 'Detalle de envío con badge Pendiente de cobro y formulario Registrar cobro',
+            caption: 'Detalle del envío: badge de cobro, factura y formulario para registrar efectivo o transferencia.'
+        }) %>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Si el remitente paga online</p>
+        <div class="help-steps__text">No tenés que hacer nada: Mercado Pago confirma el pago y el envío pasa a <em>Pendiente</em> automáticamente.</div>
+    </li>
+    <li class="help-steps__item">
+        <p class="help-steps__title">Si cobrás en persona</p>
+        <div class="help-steps__text">Elegí <strong>Efectivo</strong> o <strong>Transferencia</strong> y tocá <strong>Registrar cobro</strong>.</div>
+    </li>
+</ol>
+
+<div class="help-callout help-callout--info">
+    <span class="help-callout__icon material-symbols-outlined">info</span>
+    <div class="help-callout__body">Mercado Pago lo usa el <strong>remitente</strong> desde el link del email. Desde staff no iniciás el checkout de MP: solo registrás cobros presenciales o revisás pagos reportados.</div>
+</div>
+
+<h2>Pago reportado por el remitente</h2>
+<p>Desde el link público el remitente puede indicar que pagó en efectivo (Pago Fácil) o por transferencia. En el detalle del envío aparece un aviso amarillo para que lo verifiques y confirmes o descartes el cobro.</p>
+
+<h2>¿Algo no funciona?</h2>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        El envío sigue en Pendiente de Pago pero ya cobramos
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Abrí el detalle y usá <strong>Registrar cobro</strong> con el método correcto. Si el remitente pagó online, esperá unos minutos o pedí que reenvíen el comprobante.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        No veo el botón Registrar cobro
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>Solo lo ven supervisor, operador y administrador. Si la factura ya está cobrada o anulada, el botón no aparece.</p>
+    </div>
+</details>
+
+<details class="help-accordion">
+    <summary class="help-accordion__summary">
+        ¿La importación CSV también cobra?
+        <span class="help-accordion__chevron material-symbols-outlined">chevron_right</span>
+    </summary>
+    <div class="help-accordion__content">
+        <p>No. El flujo de cobro aplica al alta manual. La carga masiva por CSV no genera factura ni link de pago.</p>
+    </div>
+</details>
+
+<h2>Artículos relacionados</h2>
+<ul class="help-related">
+    <li><a href="/help/envios">Gestión de envíos</a></li>
+    <li><a href="/help/glosario">Glosario</a></li>
+</ul>

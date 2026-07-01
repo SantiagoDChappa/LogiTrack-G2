@@ -21,6 +21,12 @@ const requireAuth = async (req, res, next) => {
                 if (fresh) {
                     decoded.onboarded = fresh.onboarded;
                     decoded.helpSeen = userModel.parseHelpSeenModules(fresh.helpSeenModules);
+                    try {
+                        const { getPendingReleaseForUser } = require('../data/releaseNotes');
+                        decoded.pendingRelease = getPendingReleaseForUser(decoded.helpSeen, decoded.roleId);
+                    } catch {
+                        decoded.pendingRelease = null;
+                    }
                     if (!decoded.branchId && fresh.branchId) {
                         decoded.branchId = fresh.branchId;
                         const branchModel = require('../models/branch');
