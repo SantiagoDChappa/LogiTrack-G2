@@ -385,16 +385,18 @@
 
     // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
     function extractSearchName(raw) {
-        // Saca los prefijos del disparador en bucle (aguanta "buscar el paquete camila" sin "de",
-        // y "buscar el envío de camila gómez"), hasta quedarse solo con el nombre.
-        const strip = /^\s*(llevame a la|llevame al|llevame a|donde esta el|donde esta la|donde esta|buscar el|buscar la|buscar a|buscar|busca a|busca|el paquete|la entrega|el envio|paquete|entrega|envio|de|para)\b\s*/i;
-        let s = String(raw || '').trim();
+        // Trabajamos sobre el texto NORMALIZADO (sin tildes ni puntuación) para que el stripping no
+        // falle por acentos ("envío") y para tolerar muletillas iniciales ("quiero buscar el envío
+        // de camila"). Saca prefijos en bucle hasta quedarse solo con el nombre. El nombre se usa
+        // para buscar (searchStops ya normaliza) y para el aviso hablado.
+        const strip = /^\s*(quiero|quisiera|queria|necesito|necesitaria|me gustaria|podes|podrias|dale|a ver|por favor|llevame a la|llevame al|llevame a|donde esta el|donde esta la|donde esta|buscame|busca me|buscar el|buscar la|buscar a|buscar|busca a|busca|buscas|encontrame|encontra|el paquete|la entrega|el envio|paquete|entrega|envio|de|para)\b\s*/i;
+        let s = normalize(raw);
         let prev;
         do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
         return s.trim();
     }
     function extractNameOnly(raw) {
-        return String(raw || '').trim().replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
+        return normalize(raw).replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
     }
     function searchStops(name) {
         const stops = Array.isArray(window.LT_STOPS) ? window.LT_STOPS : [];
