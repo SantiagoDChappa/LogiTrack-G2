@@ -88,6 +88,9 @@ const CATALOG = [
     { token: 'totalAmount',          label: 'Total a pagar',        group: 'Pago de factura', description: 'Importe total con IVA, ya formateado (ej. $ 12.100,00).',   resolve: s => s._totalAmount || '' },
     { token: 'empresaNombre',        label: 'Nombre de la empresa', group: 'Pago de factura', description: 'Nombre de la empresa (LogiTrack o el configurado).',       resolve: s => s._empresaNombre || 'LogiTrack' },
     { token: 'payUrl',               label: 'Enlace de pago',       group: 'Pago de factura', description: '🔗 Link al checkout de pago simulado (estilo Mercado Pago).', resolve: s => s._payUrl || `${baseUrl()}/pago/demo` },
+    { token: 'recipientName',        label: 'Destinatario',         group: 'Pago de factura', description: 'Nombre completo del destinatario del envío.',               resolve: s => s._recipientName || s.recipient?.fullName || '' },
+    { token: 'deliveryAddress',      label: 'Dirección de entrega', group: 'Pago de factura', description: 'Dirección de entrega o "Retiro en sucursal".',              resolve: s => s._deliveryAddress || '' },
+    { token: 'cancellationHours',    label: 'Horas para cancelación', group: 'Pago de factura', description: 'Horas configuradas antes de cancelar por falta de pago (default 48).', resolve: s => s._cancellationHours || '48' },
 ];
 
 // Construye { token: valor } a partir de un shipment (instancia o JSON).

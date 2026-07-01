@@ -1,6 +1,6 @@
 // Cancela automáticamente los envíos que quedaron en "Pendiente de Pago" sin que
 // se confirme el cobro, pasado el plazo configurado en Ajustes (default 48hs).
-// Avisa al cliente igual que cualquier otra cancelación.
+// Avisa al remitente con un mail descriptivo + la notificación genérica de cancelación.
 const { Op } = require('sequelize');
 const sequelize = require('../database/connection');
 const { Shipment } = require('../models/shipment');
@@ -9,6 +9,7 @@ const shipmentHistoryModel = require('../models/shipmentHistory');
 const Setting = require('../models/setting');
 const invoiceService = require('../services/invoiceService');
 const { Status, NotificationEvent } = require('../constants/enums');
+const { sendPaymentCancelled } = require('../services/invoicePaymentEmail');
 
 const DEFAULT_HOURS = 48;
 
@@ -38,7 +39,7 @@ const processPendingPaymentExpirations = async () => {
         for (const shipment of expired) {
             const invoice = await invoiceService.getByShipment(shipment.id).catch(() => null);
             if (invoice && invoice.payStatus === 'ANULADA') { continue; }
-            candidates.push(shipment);
+            candidates.push({ shipment, invoice });
         }
 
         if (!candidates.length) {
@@ -47,8 +48,9 @@ const processPendingPaymentExpirations = async () => {
         }
 
         const { notifyShipmentEvent } = require('../controllers/shipment');
+        const empresa = await Setting.get('nombre_empresa').catch(() => null) || 'LogiTrack';
 
-        for (const shipment of candidates) {
+        for (const { shipment, invoice } of candidates) {
             await sequelize.transaction(async (t) => {
                 await shipmentHistoryModel.create({
                     shipmentId: shipment.id,
@@ -63,6 +65,9 @@ const processPendingPaymentExpirations = async () => {
             });
             await notifyShipmentEvent(NotificationEvent.SHIPMENT_CANCELLED, shipment.id)
                 .catch(e => console.error('[pendingPaymentCancellationJob] notify:', e.message));
+            const fullShipment = await shipmentModel.getById(shipment.id).catch(() => null);
+            sendPaymentCancelled({ invoice, shipment: fullShipment, empresa })
+                .catch(e => console.error('[pendingPaymentCancellationJob] mail cancelacion:', e.message));
         }
 
         console.log(`[pendingPaymentCancellationJob] Cancelados ${candidates.length} envío(s) sin pagar (umbral ${hours}h).`);

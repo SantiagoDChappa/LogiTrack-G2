@@ -9,7 +9,7 @@ const shipmentModel = require('../models/shipment');
 const settingModel = require('../models/setting');
 const mercadoPagoService = require('../services/mercadoPagoService');
 const webhookEventModel = require('../models/paymentWebhookEvent');
-const { totalConIva } = require('../services/invoicePaymentEmail');
+const { totalConIva, sendComprobanteRejected } = require('../services/invoicePaymentEmail');
 const sequelize = require('../database/connection');
 const shipmentHistoryModel = require('../models/shipmentHistory');
 const statusModel = require('../models/status');
@@ -30,16 +30,18 @@ const renderCheckout = async (res, invoice, extra = {}) => {
     const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);
     const empresa = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
     const paymentMethods = await paymentMethodsConfig.get();
+    const { readThresholdHours, DEFAULT_HOURS } = require('../jobs/pendingPaymentCancellationJob');
+    let cancellationHours = DEFAULT_HOURS;
+    try { cancellationHours = await readThresholdHours(); } catch { /* usa default */ }
     res.render('payment/checkout', {
         invoice,
         shipment,
         empresa,
         total: totalConIva(invoice),
         mpConfigured: await isMpEnabled(),
-        // Credenciales presentes pero el admin lo apagó desde Ajustes → distinto
-        // mensaje del modo simulado (que es cuando ni siquiera hay credenciales).
         mpDisabledByAdmin: mercadoPagoService.isConfigured() && !paymentMethods.mercadopagoEnabled,
         paymentMethods,
+        cancellationHours,
         layout: false,
         ...extra,
     });
@@ -179,7 +181,13 @@ const getComprobante = async (req, res) => {
 // el remitente pueda reintentar desde el link.
 const postDiscardVerification = async (req, res) => {
     const invoice = await invoiceService.getByShipment(Number(req.params.id));
-    if (invoice) { await invoiceService.clearVerification(invoice); }
+    if (invoice) {
+        await invoiceService.clearVerification(invoice);
+        const shipment = await shipmentModel.getById(invoice.shipmentId).catch(() => null);
+        const empresa = (await settingModel.get('nombre_empresa')) || 'LogiTrack';
+        sendComprobanteRejected({ invoice, shipment, empresa })
+            .catch(e => console.error('[payment] mail rechazo comprobante:', e.message));
+    }
     return res.redirect(`/shipment/update/${req.params.id}`);
 };
 

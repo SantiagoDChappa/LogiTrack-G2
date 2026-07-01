@@ -265,7 +265,26 @@
                 </div>
                 <div class="meta">
                     <div class="meta-row"><span>Cliente</span><strong><%= invoice.senderName || (shipment && shipment.sender ? shipment.sender.fullName : '—') %></strong></div>
-                    <% if (shipment) { %><div class="meta-row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div><% } %>
+                    <% if (shipment) { %>
+                        <div class="meta-row"><span>Envío</span><strong><%= shipment.trackingId %></strong></div>
+                        <% if (shipment.recipient) { %>
+                            <div class="meta-row"><span>Destinatario</span><strong><%= shipment.recipient.fullName %></strong></div>
+                        <% } %>
+                        <% if (shipment.deliveryMode === 'branch') { %>
+                            <div class="meta-row"><span>Entrega</span><strong>Retiro en sucursal</strong></div>
+                        <% } else if (shipment.address) { %>
+                            <div class="meta-row"><span>Entrega</span><strong><%= [shipment.address.street, shipment.address.number, shipment.address.province && shipment.address.province.description].filter(Boolean).join(', ') %></strong></div>
+                        <% } %>
+                        <% if (shipment.shipmentType) { %>
+                            <div class="meta-row"><span>Tipo</span><strong><%= shipment.shipmentType.description || shipment.shipmentType.name %></strong></div>
+                        <% } %>
+                        <% if (shipment.expectedDeliveryDate) { %>
+                            <div class="meta-row"><span>Entrega estimada</span><strong><%= new Date(shipment.expectedDeliveryDate).toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'}) %></strong></div>
+                        <% } %>
+                    <% } %>
+                </div>
+                <div class="alert-warn" style="margin-bottom:20px">
+                    ⚠️ Si no confirmamos el pago en las próximas <strong><%= typeof cancellationHours !== 'undefined' ? cancellationHours : 48 %> horas</strong>, el envío se cancelará automáticamente.
                 </div>
 
                 <% if (typeof mpError !== 'undefined' && mpError) { %>
