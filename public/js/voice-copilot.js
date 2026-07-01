@@ -365,10 +365,11 @@
             if (data.queued) {                                                            // CA5
                 return { speak: 'Sin señal: la alerta de emergencia quedó en cola y se envía apenas vuelva la conexión.' };
             }
-            if (!hasGeo) {                                                                // CA4
-                return { speak: 'Alerta de emergencia enviada a la central, sin tu ubicación porque no estaba disponible.' };
-            }
-            return { speak: 'Alerta de emergencia enviada a la central con tu ubicación.' }; // CA2
+            const ubic = hasGeo ? 'con tu ubicación' : 'sin tu ubicación porque no estaba disponible'; // CA4/CA2
+            const avisado = data.notified > 0
+                ? 'Avisamos a tu supervisor.'
+                : 'Quedó registrada, pero no pude avisar a un supervisor; llamá a la central.';
+            return { speak: `Alerta de emergencia enviada ${ubic}. ${avisado}` };
         },
     });
 
