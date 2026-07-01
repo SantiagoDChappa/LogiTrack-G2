@@ -990,16 +990,21 @@
         max-width: calc(100% - 2.4em);
         box-sizing: border-box;
     }
-    /* Alinear el combo (select): el margen por defecto de SweetAlert es asimétrico y lo descentra.
-       Lo dejamos ancho completo, centrado y con padding/alto consistentes con los inputs. */
+    /* Alinear inputs y combo: el margen por defecto de SweetAlert es asimétrico y los descentra.
+       Ancho completo, centrado y con padding consistente. (Los campos con style inline propio
+       —ej. el modal de fallido— mantienen su margen por la especificidad del inline.) */
+    .swal2-popup .swal2-input,
+    .swal2-popup .swal2-textarea,
     .swal2-popup .swal2-select {
         width: 100%;
         margin: 1em auto;
         padding: .55em .9em;
-        height: 2.625em;
-        line-height: 1.4;
         border-radius: .375em;
         text-align: left;
+    }
+    .swal2-popup .swal2-select {
+        height: 2.625em;
+        line-height: 1.4;
     }
     </style>
 
@@ -2607,12 +2612,12 @@
             return;
         }
 
-        // De acá en adelante las acciones sí envían ubicación → recién ahora pedimos el GPS
-        // (skip/unskip salieron antes: no la usan y no deben esperar el getCurrentPosition).
-        const geo = await getGeo();
+        // Cada acción pide el GPS recién al confirmar (no antes), para que el modal/confirmación
+        // abran al instante. skip/unskip salieron antes: no usan ubicación.
         if (action === 'failed') {
             const form = await openFailedModal(stopId);
             if (!form) return;
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/failed`, { ...form, ...geo });
             if (r) {
                 if (r.retrySameDay) markStopSkipped(stopId, true);
@@ -2628,11 +2633,13 @@
                 confirmButtonColor: '#16a34a',
             });
             if (!c.isConfirmed) return;
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/delivered`, geo);
             if (r) markStopDone(stopId, 'delivered');
             return;
         }
         if (action === 'pickup-confirmed') {
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/pickup-confirmed`, geo);
             if (r) markStopDone(stopId, 'pickup-done');
             return;
@@ -2645,6 +2652,7 @@
                 confirmButtonColor: '#16a34a',
             });
             if (!c.isConfirmed) return;
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/drop-at-branch`, geo);
             if (r) {
                 markStopDone(stopId, 'branch-dropped');
