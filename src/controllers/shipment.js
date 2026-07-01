@@ -668,7 +668,11 @@ const getUpdateShipment = async (req, res) => {
     const availableActions = stateMachine
         .getAvailableActions({ shipment, actor: currentUser })
         .filter(a => !DESK_BLOCKED_STATUSES.has(a.toStatusId));
-    res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions });
+    const [invoice, paymentMethods] = await Promise.all([
+        require('../services/invoiceService').getByShipment(id).catch(() => null),
+        require('../services/paymentMethodsConfig').get().catch(() => ({})),
+    ]);
+    res.render('shipment/update', { errors: [], shipment, provinces, statuses, history, typesShipment, mapData, deliveryUsers, returnUrl, isSupervisor: canChangeStatus, availableActions, invoice, paymentMethods });
 };
 
 const updateShipment = async (req, res) => {
