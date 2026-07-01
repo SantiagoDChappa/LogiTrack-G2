@@ -2604,7 +2604,13 @@
         if (!c.isConfirmed) return;
         const geo = await getGeo();
         const r = await post('/delivery/panic', { ...geo, routeId, message: 'SOS desde la app del repartidor' });
-        if (r) Swal.fire({ icon: 'success', title: 'SOS enviado', text: 'Despacho fue alertado.', confirmButtonColor: '#dc2626' });
+        if (r) {
+            const avisado = r.notified > 0
+                ? 'Tu supervisor fue avisado.'
+                : (r.queued ? 'Sin señal: se enviará al recuperar la conexión.'
+                            : 'Quedó registrado, pero no pude avisar a un supervisor. Llamá a la central.');
+            Swal.fire({ icon: 'success', title: 'SOS enviado', text: avisado, confirmButtonColor: '#dc2626' });
+        }
     });
 
     // === Finalizar ruta ===

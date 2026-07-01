@@ -1080,7 +1080,15 @@ router.post('/panic', requireDelivery, async (req, res) => {
         message:     message || null,
         at:          new Date().toISOString(),
     }));
-    res.json({ ok: true, panicId: ev.id });
+    // Aviso a un humano: supervisores de la sucursal del conductor + admins (in-app + email),
+    // reusando el criterio de fatiga. Best-effort: no bloquea ni rompe el SOS si falla.
+    let notified = 0;
+    try {
+        const { notifyPanic } = require('../services/panic/notify');
+        const r = await notifyPanic({ userId: res.locals.currentUser.id, routeId: routeId || null, latitude, longitude, at: ev.createdAt });
+        notified = (r.notified || 0) + (r.emails || 0);
+    } catch (e) { console.error('[panic] notify falló:', e.message); }
+    res.json({ ok: true, panicId: ev.id, notified });
 });
 
 // === Telemetría del copiloto de voz (punto 4) ===
