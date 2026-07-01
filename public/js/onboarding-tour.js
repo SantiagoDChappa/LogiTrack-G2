@@ -469,6 +469,9 @@
 
     if (!window.__LGT || isTourDismissed()) return;
 
+    // Si hay novedades pendientes, priorizar el modal de release sobre el tour principal.
+    if (window.__LGT.pendingRelease) return;
+
     if (isInterimAuthPage()) {
         markTourPending();
         return;

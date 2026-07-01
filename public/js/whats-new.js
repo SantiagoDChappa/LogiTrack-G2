@@ -21,15 +21,15 @@
         if (path === '/login/2fa/setup' || path === '/login/2fa' || path === '/account/password/forced') {
             return true;
         }
+        // Novedades pendientes: mostrar el modal sin esperar ningún tour.
+        if (window.__LGT.pendingRelease) return false;
         if (window.__LGT.onboarded) return false;
         try {
             if (sessionStorage.getItem('lgt_tour_dismissed_' + userId()) === '1') return false;
         } catch (_) { return true; }
-        // Tour principal en pantalla → esperar a que termine.
         if (document.querySelector('.driver-overlay, .driver-popover, .driver-popover-wrapper')) {
             return true;
         }
-        // onboarded=false pero el tour no arrancó (pocos pasos DOM, etc.): no bloquear para siempre.
         return false;
     }
 
@@ -71,21 +71,6 @@
         if (focusable) focusable.focus();
     }
 
-    function initModalImages(backdrop) {
-        backdrop.querySelectorAll('.whats-new-card__img').forEach(function (img) {
-            img.addEventListener('error', function () {
-                var media = img.closest('.whats-new-card__media');
-                if (!media || media.querySelector('.whats-new-card__icon-fallback')) return;
-                img.remove();
-                var icon = media.getAttribute('data-fallback-icon') || 'image';
-                var span = document.createElement('span');
-                span.className = 'material-symbols-outlined whats-new-card__icon-fallback';
-                span.textContent = icon;
-                media.appendChild(span);
-            });
-        });
-    }
-
     function initWhatsNewModal() {
         try { sessionStorage.removeItem(LEGACY_DISMISSED); } catch (_) { /* ignore */ }
 
@@ -97,7 +82,6 @@
         var release = window.__LGT.pendingRelease;
         if (wasSessionDismissed(release.id)) return;
 
-        initModalImages(backdrop);
         var opened = false;
 
         function dismiss() {
@@ -144,10 +128,6 @@
 
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && !backdrop.hidden) dismiss();
-        });
-
-        window.addEventListener('lgt:main-tour-finished', function () {
-            setTimeout(tryOpen, 350);
         });
 
         setTimeout(function () {

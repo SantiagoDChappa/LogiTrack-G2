@@ -14,12 +14,8 @@
         <div class="whats-new-modal__body">
             <% pr.features.forEach(function (f) { %>
             <article class="whats-new-card" data-help-slug="<%= f.helpSlug %>">
-                <div class="whats-new-card__media" data-fallback-icon="<%= f.icon %>">
-                    <% if (f.image) { %>
-                    <img src="<%= f.image %>?v=<%= assetVersion %>" alt="" class="whats-new-card__img" loading="lazy">
-                    <% } else { %>
-                    <span class="material-symbols-outlined whats-new-card__icon-fallback"><%= f.icon %></span>
-                    <% } %>
+                <div class="whats-new-card__media" aria-hidden="true">
+                    <span class="material-symbols-outlined whats-new-card__icon"><%= f.icon %></span>
                 </div>
                 <div class="whats-new-card__content">
                     <h3 class="whats-new-card__title">
@@ -28,14 +24,17 @@
                     </h3>
                     <p class="whats-new-card__summary"><%= f.summary %></p>
                     <div class="whats-new-card__actions">
-                        <a href="/help/<%= f.helpSlug %>?from=whats-new" class="help-btn whats-new-btn-manual">Ver manual</a>
+                        <a href="/help/<%= f.helpSlug %>?from=whats-new" class="whats-new-btn-manual">
+                            <span class="material-symbols-outlined">menu_book</span>
+                            Ver manual
+                        </a>
                     </div>
                 </div>
             </article>
             <% }); %>
         </div>
         <footer class="whats-new-modal__footer">
-            <button type="button" class="help-btn whats-new-btn-dismiss" id="whats-new-dismiss">Entendido</button>
+            <button type="button" class="whats-new-btn-dismiss" id="whats-new-dismiss">Entendido</button>
         </footer>
     </div>
 </div>

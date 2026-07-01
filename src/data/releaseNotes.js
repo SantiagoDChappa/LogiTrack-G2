@@ -13,7 +13,6 @@ const RELEASES = Object.freeze([
                 summary: 'Los envíos manuales quedan pendientes de pago hasta que el remitente pague online o vos registres el cobro en efectivo o transferencia.',
                 icon: 'payments',
                 helpSlug: 'cobro-envios',
-                image: '/images/help/cobro-envios/01-detalle.png',
             },
             {
                 id: 'copiloto-voz',
@@ -22,7 +21,6 @@ const RELEASES = Object.freeze([
                 summary: 'Comandos de voz en ruta para consultar la próxima entrega, pausar, navegar o llamar al destinatario sin sacar las manos del volante.',
                 icon: 'mic',
                 helpSlug: 'copiloto-voz',
-                image: '/images/help/copiloto-voz/01-controles.png',
             },
         ]),
     },
