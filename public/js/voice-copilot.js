@@ -99,10 +99,14 @@
     // Motivo OPCIONAL de pausa para trazabilidad: si el repartidor lo dice en la misma frase
     // ("registrar pausa por almuerzo") lo tomamos; si no, queda genérico. Cero turnos extra.
     function extractPauseReason(raw) {
-        return String(raw || '').trim()
-            .replace(/^\s*(registrar pausa|tomar pausa|pausar la ruta|pausar ruta|poner en pausa|pausar|pausa|pausame)\b[\s,:.]*/i, '')
-            .replace(/^(por|porque|para|por que|el motivo es|motivo|a)\s+/i, '')
-            .trim();
+        // Normalizamos (sin tildes) y sacamos en bucle muletillas + el disparador + conectores,
+        // hasta quedarnos solo con el motivo. Aguanta "quiero registrar pausa" (sin motivo → vacío)
+        // y "quiero registrar pausa por almuerzo" (motivo = almuerzo).
+        const strip = /^\s*(quiero|quisiera|queria|necesito|necesitaria|voy a|me gustaria|podes|podrias|dale|por favor|registrar una pausa|registrar pausa|tomar una pausa|tomar pausa|hacer una pausa|poner en pausa|pausar la ruta|pausar ruta|pausar|pausame|pausa|una|por que|porque|por|para|el motivo es|motivo|a)\b\s*/i;
+        let s = normalize(raw);
+        let prev;
+        do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
+        return s.trim();
     }
     const PAUSE_REASONS = [
         { code: 'almuerzo',    syn: ['almuerzo', 'almorzar', 'comer', 'comida', 'la comida', 'a comer'] },
@@ -370,6 +374,66 @@
         keywords: ['finalizar ruta', 'finalizar la ruta', 'terminar la ruta', 'cerrar la ruta'],
         run: () => ({ speak: 'La ruta se finaliza desde la pantalla, así ves el resumen.' }),
     });
+
+    // Retomar/despostergar una entrega postergada (inverso de "volver luego"). Reversible, sin
+    // confirmación. Keywords SIN "retomar" a secas para no pisar "retomar ruta" (resume).
+    register({
+        id: 'unpostpone', label: 'retomar una entrega postergada',
+        keywords: ['despostergar', 'desposterga', 'recuperar la entrega', 'recupera la entrega',
+            'recuperar entrega', 'recupera entrega', 'reactivar la entrega', 'reactiva la entrega',
+            'retomar la entrega', 'retoma la entrega', 'retomar entrega', 'retoma entrega', 'volver a la entrega'],
+        run: async (c, raw) => {
+            const sk = (window.LT_STOPS || []).filter((s) => s.skipped && !s.completed);
+            if (!sk.length) { return { speak: 'No tenés entregas postergadas.' }; }
+            const name = extractUnpostponeName(raw);
+            let cands = sk;
+            if (name) {
+                const q = normalize(name);
+                const m = sk.filter((s) => s.recipient && normalize(s.recipient).includes(q));
+                if (!m.length) { return { speak: `No tenés una entrega postergada para ${name}.` }; }
+                cands = m;
+            }
+            if (cands.length === 1) { return doUnpostpone(cands[0]); }
+            askWhichUnpostpone(cands, 0); // varias → desambigua y responde por su cuenta
+            return { handled: true };
+        },
+    });
+    // Saca el disparador y deja el nombre si lo dijeron ("retomá la entrega de garcía" → "garcía").
+    function extractUnpostponeName(raw) {
+        const strip = /^\s*(quiero|quisiera|necesito|voy a|por favor|despostergar|desposterga|recuperar la entrega|recupera la entrega|recuperar entrega|recupera entrega|reactivar la entrega|reactiva la entrega|reactivar entrega|reactiva entrega|retomar la entrega|retoma la entrega|retomar entrega|retoma entrega|volver a la entrega|la entrega|entrega|la de|de|para|a)\b\s*/i;
+        let s = normalize(raw);
+        let prev;
+        do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
+        return s.trim();
+    }
+    async function doUnpostpone(stop) {
+        const who = stop.recipient || 'esa parada';
+        const r = await window.LT_voiceUnskip(stop.id);
+        if (r && r.queued) { return { speak: `Retomé la entrega de ${who}. Sin señal: se sincroniza al reconectar.` }; }
+        if (r && r.ok) { return { speak: `Listo, retomé la entrega de ${who}. Vuelve a la ruta.` }; }
+        return { speak: 'No pude retomar la entrega.', error: true };
+    }
+    function askWhichUnpostpone(cands, tries) {
+        const opts = cands.slice(0, 3);
+        pendingPrompt = async (ans) => {
+            const t = normalize(ans);
+            if (/^(cancelar|cancela|dejalo|olvidalo|nada|ninguna|ninguno)\b/.test(t)) {
+                return respond('Listo, no hago nada.', {});
+            }
+            const num = t.match(/\b(\d+)\b/);
+            let pick = num ? cands.find((s) => String(s.seq) === num[1]) : null;
+            if (!pick) { pick = cands.find((s) => s.recipient && normalize(s.recipient).split(' ').some((w) => w.length >= 3 && t.includes(w))) || null; }
+            if (pick) { const out = await doUnpostpone(pick); return respond(out.speak, { error: !!out.error }); }
+            if (tries < 2) { return askWhichUnpostpone(cands, tries + 1); }
+            return respond('No pude identificar la entrega, cancelo.', {});
+        };
+        const parts = opts.map((s) => `la parada ${s.seq}${s.recipient ? ', de ' + speakable(s.recipient) : ''}`);
+        const more = cands.length > opts.length ? `, y ${cands.length - opts.length} más` : '';
+        const lead = tries === 0
+            ? `Tenés ${cands.length} postergada${cands.length === 1 ? '' : 's'}: ${parts.join('; ')}${more}. Decime el número de parada.`
+            : `Esa no es una de las opciones. Las postergadas son: ${cands.map((s) => s.seq).join(', ')}. Decime el número.`;
+        return respond(lead, { relisten: true });
+    }
 
     // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
     function extractSearchName(raw) {

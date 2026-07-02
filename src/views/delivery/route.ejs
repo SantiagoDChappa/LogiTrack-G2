@@ -2805,6 +2805,27 @@
             return { ok: true, queued: !!data.queued };
         } catch (_) { return { ok: false, error: true }; }
     };
+    // Retomar/despostergar por voz: reusa /unskip (encolable) + la UI, y recalcula LT_NEXT_STOP
+    // (la parada retomada vuelve a pendiente y puede pasar a ser la próxima).
+    window.LT_voiceUnskip = async function (stopId) {
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/stop/${stopId}/unskip`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return { ok: false, error: true }; }
+            markStopSkipped(stopId, false);
+            const st = (window.LT_STOPS || []).find((s) => s.id === stopId);
+            if (st) { st.skipped = false; }
+            const nx = (window.LT_STOPS || []).find((s) => !s.completed && !s.skipped)
+                    || (window.LT_STOPS || []).find((s) => !s.completed) || null;
+            window.LT_NEXT_STOP = nx ? {
+                id: nx.id, street: nx.street, number: nx.number, recipient: nx.recipient,
+                lat: nx.lat, lng: nx.lng, phone: nx.phone,
+            } : null;
+            return { ok: true, queued: !!data.queued };
+        } catch (_) { return { ok: false, error: true }; }
+    };
 
     // === Incidente ===
     document.getElementById('btn-incident')?.addEventListener('click', async () => {
