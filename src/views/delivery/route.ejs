@@ -2906,8 +2906,14 @@
             const avisado = r.notified > 0
                 ? 'Tu supervisor fue avisado.'
                 : (r.queued ? 'Sin señal: se enviará al recuperar la conexión.'
-                            : 'Quedó registrado, pero no pude avisar a un supervisor. Llamá a la central.');
-            Swal.fire({ icon: 'success', title: 'SOS enviado', text: avisado, confirmButtonColor: '#dc2626' });
+                            : 'Quedó registrado, pero no pude avisar a un supervisor.');
+            const c2 = await Swal.fire({
+                icon: 'success', title: 'SOS enviado',
+                html: `${avisado}<br><br>¿Llamar al 911 ahora?`,
+                showCancelButton: true, confirmButtonText: '📞 Llamar al 911',
+                confirmButtonColor: '#dc2626', cancelButtonText: 'No',
+            });
+            if (c2.isConfirmed) { window.location.href = 'tel:911'; }
         }
     });
 

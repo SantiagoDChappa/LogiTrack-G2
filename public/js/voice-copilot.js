@@ -312,6 +312,9 @@
         run: async () => {
             const geo = await getGeo();
             const hasGeo = geo.latitude != null && geo.longitude != null;
+            // Tras avisar al supervisor, abrimos el discador al 911 (NO llama solo: el repartidor
+            // toca "llamar"). En laptop el tel: es no-op. Prioridad: llegar a emergencias siempre.
+            const dial911 = () => { setTimeout(() => { try { window.location.href = 'tel:911'; } catch (_) { /* laptop */ } }, 1600); };
             let data;
             try {
                 // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
@@ -324,19 +327,22 @@
                 });
                 data = await res.json().catch(() => ({}));
                 if (!res.ok && !(data && data.queued)) {
-                    return { speak: 'No pude enviar la alerta. Probá de nuevo o usá el botón de pánico.', error: true };
+                    dial911();
+                    return { speak: 'No pude avisar a la central, pero te comunico con el 911.', error: true };
                 }
             } catch (_) {
-                return { speak: 'No pude enviar la alerta. Probá de nuevo o usá el botón de pánico.', error: true };
+                dial911();
+                return { speak: 'No pude avisar a la central, pero te comunico con el 911.', error: true };
             }
+            dial911();
             if (data.queued) {                                                            // CA5
-                return { speak: 'Sin señal: la alerta de emergencia quedó en cola y se envía apenas vuelva la conexión.' };
+                return { speak: 'Sin señal: la alerta quedó en cola. Te comunico con el 911.' };
             }
             const ubic = hasGeo ? 'con tu ubicación' : 'sin tu ubicación porque no estaba disponible'; // CA4/CA2
             const avisado = data.notified > 0
                 ? 'Avisamos a tu supervisor.'
-                : 'Quedó registrada, pero no pude avisar a un supervisor; llamá a la central.';
-            return { speak: `Alerta de emergencia enviada ${ubic}. ${avisado}` };
+                : 'Quedó registrada, pero no pude avisar a un supervisor.';
+            return { speak: `Alerta enviada ${ubic}. ${avisado} Te comunico con el 911.` };
         },
     });
 
