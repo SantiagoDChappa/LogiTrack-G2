@@ -2676,8 +2676,12 @@
         if (pauseTimer) clearInterval(pauseTimer);
         const tick = () => {
             if (!activePauseStart) return;
-            const sec = Math.floor((Date.now() - new Date(activePauseStart).getTime()) / 1000);
-            if (pauseElapsedE) pauseElapsedE.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
+            // Re-consultamos el elemento cada tick (el banner puede haberse creado dinámicamente
+            // después de capturar la referencia) y clampeamos a 0 por si hay desfasaje de reloj.
+            const el = document.getElementById('pause-elapsed');
+            if (!el) return;
+            const sec = Math.max(0, Math.floor((Date.now() - new Date(activePauseStart).getTime()) / 1000));
+            el.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
         };
         tick();
         pauseTimer = setInterval(tick, 1000);
@@ -2719,7 +2723,7 @@
         if (!reason) return;
         const r = await post(`/delivery/route/${routeId}/pause`, { reason });
         if (r) {
-            activePauseId = r.pauseId; activePauseStart = r.startedAt;
+            activePauseId = r.pauseId; activePauseStart = new Date().toISOString(); // contador desde el cliente (inmune al desfasaje de reloj)
             ensurePauseBanner();
             if (pauseReasonE) pauseReasonE.textContent = '· ' + reason;
             if (pauseBanner) pauseBanner.hidden = false;
@@ -2758,7 +2762,7 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) { return res.status === 409 ? { ok: false, already: true } : { ok: false, error: true }; }
-            activePauseId = data.pauseId; activePauseStart = data.startedAt;
+            activePauseId = data.pauseId; activePauseStart = new Date().toISOString(); // contador desde el cliente (inmune al desfasaje de reloj)
             ensurePauseBanner();
             if (pauseReasonE) { pauseReasonE.textContent = '· ' + (reason || 'pausa'); }
             if (pauseBanner) { pauseBanner.hidden = false; }

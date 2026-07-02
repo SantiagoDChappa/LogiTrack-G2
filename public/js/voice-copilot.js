@@ -128,7 +128,7 @@
 
     register({
         id: 'help', label: 'Ayuda',
-        keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
+        keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu', 'lista'],
         run: () => ({ speak: 'Podés pedirme: próxima entrega, buscar un envío, '
             + 'pausar o retomar, navegar, llamar al cliente, o emergencia.' }),
     });
@@ -427,15 +427,30 @@
         if (pending.length === 1) { return indicateStop(pending[0]); } // CA1
         // CA3: varias pendientes → desambiguar. Nombramos en voz solo las primeras, pero el número
         // de parada vale para CUALQUIERA (antes decía "hay 5" y solo dejaba elegir 3 → #3).
+        return askWhichStop(pending, 0);
+    }
+
+    // CA4 — desambiguación de búsqueda: pide el número de parada. Si el repartidor dice uno que NO
+    // está entre las opciones (o algo que no identifica ninguna), lo AVISA y vuelve a preguntar
+    // (hasta 2 reintentos) en vez de cancelar. "Cancelar"/silencio sí cancela.
+    function askWhichStop(pending, tries) {
         const opts = pending.slice(0, 3);
         pendingPrompt = (ans) => {
             const pick = resolvePick(ans, opts, pending);
-            if (pick) { return indicateStop(pick); } // CA4
-            return respond('Listo, no hago nada.', {});
+            if (pick) { return indicateStop(pick); }
+            const t = normalize(ans);
+            if (/^(cancelar|cancela|dejalo|olvidalo|nada|ninguna|ninguno)\b/.test(t)) {
+                return respond('Listo, no hago nada.', {});
+            }
+            if (tries < 2) { return askWhichStop(pending, tries + 1); }  // no coincide → re-preguntar
+            return respond('No pude identificar la parada, cancelo la búsqueda.', {});
         };
-        const parts = opts.map((s) => `la parada ${s.seq}${s.street ? ', en ' + speakable(s.street) : ''}`);
-        const more = pending.length > opts.length ? `, y ${pending.length - opts.length} más` : '';
-        return respond(`Encontré ${pending.length}. Las primeras: ${parts.join('; ')}${more}. Decime el número de parada.`, { relisten: true });
+        if (tries === 0) {
+            const parts = opts.map((s) => `la parada ${s.seq}${s.street ? ', en ' + speakable(s.street) : ''}`);
+            const more = pending.length > opts.length ? `, y ${pending.length - opts.length} más` : '';
+            return respond(`Encontré ${pending.length}. Las primeras: ${parts.join('; ')}${more}. Decime el número de parada.`, { relisten: true });
+        }
+        return respond(`Esa no es una de las opciones. Las paradas son: ${pending.map((s) => s.seq).join(', ')}. Decime el número.`, { relisten: true });
     }
 
     // Palabras genéricas que no distinguen un comando de otro (no cuentan para el matching).
