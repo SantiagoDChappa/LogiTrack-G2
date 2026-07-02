@@ -663,6 +663,22 @@ const saveIncidentParams = async (req, res) => {
     }
 };
 
+// Alcance de incidencias del buscador para el OPERADOR: 'branch' (todas las de su sucursal)
+// o 'assigned' (solo las asignadas/abiertas por él). No afecta a supervisor ni admin.
+const saveOperatorIncidentScope = async (req, res) => {
+    try {
+        const key = 'busqueda_incidencias_scope_operador';
+        const value = req.body.busqueda_incidencias_scope_operador === 'assigned' ? 'assigned' : 'branch';
+        const oldValue = await settingModel.get(key);
+        await settingLogModel.logChange(res.locals.currentUser?.id, key, oldValue, value);
+        await settingModel.set(key, value);
+        res.redirect(settingBack(req, '?success=operator_incident_scope'));
+    } catch (err) {
+        console.error('saveOperatorIncidentScope:', err.message);
+        res.status(500).redirect(settingBack(req, '?error=operator_incident_scope_save'));
+    }
+};
+
 // LGT-172: Identidad visual (nombre + logo institucional).
 const saveIdentity = async (req, res) => {
     try {
@@ -1139,6 +1155,7 @@ module.exports = {
     saveNotificationVariable, deleteNotificationVariable, saveEmailSnippet, deleteEmailSnippet,
     saveFailedReason, saveStandardMessage, saveTimeWindow, saveIncidentType,
     saveIncidentNotifConfig, testShipmentNotification, flushEmailQueue, runProcess, saveStatusColors, saveIncidentStatusColors, saveIncidentParams,
+    saveOperatorIncidentScope,
     saveFatigueConsentNotifConfig,
     triggerDelayDetection,
     saveDateTimeSettings,

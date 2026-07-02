@@ -8,6 +8,11 @@ const {
 } = require('../models/index');
 const incidentModel = require('../models/incident');
 const modificationModel = require('../models/shipmentModificationRequest');
+const settingModel = require('../models/setting');
+
+// Clave del setting admin que decide, para el OPERADOR, el alcance de incidencias del
+// buscador: 'branch' (todas las de su sucursal, default) o 'assigned' (solo las suyas).
+const OPERATOR_INCIDENT_SCOPE_KEY = 'busqueda_incidencias_scope_operador';
 
 const RouteStatus = Object.freeze({
     PLANNED: 1, IN_ROUTE: 2, FINISHED: 3, CANCELLED: 4,
@@ -505,6 +510,15 @@ const search = async (req, res) => {
         const numeric = isNum(q);
         const scopeFilter = buildShipmentScope(role, uid, branchId);
 
+        // Setting admin: si el OPERADOR debe ver en el buscador solo las incidencias
+        // asignadas/abiertas por él ('assigned') o todas las de su sucursal ('branch', default).
+        // Se implementa anulando el branchId que se pasa a las búsquedas de incidencias: sin
+        // sucursal, los filtros quedan sólo con las cláusulas del propio usuario.
+        const operatorScope = (await settingModel.get(OPERATOR_INCIDENT_SCOPE_KEY).catch(() => null)) === 'assigned'
+            ? 'assigned' : 'branch';
+        const incidentBranchId = (role === RoleType.OPERATOR.id && operatorScope === 'assigned')
+            ? null : branchId;
+
         const shipIncludes = (senderReq, recipientReq) => [
             { model: Person, as: 'sender', required: senderReq, attributes: ['fullName'], ...(senderReq ? { where: { fullName: like } } : {}) },
             { model: Person, as: 'recipient', required: recipientReq, attributes: ['fullName'], ...(recipientReq ? { where: { fullName: like } } : {}) },
@@ -527,14 +541,14 @@ const search = async (req, res) => {
             .then(([byT, byL, byS, byR]) => mergeShipments(byT, byL, byS, byR));
 
         const incidentsFromListP = incidentModel.list(
-            buildIncidentFilters(role, uid, branchId, q, numeric)
+            buildIncidentFilters(role, uid, incidentBranchId, q, numeric)
         ).catch(() => []);
 
         const incidentsFromTypeP = (!numeric)
-            ? searchIncidentsByType(role, uid, branchId, q)
+            ? searchIncidentsByType(role, uid, incidentBranchId, q)
             : Promise.resolve([]);
 
-        const incidentsFromReporterP = searchIncidentsByReporter(role, uid, branchId, q, like, numeric);
+        const incidentsFromReporterP = searchIncidentsByReporter(role, uid, incidentBranchId, q, like, numeric);
 
         const incidentsPromise = Promise.all([incidentsFromListP, incidentsFromTypeP, incidentsFromReporterP])
             .then(([fromList, fromType, fromReporter]) => mergeIncidents(fromList, fromType, fromReporter, numeric, q));

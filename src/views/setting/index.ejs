@@ -2076,6 +2076,31 @@
                 </form>
             </div>
 
+            <!-- Card: Alcance de incidencias del buscador (operador) -->
+            <% var _opScope = settings.busqueda_incidencias_scope_operador === 'assigned' ? 'assigned' : 'branch'; %>
+            <div class="settings-card">
+                <h2 class="settings-card-title">
+                    <span class="material-symbols-outlined">manage_search</span>
+                    Buscador — incidencias del operador
+                </h2>
+                <p class="settings-subtitle">
+                    Cuando un <strong>operador</strong> busca por nombre, DNI, email o tracking, qué incidencias
+                    le trae el buscador. No afecta a supervisores ni administradores.
+                </p>
+                <form method="POST" action="/setting/operator-incident-scope">
+                    <div class="field" style="max-width:520px">
+                        <label for="busqueda_incidencias_scope_operador">Alcance</label>
+                        <select id="busqueda_incidencias_scope_operador" name="busqueda_incidencias_scope_operador">
+                            <option value="branch" <%= _opScope === 'branch' ? 'selected' : '' %>>Todas las incidencias de su sucursal</option>
+                            <option value="assigned" <%= _opScope === 'assigned' ? 'selected' : '' %>>Solo las asignadas al operador</option>
+                        </select>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="action-btn action-btn--lg guardar" type="submit" data-tooltip="Guardar" aria-label="Guardar"><span class="material-symbols-outlined">save</span></button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Card: Plantillas de checklist -->
             <div class="settings-card">
                 <h2 class="settings-card-title">

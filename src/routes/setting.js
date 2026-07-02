@@ -24,6 +24,7 @@ router.post('/eta-settings',    requireAdmin, settingController.saveEtaSettings)
 router.post('/cobros',          requireAdmin, settingController.saveCobros);
 router.post('/params',          requireAdmin, settingController.saveParams);
 router.post('/incident-params', requireAdmin, settingController.saveIncidentParams);
+router.post('/operator-incident-scope', requireAdmin, settingController.saveOperatorIncidentScope);
 router.post('/status-colors',   requireAdmin, settingController.saveStatusColors);
 router.post('/incident-status-colors', requireAdmin, settingController.saveIncidentStatusColors);
 router.post('/notification-config',         requireAdmin, settingController.saveNotificationConfig);
