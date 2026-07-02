@@ -48,7 +48,7 @@ const includesFull = () => {
 
 const findByIdFull = (id) => Incident.findOne({ where: { id }, include: includesFull() });
 
-const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, trackingId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, limit = 200 } = {}) => {
+const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, trackingId, openedByUserId, deliveryUserId, branchId, staffScope, openedChannel, resolution, reporterName, reporterEmail, reporterDocument, limit = 200 } = {}) => {
     const { Op } = require('sequelize');
     const where = {};
     if (id)                { where.id = id; }
@@ -64,6 +64,7 @@ const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, t
     const { Shipment }     = require('./shipment');
     const { IncidentType } = require('./incidentType');
     const { User }         = require('./user');
+    const { Person }       = require('./person');
 
     const shipmentInclude = { model: Shipment, as: 'shipment', attributes: ['id', 'trackingId', 'deliveryUserId', 'currentBranchId'] };
     const shipmentWhere = {};
@@ -96,14 +97,42 @@ const list = ({ id, status, escalated, priority, assignedToUserId, shipmentId, t
         }
     }
 
+    const includes = [
+        shipmentInclude,
+        { model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'] },
+        { model: User, as: 'assignedTo',   attributes: ['id', 'fullName', 'branchId'], required: false },
+        { model: User, as: 'openedByUser', attributes: ['id', 'fullName'], required: false },
+    ];
+
+    if (reporterName) {
+        const like = { [Op.iLike]: `%${String(reporterName).trim()}%` };
+        where[Op.and] = [...(where[Op.and] || []), {
+            [Op.or]: [
+                { reporterName: like },
+                { '$openedByPerson.fullName$': like },
+            ],
+        }];
+        includes.push({ model: Person, as: 'openedByPerson', required: false, attributes: ['id', 'fullName', 'email', 'document'] });
+    } else if (reporterEmail) {
+        const like = { [Op.iLike]: `%${String(reporterEmail).trim()}%` };
+        where[Op.and] = [...(where[Op.and] || []), {
+            [Op.or]: [
+                { reporterEmail: like },
+                { '$openedByPerson.email$': like },
+            ],
+        }];
+        includes.push({ model: Person, as: 'openedByPerson', required: false, attributes: ['id', 'fullName', 'email', 'document'] });
+    } else if (reporterDocument) {
+        const doc = parseInt(String(reporterDocument).trim(), 10);
+        if (Number.isFinite(doc)) {
+            where[Op.and] = [...(where[Op.and] || []), { '$openedByPerson.document$': doc }];
+            includes.push({ model: Person, as: 'openedByPerson', required: true, attributes: ['id', 'fullName', 'email', 'document'] });
+        }
+    }
+
     return Incident.findAll({
         where,
-        include: [
-            shipmentInclude,
-            { model: IncidentType, as: 'type', attributes: ['id', 'code', 'description'] },
-            { model: User, as: 'assignedTo',   attributes: ['id', 'fullName', 'branchId'], required: false },
-            { model: User, as: 'openedByUser', attributes: ['id', 'fullName'], required: false }
-        ],
+        include: includes,
         order: [['escalated', 'DESC'], ['priority', 'DESC'], ['createdAt', 'DESC']],
         limit,
         subQuery: false
