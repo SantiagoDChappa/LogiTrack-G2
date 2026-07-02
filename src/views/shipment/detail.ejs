@@ -528,6 +528,61 @@
                     </div>
                 </div>
 
+                <%# ── Fotos del envío: POD de entrega + intentos fallidos ── %>
+                <% var _ev = (typeof deliveryEvidence !== 'undefined') ? deliveryEvidence : null;
+                   var _fp = (typeof failedPhotos !== 'undefined' && failedPhotos) ? failedPhotos : [];
+                   var _hasEv = _ev && (_ev.hasPhoto || _ev.hasSignature); %>
+                <% if (_hasEv || _fp.length > 0) { %>
+                <style>
+                    .ship-photos-block + .ship-photos-block { margin-top: 1rem; }
+                    .ship-photos-block-title { font-size: .82rem; color: var(--color-text-secondary, #64748b); margin: .2rem 0 .5rem; }
+                    .ship-photos-grid { display: flex; flex-wrap: wrap; gap: .6rem; }
+                    .ship-photo-thumb { display: block; width: 140px; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; overflow: hidden; background: var(--color-surface, #fff); text-decoration: none; }
+                    .ship-photo-thumb img { display: block; width: 100%; height: 140px; object-fit: cover; background: #f1f5f9; }
+                    .ship-photo-thumb--sig img { object-fit: contain; background: #fff; }
+                    .ship-photo-cap { display: block; padding: .3rem .5rem; font-size: .72rem; color: var(--color-text-secondary, #64748b); border-top: 1px solid var(--color-border, #e2e8f0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                </style>
+                <div class="update-card" style="margin-top:1rem;">
+                    <h3><span class="material-symbols-outlined" style="color:#2563eb;">photo_camera</span> Fotos del envío</h3>
+
+                    <% if (_hasEv) { %>
+                    <div class="ship-photos-block">
+                        <div class="ship-photos-block-title">
+                            Entrega (POD)<% if (_ev.receiverName) { %> · recibió <strong><%= _ev.receiverName %></strong><% if (_ev.receiverDni) { %> (DNI <%= _ev.receiverDni %>)<% } %><% } %><% if (_ev.at) { %> · <%= new Date(_ev.at).toLocaleString('es-AR') %><% } %>
+                        </div>
+                        <div class="ship-photos-grid">
+                            <% if (_ev.hasPhoto) { %>
+                            <a href="/shipment/<%= shipment.id %>/evidence/photo" target="_blank" rel="noopener" class="ship-photo-thumb">
+                                <img src="/shipment/<%= shipment.id %>/evidence/photo" loading="lazy" alt="Foto de entrega">
+                                <span class="ship-photo-cap">Foto de entrega</span>
+                            </a>
+                            <% } %>
+                            <% if (_ev.hasSignature) { %>
+                            <a href="/shipment/<%= shipment.id %>/evidence/signature" target="_blank" rel="noopener" class="ship-photo-thumb ship-photo-thumb--sig">
+                                <img src="/shipment/<%= shipment.id %>/evidence/signature" loading="lazy" alt="Firma del receptor">
+                                <span class="ship-photo-cap">Firma</span>
+                            </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <% if (_fp.length > 0) { %>
+                    <div class="ship-photos-block">
+                        <div class="ship-photos-block-title">Intentos fallidos con foto (<%= _fp.length %>)</div>
+                        <div class="ship-photos-grid">
+                            <% _fp.forEach(function(fp){ %>
+                            <a href="/shipment/<%= shipment.id %>/failed-attempt/<%= fp.id %>/photo" target="_blank" rel="noopener" class="ship-photo-thumb">
+                                <img src="/shipment/<%= shipment.id %>/failed-attempt/<%= fp.id %>/photo" loading="lazy" alt="Foto de intento fallido">
+                                <span class="ship-photo-cap"><%= fp.reason || 'Intento fallido' %><% if (fp.at) { %> · <%= new Date(fp.at).toLocaleDateString('es-AR') %><% } %></span>
+                            </a>
+                            <% }) %>
+                        </div>
+                    </div>
+                    <% } %>
+                </div>
+                <% } %>
+
             </div>
             <!-- ══════════ FIN TOP GRID ══════════ -->
 
