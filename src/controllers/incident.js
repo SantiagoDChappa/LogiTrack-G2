@@ -62,17 +62,28 @@ const incidentVisibleTo = (incident, user) => {
     return false;
 };
 
-const computeActionFlags = (incident, user) => ({
-    canComment:      isStaff(user) || (isDelivery(user) && incidentVisibleTo(incident, user)),
-    canAssign:       isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
-    canChangeStatus: isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
-    canEscalate:     isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
-    canClose:        isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
-    canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED,
-    // Tareas del checklist y evidencias: staff o repartidor con visibilidad, mientras no este cerrada.
-    canManageTasks:  (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED,
-    canAttach:       (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED
-});
+// El OPERADOR sólo puede MODIFICAR incidencias asignadas a él. Sobre las demás de su
+// sucursal (visibles por el buscador según el setting) tiene acceso de solo lectura.
+// Supervisor, admin y repartidor no se ven afectados por esta regla.
+const operatorCanModify = (incident, user) =>
+    !isOperator(user) || (incident && incident.assignedToUserId === user.id);
+
+const computeActionFlags = (incident, user) => {
+    const opCanModify = operatorCanModify(incident, user);
+    return {
+        canComment:      (isStaff(user) || (isDelivery(user) && incidentVisibleTo(incident, user))) && opCanModify,
+        canAssign:       isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
+        canChangeStatus: isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
+        canEscalate:     isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
+        canClose:        isSupOrAdmin(user) && incident.status !== IncidentStatus.CLOSED,
+        canReopen:       isSupOrAdmin(user) && incident.status === IncidentStatus.CLOSED,
+        // Tareas del checklist y evidencias: staff o repartidor con visibilidad, mientras no este cerrada.
+        canManageTasks:  (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED && opCanModify,
+        canAttach:       (isStaff(user) || isDelivery(user)) && incident.status !== IncidentStatus.CLOSED && opCanModify,
+        // Operador viendo una incidencia de su sucursal que NO tiene asignada: solo lectura.
+        operatorReadOnly: isOperator(user) && !opCanModify,
+    };
+};
 
 // Acepta '200', 'INC-200', 'INC200', ' 200 '. Devuelve el numero o null si no se reconoce.
 const parseIncidentIdInput = (raw) => {
@@ -601,6 +612,8 @@ const addComment = async (req, res) => {
     const incident = await incidentModel.findByIdFull(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    // Operador sin asignación: solo lectura (defensa por si llega un POST directo).
+    if (!operatorCanModify(incident, user)) { return res.status(403).redirect(`/incident/${id}?error=not_assigned`); }
     if (!comment || comment.trim().length === 0) {
         return res.status(400).redirect(`/incident/${id}?error=comment_required`);
     }
@@ -1016,6 +1029,7 @@ const toggleTask = async (req, res) => {
     const incident = await incidentModel.findByIdFull(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    if (!operatorCanModify(incident, user)) { return res.status(403).redirect(`/incident/${id}?error=not_assigned`); }
     if (incident.status === IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=closed`);
     }
@@ -1050,6 +1064,7 @@ const uploadAttachment = async (req, res) => {
     const incident = await incidentModel.findByIdFull(id);
     if (!incident) { return res.status(404).send('Incidencia no encontrada'); }
     if (!incidentVisibleTo(incident, user)) { return res.status(403).send('Acceso denegado'); }
+    if (!operatorCanModify(incident, user)) { return res.status(403).redirect(`/incident/${id}?error=not_assigned`); }
     if (incident.status === IncidentStatus.CLOSED) {
         return res.status(400).redirect(`/incident/${id}?error=closed`);
     }

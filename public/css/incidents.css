@@ -747,6 +747,13 @@ section.incident-detail-card {
     border: 1px solid #fcd34d;
 }
 
+.alert-info {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+.alert-info .material-symbols-outlined { font-size: 1.15rem; }
+
 .alert-warning::before {
     content: '⚠';
     font-size: 1.1rem;

@@ -34,10 +34,18 @@
             file_type:           'Tipo de archivo no permitido (solo JPG, PNG o PDF).',
             action_requires_procedente: 'La acción sobre el envío requiere resolución procedente.',
             shipment_already_terminal:  'El envío ya está en estado final, no se puede cancelar.',
-            resolution_required_before_close: 'Antes de cerrar tenés que marcar la resolución (Procedente / No procedente).'
+            resolution_required_before_close: 'Antes de cerrar tenés que marcar la resolución (Procedente / No procedente).',
+            not_assigned:        'Esta incidencia no está asignada a vos: solo podés verla. Para gestionarla, pedí que te la asignen.'
         }; %>
         <% if (errCode) { %>
             <div class="alert alert-error" role="alert"><%= errMessages[errCode] || errCode %></div>
+        <% } %>
+
+        <% if (flags.operatorReadOnly) { %>
+            <div class="alert alert-info" role="status" style="display:flex;align-items:center;gap:.5rem">
+                <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+                <span>Estás viendo una incidencia de tu sucursal que <strong>no tenés asignada</strong>. Es solo lectura: no podés comentar, subir evidencia ni tildar tareas. Para gestionarla, pedí que te la asignen.</span>
+            </div>
         <% } %>
 
         <section class="incident-detail-grid">
