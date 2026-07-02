@@ -10,10 +10,17 @@
 %>
 <% const tone = (sv && sv.tone) || 'transit';
    const toneColor = { ready:'#16a34a', done:'#2563eb', transit:'#0891b2', bad:'#dc2626', delayed:'#d97706' }[tone] || '#0891b2';
+   // Badge "DEMORADO" al lado del estado: por demora en vivo (eta) o por overlay persistido.
+   const isDelayed = (typeof delayed !== 'undefined' && delayed) || tone === 'delayed';
 %>
 <div class="ss-card" style="border-left:5px solid <%= toneColor %>;background:var(--c-surface,#fff);border:1px solid var(--c-border,#e2e8f0);border-radius:14px;padding:1.4rem 1.5rem;margin-bottom:1.1rem">
     <div style="font-size:.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--c-text-2,#64748b)">Envío <%= trackingId %></div>
-    <h2 style="margin:.3rem 0 .35rem;font-size:1.5rem;color:<%= toneColor %>"><%= sv ? sv.headline : 'En proceso' %></h2>
+    <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.3rem 0 .35rem">
+        <h2 style="margin:0;font-size:1.5rem;color:<%= toneColor %>"><%= sv ? sv.headline : 'En proceso' %></h2>
+        <% if (isDelayed) { %>
+            <span style="display:inline-block;background:#d97706;color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:.28rem .65rem;border-radius:999px;white-space:nowrap">Demorado</span>
+        <% } %>
+    </div>
     <p style="margin:0;font-size:1.02rem;line-height:1.45;color:var(--c-text,#0f172a)"><%= sv ? sv.detail : '' %></p>
 </div>
 

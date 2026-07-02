@@ -48,6 +48,7 @@
                     sv,
                     timeline: typeof timeline !== 'undefined' ? timeline : [],
                     authed: true,
+                    delayed: typeof delayed !== 'undefined' ? delayed : false,
                     qrDataUrl: typeof qrDataUrl !== 'undefined' ? qrDataUrl : null,
                     pickup: typeof pickup !== 'undefined' ? pickup : null,
                     trackingId: shipment.trackingId,
@@ -55,6 +56,18 @@
                     identifyUrl: null,
                 }) %>
             <% } %>
+
+            <%# Última Milla — chat con el repartidor. Sólo acá (portal autenticado por DNI +
+                email), no en la búsqueda pública anónima. Se muestra si el chat está abierto.
+                La demora ya se comunica en la tarjeta de estado (badge DEMORADO), sin banner. %>
+            <div id="portal-chat-<%= shipment.id %>" class="portal-chat-box portal-chat-box--docked" data-tracking="<%= shipment.trackingId %>" style="display:none;">
+                <div class="portal-chat-box__head"><span class="material-symbols-outlined">chat</span> Chat con el repartidor</div>
+                <div class="portal-chat-msgs"></div>
+                <form class="portal-chat-form">
+                    <input type="text" class="portal-chat-input" maxlength="1000" placeholder="Escribí un mensaje…" autocomplete="off">
+                    <button type="submit" class="portal-chat-send">Enviar</button>
+                </form>
+            </div>
 
             <%- include('../partials/portal-shipment-public-detail', { shipment, canSelfService, modifications: typeof modifications !== 'undefined' ? modifications : [], incidents: typeof incidents !== 'undefined' ? incidents : [] }) %>
 
@@ -106,6 +119,58 @@
     </section>
 
     <script src="/js/theme.js" defer></script>
+
+    <%# Última Milla — chat con el repartidor (portal autenticado). %>
+    <script>
+    (function(){
+        const shipmentId = <%- JSON.stringify(shipment.id) %>;
+        const tracking = <%- JSON.stringify(shipment.trackingId) %>;
+
+        // Chat cliente↔repartidor. Polling cada 5s. Visible sólo mientras el chat está
+        // abierto (repartidor en camino); al cerrarse la entrega deja de mostrarse.
+        const chatBox = document.getElementById('portal-chat-' + shipmentId);
+        if (chatBox) {
+            const msgsEl = chatBox.querySelector('.portal-chat-msgs');
+            const form = chatBox.querySelector('.portal-chat-form');
+            const input = chatBox.querySelector('.portal-chat-input');
+            let lastId = 0;
+            const append = (m) => {
+                const row = document.createElement('div');
+                row.className = 'portal-chat-msg' + (m.role === 'CLIENT' ? ' portal-chat-msg--mine' : '');
+                row.textContent = m.body;
+                msgsEl.appendChild(row);
+                if (m.id > lastId) lastId = m.id;
+            };
+            const poll = () => {
+                fetch('/delivery/chat/track/' + encodeURIComponent(tracking) + '/messages?since=' + lastId)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(t => {
+                        if (!t) return;
+                        if (t.open) {
+                            chatBox.style.display = 'block';
+                            (t.messages || []).forEach(append);
+                            if (t.messages && t.messages.length) msgsEl.scrollTop = msgsEl.scrollHeight;
+                        } else {
+                            chatBox.style.display = 'none';
+                        }
+                    }).catch(() => {});
+            };
+            form.addEventListener('submit', (ev) => {
+                ev.preventDefault();
+                const body = input.value.trim();
+                if (!body) return;
+                input.value = '';
+                fetch('/delivery/chat/track/' + encodeURIComponent(tracking) + '/messages', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ body }),
+                }).then(r => r.ok ? r.json() : null).then(m => { if (m) { append(m); msgsEl.scrollTop = msgsEl.scrollHeight; } }).catch(() => {});
+            });
+            poll();
+            setInterval(poll, 5000);
+        }
+    })();
+    </script>
+
     <% if (shipment.mapStops && shipment.mapStops.length >= 1) { %>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>

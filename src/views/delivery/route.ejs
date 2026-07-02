@@ -714,7 +714,7 @@
                 <h1>Ruta #<%= route.id %></h1>
                 <div class="meta"><%= route.transport.name %> · <%= route.totalDistanceKm %> km · <%= (route.stops || []).length %> paradas</div>
                 <div class="live-metrics">
-                    <span>ETA fin: <b id="m-eta">—</b></span>
+                    <span>Fin del reparto: <b id="m-eta">—</b></span>
                     <span>Km: <b id="m-km">0 / <%= route.totalDistanceKm %></b></span>
                     <span>Prom/parada: <b id="m-avg">—</b></span>
                 </div>
@@ -1072,6 +1072,10 @@
         return 'pending';
     }
 
+    // Duraciones de manejo (seg) por tramo OSRM entre paradas consecutivas + el orden de
+    // ids de parada que corresponde a ese trazado, para calcular la "hora de llegada" real.
+    let osrmLegSec = null;
+    const osrmStopIds = [];
     const latlngs = [];
     stops.forEach(s => {
         if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
@@ -1080,6 +1084,7 @@
             .addTo(map);
         markers[s.id] = m;
         latlngs.push([s.lat, s.lng]);
+        osrmStopIds.push(s.id);
     });
 
     let routeGlow = null, routeLine = null;
@@ -1100,6 +1105,11 @@
                 const poly = d.routes[0].geometry.coordinates.map(([ln, la]) => [la, ln]);
                 drawRoute(poly);
                 map.fitBounds(poly, { padding: [40,40] });
+                // Tramos OSRM: leg[i] = manejo de osrmStopIds[i] → osrmStopIds[i+1] (seg).
+                if (Array.isArray(d.routes[0].legs) && d.routes[0].legs.length) {
+                    osrmLegSec = d.routes[0].legs.map(l => Number(l.duration) || 0);
+                    applyStepState(); // recalcular horas de llegada con manejo real
+                }
             }).catch(() => {});
     }
 
@@ -2268,6 +2278,17 @@
         let kmDone = 0, kmAcc = 0;
         const now = new Date();
         let etaCursor = new Date(now);
+        // Estado para la hora de llegada con manejo OSRM: índice de la parada desde la que
+        // se mide el próximo tramo y el servicio (min en puerta) de la parada anterior.
+        let lastEtaIdx = null;
+        let lastServiceSec = 0;
+        // Suma de tramos de manejo OSRM (seg) entre dos paradas por su índice en el trazado.
+        const osrmTravelSec = (fromIdx, toIdx) => {
+            if (!osrmLegSec || fromIdx == null || toIdx == null || toIdx <= fromIdx) return null;
+            let s = 0;
+            for (let i = fromIdx; i < toIdx && i < osrmLegSec.length; i++) s += osrmLegSec[i];
+            return s;
+        };
 
         rows.forEach(r => {
             r.classList.remove('is-current', 'locked');
@@ -2323,6 +2344,10 @@
                 if (etaEl) etaEl.textContent = '';
                 if (stop) kmDone += stop.distanceFromPrevKm;
                 kmAcc += (stop ? stop.distanceFromPrevKm : 0);
+                // El viaje hacia la primera parada pendiente se mide desde esta parada ya
+                // completada (sin sumar servicio: el repartidor ya la atendió).
+                lastEtaIdx = osrmStopIds.indexOf(Number(r.dataset.stopId));
+                lastServiceSec = 0;
                 return;
             }
 
@@ -2345,8 +2370,14 @@
                 if (bubble) { bubble.classList.remove('pending'); bubble.classList.add('current'); }
                 if (badge) { badge.classList.remove('gray'); badge.classList.add('amber'); badge.textContent = 'En camino'; }
                 if (stop && markers[stopId]) markers[stopId].setIcon(buildIcon(stop, 'current'));
-                etaCursor = new Date(now.getTime() + estMin * 60000);
-                if (etaEl) etaEl.textContent = 'ETA ~ ' + fmtTime(etaCursor);
+                // Primera parada pendiente: hora de llegada = ahora + manejo OSRM desde la
+                // última parada (completada u origen). Sin OSRM cae al estimado por parada.
+                const thisIdx = osrmStopIds.indexOf(stopId);
+                const travelSec = osrmTravelSec(lastEtaIdx, thisIdx);
+                etaCursor = new Date(now.getTime() + (travelSec != null ? travelSec * 1000 : estMin * 60000));
+                if (etaEl) etaEl.textContent = 'Hora de llegada: ' + fmtTime(etaCursor);
+                lastEtaIdx = thisIdx;
+                lastServiceSec = estMin * 60;
                 currentFound = true;
             } else if (!currentFound && readOnly) {
                 // Modo solo lectura: marca el stop incompleto pero sin "is-current" interactivo
@@ -2362,8 +2393,18 @@
                     if (txt) txt.textContent = `Completá el paso #${prevSeq} antes`;
                     lockMsg.hidden = false;
                 }
-                etaCursor = new Date(etaCursor.getTime() + estMin * 60000);
-                if (etaEl) etaEl.textContent = 'ETA ~ ' + fmtTime(etaCursor);
+                // Paradas siguientes: parten de la salida de la parada anterior (llegada +
+                // servicio) más el manejo OSRM hasta esta. Sin OSRM, estimado por parada.
+                const thisIdx = osrmStopIds.indexOf(stopId);
+                const travelSec = osrmTravelSec(lastEtaIdx, thisIdx);
+                if (travelSec != null) {
+                    etaCursor = new Date(etaCursor.getTime() + lastServiceSec * 1000 + travelSec * 1000);
+                } else {
+                    etaCursor = new Date(etaCursor.getTime() + estMin * 60000);
+                }
+                if (etaEl) etaEl.textContent = 'Hora de llegada: ' + fmtTime(etaCursor);
+                lastEtaIdx = thisIdx;
+                lastServiceSec = estMin * 60;
             }
         });
 
@@ -2373,8 +2414,9 @@
         document.getElementById('progress-fill').style.width = pct + '%';
         document.getElementById('progress-text').textContent = `${done} / ${total}`;
 
-        // Métricas en vivo
-        document.getElementById('m-eta').textContent = currentFound ? fmtTime(etaCursor) : (done === total ? 'completa' : '—');
+        // Métricas en vivo. "Fin del reparto" = llegada a la última parada + su servicio.
+        const endCursor = new Date(etaCursor.getTime() + lastServiceSec * 1000);
+        document.getElementById('m-eta').textContent = currentFound ? fmtTime(endCursor) : (done === total ? 'completa' : '—');
         document.getElementById('m-km').textContent = `${kmDone.toFixed(1)} / ${Number(totalKm).toFixed(1)}`;
         const completedWithTime = stops.filter(s => s.completed && s.completedAt);
         if (completedWithTime.length > 0) {

@@ -79,6 +79,11 @@ function pendingDeliveryStops(route) {
 
 // Calcula la hora estimada de llegada de cada parada pendiente.
 // Devuelve Map<stopId, Date>. `route` debe venir de routeModel.getById (incluye stops, origin).
+//
+// Distancia: por calle vía OSRM (mismo motor que ya dibuja la línea en el mapa en vivo,
+// utils/roadRouter), no línea recta. Si OSRM no responde, roadRouter cae solo a haversine
+// (comportamiento anterior), así que nunca rompe el cálculo, sólo lo hace menos preciso
+// mientras dure la falla.
 async function computeEtas(route, cfg) {
     const config = cfg || await loadConfig();
     const pending = pendingDeliveryStops(route);
@@ -99,18 +104,24 @@ async function computeEtas(route, cfg) {
         cursor = first;
     }
 
+    const validStops = pending.filter(s => stopCoords(s));
+    if (validStops.length === 0) { return result; }
+
+    const { routeViaRoads } = require('../utils/roadRouter');
+    const points = [cursor, ...validStops.map(stopCoords)];
+    const road = await routeViaRoads(points);
+    const legKm = (road.legDistancesKm && road.legDistancesKm.length === validStops.length)
+        ? road.legDistancesKm
+        : validStops.map((_, i) => haversine(points[i].lat, points[i].lng, points[i + 1].lat, points[i + 1].lng));
+
     let t = Date.now();
-    for (const stop of pending) {
-        const coords = stopCoords(stop);
-        if (!coords) { continue; }
-        const km = haversine(cursor.lat, cursor.lng, coords.lat, coords.lng);
-        const travelMin = (km / speed) * 60;
+    validStops.forEach((stop, i) => {
+        const travelMin = (legKm[i] / speed) * 60;
         t += travelMin * 60000;
         result.set(stop.id, new Date(t));
         const serviceMin = Number(stop.estimatedMinutes) || config.serviceMinDef;
         t += serviceMin * 60000;
-        cursor = coords;
-    }
+    });
     return result;
 }
 

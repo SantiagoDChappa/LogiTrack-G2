@@ -256,6 +256,8 @@ const getShipmentDetail = async (req, res) => {
         canRequestReturn,
         returnError: req.query.returnError ? String(req.query.returnError) : null,
         sv, timeline, qrDataUrl, pickup,
+        // Demora en vivo (ETA corriendo tarde vs. la promesa) para el badge "DEMORADO".
+        delayed: !!(eta && eta.delayed),
     });
 };
 

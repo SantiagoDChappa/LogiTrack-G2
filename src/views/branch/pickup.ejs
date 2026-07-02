@@ -21,6 +21,12 @@
         .pk-btn { padding: .7rem 1.1rem; border-radius: 10px; border: 0; background: #2563eb; color: #fff;
             font-weight: 600; cursor: pointer; }
         .pk-btn--ghost { background: transparent; border: 1px solid var(--color-border, #cbd5e1); color: var(--color-text, #1e293b); }
+        /* Estado "verificando" tras escanear/enviar: spinner + tono neutro (claro y oscuro). */
+        .pk-result--loading { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0); color: var(--color-text, #1e293b); }
+        .pk-spinner { width: 42px; height: 42px; margin: 0 auto .6rem; border-radius: 50%;
+            border: 4px solid rgba(37,99,235,.22); border-top-color: #2563eb; animation: pk-spin .8s linear infinite; }
+        @keyframes pk-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .pk-spinner { animation-duration: 2s; } }
     </style>
 </head>
 <body>
@@ -37,13 +43,13 @@
             <% if (typeof result !== 'undefined' && result) { %>
                 <div class="pk-card pk-result pk-result--ok">
                     <span class="material-symbols-outlined">check_circle</span>
-                    <h2 style="margin:.5rem 0 .25rem">Retiro confirmado</h2>
+                    <h2 style="margin:.5rem 0 .25rem">¡Envío entregado con éxito!</h2>
                     <p style="margin:0">Envío <strong><%= result.trackingId %></strong> entregado<% if (result.recipientName) { %> a <strong><%= result.recipientName %></strong><% } %>.</p>
                 </div>
             <% } else if (typeof error !== 'undefined' && error) { %>
                 <div class="pk-card pk-result pk-result--err">
                     <span class="material-symbols-outlined">error</span>
-                    <h2 style="margin:.5rem 0 .25rem">No se pudo confirmar</h2>
+                    <h2 style="margin:.5rem 0 .25rem">Rechazado</h2>
                     <p style="margin:0"><%= error %></p>
                 </div>
             <% } %>
@@ -52,6 +58,7 @@
             <div class="pk-card">
                 <div class="pk-scanbox">
                     <video id="pk-video" playsinline muted></video>
+                    <canvas id="pk-canvas" style="display:none"></canvas>
                 </div>
                 <p class="pk-hint" id="pk-cam-hint">Iniciando cámara…</p>
                 <div style="display:flex;gap:.5rem;margin-top:.5rem">
@@ -69,6 +76,8 @@
 
     <script src="/js/theme.js" defer></script>
     <script src="/js/ui.js" defer></script>
+    <%# jsQR: decodificador de QR en JS para navegadores sin BarcodeDetector (Safari/iOS). %>
+    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
     <script>
     (function () {
         const video   = document.getElementById('pk-video');
@@ -77,7 +86,20 @@
         const form    = document.getElementById('pk-form');
         const input   = document.getElementById('pk-value');
         const slot    = document.getElementById('pk-result-slot');
+        const canvas  = document.getElementById('pk-canvas');
         let stream = null, scanning = false, lastValue = null, busy = false;
+
+        // Escape para valores dinámicos insertados vía innerHTML (nombre, motivo, tracking).
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g,
+            c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        function showLoading() {
+            slot.innerHTML = '<div class="pk-card pk-result pk-result--loading">'
+                + '<div class="pk-spinner" role="status" aria-label="Verificando"></div>'
+                + '<h2 style="margin:.25rem 0 .1rem">Verificando…</h2>'
+                + '<p style="margin:0">Estamos confirmando el código.</p></div>';
+            slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
 
         function showResult(ok, html) {
             slot.innerHTML = '<div class="pk-card pk-result pk-result--' + (ok ? 'ok' : 'err') + '">'
@@ -89,6 +111,13 @@
         async function confirm(value) {
             if (busy) { return; }
             busy = true;
+            showLoading();
+            const startedAt = Date.now();
+            // Mínimo de exposición del spinner para que la animación se perciba aun con red rápida.
+            const settle = async () => {
+                const wait = 650 - (Date.now() - startedAt);
+                if (wait > 0) { await new Promise(r => setTimeout(r, wait)); }
+            };
             try {
                 const res = await fetch('/branch/pickup/confirm', {
                     method: 'POST',
@@ -96,18 +125,21 @@
                     body: JSON.stringify({ value }),
                 });
                 const data = await res.json().catch(() => ({}));
+                await settle();
                 if (data.ok) {
-                    showResult(true, '<h2 style="margin:.5rem 0 .25rem">Retiro confirmado</h2><p style="margin:0">Envío <strong>'
-                        + data.trackingId + '</strong> entregado' + (data.recipientName ? ' a <strong>' + data.recipientName + '</strong>' : '') + '.</p>');
+                    showResult(true, '<h2 style="margin:.5rem 0 .25rem">¡Envío entregado con éxito!</h2><p style="margin:0">Envío <strong>'
+                        + esc(data.trackingId) + '</strong> entregado' + (data.recipientName ? ' a <strong>' + esc(data.recipientName) + '</strong>' : '') + '.</p>');
                     input.value = '';
                 } else {
-                    showResult(false, '<h2 style="margin:.5rem 0 .25rem">No se pudo confirmar</h2><p style="margin:0">'
-                        + (data.error || 'Error') + '</p>');
+                    showResult(false, '<h2 style="margin:.5rem 0 .25rem">Rechazado</h2><p style="margin:0">'
+                        + esc(data.error || 'No se pudo confirmar el retiro.') + '</p>');
                     // Permite reintentar el mismo código tras un rato (ej. otra sucursal corrige).
                     setTimeout(() => { lastValue = null; }, 2500);
                 }
             } catch (e) {
-                showResult(false, '<p style="margin:0">Error de conexión. Probá de nuevo.</p>');
+                await settle();
+                showResult(false, '<h2 style="margin:.5rem 0 .25rem">Rechazado</h2><p style="margin:0">Error de conexión. Probá de nuevo.</p>');
+                setTimeout(() => { lastValue = null; }, 2500);
             } finally {
                 busy = false;
             }
@@ -120,29 +152,48 @@
             if (v) { confirm(v); }
         });
 
-        // Escaneo de QR con la API nativa BarcodeDetector (Chromium). Sin librerías externas.
+        // Escaneo de QR. Preferimos la API nativa BarcodeDetector (Chromium/Android); si no
+        // está (Safari/iOS), caemos a jsQR decodificando frames sobre un canvas.
         async function startCamera() {
-            if (!('BarcodeDetector' in window)) {
+            const hasBarcode = ('BarcodeDetector' in window);
+            const hasJsQR = (typeof window.jsQR === 'function');
+            if (!hasBarcode && !hasJsQR) {
                 hint.textContent = 'Tu navegador no soporta el escaneo automático. Ingresá el código a mano.';
                 video.style.display = 'none';
                 return;
             }
             try {
-                const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                let detector = null;
+                if (hasBarcode) {
+                    try { detector = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch { detector = null; }
+                }
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
                 video.srcObject = stream;
                 await video.play();
                 hint.textContent = 'Apuntá la cámara al código QR del cliente.';
                 scanning = true;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
                 const tick = async () => {
                     if (!scanning) { return; }
-                    try {
-                        const codes = await detector.detect(video);
-                        if (codes && codes.length) {
-                            const v = codes[0].rawValue;
-                            if (v && v !== lastValue) { lastValue = v; confirm(v); }
-                        }
-                    } catch { /* frame sin código */ }
+                    // No escanear mientras se verifica un código (evita disparos repetidos).
+                    if (!busy) {
+                        try {
+                            if (detector) {
+                                const codes = await detector.detect(video);
+                                if (codes && codes.length) {
+                                    const v = codes[0].rawValue;
+                                    if (v && v !== lastValue) { lastValue = v; confirm(v); }
+                                }
+                            } else if (window.jsQR && video.videoWidth) {
+                                canvas.width = video.videoWidth;
+                                canvas.height = video.videoHeight;
+                                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                                const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+                                if (code && code.data && code.data !== lastValue) { lastValue = code.data; confirm(code.data); }
+                            }
+                        } catch { /* frame sin código */ }
+                    }
                     requestAnimationFrame(tick);
                 };
                 requestAnimationFrame(tick);

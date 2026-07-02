@@ -1481,6 +1481,98 @@ ul { list-style: none; }
 }
 .portal-mis-envios-list-wrapper,
 .portal-mis-envios-detail-wrapper { max-width: 960px; }
+
+/* ── Última Milla — chat con el repartidor (portal autenticado) ──
+   Colores por variables de tema: se adapta solo a claro/oscuro. */
+.portal-chat-box {
+    margin-top: .75rem;
+    border: 1px solid var(--c-border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--c-surface);
+    box-shadow: var(--shadow);
+}
+.portal-chat-box__head {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    background: var(--c-primary);
+    color: #fff;
+    padding: .6rem .95rem;
+    font-weight: 600;
+    font-size: .9rem;
+}
+.portal-chat-box__head .material-symbols-outlined { font-size: 1.1rem; }
+.portal-chat-msgs {
+    max-height: 240px;
+    overflow-y: auto;
+    padding: .7rem .95rem;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    background: var(--c-bg);
+}
+.portal-chat-msg {
+    align-self: flex-start;
+    max-width: 80%;
+    padding: .4rem .65rem;
+    border-radius: 10px;
+    font-size: .88rem;
+    line-height: 1.35;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text);
+}
+.portal-chat-msg--mine {
+    align-self: flex-end;
+    background: var(--c-primary-lt);
+    border-color: var(--c-primary);
+    color: var(--c-text);
+}
+.portal-chat-form {
+    display: flex;
+    gap: .4rem;
+    padding: .6rem;
+    border-top: 1px solid var(--c-border);
+    background: var(--c-surface);
+}
+.portal-chat-input {
+    flex: 1;
+    padding: .5rem .7rem;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    font-size: .9rem;
+    background: var(--c-bg);
+    color: var(--c-text);
+}
+.portal-chat-input::placeholder { color: var(--c-text-3); }
+.portal-chat-input:focus { outline: none; border-color: var(--c-primary); }
+.portal-chat-send {
+    padding: .5rem 1rem;
+    border: 0;
+    border-radius: 8px;
+    background: var(--c-primary);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+}
+.portal-chat-send:hover { background: var(--c-primary-dk); }
+
+/* En pantallas anchas el chat se ancla como panel flotante a la derecha del box
+   central (patrón "burbuja de chat"). En pantallas chicas queda en el flujo. */
+@media (min-width: 900px) {
+    .portal-chat-box--docked {
+        position: fixed;
+        right: 1.25rem;
+        bottom: 1.25rem;
+        width: 340px;
+        max-width: calc(100vw - 2.5rem);
+        z-index: 60;
+        margin-top: 0;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+    }
+    .portal-chat-box--docked .portal-chat-msgs { max-height: 320px; }
+}
 .portal-incident-eyebrow {
     display: inline-flex;
     align-items: center;
