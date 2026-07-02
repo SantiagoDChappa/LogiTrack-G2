@@ -11,8 +11,10 @@
   var _figSrc = src + (src.indexOf('?') === -1 ? '?v=' + assetVersion : '');
   var _w = (typeof width !== 'undefined' && width) ? width : null;
   var _h = (typeof height !== 'undefined' && height) ? height : null;
+  var _variant = (typeof variant !== 'undefined' && variant) ? String(variant) : '';
+  var _figClass = 'help-figure' + (_variant ? ' help-figure--' + _variant : '');
 %>
-<figure class="help-figure">
+<figure class="<%= _figClass %>">
     <button type="button" class="help-figure__frame" data-help-zoom
             aria-label="Ampliar imagen: <%= alt %>">
         <img class="help-figure__img" src="<%= _figSrc %>" alt="<%= alt %>"

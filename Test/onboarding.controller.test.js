@@ -130,4 +130,41 @@ describe('Onboarding API', () => {
             expect(markHelpModuleSeen).not.toHaveBeenCalled();
         });
     });
+
+    describe('POST /api/onboarding/release-seen', () => {
+        it('marca release como visto en help_seen_modules', async () => {
+            markHelpModuleSeen.mockResolvedValue({ 'release:2026-06': true });
+            const app = buildApp({ id: 12 });
+
+            const res = await request(app)
+                .post('/api/onboarding/release-seen')
+                .send({ releaseId: '2026-06' });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ ok: true, helpSeen: { 'release:2026-06': true } });
+            expect(markHelpModuleSeen).toHaveBeenCalledWith(12, 'release:2026-06');
+        });
+
+        it('rechaza release inválido', async () => {
+            const app = buildApp({ id: 12 });
+
+            const res = await request(app)
+                .post('/api/onboarding/release-seen')
+                .send({ releaseId: 'inventado' });
+
+            expect(res.status).toBe(400);
+            expect(markHelpModuleSeen).not.toHaveBeenCalled();
+        });
+
+        it('responde 401 sin usuario autenticado', async () => {
+            const app = buildApp(null);
+
+            const res = await request(app)
+                .post('/api/onboarding/release-seen')
+                .send({ releaseId: '2026-06' });
+
+            expect(res.status).toBe(401);
+            expect(markHelpModuleSeen).not.toHaveBeenCalled();
+        });
+    });
 });

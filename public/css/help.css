@@ -534,6 +534,24 @@ button.help-figure__frame {
     height: auto;
 }
 
+/* Recorte UI estrecho (ej. columna de botones del copiloto de voz) */
+.help-figure--compact {
+    max-width: 200px;
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.help-figure--compact .help-figure__frame {
+    cursor: zoom-in;
+}
+
+.help-figure--compact .help-figure__img {
+    width: 100%;
+    max-height: 360px;
+    object-fit: contain;
+    object-position: top center;
+}
+
 /* Estado "captura pendiente": cuando el .webp aún no fue generado por Playwright,
    en lugar de una imagen rota mostramos un marcador prolijo. */
 .help-figure--pending .help-figure__frame {
@@ -891,6 +909,90 @@ ul.help-related {
 
 .help-glossary__def code {
     font-size: 0.8rem;
+}
+
+/* --- Novedades: badge verde y callout --- */
+.help-badge--new {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.1);
+    color: #15803d;
+}
+
+[data-theme="dark"] .help-badge--new {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+}
+
+.help-badge--pill-new,
+.help-card__new {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+
+[data-theme="dark"] .help-badge--pill-new,
+[data-theme="dark"] .help-card__new {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.help-card--new {
+    border-color: #86efac;
+    box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.12);
+}
+
+.help-card__title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.help-callout--new {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+[data-theme="dark"] .help-callout--new {
+    background: rgba(22, 163, 74, 0.12);
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+.help-callout--new .help-callout__icon {
+    color: #16a34a;
+}
+
+.help-section--new {
+    margin-bottom: 2rem;
+    padding: 1rem 1.1rem 0.25rem;
+    border: 1px solid #86efac;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, rgba(220, 252, 231, 0.45) 0%, transparent 100%);
+}
+
+[data-theme="dark"] .help-section--new {
+    background: linear-gradient(180deg, rgba(22, 163, 74, 0.12) 0%, transparent 100%);
+}
+
+.help-section--new .help-section__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.help-btn--sm {
+    padding: 6px 12px;
+    font-size: 0.82rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -990,16 +990,21 @@
         max-width: calc(100% - 2.4em);
         box-sizing: border-box;
     }
-    /* Alinear el combo (select): el margen por defecto de SweetAlert es asimétrico y lo descentra.
-       Lo dejamos ancho completo, centrado y con padding/alto consistentes con los inputs. */
+    /* Alinear inputs y combo: el margen por defecto de SweetAlert es asimétrico y los descentra.
+       Ancho completo, centrado y con padding consistente. (Los campos con style inline propio
+       —ej. el modal de fallido— mantienen su margen por la especificidad del inline.) */
+    .swal2-popup .swal2-input,
+    .swal2-popup .swal2-textarea,
     .swal2-popup .swal2-select {
         width: 100%;
         margin: 1em auto;
         padding: .55em .9em;
-        height: 2.625em;
-        line-height: 1.4;
         border-radius: .375em;
         text-align: left;
+    }
+    .swal2-popup .swal2-select {
+        height: 2.625em;
+        line-height: 1.4;
     }
     </style>
 
@@ -2466,6 +2471,15 @@
         row.dataset.skipped = skipped ? '1' : '0';
         const stop = stops.find(s => s.id === Number(stopId));
         if (stop) { stop.skipped = !!skipped; if (markers[stop.id]) markers[stop.id].setIcon(buildIcon(stop, skipped ? 'skipped' : 'pending')); }
+        // El botón lo renderiza el servidor (skip/unskip); acá lo togglemos para que refleje el
+        // estado sin recargar. El handler es delegado y lee data-action al click, así que es seguro.
+        const skipBtn = row.querySelector('.btn-skip-ui');
+        if (skipBtn) {
+            skipBtn.dataset.action = skipped ? 'unskip' : 'skip';
+            skipBtn.innerHTML = skipped
+                ? '<span class="material-symbols-outlined">restart_alt</span>Retomar'
+                : '<span class="material-symbols-outlined">schedule_send</span>Volver luego';
+        }
         applyStepState();
     }
 
@@ -2618,7 +2632,6 @@
             return;
         }
 
-        const geo = await getGeo();
         const baseUrl = `/delivery/route/${routeId}/stop/${stopId}`;
 
         if (action === 'skip') {
@@ -2629,18 +2642,24 @@
                 confirmButtonColor: '#f59e0b',
             });
             if (reason === undefined) return;
+            markStopSkipped(stopId, true);              // UI optimista: cambia el estado ya
             const r = await post(`${baseUrl}/skip`, { reason });
-            if (r) markStopSkipped(stopId, true);
+            if (!r) markStopSkipped(stopId, false);     // revertir si el server rechazó (post ya avisó)
             return;
         }
         if (action === 'unskip') {
+            markStopSkipped(stopId, false);             // UI optimista
             const r = await post(`${baseUrl}/unskip`);
-            if (r) markStopSkipped(stopId, false);
+            if (!r) markStopSkipped(stopId, true);      // revertir si falló
             return;
         }
+
+        // Cada acción pide el GPS recién al confirmar (no antes), para que el modal/confirmación
+        // abran al instante. skip/unskip salieron antes: no usan ubicación.
         if (action === 'failed') {
             const form = await openFailedModal(stopId);
             if (!form) return;
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/failed`, { ...form, ...geo });
             if (r) {
                 if (r.retrySameDay) markStopSkipped(stopId, true);
@@ -2656,11 +2675,13 @@
                 confirmButtonColor: '#16a34a',
             });
             if (!c.isConfirmed) return;
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/delivered`, geo);
             if (r) markStopDone(stopId, 'delivered');
             return;
         }
         if (action === 'pickup-confirmed') {
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/pickup-confirmed`, geo);
             if (r) markStopDone(stopId, 'pickup-done');
             return;
@@ -2673,6 +2694,7 @@
                 confirmButtonColor: '#16a34a',
             });
             if (!c.isConfirmed) return;
+            const geo = await getGeo();
             const r = await post(`${baseUrl}/drop-at-branch`, geo);
             if (r) {
                 markStopDone(stopId, 'branch-dropped');
@@ -2696,8 +2718,12 @@
         if (pauseTimer) clearInterval(pauseTimer);
         const tick = () => {
             if (!activePauseStart) return;
-            const sec = Math.floor((Date.now() - new Date(activePauseStart).getTime()) / 1000);
-            if (pauseElapsedE) pauseElapsedE.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
+            // Re-consultamos el elemento cada tick (el banner puede haberse creado dinámicamente
+            // después de capturar la referencia) y clampeamos a 0 por si hay desfasaje de reloj.
+            const el = document.getElementById('pause-elapsed');
+            if (!el) return;
+            const sec = Math.max(0, Math.floor((Date.now() - new Date(activePauseStart).getTime()) / 1000));
+            el.textContent = 'Tiempo pausado: ' + fmtDuration(sec);
         };
         tick();
         pauseTimer = setInterval(tick, 1000);
@@ -2739,7 +2765,7 @@
         if (!reason) return;
         const r = await post(`/delivery/route/${routeId}/pause`, { reason });
         if (r) {
-            activePauseId = r.pauseId; activePauseStart = r.startedAt;
+            activePauseId = r.pauseId; activePauseStart = new Date().toISOString(); // contador desde el cliente (inmune al desfasaje de reloj)
             ensurePauseBanner();
             if (pauseReasonE) pauseReasonE.textContent = '· ' + reason;
             if (pauseBanner) pauseBanner.hidden = false;
@@ -2778,7 +2804,7 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) { return res.status === 409 ? { ok: false, already: true } : { ok: false, error: true }; }
-            activePauseId = data.pauseId; activePauseStart = data.startedAt;
+            activePauseId = data.pauseId; activePauseStart = new Date().toISOString(); // contador desde el cliente (inmune al desfasaje de reloj)
             ensurePauseBanner();
             if (pauseReasonE) { pauseReasonE.textContent = '· ' + (reason || 'pausa'); }
             if (pauseBanner) { pauseBanner.hidden = false; }
@@ -2812,6 +2838,27 @@
             const st = (window.LT_STOPS || []).find((s) => s.id === stopId);
             if (st) { st.skipped = true; }
             // Misma lógica que _ns en el render: primero pendiente sin postergar; si no quedan, una postergada.
+            const nx = (window.LT_STOPS || []).find((s) => !s.completed && !s.skipped)
+                    || (window.LT_STOPS || []).find((s) => !s.completed) || null;
+            window.LT_NEXT_STOP = nx ? {
+                id: nx.id, street: nx.street, number: nx.number, recipient: nx.recipient,
+                lat: nx.lat, lng: nx.lng, phone: nx.phone,
+            } : null;
+            return { ok: true, queued: !!data.queued };
+        } catch (_) { return { ok: false, error: true }; }
+    };
+    // Retomar/despostergar por voz: reusa /unskip (encolable) + la UI, y recalcula LT_NEXT_STOP
+    // (la parada retomada vuelve a pendiente y puede pasar a ser la próxima).
+    window.LT_voiceUnskip = async function (stopId) {
+        try {
+            const res = await fetch(`/delivery/route/${routeId}/stop/${stopId}/unskip`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { return { ok: false, error: true }; }
+            markStopSkipped(stopId, false);
+            const st = (window.LT_STOPS || []).find((s) => s.id === stopId);
+            if (st) { st.skipped = false; }
             const nx = (window.LT_STOPS || []).find((s) => !s.completed && !s.skipped)
                     || (window.LT_STOPS || []).find((s) => !s.completed) || null;
             window.LT_NEXT_STOP = nx ? {
@@ -2901,8 +2948,14 @@
             const avisado = r.notified > 0
                 ? 'Tu supervisor fue avisado.'
                 : (r.queued ? 'Sin señal: se enviará al recuperar la conexión.'
-                            : 'Quedó registrado, pero no pude avisar a un supervisor. Llamá a la central.');
-            Swal.fire({ icon: 'success', title: 'SOS enviado', text: avisado, confirmButtonColor: '#dc2626' });
+                            : 'Quedó registrado, pero no pude avisar a un supervisor.');
+            const c2 = await Swal.fire({
+                icon: 'success', title: 'SOS enviado',
+                html: `${avisado}<br><br>¿Llamar al 911 ahora?`,
+                showCancelButton: true, confirmButtonText: '📞 Llamar al 911',
+                confirmButtonColor: '#dc2626', cancelButtonText: 'No',
+            });
+            if (c2.isConfirmed) { window.location.href = 'tel:911'; }
         }
     });
 

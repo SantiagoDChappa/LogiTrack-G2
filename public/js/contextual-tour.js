@@ -2,7 +2,6 @@
     'use strict';
 
     var MIN_TOUR_STEPS = 2;
-    var START_DELAY_MS = 450;
 
     var TOURS = {
         kanban: {
@@ -144,49 +143,6 @@
         }).catch(function () {});
     }
 
-    function tourMatchScore(path, tour) {
-        if (tour.path && path === tour.path) {
-            return 10000 + tour.path.length;
-        }
-        if (tour.pathPrefix && path.indexOf(tour.pathPrefix) === 0) {
-            var rest = path.slice(tour.pathPrefix.length);
-            if (rest === '' || rest.charAt(0) === '/') {
-                return tour.pathPrefix.length;
-            }
-        }
-        return 0;
-    }
-
-    function findTourForPage() {
-        var path = window.location.pathname;
-        var best = null;
-        var bestScore = 0;
-        var keys = Object.keys(TOURS);
-        for (var i = 0; i < keys.length; i++) {
-            var tour = TOURS[keys[i]];
-            var score = tourMatchScore(path, tour);
-            if (score > bestScore) {
-                bestScore = score;
-                best = tour;
-            }
-        }
-        return best;
-    }
-
-    function tourDismissedForUser() {
-        if (!window.__LGT || window.__LGT.onboarded) return true;
-        try {
-            var uid = window.__LGT.userId != null ? String(window.__LGT.userId) : '0';
-            return sessionStorage.getItem('lgt_tour_dismissed_' + uid) === '1';
-        } catch (_) { return false; }
-    }
-
-    function canAutoStart() {
-        if (!window.__LGT) return false;
-        if (window.__LGT.onboarded) return true;
-        return tourDismissedForUser();
-    }
-
     function startContextualTour(tour, force) {
         if (!window.__LGT || !window.driver || !window.driver.js) return;
         if (!force && isModuleSeen(tour.module)) return;
@@ -234,15 +190,6 @@
         driverObj.drive();
     }
 
-    function scheduleAutoTour() {
-        if (!canAutoStart()) return;
-        var tour = findTourForPage();
-        if (!tour) return;
-        setTimeout(function () {
-            startContextualTour(tour, false);
-        }, START_DELAY_MS);
-    }
-
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('[data-lgt-help-tour]');
         if (!btn) return;
@@ -252,11 +199,5 @@
         if (tour) startContextualTour(tour, true);
     });
 
-    if (!window.__LGT) return;
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', scheduleAutoTour);
-    } else {
-        scheduleAutoTour();
-    }
+    // Tours contextuales solo bajo demanda (ícono bandera en pantalla), nunca al cargar.
 })();

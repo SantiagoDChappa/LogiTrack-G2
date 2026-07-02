@@ -34,11 +34,15 @@
 <script src="/js/offline-db.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/delivery-offline.js?v=<%= assetVersion %>" defer></script>
 <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-<script>window.__LGT={userId:<%= currentUser.id %>,roleId:<%= currentUser.roleId %>,onboarded:<%= currentUser.onboarded ? 'true' : 'false' %>,helpSeen:<%- JSON.stringify(currentUser.helpSeen || {}) %>};</script>
+<script>window.__LGT={userId:<%= currentUser.id %>,roleId:<%= currentUser.roleId %>,onboarded:<%= currentUser.onboarded ? 'true' : 'false' %>,helpSeen:<%- JSON.stringify(currentUser.helpSeen || {}) %>,pendingRelease:<%- JSON.stringify(currentUser.pendingRelease || null) %>};</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.css"/>
 <link rel="stylesheet" href="/css/onboarding-tour.css?v=<%= assetVersion %>">
+<% if (currentUser.pendingRelease) { %>
+<link rel="stylesheet" href="/css/whats-new.css?v=<%= assetVersion %>">
+<% } %>
 <script src="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.js.iife.js"></script>
 <script src="/js/tour-popover-ui.js?v=<%= assetVersion %>"></script>
 <script src="/js/onboarding-tour.js?v=<%= assetVersion %>" defer></script>
 <script src="/js/contextual-tour.js?v=<%= assetVersion %>" defer></script>
+<script src="/js/whats-new.js?v=<%= assetVersion %>" defer></script>
 <% } %>

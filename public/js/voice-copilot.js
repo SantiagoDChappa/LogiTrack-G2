@@ -99,10 +99,14 @@
     // Motivo OPCIONAL de pausa para trazabilidad: si el repartidor lo dice en la misma frase
     // ("registrar pausa por almuerzo") lo tomamos; si no, queda genérico. Cero turnos extra.
     function extractPauseReason(raw) {
-        return String(raw || '').trim()
-            .replace(/^\s*(registrar pausa|tomar pausa|pausar la ruta|pausar ruta|poner en pausa|pausar|pausa|pausame)\b[\s,:.]*/i, '')
-            .replace(/^(por|porque|para|por que|el motivo es|motivo|a)\s+/i, '')
-            .trim();
+        // Normalizamos (sin tildes) y sacamos en bucle muletillas + el disparador + conectores,
+        // hasta quedarnos solo con el motivo. Aguanta "quiero registrar pausa" (sin motivo → vacío)
+        // y "quiero registrar pausa por almuerzo" (motivo = almuerzo).
+        const strip = /^\s*(quiero|quisiera|queria|necesito|necesitaria|voy a|me gustaria|podes|podrias|dale|por favor|registrar una pausa|registrar pausa|tomar una pausa|tomar pausa|hacer una pausa|poner en pausa|pausar la ruta|pausar ruta|pausar|pausame|pausa|una|por que|porque|por|para|el motivo es|motivo|a)\b\s*/i;
+        let s = normalize(raw);
+        let prev;
+        do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
+        return s.trim();
     }
     const PAUSE_REASONS = [
         { code: 'almuerzo',    syn: ['almuerzo', 'almorzar', 'comer', 'comida', 'la comida', 'a comer'] },
@@ -128,9 +132,9 @@
 
     register({
         id: 'help', label: 'Ayuda',
-        keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu'],
-        run: () => ({ speak: 'Podés pedirme: próxima entrega, cuántas paradas quedan, '
-            + 'registrar o retomar pausa, o reportar zona insegura.' }),
+        keywords: ['que puedo decir', 'que puedo hacer', 'que puedo pedir', 'comandos', 'opciones', 'menu', 'lista'],
+        run: () => ({ speak: 'Podés pedirme: próxima entrega, buscar un envío, '
+            + 'pausar o retomar, navegar, llamar al cliente, o emergencia.' }),
     });
 
     // Repetir la última respuesta (cuando el ruido la tapó). No pide confirmación, funciona siempre.
@@ -298,43 +302,6 @@
             return { speak: 'No pude retomar la ruta, probá de nuevo.', error: true };                               // CA6
         },
     });
-    // CV-04 — Reportar una zona insegura (acción sensible: confirma antes de registrar).
-    register({
-        id: 'unsafe', label: 'reportar zona insegura',
-        keywords: ['reportar zona insegura', 'zona insegura', 'lugar inseguro', 'reportar peligro', 'zona peligrosa'],
-        applies: (c) => c.paused ? { ok: false, reason: 'Primero tenés que retomar la ruta.' } : { ok: true },
-        confirm: 'Voy a reportar una zona insegura en tu ubicación actual. ¿Confirmás?', // CA1
-        run: async () => {
-            const myTurn = turnGen;
-            const geo = await getGeo();                                                  // ubicación al confirmar (CA4)
-            if (myTurn !== turnGen) { return { handled: true }; } // canceló durante el GPS → NO registrar
-            const hasGeo = geo.latitude != null && geo.longitude != null;
-            let data;
-            try {
-                // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
-                const res = await fetch(`/delivery/route/${ctx.routeId}/incident`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        incidentType: 'zona_insegura', severity: 'alta',
-                        description: 'Zona insegura reportada por voz',
-                        latitude: geo.latitude || null, longitude: geo.longitude || null,
-                    }),
-                });
-                data = await res.json().catch(() => ({}));
-                if (!res.ok) { return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true }; } // CA6 implícito
-            } catch (_) {
-                return { speak: 'No pude registrar el reporte, probá de nuevo.', error: true };
-            }
-            if (data.queued) {                                                            // CA5 (sin conexión)
-                return { speak: 'Sin señal: el reporte quedó pendiente y lo envío cuando vuelva la conexión.' };
-            }
-            if (!hasGeo) {                                                                // CA4 (sin ubicación)
-                return { speak: 'Reporté la zona insegura, pero sin tu ubicación porque no estaba disponible.' };
-            }
-            return { speak: 'Listo, zona insegura reportada con tu ubicación.' };          // CA2
-        },
-    });
-
     // CV-07 — Pedir ayuda en una emergencia (acción sensible: confirmación breve antes de enviar).
     // Se puede disparar siempre (no se bloquea por pausa ni requiere ruta en curso).
     // "ayuda" queda para la lista de comandos; la emergencia usa disparadores inequívocos.
@@ -345,6 +312,9 @@
         run: async () => {
             const geo = await getGeo();
             const hasGeo = geo.latitude != null && geo.longitude != null;
+            // Tras avisar al supervisor, abrimos el discador al 911 (NO llama solo: el repartidor
+            // toca "llamar"). En laptop el tel: es no-op. Prioridad: llegar a emergencias siempre.
+            const dial911 = () => { setTimeout(() => { try { window.location.href = 'tel:911'; } catch (_) { /* laptop */ } }, 1600); };
             let data;
             try {
                 // window.fetch pasa por la cola offline: sin señal, queda encolado (CA5).
@@ -357,19 +327,22 @@
                 });
                 data = await res.json().catch(() => ({}));
                 if (!res.ok && !(data && data.queued)) {
-                    return { speak: 'No pude enviar la alerta. Probá de nuevo o usá el botón de pánico.', error: true };
+                    dial911();
+                    return { speak: 'No pude avisar a la central, pero te comunico con el 911.', error: true };
                 }
             } catch (_) {
-                return { speak: 'No pude enviar la alerta. Probá de nuevo o usá el botón de pánico.', error: true };
+                dial911();
+                return { speak: 'No pude avisar a la central, pero te comunico con el 911.', error: true };
             }
+            dial911();
             if (data.queued) {                                                            // CA5
-                return { speak: 'Sin señal: la alerta de emergencia quedó en cola y se envía apenas vuelva la conexión.' };
+                return { speak: 'Sin señal: la alerta quedó en cola. Te comunico con el 911.' };
             }
             const ubic = hasGeo ? 'con tu ubicación' : 'sin tu ubicación porque no estaba disponible'; // CA4/CA2
             const avisado = data.notified > 0
                 ? 'Avisamos a tu supervisor.'
-                : 'Quedó registrada, pero no pude avisar a un supervisor; llamá a la central.';
-            return { speak: `Alerta de emergencia enviada ${ubic}. ${avisado}` };
+                : 'Quedó registrada, pero no pude avisar a un supervisor.';
+            return { speak: `Alerta enviada ${ubic}. ${avisado} Te comunico con el 911.` };
         },
     });
 
@@ -383,18 +356,105 @@
         run: (c, raw) => { searchStart(extractSearchName(raw)); return { handled: true }; },
     });
 
+    // Acciones que a propósito NO se hacen por voz: en vez de "no entendí", el copiloto explica
+    // dónde se hacen. Deja el límite explícito (no parece un comando que "falta").
+    register({
+        id: 'guidePod', label: 'confirmar entrega',
+        keywords: ['marcar como entregado', 'marcar entregado', 'confirmar entrega', 'confirmar la entrega',
+            'ya entregue', 'dar por entregado', 'registrar la entrega'],
+        run: () => ({ speak: 'La entrega se confirma desde la pantalla, con la foto o el código. Por voz no, para no validar una entrega por error.' }),
+    });
+    register({
+        id: 'guideFailed', label: 'entrega fallida',
+        keywords: ['entrega fallida', 'marcar fallida', 'marcar como fallida', 'no pude entregar', 'parada no realizada'],
+        run: () => ({ speak: 'La entrega fallida se registra desde la pantalla, para elegir el motivo.' }),
+    });
+    register({
+        id: 'guideIncident', label: 'reportar incidente',
+        keywords: ['reportar incidente', 'reportar un incidente', 'reportar incidencia', 'cargar incidencia',
+            'zona insegura', 'reportar zona insegura', 'lugar inseguro'],
+        run: () => ({ speak: 'El incidente se reporta desde la pantalla, con el tipo y la descripción.' }),
+    });
+    register({
+        id: 'guideFinish', label: 'finalizar ruta',
+        keywords: ['finalizar ruta', 'finalizar la ruta', 'terminar la ruta', 'cerrar la ruta'],
+        run: () => ({ speak: 'La ruta se finaliza desde la pantalla, así ves el resumen.' }),
+    });
+
+    // Retomar/despostergar una entrega postergada (inverso de "volver luego"). Reversible, sin
+    // confirmación. Keywords SIN "retomar" a secas para no pisar "retomar ruta" (resume).
+    register({
+        id: 'unpostpone', label: 'retomar una entrega postergada',
+        keywords: ['despostergar', 'desposterga', 'recuperar la entrega', 'recupera la entrega',
+            'recuperar entrega', 'recupera entrega', 'reactivar la entrega', 'reactiva la entrega',
+            'retomar la entrega', 'retoma la entrega', 'retomar entrega', 'retoma entrega', 'volver a la entrega'],
+        run: async (c, raw) => {
+            const sk = (window.LT_STOPS || []).filter((s) => s.skipped && !s.completed);
+            if (!sk.length) { return { speak: 'No tenés entregas postergadas.' }; }
+            const name = extractUnpostponeName(raw);
+            let cands = sk;
+            if (name) {
+                const q = normalize(name);
+                const m = sk.filter((s) => s.recipient && normalize(s.recipient).includes(q));
+                if (!m.length) { return { speak: `No tenés una entrega postergada para ${name}.` }; }
+                cands = m;
+            }
+            if (cands.length === 1) { return doUnpostpone(cands[0]); }
+            askWhichUnpostpone(cands, 0); // varias → desambigua y responde por su cuenta
+            return { handled: true };
+        },
+    });
+    // Saca el disparador y deja el nombre si lo dijeron ("retomá la entrega de garcía" → "garcía").
+    function extractUnpostponeName(raw) {
+        const strip = /^\s*(quiero|quisiera|necesito|voy a|por favor|despostergar|desposterga|recuperar la entrega|recupera la entrega|recuperar entrega|recupera entrega|reactivar la entrega|reactiva la entrega|reactivar entrega|reactiva entrega|retomar la entrega|retoma la entrega|retomar entrega|retoma entrega|volver a la entrega|la entrega|entrega|la de|de|para|a)\b\s*/i;
+        let s = normalize(raw);
+        let prev;
+        do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
+        return s.trim();
+    }
+    async function doUnpostpone(stop) {
+        const who = stop.recipient || 'esa parada';
+        const r = await window.LT_voiceUnskip(stop.id);
+        if (r && r.queued) { return { speak: `Retomé la entrega de ${who}. Sin señal: se sincroniza al reconectar.` }; }
+        if (r && r.ok) { return { speak: `Listo, retomé la entrega de ${who}. Vuelve a la ruta.` }; }
+        return { speak: 'No pude retomar la entrega.', error: true };
+    }
+    function askWhichUnpostpone(cands, tries) {
+        const opts = cands.slice(0, 3);
+        pendingPrompt = async (ans) => {
+            const t = normalize(ans);
+            if (/^(cancelar|cancela|dejalo|olvidalo|nada|ninguna|ninguno)\b/.test(t)) {
+                return respond('Listo, no hago nada.', {});
+            }
+            const num = t.match(/\b(\d+)\b/);
+            let pick = num ? cands.find((s) => String(s.seq) === num[1]) : null;
+            if (!pick) { pick = cands.find((s) => s.recipient && normalize(s.recipient).split(' ').some((w) => w.length >= 3 && t.includes(w))) || null; }
+            if (pick) { const out = await doUnpostpone(pick); return respond(out.speak, { error: !!out.error }); }
+            if (tries < 2) { return askWhichUnpostpone(cands, tries + 1); }
+            return respond('No pude identificar la entrega, cancelo.', {});
+        };
+        const parts = opts.map((s) => `la parada ${s.seq}${s.recipient ? ', de ' + speakable(s.recipient) : ''}`);
+        const more = cands.length > opts.length ? `, y ${cands.length - opts.length} más` : '';
+        const lead = tries === 0
+            ? `Tenés ${cands.length} postergada${cands.length === 1 ? '' : 's'}: ${parts.join('; ')}${more}. Decime el número de parada.`
+            : `Esa no es una de las opciones. Las postergadas son: ${cands.map((s) => s.seq).join(', ')}. Decime el número.`;
+        return respond(lead, { relisten: true });
+    }
+
     // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
     function extractSearchName(raw) {
-        // Saca los prefijos del disparador en bucle (aguanta "buscar el paquete camila" sin "de",
-        // y "buscar el envío de camila gómez"), hasta quedarse solo con el nombre.
-        const strip = /^\s*(llevame a la|llevame al|llevame a|donde esta el|donde esta la|donde esta|buscar el|buscar la|buscar a|buscar|busca a|busca|el paquete|la entrega|el envio|paquete|entrega|envio|de|para)\b\s*/i;
-        let s = String(raw || '').trim();
+        // Trabajamos sobre el texto NORMALIZADO (sin tildes ni puntuación) para que el stripping no
+        // falle por acentos ("envío") y para tolerar muletillas iniciales ("quiero buscar el envío
+        // de camila"). Saca prefijos en bucle hasta quedarse solo con el nombre. El nombre se usa
+        // para buscar (searchStops ya normaliza) y para el aviso hablado.
+        const strip = /^\s*(quiero|quisiera|queria|necesito|necesitaria|me gustaria|podes|podrias|dale|a ver|por favor|llevame a la|llevame al|llevame a|donde esta el|donde esta la|donde esta|buscame|busca me|buscar el|buscar la|buscar a|buscar|busca a|busca|buscas|encontrame|encontra|el paquete|la entrega|el envio|paquete|entrega|envio|de|para)\b\s*/i;
+        let s = normalize(raw);
         let prev;
         do { prev = s; s = s.replace(strip, ''); } while (s !== prev && s.length);
         return s.trim();
     }
     function extractNameOnly(raw) {
-        return String(raw || '').trim().replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
+        return normalize(raw).replace(/^(es|el de|la de|de|para|busca a|busca)\s+/i, '').trim();
     }
     function searchStops(name) {
         const stops = Array.isArray(window.LT_STOPS) ? window.LT_STOPS : [];
@@ -462,15 +522,30 @@
         if (pending.length === 1) { return indicateStop(pending[0]); } // CA1
         // CA3: varias pendientes → desambiguar. Nombramos en voz solo las primeras, pero el número
         // de parada vale para CUALQUIERA (antes decía "hay 5" y solo dejaba elegir 3 → #3).
+        return askWhichStop(pending, 0);
+    }
+
+    // CA4 — desambiguación de búsqueda: pide el número de parada. Si el repartidor dice uno que NO
+    // está entre las opciones (o algo que no identifica ninguna), lo AVISA y vuelve a preguntar
+    // (hasta 2 reintentos) en vez de cancelar. "Cancelar"/silencio sí cancela.
+    function askWhichStop(pending, tries) {
         const opts = pending.slice(0, 3);
         pendingPrompt = (ans) => {
             const pick = resolvePick(ans, opts, pending);
-            if (pick) { return indicateStop(pick); } // CA4
-            return respond('Listo, no hago nada.', {});
+            if (pick) { return indicateStop(pick); }
+            const t = normalize(ans);
+            if (/^(cancelar|cancela|dejalo|olvidalo|nada|ninguna|ninguno)\b/.test(t)) {
+                return respond('Listo, no hago nada.', {});
+            }
+            if (tries < 2) { return askWhichStop(pending, tries + 1); }  // no coincide → re-preguntar
+            return respond('No pude identificar la parada, cancelo la búsqueda.', {});
         };
-        const parts = opts.map((s) => `la parada ${s.seq}${s.street ? ', en ' + speakable(s.street) : ''}`);
-        const more = pending.length > opts.length ? `, y ${pending.length - opts.length} más` : '';
-        return respond(`Encontré ${pending.length}. Las primeras: ${parts.join('; ')}${more}. Decime el número de parada.`, { relisten: true });
+        if (tries === 0) {
+            const parts = opts.map((s) => `la parada ${s.seq}${s.street ? ', en ' + speakable(s.street) : ''}`);
+            const more = pending.length > opts.length ? `, y ${pending.length - opts.length} más` : '';
+            return respond(`Encontré ${pending.length}. Las primeras: ${parts.join('; ')}${more}. Decime el número de parada.`, { relisten: true });
+        }
+        return respond(`Esa no es una de las opciones. Las paradas son: ${pending.map((s) => s.seq).join(', ')}. Decime el número.`, { relisten: true });
     }
 
     // Palabras genéricas que no distinguen un comando de otro (no cuentan para el matching).
@@ -738,12 +813,25 @@
 
     function matchChoice(text, options) {
         const t = normalize(text);
-        // primero por keywords; si no, por una afirmación simple sobre la primera opción
+        // 1) por posición ("la primera / la segunda")
+        if (/^(el primero|la primera|primero|primera)\b/.test(t)) { return options[0]; }
+        if (/^(el segundo|la segunda|segundo|segunda|el otro|la otra)\b/.test(t)) { return options[1]; }
+        // 2) nombró una completa (keyword o etiqueta)
         for (const cmd of options) {
             if (cmd.keywords.some((kw) => t.includes(normalize(kw))) || t.includes(normalize(cmd.label))) { return cmd; }
         }
-        if (/^(si|el primero|la primera|dale|ese|esa)\b/.test(t)) { return options[0]; }
-        if (/^(el segundo|la segunda|el otro|la otra)\b/.test(t)) { return options[1]; }
+        // 3) repitió parcial (ej. "próxima", "entrega"): elegí la que más se parece por palabras
+        //    distintivas, así "próxima entrega" o incluso "próxima" resuelven en vez de cancelar.
+        const spoken = tokens(text);
+        let best = null, bestOv = 0;
+        for (const cmd of options) {
+            let ov = 0;
+            for (const w of spoken) { if (cmd._tokens.has(w)) { ov++; } }
+            if (ov > bestOv) { bestOv = ov; best = cmd; }
+        }
+        if (best) { return best; }
+        // 4) afirmación simple → la primera (la nombramos primero)
+        if (/^(si|sip|dale|ese|esa)\b/.test(t)) { return options[0]; }
         return null;
     }
 
