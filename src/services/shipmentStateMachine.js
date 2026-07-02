@@ -80,7 +80,7 @@ const buildAutoComment = ({ fromStatusId, toStatusId }) => {
 
 const TRANSITIONS = {
     [S.PENDING_PAYMENT.id]: [S.PENDING.id, S.CANCELLED.id],
-    [S.PENDING.id]:        [S.ASSIGNED.id, S.CANCELLED.id],
+    [S.PENDING.id]:        [S.ASSIGNED.id, S.READY_FOR_PICKUP.id, S.CANCELLED.id],
     [S.ASSIGNED.id]:       [S.IN_PREPARATION.id, S.IN_TRANSIT.id, S.DELIVERED.id, S.CANCELLED.id],
     [S.IN_PREPARATION.id]: [S.IN_TRANSIT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
     [S.IN_TRANSIT.id]:     [S.AT_BRANCH.id, S.READY_FOR_PICKUP.id, S.DELIVERED.id, S.FAILED_ATTEMPT.id, S.PACKAGE_FAILED.id, S.CANCELLED.id],
@@ -95,6 +95,10 @@ const TRANSITIONS = {
 
 const RULES_TARGETED = {
     [`${S.PENDING.id}->${S.ASSIGNED.id}`]:               { roles: [R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'ASSIGNED',          label: 'Asignar repartidor',     endpoint: '/shipment/update/:id/assign' },
+    // Retiro por sucursal cuando el punto de retiro es la misma sucursal donde se creó el
+    // envío: nunca sale a ruta, así que tras el pago se marca listo para retirar directo
+    // desde la modificación de envío (validación de "misma sucursal" vive en el controller).
+    [`${S.PENDING.id}->${S.READY_FOR_PICKUP.id}`]:       { roles: [R.SUPERVISOR.id, R.OPERATOR.id, R.ADMIN.id], requireComment: false, eventType: 'STATUS_CHANGE', label: 'Marcar listo para retiro', endpoint: '/shipment/update/:id/ready-for-pickup' },
     [`${S.AT_BRANCH.id}->${S.ASSIGNED.id}`]:             { roles: [R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'REASSIGNED',        label: 'Reasignar repartidor',   endpoint: '/shipment/update/:id/assign' },
     [`${S.ASSIGNED.id}->${S.IN_PREPARATION.id}`]:        { roles: [R.SUPERVISOR.id, R.ADMIN.id], requireComment: false, eventType: 'STATUS_CHANGE',     label: 'Iniciar preparacion',    endpoint: '/shipment/update/:id/prepare' },
     [`${S.IN_PREPARATION.id}->${S.IN_TRANSIT.id}`]:      { roles: [R.DELIVERY.id],               requireComment: false, eventType: 'PICKUP_CONFIRMED',  label: 'Confirmar retiro',       endpoint: '/scan/:trackingId/pickup' },

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority } = require('../controllers/shipment.js');
+const { home, getDetail, getNewShipmentForm, createShipment, getUpdateShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, readyForPickup, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority, getEvidenceImage, getFailedAttemptImage } = require('../controllers/shipment.js');
 const { validateShipment, validateUpdateShipment, handleUpdateValidationErrors, validatePriority } = require('../middlewares/shipment.js');
 const { requireAuth, requireAdmin, requireSupervisor, requireSupervisorOrAdmin, requireSupervisorOrOperator } = require('../middlewares/auth.js');
 const { csvUpload } = require('../middlewares/upload.js');
@@ -23,6 +23,7 @@ router.post('/update/:id', requireAuth, validateUpdateShipment, handleUpdateVali
 router.post('/update/:id/status',      requireSupervisorOrAdmin, updateShipmentStatus);
 router.post('/update/:id/assign',      requireSupervisorOrAdmin, assignDelivery);
 router.post('/update/:id/prepare',     requireSupervisorOrAdmin, prepareShipment);
+router.post('/update/:id/ready-for-pickup', requireSupervisorOrOperator, readyForPickup);
 router.post('/update/:id/cancel',      requireSupervisorOrAdmin, cancelShipment);
 router.post('/update/:id/mark-failed', requireSupervisorOrAdmin, markPackageFailed);
 router.post('/:id/registrar-cobro',    requireSupervisorOrOperator, postRegisterPayment);
@@ -30,6 +31,9 @@ router.get('/:id/comprobante',         requireSupervisorOrOperator, getComproban
 router.post('/:id/descartar-verificacion', requireSupervisorOrOperator, postDiscardVerification);
 router.get('/:id/qr', requireAuth, getQR);
 router.get('/:id/label', requireAuth, getLabel);
+// Fotos del envío (POD + intentos fallidos) para el detalle. RBAC dentro del controller.
+router.get('/:id/evidence/:kind', requireAuth, getEvidenceImage);
+router.get('/:id/failed-attempt/:attemptId/photo', requireAuth, getFailedAttemptImage);
 
 router.post('/calculate-initial-priority', calculateInitialPriority);
 

@@ -20,9 +20,9 @@ const SERVICE_MIN_PER_STOP = 10;   // tiempo entrega por parada
 const SERVICE_STOP_MIN = 30;       // tiempo extra en parada de servicio (combustible + descanso)
 const SHIFT_MAX_SEC = SHIFT_MAX_HOURS * 3600;
 
-// Prioridades: 1=normal, 2=express, 3=urgent
-const PRIORITY_LABEL = { 1: 'normal', 2: 'express', 3: 'urgent' };
-const PRIORITY_WEIGHT = { 1: 0, 2: 1000, 3: 100000 }; // urgent obliga vehiculo dedicado
+// Prioridades (ShipmentPriority): 1=baja, 2=media, 3=alta, 4=urgente
+const PRIORITY_LABEL = { 1: 'normal', 2: 'normal', 3: 'express', 4: 'urgent' };
+const PRIORITY_WEIGHT = { 1: 0, 2: 0, 3: 1000, 4: 100000 }; // urgente obliga vehiculo dedicado
 
 // Parsea TIME 'HH:MM:SS' a segundos desde 00:00
 const parseTimeToSec = (t) => {
@@ -290,13 +290,13 @@ const assignClusterToTransports = (cluster, availableTx, distKm, options = {}) =
     const unassigned = [];
     const used = new Set();
 
-    // Urgent (priority=3) primero, despues express (2), normal (1)
+    // Urgente (priority=4) primero, despues alta (3), media/baja (2/1)
     sortedShipments.sort((a, b) => (b.priority || 1) - (a.priority || 1) || num(b.weightKg) - num(a.weightKg));
 
     for (const s of sortedShipments) {
         const w = num(s.weightKg);
         const v = num(s.volumeM3);
-        const isUrgent = (s.priority || 1) === 3;
+        const isUrgent = (s.priority || 1) === 4;
         let placed = false;
 
         // No-urgent: intentar primero sumarse a un bucket URGENTE dedicado existente
@@ -720,7 +720,7 @@ const buildProposal = async ({ bucket, branch, cluster }) => {
         };
     }
     const autonomyInfo = num(t.autonomyKm) > 0 ? ` Autonomia ${num(t.autonomyKm)}km.` : '';
-    const urgentShips = bucket.shipments.filter(s => (s.priority || 1) === 3);
+    const urgentShips = bucket.shipments.filter(s => (s.priority || 1) === 4);
     const urgentCombinedInfo = (bucket.dedicated && urgentShips.length > 1)
         ? ` 🚨 ${urgentShips.length} envíos URGENTES combinados en este vehículo dedicado por destinos cercanos (max ${(bucket.urgentCombined || []).reduce((m, c) => Math.max(m, c.pairedDistKm || 0), 0).toFixed(1)}km entre destinos).`
         : '';

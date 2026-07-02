@@ -115,6 +115,50 @@ const searchShipments = async (req, res) => {
     res.render('shipment/index', { shipments, query, statuses, branches, isAdmin });
 };
 
+// RBAC de visualización de un envío (misma regla que getDetail): admin ve todo;
+// repartidor solo los asignados a él; staff solo los de su sucursal actual.
+const canViewShipment = (shipment, viewer) => {
+    if (!viewer || isAdminUser(viewer)) { return true; }
+    if (viewer.roleId === RoleType.DELIVERY.id) { return shipment.deliveryUserId === viewer.id; }
+    if (viewer.branchId && shipment.currentBranchId !== viewer.branchId) { return false; }
+    return true;
+};
+
+// Sirve una imagen guardada como data URL base64 (foto/firma) decodificándola a bytes.
+// Así el HTML del detalle no carga los base64 pesados: solo se traen al ver la imagen.
+const sendDataUrlImage = (res, dataUrl) => {
+    if (!dataUrl) { return res.status(404).send('Sin imagen'); }
+    const m = String(dataUrl).match(/^data:(.+?);base64,(.*)$/s);
+    // Formato normal: data URL. Fallback tolerante para base64 crudo (datos legacy).
+    const mime = m ? m[1] : 'image/jpeg';
+    const b64  = m ? m[2] : String(dataUrl).replace(/^data:.*?,/, '');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.type(mime).send(Buffer.from(b64, 'base64'));
+};
+
+// GET /shipment/:id/evidence/:kind  (kind = photo | signature) — foto/firma del POD.
+const getEvidenceImage = async (req, res) => {
+    const { id, kind } = req.params;
+    const shipment = await shipmentModel.getById(id);
+    if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+    if (!canViewShipment(shipment, res.locals.currentUser)) { return res.status(403).send('Sin acceso'); }
+    const col = kind === 'signature' ? 'signatureBase64' : 'photoBase64';
+    const { DeliveryEvidence } = require('../models/deliveryEvidence');
+    const row = await DeliveryEvidence.findOne({ where: { shipmentId: id }, attributes: [col] });
+    return sendDataUrlImage(res, row && row.get(col));
+};
+
+// GET /shipment/:id/failed-attempt/:attemptId/photo — foto de un intento de entrega fallido.
+const getFailedAttemptImage = async (req, res) => {
+    const { id, attemptId } = req.params;
+    const shipment = await shipmentModel.getById(id);
+    if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+    if (!canViewShipment(shipment, res.locals.currentUser)) { return res.status(403).send('Sin acceso'); }
+    const att = await failedAttemptModel.getById(attemptId);
+    if (!att || Number(att.shipmentId) !== Number(id)) { return res.status(404).send('No encontrado'); }
+    return sendDataUrlImage(res, att.photoBase64);
+};
+
 const getDetail = async (req, res) => {
     const { id } = req.params;
     const [shipment, history, originLat, originLng, originStreet, originNumber] = await Promise.all([
@@ -267,8 +311,39 @@ const getDetail = async (req, res) => {
 
     const paymentMethods = await require('../services/paymentMethodsConfig').get();
 
+    // Fotos del envío (POD de entrega + intentos fallidos). Solo metadata acá: los base64
+    // se sirven por endpoint al abrir la imagen, para no inflar el HTML ni el egress de Neon.
+    const sequelize = require('../database/connection');
+    const { DeliveryEvidence } = require('../models/deliveryEvidence');
+    const notNull = (col) => [sequelize.literal(`("${col}" IS NOT NULL)`), `has_${col}`];
+    const [evidenceRow, failedRows] = await Promise.all([
+        DeliveryEvidence.findOne({
+            where: { shipmentId: id },
+            attributes: ['id', 'receiverName', 'receiverLastname', 'receiverDni', 'latitude', 'longitude', 'createdAt',
+                notNull('photoBase64'), notNull('signatureBase64')],
+        }).catch(() => null),
+        failedAttemptModel.FailedAttempt.findAll({
+            where: { shipmentId: id },
+            attributes: ['id', 'reason', 'attemptDate', notNull('photoBase64')],
+            order: [['attemptDate', 'DESC']],
+        }).catch(() => []),
+    ]);
+    const deliveryEvidence = evidenceRow ? {
+        receiverName: [evidenceRow.receiverName, evidenceRow.receiverLastname].filter(Boolean).join(' '),
+        receiverDni:  evidenceRow.receiverDni,
+        hasPhoto:     !!evidenceRow.get('has_photoBase64'),
+        hasSignature: !!evidenceRow.get('has_signatureBase64'),
+        at:           evidenceRow.createdAt,
+        lat:          evidenceRow.latitude,
+        lng:          evidenceRow.longitude,
+    } : null;
+    const failedPhotos = (failedRows || [])
+        .filter(r => r.get('has_photoBase64'))
+        .map(r => ({ id: r.id, reason: r.reason, at: r.attemptDate }));
+
     res.render('shipment/detail', {
         shipment, history, mapData, returnUrl, returnLabel, sla, costClient, invoice, creditNotes, paymentMethods,
+        deliveryEvidence, failedPhotos,
         modifications: (await require('../services/portalModificationService').listByShipment(id))
             .map(require('../controllers/shipmentModification').formatRow),
         incidents: incidentsForShipment,
@@ -665,9 +740,13 @@ const getUpdateShipment = async (req, res) => {
     const DESK_BLOCKED_STATUSES = new Set([
         Status.IN_TRANSIT.id, Status.AT_BRANCH.id, Status.DELIVERED.id, Status.FAILED_ATTEMPT.id,
     ]);
+    // "Marcar listo para retiro" desde PENDING solo aplica si el punto de retiro
+    // es la misma sucursal donde se creó el envío (ver readyForPickup).
+    const isSameBranchPickup = shipment.deliveryMode === 'branch_pickup' && shipment.pickupBranchId === shipment.currentBranchId;
     const availableActions = stateMachine
         .getAvailableActions({ shipment, actor: currentUser })
-        .filter(a => !DESK_BLOCKED_STATUSES.has(a.toStatusId));
+        .filter(a => !DESK_BLOCKED_STATUSES.has(a.toStatusId))
+        .filter(a => a.toStatusId !== Status.READY_FOR_PICKUP.id || isSameBranchPickup);
     const [invoice, paymentMethods] = await Promise.all([
         require('../services/invoiceService').getByShipment(id).catch(() => null),
         require('../services/paymentMethodsConfig').get().catch(() => ({})),
@@ -939,6 +1018,37 @@ const prepareShipment = async (req, res) => {
         if (handled) { return; }
         console.error('ERROR prepareShipment:', err.message);
         res.status(500).send('Error interno al iniciar preparación');
+    }
+};
+
+// Retiro por sucursal cuando el punto de retiro es la misma sucursal donde se creó el
+// envío: el paquete nunca sale a ruta, queda físicamente ahí. Tras el pago, se marca
+// listo para retiro directo desde "modificación de envío" en vez de pasar por
+// preparación/asignación/tránsito (que no aplican porque no hay traslado real).
+const readyForPickup = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const shipment = await shipmentModel.getById(id);
+        if (!shipment) { return res.status(404).send('Envío no encontrado'); }
+        if (shipment.deliveryMode !== 'branch_pickup' || shipment.pickupBranchId !== shipment.currentBranchId) {
+            return res.status(422).send('Esta acción solo aplica a envíos de retiro en sucursal cuyo punto de retiro es la misma sucursal donde se creó el envío.');
+        }
+        const currentUser = res.locals.currentUser;
+        const actorCoords = await resolveUserBranchCoords(currentUser?.id);
+        await stateMachine.transition({
+            shipmentId: Number(id),
+            toStatusId: Status.READY_FOR_PICKUP.id,
+            actor: currentUser,
+            branchId: actorCoords.branchId || shipment.currentBranchId,
+            latitude: actorCoords.latitude,
+            longitude: actorCoords.longitude,
+        });
+        res.redirect(`/shipment/update/${id}?success=6`);
+    } catch (err) {
+        const handled = renderStateMachineError(err, res, `/shipment/update/${req.params.id}`);
+        if (handled) { return; }
+        console.error('ERROR readyForPickup:', err.message);
+        res.status(500).send('Error interno al marcar listo para retiro');
     }
 };
 
@@ -1466,4 +1576,4 @@ const exportShipments = async (req, res) => {
     }
 };
 
-module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority, notifyShipmentEvent };
+module.exports = { home, getDetail, getNewShipmentForm, getUpdateShipment, createShipment, updateShipment, updateShipmentStatus, searchShipments, assignDelivery, prepareShipment, readyForPickup, cancelShipment, markPackageFailed, getKanban, getQR, getLabel, showImportForm, processImportPreview, commitImport, downloadImportReport, showImportHistory, exportShipments, calculateInitialPriority, notifyShipmentEvent, getEvidenceImage, getFailedAttemptImage };

@@ -124,15 +124,15 @@
                             </thead>
                             <tbody>
                                 <%
-                                    const priLabels = { 1: 'Normal', 2: 'Express', 3: 'Urgente' };
-                                    const priCls    = { 1: 'inicial', 2: 'en_transito', 3: 'cancelado' };
+                                    const priLabels = { 1: 'Baja', 2: 'Media', 3: 'Alta', 4: 'Urgente' };
+                                    const priCls    = { 1: 'priority-badge--low', 2: 'priority-badge--mid', 3: 'priority-badge--high', 4: 'priority-badge--urgent' };
                                 %>
                                 <% shipments.forEach(s => { %>
                                     <% const pr = s.priority || 1; %>
                                     <tr>
                                         <td><input type="checkbox" name="shipmentIds" value="<%= s.id %>" class="ship-cb"></td>
                                         <td class="tracking-id"><%= s.trackingId %></td>
-                                        <td><span class="status-badge status-badge--sm <%= priCls[pr] %>"><%= priLabels[pr] %></span></td>
+                                        <td><span class="priority-badge <%= priCls[pr] %>"><%= priLabels[pr] || '—' %></span></td>
                                         <td><%= s.recipient ? s.recipient.fullName : '-' %></td>
                                         <td><%= s.zone ? s.zone.name : '—' %></td>
                                         <td><%= s.weightKg || '-' %></td>
