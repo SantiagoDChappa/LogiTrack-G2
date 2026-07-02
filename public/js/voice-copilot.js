@@ -346,6 +346,31 @@
         run: (c, raw) => { searchStart(extractSearchName(raw)); return { handled: true }; },
     });
 
+    // Acciones que a propósito NO se hacen por voz: en vez de "no entendí", el copiloto explica
+    // dónde se hacen. Deja el límite explícito (no parece un comando que "falta").
+    register({
+        id: 'guidePod', label: 'confirmar entrega',
+        keywords: ['marcar como entregado', 'marcar entregado', 'confirmar entrega', 'confirmar la entrega',
+            'ya entregue', 'dar por entregado', 'registrar la entrega'],
+        run: () => ({ speak: 'La entrega se confirma desde la pantalla, con la foto o el código. Por voz no, para no validar una entrega por error.' }),
+    });
+    register({
+        id: 'guideFailed', label: 'entrega fallida',
+        keywords: ['entrega fallida', 'marcar fallida', 'marcar como fallida', 'no pude entregar', 'parada no realizada'],
+        run: () => ({ speak: 'La entrega fallida se registra desde la pantalla, para elegir el motivo.' }),
+    });
+    register({
+        id: 'guideIncident', label: 'reportar incidente',
+        keywords: ['reportar incidente', 'reportar un incidente', 'reportar incidencia', 'cargar incidencia',
+            'zona insegura', 'reportar zona insegura', 'lugar inseguro'],
+        run: () => ({ speak: 'El incidente se reporta desde la pantalla, con el tipo y la descripción.' }),
+    });
+    register({
+        id: 'guideFinish', label: 'finalizar ruta',
+        keywords: ['finalizar ruta', 'finalizar la ruta', 'terminar la ruta', 'cerrar la ruta'],
+        run: () => ({ speak: 'La ruta se finaliza desde la pantalla, así ves el resumen.' }),
+    });
+
     // Saca el disparador inicial y deja solo el nombre buscado (más largo primero).
     function extractSearchName(raw) {
         // Trabajamos sobre el texto NORMALIZADO (sin tildes ni puntuación) para que el stripping no
@@ -718,12 +743,25 @@
 
     function matchChoice(text, options) {
         const t = normalize(text);
-        // primero por keywords; si no, por una afirmación simple sobre la primera opción
+        // 1) por posición ("la primera / la segunda")
+        if (/^(el primero|la primera|primero|primera)\b/.test(t)) { return options[0]; }
+        if (/^(el segundo|la segunda|segundo|segunda|el otro|la otra)\b/.test(t)) { return options[1]; }
+        // 2) nombró una completa (keyword o etiqueta)
         for (const cmd of options) {
             if (cmd.keywords.some((kw) => t.includes(normalize(kw))) || t.includes(normalize(cmd.label))) { return cmd; }
         }
-        if (/^(si|el primero|la primera|dale|ese|esa)\b/.test(t)) { return options[0]; }
-        if (/^(el segundo|la segunda|el otro|la otra)\b/.test(t)) { return options[1]; }
+        // 3) repitió parcial (ej. "próxima", "entrega"): elegí la que más se parece por palabras
+        //    distintivas, así "próxima entrega" o incluso "próxima" resuelven en vez de cancelar.
+        const spoken = tokens(text);
+        let best = null, bestOv = 0;
+        for (const cmd of options) {
+            let ov = 0;
+            for (const w of spoken) { if (cmd._tokens.has(w)) { ov++; } }
+            if (ov > bestOv) { bestOv = ov; best = cmd; }
+        }
+        if (best) { return best; }
+        // 4) afirmación simple → la primera (la nombramos primero)
+        if (/^(si|sip|dale|ese|esa)\b/.test(t)) { return options[0]; }
         return null;
     }
 
