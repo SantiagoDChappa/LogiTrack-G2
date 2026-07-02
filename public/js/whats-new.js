@@ -21,16 +21,17 @@
         if (path === '/login/2fa/setup' || path === '/login/2fa' || path === '/account/password/forced') {
             return true;
         }
-        // Novedades pendientes: mostrar el modal sin esperar ningún tour.
-        if (window.__LGT.pendingRelease) return false;
+        // Usuario ya onboarded: mostrar novedades sin esperar tour.
         if (window.__LGT.onboarded) return false;
+        // Tour completado/saltado en esta sesión (antes de que persista en el servidor).
         try {
             if (sessionStorage.getItem('lgt_tour_dismissed_' + userId()) === '1') return false;
-        } catch (_) { return true; }
+        } catch (_) { /* ignore */ }
         if (document.querySelector('.driver-overlay, .driver-popover, .driver-popover-wrapper')) {
             return true;
         }
-        return false;
+        // Onboarding pendiente: el tour principal va antes que el modal de novedades.
+        return true;
     }
 
     function markSessionDismissed(releaseId) {
@@ -128,6 +129,10 @@
 
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && !backdrop.hidden) dismiss();
+        });
+
+        window.addEventListener('lgt:main-tour-finished', function () {
+            tryOpen();
         });
 
         setTimeout(function () {

@@ -24,6 +24,10 @@
             || path === '/account/password/forced';
     }
 
+    function isHelpPage() {
+        return window.location.pathname.indexOf('/help') === 0;
+    }
+
     function asRole(roleId) {
         return Number(roleId);
     }
@@ -373,10 +377,12 @@
             markTourPending();
             return false;
         }
+        // En el manual no forzar vuelta a inicio (p. ej. novedades → Ver manual).
+        if (isHelpPage()) return false;
         var home = getTourHome(roleId);
         if (window.location.pathname === home) return true;
         try {
-            if (sessionStorage.getItem(redirectStorageKey()) === '1') return true;
+            if (sessionStorage.getItem(redirectStorageKey()) === '1') return false;
         } catch (_) { /* ignore */ }
         try { sessionStorage.setItem(redirectStorageKey(), '1'); } catch (_) { /* ignore */ }
         window.location.replace(home);
@@ -469,11 +475,27 @@
 
     if (!window.__LGT || isTourDismissed()) return;
 
-    // Si hay novedades pendientes, priorizar el modal de release sobre el tour principal.
-    if (window.__LGT.pendingRelease) return;
-
     if (isInterimAuthPage()) {
         markTourPending();
+        return;
+    }
+
+    // Manual / centro de ayuda: no redirigir ni relanzar el tour automáticamente.
+    if (isHelpPage()) return;
+
+    var roleId = asRole(window.__LGT.roleId);
+    var home = getTourHome(roleId);
+    var path = window.location.pathname;
+
+    if (path !== home) {
+        // Fuera de inicio: como mucho una redirección a home si el tour sigue pendiente.
+        try {
+            if (sessionStorage.getItem(redirectStorageKey()) !== '1') {
+                markTourPending();
+                sessionStorage.setItem(redirectStorageKey(), '1');
+                window.location.replace(home);
+            }
+        } catch (_) { /* ignore */ }
         return;
     }
 
