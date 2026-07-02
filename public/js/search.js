@@ -37,7 +37,13 @@
         if (/^\d{1,9}$/.test(q)) {
             return '/incident?id=' + encodeURIComponent(q);
         }
-        return '/incident?trackingId=' + encodeURIComponent(q);
+        if (looksLikeTracking(q)) {
+            return '/incident?trackingId=' + encodeURIComponent(q);
+        }
+        if (q.indexOf('@') >= 0) {
+            return '/incident?reporterEmail=' + encodeURIComponent(q);
+        }
+        return '/incident?reporterName=' + encodeURIComponent(q);
     }
 
     var CATEGORIES = [
@@ -70,7 +76,10 @@
               return r.status ? { label: r.status, slug: r.statusCode, kind: 'incident' } : null;
           },
           detailFn: function (r) {
-              return r.type ? [{ label: 'Tipo', value: r.type }] : [];
+              var parts = [];
+              if (r.type) parts.push({ label: 'Tipo', value: r.type });
+              if (r.reporterName) parts.push({ label: 'Reportante', value: r.reporterName });
+              return parts;
           },
           matchFn: function (r) { return matchMeta(r); },
           secondaryFn: function (r) { return [r.type, r.status].filter(Boolean).join(' · '); }

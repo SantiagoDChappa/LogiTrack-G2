@@ -94,7 +94,6 @@ describe('Universal search RBAC', () => {
         expect(res.body.routes).toHaveLength(1);
         expect(res.body.routes[0].id).toBe(74);
         expect(res.body.meta.routes.hasMore).toBe(false);
-        expect(Incident.findAll).not.toHaveBeenCalled();
         expect(User.findAll).not.toHaveBeenCalled();
         expect(modificationModel.searchForUniversal).not.toHaveBeenCalled();
     });
@@ -293,6 +292,87 @@ describe('Universal search enhancements', () => {
         expect(res.body.incidents[0].type).toBe('Paquete dañado');
         expect(res.body.incidents[0].matchedBy).toBe('type');
         expect(res.body.incidents[0].matchLabel).toBe('Tipo de incidencia');
+    });
+
+    test('incidents: búsqueda por nombre del reportante', async () => {
+        incidentModel.list.mockResolvedValue([]);
+        Incident.findAll.mockImplementation((opts) => {
+            if (opts.include?.some((i) => i.as === 'openedByPerson')) {
+                return Promise.resolve([{
+                    id: 15,
+                    status: 'OPEN',
+                    reporterName: 'Paula Moragues',
+                    reporterEmail: 'paula@test.com',
+                    shipment: { trackingId: 'ENV-15' },
+                    type: { code: 'DAMAGE', description: 'Daño' },
+                    openedByPerson: { fullName: 'Paula Moragues', document: 38456789, email: 'paula@test.com' },
+                }]);
+            }
+            return Promise.resolve([]);
+        });
+
+        const res = await request(buildApp({ id: 1, roleId: 4, branchId: null }))
+            .get('/api/search?q=Paula')
+            .expect(200);
+
+        expect(res.body.incidents).toHaveLength(1);
+        expect(res.body.incidents[0].id).toBe(15);
+        expect(res.body.incidents[0].matchedBy).toBe('reporterName');
+        expect(res.body.incidents[0].matchLabel).toBe('Reportante');
+        expect(res.body.incidents[0].reporterName).toBe('Paula Moragues');
+    });
+
+    test('incidents: búsqueda por email del reportante', async () => {
+        incidentModel.list.mockResolvedValue([]);
+        Incident.findAll.mockImplementation((opts) => {
+            if (opts.include?.some((i) => i.as === 'openedByPerson')) {
+                return Promise.resolve([{
+                    id: 16,
+                    status: 'OPEN',
+                    reporterName: 'Paula Moragues',
+                    reporterEmail: 'paula@test.com',
+                    shipment: { trackingId: 'ENV-16' },
+                    type: { code: 'DAMAGE', description: 'Daño' },
+                    openedByPerson: null,
+                }]);
+            }
+            return Promise.resolve([]);
+        });
+
+        const res = await request(buildApp({ id: 1, roleId: 4, branchId: null }))
+            .get('/api/search?q=paula@test.com')
+            .expect(200);
+
+        expect(res.body.incidents).toHaveLength(1);
+        expect(res.body.incidents[0].matchedBy).toBe('reporterEmail');
+        expect(res.body.incidents[0].matchValue).toBe('paula@test.com');
+    });
+
+    test('incidents: búsqueda por DNI del reportante', async () => {
+        incidentModel.list.mockResolvedValue([]);
+        Incident.findAll.mockImplementation((opts) => {
+            if (opts.include?.some((i) => i.as === 'openedByPerson')) {
+                return Promise.resolve([{
+                    id: 20,
+                    status: 'IN_REVIEW',
+                    reporterName: null,
+                    reporterEmail: null,
+                    shipment: { trackingId: 'ENV-20' },
+                    type: { code: 'DELAY', description: 'Demora' },
+                    openedByPerson: { fullName: 'Paula Moragues', document: 38456789, email: 'paula@test.com' },
+                }]);
+            }
+            return Promise.resolve([]);
+        });
+
+        const res = await request(buildApp({ id: 1, roleId: 4, branchId: null }))
+            .get('/api/search?q=38456789')
+            .expect(200);
+
+        const hit = res.body.incidents.find((i) => i.id === 20);
+        expect(hit).toBeTruthy();
+        expect(hit.matchedBy).toBe('reporterDocument');
+        expect(hit.matchLabel).toBe('DNI reportante');
     });
 
     test('modifications: devuelve solicitudes para staff', async () => {

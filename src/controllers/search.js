@@ -113,6 +113,9 @@ const INCIDENT_MATCH_LABELS = {
     id: 'Nº incidencia',
     tracking: 'Tracking del envío',
     type: 'Tipo de incidencia',
+    reporterName: 'Reportante',
+    reporterEmail: 'Email reportante',
+    reporterDocument: 'DNI reportante',
 };
 
 const MOD_MATCH_LABELS = {
@@ -220,19 +223,13 @@ const buildRouteScope = (role, branchId) => {
     return {};
 };
 
-/** Incidencias cuyo tipo coincide con la descripción (además de tracking/id). */
-const searchIncidentsByType = (role, uid, branchId, q) => {
-    const like = { [Op.iLike]: `%${q}%` };
+/** RBAC de incidencias compartido entre búsquedas contextuales del buscador universal. */
+const buildIncidentStaffWhere = (role, uid, branchId) => {
     const where = {};
-    const shipmentInclude = {
-        model: Shipment, as: 'shipment', required: true,
-        attributes: ['id', 'trackingId', 'deliveryUserId', 'currentBranchId'],
-    };
-
     if (role === RoleType.DELIVERY.id) {
-        shipmentInclude.where = { deliveryUserId: uid };
-        shipmentInclude.required = true;
-    } else if (role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) {
+        return where;
+    }
+    if (role === RoleType.SUPERVISOR.id || role === RoleType.OPERATOR.id) {
         const orClauses = [];
         if (branchId) {
             orClauses.push({ '$shipment.currentBranchId$': branchId });
@@ -247,26 +244,106 @@ const searchIncidentsByType = (role, uid, branchId, q) => {
     } else if (role !== RoleType.ADMIN.id) {
         where.id = -1;
     }
+    return where;
+};
+
+const incidentSearchIncludes = (role, uid, branchId, { typeWhere = null, withPerson = false } = {}) => {
+    const shipmentInclude = {
+        model: Shipment, as: 'shipment', required: true,
+        attributes: ['id', 'trackingId', 'deliveryUserId', 'currentBranchId'],
+    };
+    if (role === RoleType.DELIVERY.id) {
+        shipmentInclude.where = { deliveryUserId: uid };
+    }
+    const includes = [
+        shipmentInclude,
+        {
+            model: IncidentType, as: 'type', required: true,
+            attributes: ['code', 'description'],
+            ...(typeWhere ? { where: typeWhere } : {}),
+        },
+        { model: User, as: 'assignedTo', attributes: ['id', 'branchId'], required: false },
+    ];
+    if (withPerson) {
+        includes.push({
+            model: Person, as: 'openedByPerson', required: false,
+            attributes: ['fullName', 'document', 'email'],
+        });
+    }
+    return includes;
+};
+
+/** Incidencias cuyo tipo coincide con la descripción (además de tracking/id). */
+const searchIncidentsByType = (role, uid, branchId, q) => {
+    const like = { [Op.iLike]: `%${q}%` };
+    const where = buildIncidentStaffWhere(role, uid, branchId);
+    if (where.id === -1) { return Promise.resolve([]); }
 
     return Incident.findAll({
         where,
-        include: [
-            shipmentInclude,
-            {
-                model: IncidentType, as: 'type', required: true,
-                where: { description: like },
-                attributes: ['code', 'description'],
-            },
-            { model: User, as: 'assignedTo', attributes: ['id', 'branchId'], required: false },
-        ],
-        attributes: ['id', 'status', 'shipmentId'],
+        include: incidentSearchIncludes(role, uid, branchId, { typeWhere: { description: like } }),
+        attributes: ['id', 'status', 'shipmentId', 'reporterName', 'reporterEmail'],
         order: [['id', 'DESC']],
         limit: FETCH_LIMIT,
         subQuery: false,
     }).catch(() => []);
 };
 
-const mergeIncidents = (fromList, fromType, numeric) => {
+/** Incidencias por nombre, email o DNI de quien las reportó (portal / persona vinculada). */
+const searchIncidentsByReporter = (role, uid, branchId, q, like, numeric) => {
+    const where = buildIncidentStaffWhere(role, uid, branchId);
+    if (where.id === -1) { return Promise.resolve([]); }
+
+    const reporterOr = [
+        { reporterName: like },
+        { reporterEmail: like },
+        { '$openedByPerson.fullName$': like },
+        { '$openedByPerson.email$': like },
+    ];
+    if (numeric) {
+        reporterOr.push({ '$openedByPerson.document$': parseInt(q, 10) });
+    }
+    where[Op.and] = [...(where[Op.and] || []), { [Op.or]: reporterOr }];
+
+    return Incident.findAll({
+        where,
+        include: incidentSearchIncludes(role, uid, branchId, { withPerson: true }),
+        attributes: ['id', 'status', 'shipmentId', 'reporterName', 'reporterEmail'],
+        order: [['id', 'DESC']],
+        limit: FETCH_LIMIT,
+        subQuery: false,
+    }).catch(() => []);
+};
+
+const inferReporterMatch = (row, q) => {
+    const trimmed = String(q).trim();
+    const ql = trimmed.toLowerCase();
+    if (row.reporterName && row.reporterName.toLowerCase().includes(ql)) {
+        return { matchedBy: 'reporterName', matchValue: row.reporterName };
+    }
+    if (row.reporterEmail && row.reporterEmail.toLowerCase().includes(ql)) {
+        return { matchedBy: 'reporterEmail', matchValue: row.reporterEmail };
+    }
+    const person = row.openedByPerson;
+    if (person?.fullName && person.fullName.toLowerCase().includes(ql)) {
+        return { matchedBy: 'reporterName', matchValue: person.fullName };
+    }
+    if (person?.email && person.email.toLowerCase().includes(ql)) {
+        return { matchedBy: 'reporterEmail', matchValue: person.email };
+    }
+    if (/^\d{1,9}$/.test(trimmed)) {
+        const n = parseInt(trimmed, 10);
+        if (person?.document === n) {
+            return { matchedBy: 'reporterDocument', matchValue: String(person.document) };
+        }
+    }
+    return {
+        matchedBy: 'reporterName',
+        matchValue: row.reporterName || person?.fullName || row.reporterEmail || person?.email || null,
+    };
+};
+
+const mergeIncidents = (fromList, fromType, fromReporter, numeric, q) => {
     const seen = new Set();
     const merged = [];
     const add = (row, matchedBy, matchValue) => {
@@ -280,6 +357,10 @@ const mergeIncidents = (fromList, fromType, numeric) => {
     }
     for (const i of fromType) {
         add(i, 'type', i.type?.description || null);
+    }
+    for (const i of fromReporter) {
+        const { matchedBy, matchValue } = inferReporterMatch(i, q);
+        add(i, matchedBy, matchValue);
     }
     return merged;
 };
@@ -453,8 +534,10 @@ const search = async (req, res) => {
             ? searchIncidentsByType(role, uid, branchId, q)
             : Promise.resolve([]);
 
-        const incidentsPromise = Promise.all([incidentsFromListP, incidentsFromTypeP])
-            .then(([fromList, fromType]) => mergeIncidents(fromList, fromType, numeric));
+        const incidentsFromReporterP = searchIncidentsByReporter(role, uid, branchId, q, like, numeric);
+
+        const incidentsPromise = Promise.all([incidentsFromListP, incidentsFromTypeP, incidentsFromReporterP])
+            .then(([fromList, fromType, fromReporter]) => mergeIncidents(fromList, fromType, fromReporter, numeric, q));
 
         let routesPromise = Promise.resolve([]);
         if (role === RoleType.DELIVERY.id) {
@@ -539,12 +622,14 @@ const search = async (req, res) => {
             incidents: incidentsSlice.items.filter(Boolean).map(({ row: i, matchedBy, matchValue }) => {
                 const statusCode = String(i.status || '').toLowerCase();
                 const status = INCIDENT_STATUS_LABEL[i.status] || i.status;
+                const reporterName = i.reporterName || i.openedByPerson?.fullName || null;
                 return {
                     id: i.id,
                     trackingId: i.shipment?.trackingId || null,
                     type: i.type?.description || null,
                     status,
                     statusCode,
+                    reporterName,
                     matchedBy,
                     matchLabel: INCIDENT_MATCH_LABELS[matchedBy] || null,
                     matchValue,

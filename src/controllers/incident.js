@@ -91,6 +91,9 @@ const list = async (req, res) => {
         shipmentId:        req.query.shipmentId ? Number(req.query.shipmentId) : null,
         // Búsqueda por código de envío (ej. "ENV-011").
         trackingId:        req.query.trackingId ? String(req.query.trackingId).trim() : null,
+        reporterName:      req.query.reporterName ? String(req.query.reporterName).trim() : null,
+        reporterEmail:     req.query.reporterEmail ? String(req.query.reporterEmail).trim() : null,
+        reporterDocument:  req.query.reporterDocument ? String(req.query.reporterDocument).trim() : null,
         openedChannel:     req.query.origin === 'EXTERNO' ? IncidentChannel.PORTAL
                           : req.query.origin === 'INTERNO' ? IncidentChannel.INTERNAL
                           : null,
